@@ -1,0 +1,90 @@
+.club-list-container {
+  width: 100%;
+}
+
+.club-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.club-list-header h1 {
+  margin: 0;
+  font-size: 28px;
+  color: #333;
+  flex: 1;
+  min-width: 200px;
+}
+
+.club-count {
+  background-color: #4c9a1f;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.btn-add-club {
+  background-color: #4c9a1f;
+  color: white;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  width: 100%;
+  max-width: 200px;
+}
+
+.btn-add-club:hover:not(:disabled) {
+  background-color: #3a7318;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-size: 16px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 2px dashed #ddd;
+}
+
+.empty-state p {
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  color: #666;
+}
+
+.empty-state .btn-primary {
+  display: inline-block;
+}
+
+.club-list {
+  display: grid;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .club-list-header {
+    justify-content: center;
+  }
+
+  .club-list-header h1 {
+    flex: auto;
+  }
+
+  .btn-add-club {
+    max-width: 100%;
+  }
+}
