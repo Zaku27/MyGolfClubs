@@ -1,18 +1,25 @@
 import React from 'react';
 import type { GolfClub } from '../types/golf';
+import { getClubTypeShort } from '../utils/clubUtils';
 import './ClubCard.css';
 
 interface ClubCardProps {
   club: GolfClub;
   onEdit: (club: GolfClub) => void;
   onDelete: (id: number) => void;
+  viewMode?: 'full' | 'compact';
 }
 
-export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete }) => {
+export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, viewMode = 'full' }) => {
+  const clubTypeShort = club.clubType || getClubTypeShort(club.name);
+
   return (
     <div className="club-card">
       <div className="club-card-header">
-        <h3>{club.name}</h3>
+        <h3>
+          <span className="club-type">{clubTypeShort}</span>
+          <span className="club-fullname">{club.name}</span>
+        </h3>
         <div className="club-card-actions">
           <button
             className="btn-icon btn-edit"
@@ -41,32 +48,52 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete }) =>
         </div>
       </div>
       <div className="club-card-body">
-        <div className="spec-row">
-          <span className="spec-label">長さ:</span>
-          <span className="spec-value">{club.length}"</span>
-        </div>
-        <div className="spec-row">
-          <span className="spec-label">重さ:</span>
-          <span className="spec-value">{club.weight}g</span>
-        </div>
-        <div className="spec-row">
-          <span className="spec-label">ロフト角:</span>
-          <span className="spec-value">{club.loftAngle}°</span>
-        </div>
-        <div className="spec-row">
-          <span className="spec-label">ライ角:</span>
-          <span className="spec-value">{club.lieAngle}°</span>
-        </div>
-        <div className="spec-row">
-          <span className="spec-label">シャフト:</span>
-          <span className="spec-value">{club.shaftType}</span>
-        </div>
-        {club.notes && (
-          <div className="spec-row notes">
-            <span className="spec-label">ノート:</span>
-            <span className="spec-value">{club.notes}</span>
-          </div>
-        )}
+          {viewMode === 'full' ? (
+            <>
+              <div className="spec-row">
+                <span className="spec-label">長さ:</span>
+                <span className="spec-value">{club.length}"</span>
+              </div>
+              <div className="spec-row">
+                <span className="spec-label">重さ:</span>
+                <span className="spec-value">{club.weight}g</span>
+              </div>
+              <div className="spec-row">
+                <span className="spec-label">ロフト角:</span>
+                <span className="spec-value">{club.loftAngle}°</span>
+              </div>
+              <div className="spec-row">
+                <span className="spec-label">ライ角:</span>
+                <span className="spec-value">{club.lieAngle}°</span>
+              </div>
+              <div className="spec-row">
+                <span className="spec-label">バランス:</span>
+                <span className="spec-value">{club.swingWeight}</span>
+              </div>
+              <div className="spec-row">
+                <span className="spec-label">シャフト:</span>
+                <span className="spec-value">{club.shaftType}</span>
+              </div>
+              <div className="spec-row">
+                <span className="spec-label">トルク:</span>
+                <span className="spec-value">{club.torque.toFixed(1)}</span>
+              </div>
+              <div className="spec-row">
+                <span className="spec-label">フレックス:</span>
+                <span className="spec-value">{club.flex}</span>
+              </div>
+              {club.notes && (
+                <div className="spec-row notes">
+                  <span className="spec-label">ノート:</span>
+                  <span className="spec-value">{club.notes}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="compact-view">
+              {/* 簡易表示ではロフト角・ライ角を非表示 */}
+            </div>
+          )}
       </div>
     </div>
   );

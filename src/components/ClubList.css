@@ -5,65 +5,165 @@
 .club-list-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: flex-end;
+  margin-bottom: 14px;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
 }
 
 .club-list-header h1 {
   margin: 0;
-  font-size: 28px;
-  color: #333;
+  font-size: clamp(28px, 5vw, 42px);
+  letter-spacing: -0.03em;
+  color: var(--text);
   flex: 1;
-  min-width: 200px;
+  min-width: 260px;
 }
 
 .club-count {
-  background-color: #4c9a1f;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
+  background: linear-gradient(140deg, var(--primary), #2b9b66);
+  color: #ffffff;
+  padding: 8px 15px;
+  border-radius: 999px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-add-club {
-  background-color: #4c9a1f;
-  color: white;
-  padding: 12px 20px;
-  font-size: 16px;
+  background: linear-gradient(135deg, var(--primary), #2b9b66);
+  color: #ffffff;
+  padding: 12px 18px;
+  font-size: 14px;
   font-weight: 600;
-  margin-bottom: 20px;
-  width: 100%;
-  max-width: 200px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--primary);
+}
+
+.club-list-actions .btn-icon,
+.club-list-actions .btn-import-json {
+  background-color: #ffffff;
+  color: #335246;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.club-list-actions .btn-icon:hover:not(:disabled),
+.club-list-actions .btn-import-json:hover {
+  transform: translateY(-1px);
+  background-color: var(--surface-2);
+  border-color: #c3d4c8;
+}
+
+.club-list-actions .btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-toggle-view {
+  background: #2b8db5;
+  color: #ffffff;
+  border-color: #2b8db5;
 }
 
 .btn-add-club:hover:not(:disabled) {
-  background-color: #3a7318;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(135deg, var(--primary-strong), #208955);
+  border-color: var(--primary-strong);
+  transform: translateY(-1px);
+}
+
+.club-list-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.btn-reset-clubs {
+  background-color: #ffefef;
+  color: var(--danger);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #ffd2d2;
+  border-radius: 12px;
+}
+
+.btn-reset-clubs:hover:not(:disabled) {
+  background-color: #ffe4e4;
+  color: var(--danger-strong);
+}
+
+.btn-reset-clubs:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-clearall-clubs {
+  background-color: var(--danger);
+  color: #ffffff;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+}
+
+.btn-clearall-clubs:hover:not(:disabled) {
+  background-color: var(--danger-strong);
+  border-color: var(--danger-strong);
+}
+
+.btn-import-json {
+  position: relative;
+}
+
+.btn-import-json input[type="file"] {
+  display: none;
+}
+
+.club-list-bottom {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .loading {
   text-align: center;
-  padding: 40px 20px;
-  color: #666;
-  font-size: 16px;
+  padding: 42px 20px;
+  color: var(--text-soft);
+  font-size: 15px;
+  background: #ffffff;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
 }
 
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
-  background: #f9f9f9;
-  border-radius: 8px;
-  border: 2px dashed #ddd;
+  padding: 58px 20px;
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px dashed #c9d8cd;
+  box-shadow: var(--shadow-sm);
 }
 
 .empty-state p {
-  margin: 0 0 20px 0;
-  font-size: 16px;
-  color: #666;
+  margin: 0 0 18px 0;
+  font-size: 15px;
+  color: var(--text-soft);
 }
 
 .empty-state .btn-primary {
@@ -72,19 +172,24 @@
 
 .club-list {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 @media (max-width: 768px) {
   .club-list-header {
-    justify-content: center;
+    justify-content: flex-start;
+    align-items: flex-start;
   }
 
   .club-list-header h1 {
     flex: auto;
   }
 
-  .btn-add-club {
-    max-width: 100%;
+  .club-list-bottom {
+    flex-direction: column;
+  }
+
+  .club-list-bottom button {
+    width: 100%;
   }
 }

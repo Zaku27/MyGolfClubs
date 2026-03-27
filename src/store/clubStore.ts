@@ -12,9 +12,18 @@ interface ClubStore {
   deleteClub: (id: number) => Promise<void>;
   initializeDefaults: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
+  clearAllClubs: () => Promise<void>;
 }
 
 export const useClubStore = create<ClubStore>((set) => ({
+    clearAllClubs: async () => {
+      try {
+        await ClubService.deleteAllClubs();
+        set({ clubs: [] });
+      } catch (error) {
+        set({ error: (error as Error).message });
+      }
+    },
   clubs: [],
   loading: false,
   error: null,
@@ -38,7 +47,7 @@ export const useClubStore = create<ClubStore>((set) => ({
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      set((state) => ({ clubs: [...state.clubs, newClub] }));
+      set((state) => ({ clubs: [newClub, ...state.clubs] }));
     } catch (error) {
       set({ error: (error as Error).message });
     }
