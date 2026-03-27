@@ -4,7 +4,20 @@ import { DEFAULT_CLUBS } from '../types/golf';
 
 export class ClubService {
   static async getAllClubs(): Promise<GolfClub[]> {
-    return await db.clubs.toArray();
+     const clubs = await db.clubs.toArray();
+     return clubs.map((c) => ({
+      ...c,
+      torque:      c.torque      ?? 0,
+      flex:        c.flex        ?? 'R',
+      distance:    c.distance    ?? 0,
+      swingWeight: c.swingWeight ?? '',
+      shaftType:   c.shaftType   ?? '',
+      lieAngle:    c.lieAngle    ?? 0,
+      loftAngle:   c.loftAngle   ?? 0,
+      length:      c.length      ?? 0,
+      weight:      c.weight      ?? 0,
+      notes:       c.notes       ?? '',
+     }));
   }
 
   static async getClubById(id: number): Promise<GolfClub | undefined> {

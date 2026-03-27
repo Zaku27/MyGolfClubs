@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { GolfClub } from './types/golf';
 import { ClubList } from './components/ClubList';
 import { ClubForm } from './components/ClubForm';
+import { AnalysisScreen } from './components/AnalysisScreen';
 import { useClubStore } from './store/clubStore';
 import './App.css';
 
@@ -48,6 +49,12 @@ function App() {
       URL.revokeObjectURL(url);
     };
   const [showForm, setShowForm] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [headSpeed, setHeadSpeed] = useState<number>(() => {
+    const saved = window.localStorage.getItem('golfbag-head-speed-ms');
+    const parsed = saved ? Number(saved) : 42;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 42;
+  });
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
   const { clubs, loading, error, loadClubs, addClub, updateClub, deleteClub, initializeDefaults, resetToDefaults } = useClubStore();
@@ -60,20 +67,40 @@ function App() {
     initializeApp();
   }, [initializeDefaults, loadClubs]);
 
+  useEffect(() => {
+    window.localStorage.setItem('golfbag-head-speed-ms', String(headSpeed));
+  }, [headSpeed]);
+
   const handleAddClub = () => {
+    setShowAnalysis(false);
     setEditingClub(undefined);
     setShowForm(true);
   };
 
   const handleEditClub = (club: GolfClub) => {
+    setShowAnalysis(false);
     setEditingClub(club);
     setShowForm(true);
+  };
+
+  const handleShowAnalysis = () => {
+    setShowForm(false);
+    setEditingClub(undefined);
+    setShowAnalysis(true);
+  };
+
+  const handleBackToList = () => {
+    setShowAnalysis(false);
   };
 
   const handleDeleteClub = async (id: number) => {
     if (confirm('このクラブを削除してもよろしいですか?')) {
       await deleteClub(id);
     }
+  };
+
+  const handleActualDistanceChange = async (id: number, distance: number) => {
+    await updateClub(id, { distance });
   };
 
   const handleResetClubs = async () => {
@@ -113,6 +140,14 @@ function App() {
           onCancel={handleFormCancel}
           isLoading={loading}
         />
+      ) : showAnalysis ? (
+        <AnalysisScreen
+          clubs={clubs}
+          onBack={handleBackToList}
+          onUpdateActualDistance={handleActualDistanceChange}
+          headSpeed={headSpeed}
+          onHeadSpeedChange={setHeadSpeed}
+        />
       ) : (
         <ClubList
           clubs={clubs}
@@ -125,6 +160,7 @@ function App() {
           onToggleViewMode={() => setViewMode((prev) => (prev === 'full' ? 'compact' : 'full'))}
           onExport={handleExportJSON}
           onImport={handleImportJSON}
+          onShowAnalysis={handleShowAnalysis}
           loading={loading}
         />
       )}

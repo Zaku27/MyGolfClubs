@@ -14,6 +14,7 @@ interface ClubListProps {
   onToggleViewMode: () => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onShowAnalysis: () => void;
   loading?: boolean;
 }
 
@@ -29,6 +30,7 @@ export const ClubList: React.FC<ClubListProps> = ({
   onToggleViewMode,
   onExport,
   onImport,
+  onShowAnalysis,
   loading = false,
 }) => {
 
@@ -53,6 +55,9 @@ export const ClubList: React.FC<ClubListProps> = ({
           <span role="img" aria-label="import">⬆️</span>
           <input type="file" accept="application/json" style={{ display: 'none' }} onChange={onImport} />
         </label>
+        <button className="btn-icon btn-analysis" onClick={onShowAnalysis} disabled={loading} title="分析画面">
+          <span role="img" aria-label="analysis">📈</span>
+        </button>
       </div>
 
       {loading ? (

@@ -78,6 +78,17 @@
   border-color: #2b8db5;
 }
 
+.btn-analysis {
+  background: #7a5af8;
+  color: #ffffff;
+  border-color: #7a5af8;
+}
+
+.btn-analysis:hover:not(:disabled) {
+  background: #6948eb;
+  border-color: #6948eb;
+}
+
 .btn-add-club:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--primary-strong), #208955);
   border-color: var(--primary-strong);

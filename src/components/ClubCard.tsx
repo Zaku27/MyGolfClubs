@@ -60,11 +60,11 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
               </div>
               <div className="spec-row">
                 <span className="spec-label">ロフト角:</span>
-                <span className="spec-value">{club.loftAngle}°</span>
+                  <span className="spec-value">{club.loftAngle ?? '-'}°</span>
               </div>
               <div className="spec-row">
                 <span className="spec-label">ライ角:</span>
-                <span className="spec-value">{club.lieAngle}°</span>
+                  <span className="spec-value">{club.lieAngle ?? '-'}°</span>
               </div>
               <div className="spec-row">
                 <span className="spec-label">バランス:</span>
@@ -76,7 +76,7 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
               </div>
               <div className="spec-row">
                 <span className="spec-label">トルク:</span>
-                <span className="spec-value">{club.torque.toFixed(1)}</span>
+                  <span className="spec-value">{club.torque != null ? club.torque.toFixed(1) : '-'}</span>
               </div>
               <div className="spec-row">
                 <span className="spec-label">フレックス:</span>
