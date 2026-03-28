@@ -253,17 +253,17 @@ class LieAngleDistributionChart extends ConsumerWidget {
                           final entry = clubEntries[group.x];
                           final content =
                               _buildTooltipContent(entry.club.name, [
-                            ('Type', _clubTypeLabel(entry.club)),
+                            ('クラブ種別', _clubTypeCode(entry.club)),
                             (
-                              'Measured',
+                              '計測値',
                               '${entry.club.lieAngle.toStringAsFixed(1)}°'
                             ),
                             (
-                              'Standard',
+                              '基準値',
                               '${entry.standardLieAngle.toStringAsFixed(1)}°'
                             ),
-                            ('Deviation', _formatDeviation(entry.deviation)),
-                            ('Status', entry.status.label),
+                            ('偏差', _formatDeviation(entry.deviation)),
+                            ('状態', entry.status.label),
                           ]);
 
                           return BarTooltipItem(
@@ -501,6 +501,14 @@ class LieAngleDistributionChart extends ConsumerWidget {
       case ClubCategory.putter:
         return 'Putter';
     }
+  }
+
+  static String _clubTypeCode(GolfClub club) {
+    final clubType = club.clubType.trim();
+    if (clubType.isNotEmpty) {
+      return clubType;
+    }
+    return _clubTypeLabel(club);
   }
 
   static String _formatDeviation(double deviation) {

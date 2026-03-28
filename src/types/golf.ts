@@ -30,5 +30,5 @@ export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
   { clubType: '50', name: '50 Wedge', length: 35.25, weight: 424, swingWeight: 'D1', lieAngle: 64, loftAngle: 50, shaftType: 'Steel', torque: 2.5, flex: 'S', distance: 110, notes: '' },
   { clubType: '54', name: '54 Wedge', length: 35, weight: 424, swingWeight: 'D1', lieAngle: 64, loftAngle: 54, shaftType: 'Steel', torque: 2.5, flex: 'S', distance: 100, notes: '' },
   { clubType: '58', name: '58 Wedge', length: 34.75, weight: 424, swingWeight: 'D1', lieAngle: 64, loftAngle: 58, shaftType: 'Steel', torque: 2.5, flex: 'S', distance: 90, notes: '' },
-  { clubType: 'P', name: 'Putter', length: 33, weight: 350, swingWeight: 'D1', lieAngle: 70, loftAngle: 3, shaftType: 'Steel', torque: 2.0, flex: 'S', distance: 10, notes: '' },
+  { clubType: 'P', name: 'Putter', length: 33, weight: 500, swingWeight: 'D1', lieAngle: 70, loftAngle: 3, shaftType: 'Steel', torque: 2.0, flex: 'S', distance: 10, notes: '' },
 ];

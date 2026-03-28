@@ -111,6 +111,23 @@
   padding: 18px;
 }
 
+.chart-section-heading {
+  margin-bottom: 14px;
+}
+
+.chart-section-heading h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  color: #20332a;
+}
+
+.chart-section-heading p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #5c7267;
+}
+
 .weight-length-frame {
   border: 1px solid #9ccc9c;
   background: linear-gradient(145deg, #f7fff7 0%, #eef8ee 100%);
@@ -166,6 +183,33 @@
   width: 18px;
   height: 8px;
   background: rgba(46, 125, 50, 0.35);
+  border-radius: 2px;
+}
+
+.analysis-legend i.legend-heavy-outlier {
+  background: #e53935;
+  border: 2px solid #000000;
+  box-sizing: border-box;
+}
+
+.analysis-legend i.legend-light-outlier {
+  background: #ff9800;
+  border: 2px solid #8d4e00;
+  box-sizing: border-box;
+}
+
+.analysis-legend i.legend-trend-line {
+  width: 18px;
+  height: 2px;
+  background: #7a7a7a;
+  border-radius: 2px;
+}
+
+.analysis-legend i.legend-expected-band {
+  width: 18px;
+  height: 8px;
+  background: rgba(70, 99, 130, 0.14);
+  border: 1px solid rgba(122, 122, 122, 0.25);
   border-radius: 2px;
 }
 
@@ -272,6 +316,11 @@
 .chart-line-animated {
   stroke-dasharray: 8 6;
   animation: lineSweep 1s ease both;
+}
+
+.weight-trend-band {
+  fill: rgba(70, 99, 130, 0.12);
+  stroke: none;
 }
 
 .chart-standard-line {

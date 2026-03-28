@@ -370,16 +370,21 @@ class _LoftVsDistanceChart extends StatelessWidget {
             final isActual = _isActualSpot(club, spot);
             final est = club.estimatedDistanceFor(headSpeed);
             final content = _buildTooltipContent(club.name, [
-              ('Type', club.category.label),
-              ('Loft', '${club.loftAngle.toStringAsFixed(1)}°'),
-              ('Estimated', '${est.toStringAsFixed(0)} y'),
               (
-                'Actual',
+                'クラブ種別',
+                club.clubType.trim().isNotEmpty
+                    ? club.clubType
+                    : club.category.label
+              ),
+              ('ロフト', '${club.loftAngle.toStringAsFixed(1)}°'),
+              ('推定', '${est.toStringAsFixed(0)} y'),
+              (
+                '実測',
                 club.distance > 0
                     ? '${club.distance.toStringAsFixed(0)} y'
                     : '-'
               ),
-              ('Point', isActual ? 'Actual' : 'Estimated'),
+              ('ポイント', isActual ? '実測' : '推定'),
             ]);
 
             return ScatterTooltipItem(

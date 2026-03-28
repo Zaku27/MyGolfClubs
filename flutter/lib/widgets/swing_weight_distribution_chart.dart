@@ -235,10 +235,10 @@ class SwingWeightDistributionChart extends StatelessWidget {
                       final entry = entries[group.x];
                       final deviation = entry.deviationFromD2;
                       final content = _buildTooltipContent(entry.club.name, [
-                        ('Type', _clubTypeLabel(entry.club)),
+                        ('クラブ種別', _clubTypeCode(entry.club)),
                         ('SW', entry.swingWeightLabel),
-                        ('Deviation', _formatSigned(deviation)),
-                        ('Status', _statusForDeviation(deviation).label),
+                        ('偏差', _formatSigned(deviation)),
+                        ('状態', _statusForDeviation(deviation).label),
                       ]);
 
                       return BarTooltipItem(
@@ -474,6 +474,14 @@ class SwingWeightDistributionChart extends StatelessWidget {
       default:
         return 'アイアン';
     }
+  }
+
+  static String _clubTypeCode(GolfClub club) {
+    final clubType = club.clubType.trim();
+    if (clubType.isNotEmpty) {
+      return clubType;
+    }
+    return _clubTypeLabel(club);
   }
 
   static _DeviationStatus _statusForDeviation(double deviation) {

@@ -35,7 +35,7 @@ type ClubCategory = 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
 
 const CHART_WIDTH = 920;
 const CHART_HEIGHT = 360;
-const PADDING = { top: 24, right: 28, bottom: 40, left: 48 };
+const PADDING = { top: 24, right: 28, bottom: 52, left: 60 };
 const MIN_LOFT = 5;
 const MAX_LOFT = 60;
 const MIN_DISTANCE = 0;
@@ -44,6 +44,8 @@ const MIN_LENGTH = 30;
 const MAX_LENGTH = 48;
 const MIN_WEIGHT = 250;
 const MAX_WEIGHT = 550;
+const WEIGHT_NORMAL_BAND_TOLERANCE = 12;
+const WEIGHT_OUTLIER_THRESHOLD = 15;
 
 const LIE_MIN = 50;
 const LIE_MAX = 70;
@@ -73,7 +75,12 @@ const getLieBarColor = (category: ClubCategory): string => {
 type WeightTooltipState = {
   x: number;
   y: number;
-  club: GolfClub & { category: ClubCategory };
+  club: GolfClub & {
+    category: ClubCategory;
+    expectedWeight: number;
+    deviation: number;
+    weightTrendMessage: string;
+  };
 };
 
 type LoftTooltipState = {
@@ -167,13 +174,13 @@ const getCategoryColor = (category: ClubCategory) => {
     case 'wood':
       return '#0d47a1';
     case 'hybrid':
-      return '#26c6da';
+      return '#00acc1';
     case 'iron':
-      return '#2e8b57';
+      return '#0b8f5b';
     case 'wedge':
       return '#9acd32';
     case 'putter':
-      return '#424242';
+      return '#616161';
   }
 };
 
@@ -223,9 +230,181 @@ const compareClubTypeOrder = (a: string, b: string): number => {
   return as.localeCompare(bs);
 };
 
-const getWeightLengthDotRadius = (club: GolfClub) => {
-  if (club.clubType === 'D' || club.clubType === 'P') return 10;
-  return 7;
+const getWeightLengthDotRadius = (club: Pick<GolfClub, 'clubType'>) => {
+  if (club.clubType === 'D' || club.clubType === 'P') return 7;
+  return 5.8;
+};
+
+type WeightRegression = {
+  slope: number;
+  intercept: number;
+};
+
+type WeightLengthPoint = GolfClub & {
+  category: ClubCategory;
+  expectedWeight: number;
+  deviation: number;
+  weightTrendMessage: string;
+};
+
+type WeightChartBounds = {
+  minLength: number;
+  maxLength: number;
+  minWeight: number;
+  maxWeight: number;
+  xInterval: number;
+  yInterval: number;
+};
+
+const getWeightFallbackRegression = (
+  anchorLength: number,
+  anchorWeight: number,
+): WeightRegression => {
+  const slope = -8;
+  return {
+    slope,
+    intercept: anchorWeight - slope * anchorLength,
+  };
+};
+
+const getWeightRegression = (
+  clubs: Pick<GolfClub, 'length' | 'weight'>[],
+): WeightRegression => {
+  if (clubs.length === 0) {
+    return { slope: -8, intercept: 620 };
+  }
+
+  const meanLength = clubs.reduce((sum, club) => sum + club.length, 0) / clubs.length;
+  const meanWeight = clubs.reduce((sum, club) => sum + club.weight, 0) / clubs.length;
+
+  let numerator = 0;
+  let denominator = 0;
+
+  for (const club of clubs) {
+    const dx = club.length - meanLength;
+    numerator += dx * (club.weight - meanWeight);
+    denominator += dx * dx;
+  }
+
+  if (Math.abs(denominator) < 0.0001) {
+    return getWeightFallbackRegression(meanLength, meanWeight);
+  }
+
+  const slope = numerator / denominator;
+  if (slope >= -1) {
+    return getWeightFallbackRegression(meanLength, meanWeight);
+  }
+
+  return {
+    slope,
+    intercept: meanWeight - slope * meanLength,
+  };
+};
+
+const getExpectedWeight = (length: number, regression: WeightRegression) =>
+  regression.slope * length + regression.intercept;
+
+const formatSignedGrams = (value: number) =>
+  `${value > 0 ? '+' : ''}${value.toFixed(1)} g`;
+
+const getWeightTrendMessage = (deviation: number) => {
+  if (deviation > WEIGHT_OUTLIER_THRESHOLD) {
+    return 'バランス確認推奨';
+  }
+  if (deviation < -WEIGHT_OUTLIER_THRESHOLD) {
+    return '軽量側の確認推奨';
+  }
+  if (Math.abs(deviation) <= WEIGHT_NORMAL_BAND_TOLERANCE) {
+    return 'トレンド内';
+  }
+  return 'ややトレンド外';
+};
+
+const getWeightDeviationLabel = (deviation: number) => {
+  if (Math.abs(deviation) <= WEIGHT_NORMAL_BAND_TOLERANCE) {
+    return `${formatSignedGrams(deviation)} / トレンド内`;
+  }
+  return deviation > 0
+    ? `${formatSignedGrams(deviation)} トレンドより重い`
+    : `${formatSignedGrams(deviation)} トレンドより軽い`;
+};
+
+const getWeightPointStyle = (
+  club: Pick<GolfClub, 'clubType'> & { category: ClubCategory },
+  deviation: number,
+) => {
+  if (deviation > WEIGHT_OUTLIER_THRESHOLD) {
+    return {
+      fill: '#e53935',
+      stroke: '#000000',
+      strokeWidth: 3,
+      radius: 7,
+    };
+  }
+
+  if (deviation < -WEIGHT_OUTLIER_THRESHOLD) {
+    return {
+      fill: '#ff9800',
+      stroke: '#8d4e00',
+      strokeWidth: 3,
+      radius: 7,
+    };
+  }
+
+  return {
+    fill: getCategoryColor(club.category),
+    stroke: '#ffffff',
+    strokeWidth: 2,
+    radius: getWeightLengthDotRadius(club),
+  };
+};
+
+const getWeightChartBounds = (
+  points: WeightLengthPoint[],
+  regression: WeightRegression,
+): WeightChartBounds => {
+  const lengths = points.map((club) => club.length);
+  const weights = points.map((club) => club.weight);
+  const expectedWeights = points.map((club) => club.expectedWeight);
+
+  const minLength = Math.max(28, Math.floor(Math.min(...lengths) - 1));
+  const maxLength = Math.min(50, Math.ceil(Math.max(...lengths) + 1));
+  const projectedMinWeight =
+    getExpectedWeight(maxLength, regression) - WEIGHT_NORMAL_BAND_TOLERANCE;
+  const projectedMaxWeight =
+    getExpectedWeight(minLength, regression) + WEIGHT_NORMAL_BAND_TOLERANCE;
+  const minWeight = Math.max(
+    150,
+    Math.floor(
+      (Math.min(...weights, ...expectedWeights, projectedMinWeight) - 15) / 10,
+    ) * 10,
+  );
+  const maxWeight = Math.min(
+    520,
+    Math.ceil(
+      (Math.max(...weights, ...expectedWeights, projectedMaxWeight) + 15) / 10,
+    ) * 10,
+  );
+
+  return {
+    minLength,
+    maxLength,
+    minWeight,
+    maxWeight,
+    xInterval: maxLength - minLength <= 12 ? 1 : 2,
+    yInterval: maxWeight - minWeight <= 160 ? 25 : 50,
+  };
+};
+
+const makeTickValues = (min: number, max: number, interval: number) => {
+  const ticks: number[] = [];
+  for (let value = min; value <= max; value += interval) {
+    ticks.push(Number(value.toFixed(2)));
+  }
+  if (ticks[ticks.length - 1] !== max) {
+    ticks.push(max);
+  }
+  return ticks;
 };
 
 const swingWeightToNumeric = (swingWeightRaw: string): number => {
@@ -390,17 +569,54 @@ export const AnalysisScreen = ({
 
   const loftTicks = [10, 20, 30, 40, 50, 60];
   const distanceTicks = [0, 50, 100, 150, 200, 250, 300];
-  const lengthTicks = [30, 34, 38, 42, 46, 48];
-  const weightTicks = [250, 300, 350, 400, 450, 500, 550];
 
-  const weightLengthClubs = clubs
-    .filter((club) => Number.isFinite(club.length) && Number.isFinite(club.weight) && club.length > 0 && club.weight > 0)
+  const weightLengthBaseClubs = clubs
+    .filter(
+      (club) =>
+        Number.isFinite(club.length) &&
+        Number.isFinite(club.weight) &&
+        club.length > 0 &&
+        club.weight > 0 &&
+        getClubCategory(club) !== 'putter',
+    )
     .map((club) => ({
       ...club,
       category: getClubCategory(club),
     }));
 
+  const weightRegression = getWeightRegression(weightLengthBaseClubs);
+  const weightLengthClubs = weightLengthBaseClubs.map((club) => {
+    const expectedWeight = getExpectedWeight(club.length, weightRegression);
+    const deviation = club.weight - expectedWeight;
+    return {
+      ...club,
+      expectedWeight,
+      deviation,
+      weightTrendMessage: getWeightTrendMessage(deviation),
+    };
+  });
+
   const hasWeightLengthData = weightLengthClubs.length > 0;
+  const weightBounds = hasWeightLengthData
+    ? getWeightChartBounds(weightLengthClubs, weightRegression)
+    : {
+        minLength: MIN_LENGTH,
+        maxLength: MAX_LENGTH,
+        minWeight: MIN_WEIGHT,
+        maxWeight: MAX_WEIGHT,
+        xInterval: 2,
+        yInterval: 50,
+      };
+  const lengthTicks = makeTickValues(
+    weightBounds.minLength,
+    weightBounds.maxLength,
+    weightBounds.xInterval,
+  );
+  const weightTicks = makeTickValues(
+    weightBounds.minWeight,
+    weightBounds.maxWeight,
+    weightBounds.yInterval,
+  );
 
   const swingWeightClubs = [...clubs]
     .sort((a, b) => {
@@ -613,19 +829,33 @@ export const AnalysisScreen = ({
     .map((club) => `${mapLoftX(club.loftAngle)},${mapLoftY(club.actualDistance)}`)
     .join(' ');
 
-  const weightPadding = { top: 24, right: 28, bottom: 40, left: 48 };
+  const weightPadding = { top: 24, right: 28, bottom: 52, left: 60 };
   const mapWeightLengthX = (length: number) => {
     const plotWidth = weightChartSize.width - weightPadding.left - weightPadding.right;
-    return weightPadding.left + ((length - MIN_LENGTH) / (MAX_LENGTH - MIN_LENGTH)) * plotWidth;
+    return weightPadding.left + ((length - weightBounds.minLength) / (weightBounds.maxLength - weightBounds.minLength || 1)) * plotWidth;
   };
   const mapWeightLengthY = (weight: number) => {
     const plotHeight = weightChartSize.height - weightPadding.top - weightPadding.bottom;
     return (
       weightChartSize.height -
       weightPadding.bottom -
-      ((weight - MIN_WEIGHT) / (MAX_WEIGHT - MIN_WEIGHT)) * plotHeight
+      ((weight - weightBounds.minWeight) / (weightBounds.maxWeight - weightBounds.minWeight || 1)) * plotHeight
     );
   };
+
+  const weightTrendLinePoints = hasWeightLengthData
+    ? [weightBounds.minLength, weightBounds.maxLength]
+        .map((length) => `${mapWeightLengthX(length)},${mapWeightLengthY(getExpectedWeight(length, weightRegression))}`)
+        .join(' ')
+    : '';
+
+  const weightTrendBandPoints = hasWeightLengthData
+    ? `${[weightBounds.minLength, weightBounds.maxLength]
+        .map((length) => `${mapWeightLengthX(length)},${mapWeightLengthY(getExpectedWeight(length, weightRegression) + WEIGHT_NORMAL_BAND_TOLERANCE)}`)
+        .join(' ')} ${[weightBounds.maxLength, weightBounds.minLength]
+        .map((length) => `${mapWeightLengthX(length)},${mapWeightLengthY(getExpectedWeight(length, weightRegression) - WEIGHT_NORMAL_BAND_TOLERANCE)}`)
+        .join(' ')}`
+    : '';
 
   const weightTooltipPos = weightTooltip
     ? getTooltipPosition(weightTooltip.x, weightTooltip.y, weightChartSize, weightTooltipBox)
@@ -735,7 +965,7 @@ export const AnalysisScreen = ({
           </h1>
           {activeTab === 'weightLength' ? (
             <p className="analysis-subtitle">
-              クラブ長と総重量の相関を可視化し、クラブタイプ別の重量帯バランスを確認できます。
+              <p>回帰トレンドからの偏差で、重すぎるクラブと軽すぎるクラブをすぐに判別できます。</p>
             </p>
           ) : activeTab === 'loftDistance' ? (
             <p className="analysis-subtitle">
@@ -880,7 +1110,7 @@ export const AnalysisScreen = ({
                       y2={loftChartSize.height - PADDING.bottom}
                       className="chart-grid chart-grid-animated"
                     />
-                    <text x={mapLoftX(tick)} y={loftChartSize.height - 10} textAnchor="middle" className="chart-axis-label">
+                    <text x={mapLoftX(tick)} y={loftChartSize.height - 16} textAnchor="middle" className="chart-axis-label">
                       {tick}°
                     </text>
                   </g>
@@ -976,10 +1206,10 @@ export const AnalysisScreen = ({
                   ロフト角（度）
                 </text>
                 <text
-                  x="18"
+                  x="10"
                   y={loftChartSize.height / 2}
                   textAnchor="middle"
-                  transform={`rotate(-90 18 ${loftChartSize.height / 2})`}
+                  transform={`rotate(-90 10 ${loftChartSize.height / 2})`}
                   className="chart-title-label"
                 >
                   飛距離（ヤード）
@@ -997,8 +1227,8 @@ export const AnalysisScreen = ({
                   <div className="chart-tooltip-title">{loftTooltip.club.name}</div>
                   <div className="chart-tooltip-list">
                     <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">種類</span>
-                      <span className="chart-tooltip-value">{getCategoryLabel(loftTooltip.club.category)}</span>
+                      <span className="chart-tooltip-label">クラブ種別</span>
+                      <span className="chart-tooltip-value">{loftTooltip.club.clubType || getClubTypeShort(loftTooltip.club.name)}</span>
                     </div>
                     <div className="chart-tooltip-row">
                       <span className="chart-tooltip-label">ロフト</span>
@@ -1291,8 +1521,8 @@ export const AnalysisScreen = ({
                       <div className="chart-tooltip-title">{lieTooltip.club.name}</div>
                       <div className="chart-tooltip-list">
                         <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">種類</span>
-                          <span className="chart-tooltip-value">{getCategoryLabel(lieTooltip.club.category)}</span>
+                          <span className="chart-tooltip-label">クラブ種別</span>
+                          <span className="chart-tooltip-value">{lieTooltip.club.clubType || getClubTypeShort(lieTooltip.club.name)}</span>
                         </div>
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">基準</span>
@@ -1550,8 +1780,8 @@ export const AnalysisScreen = ({
                       <div className="chart-tooltip-title">{swingTooltip.club.name}</div>
                       <div className="chart-tooltip-list">
                         <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">種類</span>
-                          <span className="chart-tooltip-value">{getCategoryLabel(swingTooltip.club.category)}</span>
+                          <span className="chart-tooltip-label">クラブ種別</span>
+                          <span className="chart-tooltip-value">{swingTooltip.club.clubType || getClubTypeShort(swingTooltip.club.name)}</span>
                         </div>
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">SW</span>
@@ -1628,12 +1858,17 @@ export const AnalysisScreen = ({
           <div className="analysis-card chart-card weight-length-frame">
             {hasWeightLengthData ? (
               <>
+                <div className="chart-section-heading">
+                  </div>
                 <div className="analysis-legend">
                   <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
-                  <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
-                  <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
+                  <span><i style={{ backgroundColor: '#00acc1' }} />ハイブリッド</span>
+                  <span><i style={{ backgroundColor: '#0b8f5b' }} />アイアン</span>
                   <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
-                  <span><i style={{ backgroundColor: '#424242' }} />パター</span>
+                  <span><i className="legend-heavy-outlier" />重い外れ値</span>
+                  <span><i className="legend-light-outlier" />軽い外れ値</span>
+                  <span><i className="legend-trend-line" />トレンド線</span>
+                  <span><i className="legend-expected-band" />期待帯 ±12g</span>
                 </div>
                 <div
                   className="chart-scroll interactive-chart-scroll"
@@ -1654,6 +1889,13 @@ export const AnalysisScreen = ({
                       fill="#ffffff"
                       rx="18"
                     />
+
+                    {weightTrendBandPoints && (
+                      <polygon
+                        points={weightTrendBandPoints}
+                        className="weight-trend-band"
+                      />
+                    )}
 
                     {weightTicks.map((tick) => (
                       <g key={`w-y-${tick}`}>
@@ -1681,7 +1923,7 @@ export const AnalysisScreen = ({
                         />
                         <text
                           x={mapWeightLengthX(tick)}
-                          y={weightChartSize.height - 10}
+                          y={weightChartSize.height - 16}
                           textAnchor="middle"
                           className="chart-axis-label"
                         >
@@ -1690,39 +1932,52 @@ export const AnalysisScreen = ({
                       </g>
                     ))}
 
-                    {weightLengthClubs.map((club, index) => (
-                      <g
-                        key={`wl-${club.id ?? club.name}`}
-                        className="weight-point-group"
-                        style={{ '--point-delay': `${index * 45}ms` } as CSSProperties}
-                      >
-                        <circle
-                          cx={mapWeightLengthX(club.length)}
-                          cy={mapWeightLengthY(club.weight)}
-                          r={getWeightLengthDotRadius(club)}
-                          fill={getCategoryColor(club.category)}
-                          stroke="#ffffff"
-                          strokeWidth="2"
-                          className="chart-point-circle"
-                          onMouseEnter={() =>
-                            setWeightTooltip({
-                              x: mapWeightLengthX(club.length),
-                              y: mapWeightLengthY(club.weight),
-                              club,
-                            })
-                          }
-                          onClick={() =>
-                            setWeightTooltip({
-                              x: mapWeightLengthX(club.length),
-                              y: mapWeightLengthY(club.weight),
-                              club,
-                            })
-                          }
+                    {weightTrendLinePoints && (
+                      <polyline
+                        points={weightTrendLinePoints}
+                        fill="none"
+                        stroke="#7a7a7a"
+                        strokeWidth="2"
+                        className="chart-standard-line"
+                      />
+                    )}
+
+                    {weightLengthClubs.map((club, index) => {
+                      const style = getWeightPointStyle(club, club.deviation);
+                      return (
+                        <g
+                          key={`wl-${club.id ?? club.name}`}
+                          className="weight-point-group"
+                          style={{ '--point-delay': `${index * 45}ms` } as CSSProperties}
                         >
-                          <title>{`${club.name} | 種類 ${getCategoryLabel(club.category)} | 長さ ${club.length.toFixed(2)} in | 重量 ${club.weight.toFixed(1)} g`}</title>
-                        </circle>
-                      </g>
-                    ))}
+                          <circle
+                            cx={mapWeightLengthX(club.length)}
+                            cy={mapWeightLengthY(club.weight)}
+                            r={style.radius}
+                            fill={style.fill}
+                            stroke={style.stroke}
+                            strokeWidth={style.strokeWidth}
+                            className="chart-point-circle"
+                            onMouseEnter={() =>
+                              setWeightTooltip({
+                                x: mapWeightLengthX(club.length),
+                                y: mapWeightLengthY(club.weight),
+                                club,
+                              })
+                            }
+                            onClick={() =>
+                              setWeightTooltip({
+                                x: mapWeightLengthX(club.length),
+                                y: mapWeightLengthY(club.weight),
+                                club,
+                              })
+                            }
+                          >
+                            <title>{`${club.name} | 種類 ${getCategoryLabel(club.category)} | 長さ ${club.length.toFixed(2)} in | 重量 ${club.weight.toFixed(1)} g | 期待 ${club.expectedWeight.toFixed(1)} g | 偏差 ${formatSignedGrams(club.deviation)}`}</title>
+                          </circle>
+                        </g>
+                      );
+                    })}
 
                     <text
                       x={weightChartSize.width / 2}
@@ -1733,10 +1988,10 @@ export const AnalysisScreen = ({
                       クラブ長（インチ）
                     </text>
                     <text
-                      x="18"
+                      x="10"
                       y={weightChartSize.height / 2}
                       textAnchor="middle"
-                      transform={`rotate(-90 18 ${weightChartSize.height / 2})`}
+                      transform={`rotate(-90 10 ${weightChartSize.height / 2})`}
                       className="chart-title-label"
                     >
                       クラブ重量（グラム）
@@ -1754,8 +2009,8 @@ export const AnalysisScreen = ({
                       <div className="chart-tooltip-title">{weightTooltip.club.name}</div>
                       <div className="chart-tooltip-list">
                         <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">種類</span>
-                          <span className="chart-tooltip-value">{getCategoryLabel(weightTooltip.club.category)}</span>
+                          <span className="chart-tooltip-label">クラブ種別</span>
+                          <span className="chart-tooltip-value">{weightTooltip.club.clubType || getClubTypeShort(weightTooltip.club.name)}</span>
                         </div>
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">長さ</span>
@@ -1764,6 +2019,18 @@ export const AnalysisScreen = ({
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">重量</span>
                           <span className="chart-tooltip-value">{weightTooltip.club.weight.toFixed(1)} g</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">期待値</span>
+                          <span className="chart-tooltip-value">{weightTooltip.club.expectedWeight.toFixed(1)} g</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">偏差</span>
+                          <span className="chart-tooltip-value">{getWeightDeviationLabel(weightTooltip.club.deviation)}</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">示唆</span>
+                          <span className="chart-tooltip-value">{weightTooltip.club.weightTrendMessage}</span>
                         </div>
                       </div>
                     </div>
@@ -1788,6 +2055,8 @@ export const AnalysisScreen = ({
                     <th>種類</th>
                     <th>長さ（in）</th>
                     <th>重量（g）</th>
+                    <th>期待値（g）</th>
+                    <th>偏差（g）</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1803,11 +2072,15 @@ export const AnalysisScreen = ({
                         <td>{getCategoryLabel(club.category)}</td>
                         <td>{club.length.toFixed(2)}</td>
                         <td>{club.weight.toFixed(1)}</td>
+                        <td>{club.expectedWeight.toFixed(1)}</td>
+                        <td style={{ color: getWeightPointStyle(club, club.deviation).fill, fontWeight: 700 }}>
+                          {formatSignedGrams(club.deviation)}
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="analysis-empty-cell">クラブがまだ追加されていません</td>
+                      <td colSpan={6} className="analysis-empty-cell">クラブがまだ追加されていません</td>
                     </tr>
                   )}
                 </tbody>
