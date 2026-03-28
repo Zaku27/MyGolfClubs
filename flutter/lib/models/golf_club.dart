@@ -72,21 +72,35 @@ class GolfClub {
     this.notes = '',
   });
 
-  // TrackMan-like loft-only approximation with a 42 m/s baseline.
-  // Anchors: Driver 10.5° ≈ 230y, 7I 31° ≈ 160y, PW 44° ≈ 120y.
+  // Club-category specific curve with a 42 m/s baseline.
+  // Each category has a separate loft-distance curve plus speed scaling.
   double estimatedDistanceFor(double headSpeedMps) {
-    final baseline = 269.13 - 3.832 * loftAngle + 0.0101 * loftAngle * loftAngle;
+    final categoryBaseline = switch (category) {
+      ClubCategory.wood => 300.0 - 8.2222 * loftAngle + 0.1481 * loftAngle * loftAngle,
+      ClubCategory.hybrid => 263.3333 - 3.3333 * loftAngle,
+      ClubCategory.iron => 177.88 + 1.2559 * loftAngle - 0.0581 * loftAngle * loftAngle,
+      ClubCategory.wedge => 235.0 - 2.5 * loftAngle,
+      ClubCategory.putter => 10.0,
+    };
+    final speedPower = switch (category) {
+      ClubCategory.wood => 1.14,
+      ClubCategory.hybrid => 1.12,
+      ClubCategory.iron => 1.08,
+      ClubCategory.wedge => 1.03,
+      ClubCategory.putter => 1.00,
+    };
     final speedRatio = (headSpeedMps / 42.0).clamp(0.7, 1.35);
-    final speedFactor = math.pow(speedRatio, 1.12).toDouble();
-    return (baseline * speedFactor).clamp(0.0, 280.0);
+    final speedFactor = math.pow(speedRatio, speedPower).toDouble();
+    return (categoryBaseline * speedFactor).clamp(0.0, 290.0);
   }
 
   double get estimatedDistance => estimatedDistanceFor(42.0);
 
   ClubCategory get category {
+    if (clubType == 'PW') return ClubCategory.iron;
     if (clubType == 'D' || clubType.endsWith('W')) return ClubCategory.wood;
     if (clubType.endsWith('H')) return ClubCategory.hybrid;
-    if (clubType == 'PW' || clubType.endsWith('I')) return ClubCategory.iron;
+    if (clubType.endsWith('I')) return ClubCategory.iron;
     if (clubType == 'P') return ClubCategory.putter;
     // Numeric types like '50', '54', '58' are wedges
     if (double.tryParse(clubType) != null) return ClubCategory.wedge;

@@ -27,6 +27,33 @@
   color: var(--text);
 }
 
+.analysis-tab-nav {
+  margin-top: 14px;
+  display: inline-flex;
+  background: #eef5ef;
+  border: 1px solid #d9e7db;
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.analysis-tab-btn {
+  border: 0;
+  background: transparent;
+  color: #496051;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.analysis-tab-btn.active {
+  background: #1b5e20;
+  color: #ffffff;
+}
+
 .analysis-subtitle {
   margin: 8px 0 0;
   color: var(--text-soft);
@@ -84,6 +111,11 @@
   padding: 18px;
 }
 
+.weight-length-frame {
+  border: 1px solid #9ccc9c;
+  background: linear-gradient(145deg, #f7fff7 0%, #eef8ee 100%);
+}
+
 .analysis-legend {
   display: flex;
   gap: 14px;
@@ -107,19 +139,19 @@
 }
 
 .analysis-legend i.legend-estimated {
-  background: #44574d;
-}
-
-.analysis-legend i.legend-actual {
   background: #ffffff;
   border: 2px solid #44574d;
   box-sizing: border-box;
 }
 
+.analysis-legend i.legend-actual {
+  background: #44574d;
+}
+
 .analysis-legend i.legend-actual-line {
   width: 18px;
   height: 2px;
-  background: #44574d;
+  background: #ff8f00;
   border-radius: 2px;
 }
 
@@ -127,11 +159,87 @@
   overflow-x: auto;
 }
 
+.interactive-chart-scroll {
+  position: relative;
+  overflow: hidden;
+  min-height: 260px;
+}
+
 .analysis-chart {
   width: 100%;
   min-width: 760px;
   height: auto;
   display: block;
+}
+
+.weight-analysis-chart {
+  min-width: 0;
+}
+
+.loft-analysis-chart {
+  min-width: 0;
+}
+
+.chart-grid-animated {
+  opacity: 0;
+  animation: chartGridFade 0.6s ease forwards;
+}
+
+.chart-point-circle {
+  opacity: 0;
+  transform-origin: center;
+  animation: pointPop 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: var(--point-delay, 0ms);
+  transition: transform 0.2s ease, filter 0.2s ease;
+  cursor: pointer;
+}
+
+.chart-point-circle:hover {
+  transform: scale(1.08);
+  filter: brightness(1.06);
+}
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 6;
+  min-width: 180px;
+  max-width: 260px;
+  background: linear-gradient(180deg, #20332a 0%, #15241d 100%);
+  color: #f4fff8;
+  border: 1px solid #4d7c5d;
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 26px rgba(8, 19, 14, 0.34);
+  pointer-events: none;
+  animation: tooltipFadeIn 0.18s ease;
+}
+
+.chart-tooltip-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+
+.chart-tooltip-row {
+  font-size: 12px;
+  color: #d8f2e2;
+  line-height: 1.45;
+}
+
+.chart-line-animated {
+  stroke-dasharray: 8 6;
+  animation: lineSweep 1s ease both;
+}
+
+.analysis-empty {
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #63786a;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .chart-grid {
@@ -202,6 +310,29 @@
   text-transform: uppercase;
 }
 
+.analysis-empty-cell {
+  text-align: center;
+  color: #607468;
+  font-weight: 600;
+}
+
+.analysis-club-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analysis-club-type {
+  display: inline-block;
+  background: #e7f7ef;
+  color: var(--primary-strong);
+  border: 1px solid #cce8d7;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 0.85em;
+  font-weight: 700;
+}
+
 .analysis-input {
   width: 92px;
   padding: 9px 10px;
@@ -221,12 +352,73 @@
     padding: 14px;
   }
 
+  .analysis-chart {
+    min-width: 0;
+  }
+
+  .chart-tooltip {
+    min-width: 160px;
+    padding: 8px 10px;
+  }
+
   .analysis-header {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .analysis-tab-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
   .analysis-controls {
     align-items: stretch;
+  }
+}
+
+@keyframes chartGridFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pointPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes lineSweep {
+  from {
+    stroke-dashoffset: 36;
+    opacity: 0.15;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
   }
 }

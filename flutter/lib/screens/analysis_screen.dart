@@ -13,6 +13,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../models/golf_club.dart';
 import '../providers/club_providers.dart';
+import '../widgets/weight_vs_length_chart.dart';
 
 // ============================================================================
 // AnalysisScreen — top-level screen with a TabBar
@@ -23,7 +24,8 @@ class AnalysisScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 1, // Extend with more analysis tabs as needed
+      length: 2,
+      initialIndex: 1,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
         appBar: AppBar(
@@ -32,15 +34,31 @@ class AnalysisScreen extends ConsumerWidget {
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.scatter_plot_outlined), text: 'Loft vs Distance'),
+              Tab(icon: Icon(Icons.straighten), text: 'Weight vs Length'),
             ],
           ),
         ),
         body: const TabBarView(
           children: [
             LoftDistanceTab(),
+            WeightLengthTab(),
           ],
         ),
       ),
+    );
+  }
+}
+
+class WeightLengthTab extends ConsumerWidget {
+  const WeightLengthTab({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clubs = ref.watch(clubsProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: WeightVsLengthChart(clubs: clubs),
     );
   }
 }
@@ -69,7 +87,7 @@ class LoftDistanceTab extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'TrackMan-like estimate with a 42 m/s baseline  •  tap a dot for details',
+            'Category-specific curves with a 42 m/s baseline  •  tap a dot for details',
             style: TextStyle(fontSize: 12, color: Colors.grey[600]),
           ),
           const SizedBox(height: 12),
@@ -162,27 +180,27 @@ class _LoftVsDistanceChart extends StatelessWidget {
   List<ScatterSpot> _buildSpots() {
     return [
       for (final c in clubs) ...[
+        ScatterSpot(
+          c.loftAngle,
+          c.estimatedDistanceFor(headSpeed),
+          dotPainter: FlDotCirclePainter(
+            color: Colors.white,
+            radius: 10,
+            strokeColor: c.category.color,
+            strokeWidth: 3,
+          ),
+        ),
         if (c.distance > 0)
           ScatterSpot(
             c.loftAngle,
             c.distance,
             dotPainter: FlDotCirclePainter(
-              color: Colors.white,
-              radius: 10,
-              strokeColor: c.category.color,
-              strokeWidth: 3,
+              color: c.category.color,
+              radius: 9,
+              strokeColor: Colors.white,
+              strokeWidth: 1.5,
             ),
           ),
-        ScatterSpot(
-          c.loftAngle,
-          c.estimatedDistanceFor(headSpeed),
-          dotPainter: FlDotCirclePainter(
-            color: c.category.color,
-            radius: 9,
-            strokeColor: Colors.white,
-            strokeWidth: 1.5,
-          ),
-        ),
       ],
     ];
   }
@@ -301,7 +319,7 @@ class _LoftVsDistanceChart extends StatelessWidget {
               LineChartBarData(
                 spots: actualSpots,
                 isCurved: false,
-                color: const Color(0xFF44574D),
+                color: Colors.orange.withValues(alpha: 0.75),
                 barWidth: 2,
                 isStrokeCapRound: true,
                 dotData: const FlDotData(show: false),
@@ -352,15 +370,15 @@ class _ChartLegend extends StatelessWidget {
           (entry) => _LegendDot(color: entry.$1.color, label: entry.$2),
         ),
         const _LegendMarker(
-          fillColor: Color(0xFF44574D),
-          strokeColor: Color(0xFF44574D),
-          label: 'Estimated',
-        ),
-        const _LegendMarker(
           fillColor: Colors.white,
           strokeColor: Color(0xFF44574D),
-          label: 'Actual',
+          label: 'Estimated',
           strokeWidth: 2,
+        ),
+        const _LegendMarker(
+          fillColor: Color(0xFF44574D),
+          strokeColor: Color(0xFF44574D),
+          label: 'Actual',
         ),
         // Actual line indicator
         Row(
@@ -370,7 +388,7 @@ class _ChartLegend extends StatelessWidget {
               width: 22,
               height: 2,
               decoration: BoxDecoration(
-                color: const Color(0xFF44574D),
+                color: Colors.orange.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(1),
               ),
             ),
@@ -564,7 +582,6 @@ class _LoftDistanceTable extends StatelessWidget {
           headingRowColor: WidgetStateProperty.all(Colors.grey.shade100),
           columns: const [
             DataColumn(label: _HeaderCell('Club')),
-            DataColumn(label: _HeaderCell('Type')),
             DataColumn(label: _HeaderCell('Loft'), numeric: true),
             DataColumn(label: _HeaderCell('Est. Dist'), numeric: true),
             DataColumn(label: _HeaderCell('Actual Dist')),
@@ -578,6 +595,22 @@ class _LoftDistanceTable extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF4ED),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        club.clubType,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2D4A3B),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
                       width: 9,
                       height: 9,
                       decoration: BoxDecoration(
@@ -588,10 +621,6 @@ class _LoftDistanceTable extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(club.name, style: const TextStyle(fontSize: 13)),
                   ],
-                )),
-                DataCell(Text(
-                  club.category.label,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                 )),
                 DataCell(Text(
                   '${club.loftAngle.toStringAsFixed(1)}°',
