@@ -16,6 +16,25 @@ class SwingWeightDistributionChart extends StatelessWidget {
   static const double _goodTolerance = 1.5;
   static const double _adjustRecommended = 2.0;
 
+  static String _buildTooltipContent(
+    String title,
+    List<(String, String)> rows,
+  ) {
+    final maxLabelLength = rows.fold<int>(0, (max, row) {
+      return row.$1.length > max ? row.$1.length : max;
+    });
+
+    final buffer = StringBuffer(title);
+    for (final row in rows) {
+      buffer
+        ..write('\n')
+        ..write(row.$1.padRight(maxLabelLength))
+        ..write(' : ')
+        ..write(row.$2);
+    }
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -215,11 +234,15 @@ class SwingWeightDistributionChart extends StatelessWidget {
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final entry = entries[group.x];
                       final deviation = entry.deviationFromD2;
+                      final content = _buildTooltipContent(entry.club.name, [
+                        ('Type', _clubTypeLabel(entry.club)),
+                        ('SW', entry.swingWeightLabel),
+                        ('Deviation', _formatSigned(deviation)),
+                        ('Status', _statusForDeviation(deviation).label),
+                      ]);
 
                       return BarTooltipItem(
-                        '${entry.club.name}\n'
-                        'スイングウェイト: ${entry.swingWeightLabel}\n'
-                        '目安偏差: ${_formatSigned(deviation)}',
+                        content,
                         const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -428,7 +451,7 @@ class SwingWeightDistributionChart extends StatelessWidget {
       case 'iron':
         return const Color(0xFF2E8B57);
       case 'wedge':
-        return const Color(0xFFEF6C00);
+        return const Color(0xFF9ACD32);
       case 'putter':
         return const Color(0xFF757575);
       default:

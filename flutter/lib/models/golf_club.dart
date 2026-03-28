@@ -31,7 +31,7 @@ extension ClubCategoryExtension on ClubCategory {
       case ClubCategory.iron:
         return const Color(0xFF2E7D32); // Green
       case ClubCategory.wedge:
-        return const Color(0xFFC62828); // Red
+        return const Color(0xFF9ACD32); // YellowGreen
       case ClubCategory.putter:
         return const Color(0xFF757575); // Grey
     }

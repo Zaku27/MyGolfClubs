@@ -254,6 +254,22 @@ class _LoftVsDistanceChart extends StatelessWidget {
     return club.distance > 0 && (spot.y - club.distance).abs() < 0.01;
   }
 
+  String _buildTooltipContent(String title, List<(String, String)> rows) {
+    final maxLabelLength = rows.fold<int>(0, (max, row) {
+      return row.$1.length > max ? row.$1.length : max;
+    });
+
+    final buffer = StringBuffer(title);
+    for (final row in rows) {
+      buffer
+        ..write('\n')
+        ..write(row.$1.padRight(maxLabelLength))
+        ..write(' : ')
+        ..write(row.$2);
+    }
+    return buffer.toString();
+  }
+
   // ── Scatter spots ────────────────────────────────────────────────────────
   List<ScatterSpot> _buildSpots() {
     return [
@@ -353,13 +369,26 @@ class _LoftVsDistanceChart extends StatelessWidget {
             );
             final isActual = _isActualSpot(club, spot);
             final est = club.estimatedDistanceFor(headSpeed);
+            final content = _buildTooltipContent(club.name, [
+              ('Type', club.category.label),
+              ('Loft', '${club.loftAngle.toStringAsFixed(1)}°'),
+              ('Estimated', '${est.toStringAsFixed(0)} y'),
+              (
+                'Actual',
+                club.distance > 0
+                    ? '${club.distance.toStringAsFixed(0)} y'
+                    : '-'
+              ),
+              ('Point', isActual ? 'Actual' : 'Estimated'),
+            ]);
+
             return ScatterTooltipItem(
-              '${club.name}\n'
-              'Loft: ${club.loftAngle}°   ${isActual ? 'Actual' : 'Est'}: ${(isActual ? spot.y : est).toStringAsFixed(0)} y',
+              content,
               textStyle: const TextStyle(
                 color: Colors.white,
                 fontSize: 12,
                 height: 1.5,
+                fontWeight: FontWeight.w600,
               ),
               bottomMargin: 8,
             );

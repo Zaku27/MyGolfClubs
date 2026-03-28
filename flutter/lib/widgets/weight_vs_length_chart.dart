@@ -13,6 +13,25 @@ class WeightVsLengthChart extends StatelessWidget {
   static const double _minY = 200;
   static const double _maxY = 450;
 
+  static String _buildTooltipContent(
+    String title,
+    List<(String, String)> rows,
+  ) {
+    final maxLabelLength = rows.fold<int>(0, (max, row) {
+      return row.$1.length > max ? row.$1.length : max;
+    });
+
+    final buffer = StringBuffer(title);
+    for (final row in rows) {
+      buffer
+        ..write('\n')
+        ..write(row.$1.padRight(maxLabelLength))
+        ..write(' : ')
+        ..write(row.$2);
+    }
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -35,7 +54,8 @@ class WeightVsLengthChart extends StatelessWidget {
     }
 
     final measuredClubs = clubs
-        .where((club) => _readLengthInInches(club) > 0 && _readWeightInGrams(club) > 0)
+        .where((club) =>
+            _readLengthInInches(club) > 0 && _readWeightInGrams(club) > 0)
         .toList(growable: false);
 
     if (measuredClubs.isEmpty) {
@@ -128,19 +148,23 @@ class WeightVsLengthChart extends StatelessWidget {
                       ),
                     ),
                   ),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                 ),
                 gridData: FlGridData(
                   show: true,
                   horizontalInterval: 25,
                   verticalInterval: 1,
                   getDrawingHorizontalLine: (_) => FlLine(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+                    color: theme.colorScheme.outlineVariant
+                        .withValues(alpha: 0.35),
                     strokeWidth: 1,
                   ),
                   getDrawingVerticalLine: (_) => FlLine(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.25),
+                    color: theme.colorScheme.outlineVariant
+                        .withValues(alpha: 0.25),
                     strokeWidth: 1,
                   ),
                 ),
@@ -157,22 +181,26 @@ class WeightVsLengthChart extends StatelessWidget {
                     tooltipPadding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     getTooltipItems: (spot) {
-                      final club = spotToClub[spot] ?? _matchClubForSpot(spot, measuredClubs);
+                      final club = spotToClub[spot] ??
+                          _matchClubForSpot(spot, measuredClubs);
                       if (club == null) {
                         return ScatterTooltipItem(
                           'Unknown club',
-                          textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+                          textStyle: const TextStyle(
+                              color: Colors.white, fontSize: 12),
                         );
                       }
 
                       final length = _readLengthInInches(club);
                       final weight = _readWeightInGrams(club);
+                      final content = _buildTooltipContent(club.name, [
+                        ('Type', _clubTypeLabel(club)),
+                        ('Length', '${length.toStringAsFixed(2)} in'),
+                        ('Weight', '${weight.toStringAsFixed(1)} g'),
+                      ]);
 
                       return ScatterTooltipItem(
-                        '${club.name}\n'
-                        'Type: ${_clubTypeLabel(club)}\n'
-                        'Length: ${length.toStringAsFixed(2)} in\n'
-                        'Weight: ${weight.toStringAsFixed(1)} g',
+                        content,
                         textStyle: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -214,9 +242,11 @@ class WeightVsLengthChart extends StatelessWidget {
                   cells: [
                     DataCell(Text(club.name)),
                     DataCell(Text(_clubTypeLabel(club))),
-                    DataCell(Text(_readLengthInInches(club).toStringAsFixed(2))),
+                    DataCell(
+                        Text(_readLengthInInches(club).toStringAsFixed(2))),
                     DataCell(Text(_readWeightInGrams(club).toStringAsFixed(1))),
-                    DataCell(Text(_readNotes(club).isEmpty ? '-' : _readNotes(club))),
+                    DataCell(Text(
+                        _readNotes(club).isEmpty ? '-' : _readNotes(club))),
                   ],
                 );
               }).toList(growable: false),
@@ -227,7 +257,8 @@ class WeightVsLengthChart extends StatelessWidget {
     );
   }
 
-  static GolfClub? _matchClubForSpot(ScatterSpot spot, List<GolfClub> candidates) {
+  static GolfClub? _matchClubForSpot(
+      ScatterSpot spot, List<GolfClub> candidates) {
     for (final club in candidates) {
       final x = _readLengthInInches(club);
       final y = _readWeightInGrams(club);
@@ -257,7 +288,7 @@ class WeightVsLengthChart extends StatelessWidget {
       case 'iron':
         return const Color(0xFF2E8B57);
       case 'wedge':
-        return const Color(0xFFEF6C00);
+        return const Color(0xFF9ACD32);
       case 'putter':
         return const Color(0xFF424242);
       default:
@@ -289,7 +320,9 @@ class WeightVsLengthChart extends StatelessWidget {
     final explicitType = _safeString(() => c.clubType).toLowerCase().trim();
     final name = _safeString(() => c.name).toLowerCase().trim();
 
-    if (explicitType.contains('driver') || explicitType == 'd' || name.contains('driver')) {
+    if (explicitType.contains('driver') ||
+        explicitType == 'd' ||
+        name.contains('driver')) {
       return 'driver';
     }
     if (explicitType.contains('wood') || explicitType.endsWith('w')) {
@@ -298,13 +331,18 @@ class WeightVsLengthChart extends StatelessWidget {
     if (explicitType.contains('hybrid') || explicitType.endsWith('h')) {
       return 'hybrid';
     }
-    if (explicitType.contains('putter') || explicitType == 'p' || name.contains('putter')) {
+    if (explicitType.contains('putter') ||
+        explicitType == 'p' ||
+        name.contains('putter')) {
       return 'putter';
     }
-    if (explicitType.contains('wedge') || double.tryParse(explicitType) != null) {
+    if (explicitType.contains('wedge') ||
+        double.tryParse(explicitType) != null) {
       return 'wedge';
     }
-    if (explicitType.contains('iron') || explicitType.endsWith('i') || explicitType == 'pw') {
+    if (explicitType.contains('iron') ||
+        explicitType.endsWith('i') ||
+        explicitType == 'pw') {
       return 'iron';
     }
     return 'iron';
@@ -395,7 +433,7 @@ class _WeightLengthLegend extends StatelessWidget {
       (label: 'Wood', color: Color(0xFF0D47A1)),
       (label: 'Hybrid', color: Color(0xFF26C6DA)),
       (label: 'Iron', color: Color(0xFF2E8B57)),
-      (label: 'Wedge', color: Color(0xFFEF6C00)),
+      (label: 'Wedge', color: Color(0xFF9ACD32)),
       (label: 'Putter', color: Color(0xFF424242)),
     ];
 

@@ -15,6 +15,25 @@ class LieAngleDistributionChart extends ConsumerWidget {
   static const double _goodTolerance = 1.5;
   static const Color _standardLineColor = Color(0xFF00897B);
 
+  static String _buildTooltipContent(
+    String title,
+    List<(String, String)> rows,
+  ) {
+    final maxLabelLength = rows.fold<int>(0, (max, row) {
+      return row.$1.length > max ? row.$1.length : max;
+    });
+
+    final buffer = StringBuffer(title);
+    for (final row in rows) {
+      buffer
+        ..write('\n')
+        ..write(row.$1.padRight(maxLabelLength))
+        ..write(' : ')
+        ..write(row.$2);
+    }
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -232,12 +251,23 @@ class LieAngleDistributionChart extends ConsumerWidget {
                         getTooltipColor: (_) => const Color(0xEE1B4332),
                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
                           final entry = clubEntries[group.x];
+                          final content =
+                              _buildTooltipContent(entry.club.name, [
+                            ('Type', _clubTypeLabel(entry.club)),
+                            (
+                              'Measured',
+                              '${entry.club.lieAngle.toStringAsFixed(1)}°'
+                            ),
+                            (
+                              'Standard',
+                              '${entry.standardLieAngle.toStringAsFixed(1)}°'
+                            ),
+                            ('Deviation', _formatDeviation(entry.deviation)),
+                            ('Status', entry.status.label),
+                          ]);
+
                           return BarTooltipItem(
-                            '${entry.club.name}\n'
-                            'Measured: ${entry.club.lieAngle.toStringAsFixed(1)}°\n'
-                            'Standard: ${entry.standardLieAngle.toStringAsFixed(1)}°\n'
-                            'Deviation: ${_formatDeviation(entry.deviation)}\n'
-                            'Status: ${entry.status.label}',
+                            content,
                             const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -452,7 +482,7 @@ class LieAngleDistributionChart extends ConsumerWidget {
       case ClubCategory.iron:
         return const Color(0xFF2E7D32);
       case ClubCategory.wedge:
-        return const Color(0xFFEF6C00);
+        return const Color(0xFF9ACD32);
       case ClubCategory.putter:
         return const Color(0xFF424242);
     }
@@ -525,7 +555,7 @@ class _LieAngleLegend extends StatelessWidget {
         _LegendChip(label: 'Iron', color: Color(0xFF2E7D32)),
         _LegendChip(label: 'Wood', color: Color(0xFF1976D2)),
         _LegendChip(label: 'Hybrid', color: Color(0xFF26C6DA)),
-        _LegendChip(label: 'Wedge', color: Color(0xFFEF6C00)),
+        _LegendChip(label: 'Wedge', color: Color(0xFF9ACD32)),
         _LegendChip(label: 'Putter', color: Color(0xFF424242)),
         _LegendChip(label: 'Standard Line', color: Color(0xFF00897B)),
         _LegendChip(label: 'Good Range ±1.5°', color: Color(0x662E7D32)),

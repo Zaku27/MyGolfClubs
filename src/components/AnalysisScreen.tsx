@@ -64,7 +64,7 @@ const getLieBarColor = (category: ClubCategory): string => {
     case 'iron':
       return '#2e7d32';
     case 'wedge':
-      return '#ef6c00';
+      return '#9acd32';
     case 'putter':
       return '#424242';
   }
@@ -156,7 +156,8 @@ const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   const speedRatio = Math.max(0.7, Math.min(1.35, headSpeed / 42));
   const speedFactor = Math.pow(speedRatio, speedPower);
   const estimated = baseline * speedFactor;
-  return Math.max(0, Math.min(290, estimated));
+  const categoryAdjustment = category === 'wedge' ? 0.90 : category === 'iron' ? 0.95 : category === 'hybrid' ? 0.96 : 1.0;
+  return Math.max(0, Math.min(290, estimated * categoryAdjustment));
 };
 
 const getClubCategory = (club: GolfClub): ClubCategory => getClubCategoryByType(club.clubType ?? '');
@@ -170,7 +171,7 @@ const getCategoryColor = (category: ClubCategory) => {
     case 'iron':
       return '#2e8b57';
     case 'wedge':
-      return '#ef6c00';
+      return '#9acd32';
     case 'putter':
       return '#424242';
   }
@@ -829,8 +830,7 @@ export const AnalysisScreen = ({
               <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
               <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
               <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
-              <span><i style={{ backgroundColor: '#ef6c00' }} />ウェッジ</span>
-              <span><i style={{ backgroundColor: '#424242' }} />パター</span>
+              <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
               <span><i className="legend-estimated" />推定</span>
               <span><i className="legend-actual" />実測</span>
               <span><i className="legend-actual-line" />実測ライン</span>
@@ -995,14 +995,29 @@ export const AnalysisScreen = ({
                   }}
                 >
                   <div className="chart-tooltip-title">{loftTooltip.club.name}</div>
-                  <div className="chart-tooltip-row">種類: {getCategoryLabel(loftTooltip.club.category)}</div>
-                  <div className="chart-tooltip-row">ロフト: {loftTooltip.club.loftAngle.toFixed(1)}°</div>
-                  <div className="chart-tooltip-row">推定: {loftTooltip.club.estimatedDistance.toFixed(0)} y</div>
-                  <div className="chart-tooltip-row">
-                    実測: {loftTooltip.club.actualDistance > 0 ? `${loftTooltip.club.actualDistance.toFixed(0)} y` : '-'}
-                  </div>
-                  <div className="chart-tooltip-row">
-                    選択点: {loftTooltip.pointType === 'estimated' ? '推定ポイント' : '実測ポイント'}
+                  <div className="chart-tooltip-list">
+                    <div className="chart-tooltip-row">
+                      <span className="chart-tooltip-label">種類</span>
+                      <span className="chart-tooltip-value">{getCategoryLabel(loftTooltip.club.category)}</span>
+                    </div>
+                    <div className="chart-tooltip-row">
+                      <span className="chart-tooltip-label">ロフト</span>
+                      <span className="chart-tooltip-value">{loftTooltip.club.loftAngle.toFixed(1)}°</span>
+                    </div>
+                    <div className="chart-tooltip-row">
+                      <span className="chart-tooltip-label">推定</span>
+                      <span className="chart-tooltip-value">{loftTooltip.club.estimatedDistance.toFixed(0)} y</span>
+                    </div>
+                    <div className="chart-tooltip-row">
+                      <span className="chart-tooltip-label">実測</span>
+                      <span className="chart-tooltip-value">
+                        {loftTooltip.club.actualDistance > 0 ? `${loftTooltip.club.actualDistance.toFixed(0)} y` : '-'}
+                      </span>
+                    </div>
+                    <div className="chart-tooltip-row">
+                      <span className="chart-tooltip-label">選択点</span>
+                      <span className="chart-tooltip-value">{loftTooltip.pointType === 'estimated' ? '推定ポイント' : '実測ポイント'}</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1125,7 +1140,7 @@ export const AnalysisScreen = ({
                   <span><i style={{ backgroundColor: '#2e7d32' }} />アイアン</span>
                   <span><i style={{ backgroundColor: '#1976d2' }} />ウッド</span>
                   <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
-                  <span><i style={{ backgroundColor: '#ef6c00' }} />ウェッジ</span>
+                  <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
                   <span><i style={{ backgroundColor: '#424242' }} />パター</span>
                   <span><i className="legend-good-range" />良好範囲 ±1.5°</span>
                   <span><i className="legend-standard-line" />基準値ライン</span>
@@ -1274,15 +1289,35 @@ export const AnalysisScreen = ({
                       }}
                     >
                       <div className="chart-tooltip-title">{lieTooltip.club.name}</div>
-                      <div className="chart-tooltip-row">種類: {getCategoryLabel(lieTooltip.club.category)}</div>
-                      <div className="chart-tooltip-row">基準: {lieTooltip.club.standardLieAngle.toFixed(1)}°</div>
-                      <div className="chart-tooltip-row">ライ角: {lieTooltip.club.lieAngle.toFixed(1)}°</div>
-                      <div className="chart-tooltip-row">
-                        偏差: {lieTooltip.club.deviationFromStandard >= 0 ? '+' : ''}
-                        {lieTooltip.club.deviationFromStandard.toFixed(1)}°
+                      <div className="chart-tooltip-list">
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">種類</span>
+                          <span className="chart-tooltip-value">{getCategoryLabel(lieTooltip.club.category)}</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">基準</span>
+                          <span className="chart-tooltip-value">{lieTooltip.club.standardLieAngle.toFixed(1)}°</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">ライ角</span>
+                          <span className="chart-tooltip-value">{lieTooltip.club.lieAngle.toFixed(1)}°</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">偏差</span>
+                          <span className="chart-tooltip-value">
+                            {lieTooltip.club.deviationFromStandard >= 0 ? '+' : ''}
+                            {lieTooltip.club.deviationFromStandard.toFixed(1)}°
+                          </span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">状態</span>
+                          <span className="chart-tooltip-value">{lieStatusLabelJa(lieTooltip.club.lieStatus)}</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">種別</span>
+                          <span className="chart-tooltip-value">{lieTooltip.club.clubType}</span>
+                        </div>
                       </div>
-                      <div className="chart-tooltip-row">状態: {lieStatusLabelJa(lieTooltip.club.lieStatus)}</div>
-                      <div className="chart-tooltip-row">種別: {lieTooltip.club.clubType}</div>
                     </div>
                   )}
                 </div>
@@ -1386,7 +1421,7 @@ export const AnalysisScreen = ({
                   <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
                   <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
                   <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
-                  <span><i style={{ backgroundColor: '#ef6c00' }} />ウェッジ</span>
+                  <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
                   <span><i style={{ backgroundColor: '#424242' }} />パター</span>
                   <span><i style={{ backgroundColor: '#fb8c00' }} />軽微なズレ</span>
                   <span><i style={{ backgroundColor: '#e53935' }} />調整推奨</span>
@@ -1513,12 +1548,26 @@ export const AnalysisScreen = ({
                       }}
                     >
                       <div className="chart-tooltip-title">{swingTooltip.club.name}</div>
-                      <div className="chart-tooltip-row">種類: {getCategoryLabel(swingTooltip.club.category)}</div>
-                      <div className="chart-tooltip-row">スイングウェイト: {swingTooltip.club.swingWeight || '-'}</div>
-                      <div className="chart-tooltip-row">
-                        目安偏差: {(swingTooltip.club.swingDeviation >= 0 ? '+' : '') + swingTooltip.club.swingDeviation.toFixed(1)}
+                      <div className="chart-tooltip-list">
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">種類</span>
+                          <span className="chart-tooltip-value">{getCategoryLabel(swingTooltip.club.category)}</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">SW</span>
+                          <span className="chart-tooltip-value">{swingTooltip.club.swingWeight || '-'}</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">目安偏差</span>
+                          <span className="chart-tooltip-value">
+                            {(swingTooltip.club.swingDeviation >= 0 ? '+' : '') + swingTooltip.club.swingDeviation.toFixed(1)}
+                          </span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">状態</span>
+                          <span className="chart-tooltip-value">{swingTooltip.club.swingStatus}</span>
+                        </div>
                       </div>
-                      <div className="chart-tooltip-row">状態: {swingTooltip.club.swingStatus}</div>
                     </div>
                   )}
                 </div>
@@ -1583,7 +1632,7 @@ export const AnalysisScreen = ({
                   <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
                   <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
                   <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
-                  <span><i style={{ backgroundColor: '#ef6c00' }} />ウェッジ</span>
+                  <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
                   <span><i style={{ backgroundColor: '#424242' }} />パター</span>
                 </div>
                 <div
@@ -1703,9 +1752,20 @@ export const AnalysisScreen = ({
                       }}
                     >
                       <div className="chart-tooltip-title">{weightTooltip.club.name}</div>
-                      <div className="chart-tooltip-row">種類: {getCategoryLabel(weightTooltip.club.category)}</div>
-                      <div className="chart-tooltip-row">長さ: {weightTooltip.club.length.toFixed(2)} in</div>
-                      <div className="chart-tooltip-row">重量: {weightTooltip.club.weight.toFixed(1)} g</div>
+                      <div className="chart-tooltip-list">
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">種類</span>
+                          <span className="chart-tooltip-value">{getCategoryLabel(weightTooltip.club.category)}</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">長さ</span>
+                          <span className="chart-tooltip-value">{weightTooltip.club.length.toFixed(2)} in</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">重量</span>
+                          <span className="chart-tooltip-value">{weightTooltip.club.weight.toFixed(1)} g</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
