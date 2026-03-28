@@ -14,7 +14,9 @@ import 'package:fl_chart/fl_chart.dart';
 import '../models/golf_club.dart';
 import '../providers/club_providers.dart';
 import 'lie_angle_settings_screen.dart';
+import 'swing_weight_settings_screen.dart';
 import '../widgets/lie_angle_distribution_chart.dart';
+import '../widgets/swing_weight_distribution_chart.dart';
 import '../widgets/weight_vs_length_chart.dart';
 
 // ============================================================================
@@ -26,7 +28,7 @@ class AnalysisScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       initialIndex: 1,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
@@ -52,6 +54,7 @@ class AnalysisScreen extends ConsumerWidget {
                   icon: Icon(Icons.scatter_plot_outlined),
                   text: 'Loft vs Distance'),
               Tab(icon: Icon(Icons.straighten), text: 'Weight vs Length'),
+              Tab(icon: Icon(Icons.bar_chart), text: 'Swing Weight'),
               Tab(icon: Icon(Icons.bar_chart_rounded), text: 'Lie Angle'),
             ],
           ),
@@ -60,9 +63,48 @@ class AnalysisScreen extends ConsumerWidget {
           children: [
             LoftDistanceTab(),
             WeightLengthTab(),
+            SwingWeightTab(),
             LieAngleTab(),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class SwingWeightTab extends ConsumerWidget {
+  const SwingWeightTab({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clubs = ref.watch(clubsProvider);
+    final swingWeightTarget = ref.watch(swingWeightTargetProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const SwingWeightSettingsScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.tune_rounded),
+              label: const Text('SW目安設定を開く'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SwingWeightDistributionChart(
+            clubs: clubs,
+            targetValue: swingWeightTarget,
+          ),
+        ],
       ),
     );
   }

@@ -13,7 +13,7 @@ export const DEFAULT_USER_LIE_ANGLE_STANDARDS: UserLieAngleStandards = {
 };
 
 export const DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE: Record<string, number> = {
-  D: 58.0,
+  D: 57.0,
   '3W': 56.0,
   '5W': 56.5,
   '4H': 59.0,

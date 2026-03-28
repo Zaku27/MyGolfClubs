@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/golf_club.dart';
 import '../models/user_lie_angle_standards.dart';
@@ -224,6 +225,47 @@ class HeadSpeedNotifier extends Notifier<double> {
 
 final headSpeedProvider = NotifierProvider<HeadSpeedNotifier, double>(
   HeadSpeedNotifier.new,
+);
+
+class SwingWeightTargetNotifier extends Notifier<double> {
+  static const double defaultTarget = 2.0;
+  static const String _storageKey = 'golfbag-swing-weight-target';
+
+  @override
+  double build() {
+    _loadSavedTarget();
+    return defaultTarget;
+  }
+
+  Future<void> _loadSavedTarget() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getDouble(_storageKey);
+    if (saved == null) return;
+    state = _normalize(saved);
+  }
+
+  Future<void> setTarget(double value) async {
+    final normalized = _normalize(value);
+    state = normalized;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_storageKey, normalized);
+  }
+
+  Future<void> reset() async {
+    state = defaultTarget;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_storageKey, defaultTarget);
+  }
+
+  double _normalize(double value) {
+    final rounded = (value * 10).roundToDouble() / 10;
+    return rounded.clamp(-30.0, 30.0);
+  }
+}
+
+final swingWeightTargetProvider =
+    NotifierProvider<SwingWeightTargetNotifier, double>(
+  SwingWeightTargetNotifier.new,
 );
 
 class UserLieAngleStandardsNotifier extends Notifier<UserLieAngleStandards> {

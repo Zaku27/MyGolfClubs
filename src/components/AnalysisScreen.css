@@ -491,7 +491,7 @@
 
   .analysis-tab-nav {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     width: 100%;
   }
 
@@ -549,6 +549,26 @@
 .lie-angle-frame {
   border: 1px solid #9ccc9c;
   background: linear-gradient(145deg, #f7fff7 0%, #eef8ee 100%);
+}
+
+.swing-weight-frame {
+  border: 1px solid #9ccc9c;
+  background: linear-gradient(145deg, #f7fff7 0%, #eef8ee 100%);
+}
+
+.swing-analysis-chart {
+  min-width: 0;
+}
+
+.swing-weight-bar {
+  opacity: 0;
+  animation: chartGridFade 0.5s ease forwards;
+  animation-delay: var(--point-delay, 0ms);
+  cursor: pointer;
+}
+
+.swing-weight-bar:hover {
+  filter: brightness(1.08);
 }
 
 .lie-analysis-chart {

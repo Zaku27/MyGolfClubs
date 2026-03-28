@@ -20,6 +20,9 @@ type AnalysisScreenProps = {
   onUpdateActualDistance: (clubId: number, distance: number) => void;
   headSpeed: number;
   onHeadSpeedChange: (value: number) => void;
+  swingWeightTarget: number;
+  onSetSwingWeightTarget: (value: number) => void;
+  onResetSwingWeightTarget: () => void;
   userLieAngleStandards: UserLieAngleStandards;
   onSetLieTypeStandard: (clubType: string, value: number) => void;
   onSetLieClubStandard: (clubName: string, value: number) => void;
@@ -47,6 +50,10 @@ const LIE_MAX = 70;
 const LIE_GOOD_TOLERANCE = 1.5;
 const LIE_PADDING = { top: 30, right: 28, bottom: 80, left: 56 };
 const LIE_STANDARD_LINE_COLOR = '#00897b';
+
+const SWING_GOOD_TOLERANCE = 1.5;
+const SWING_ADJUST_THRESHOLD = 2.0;
+const SWING_PADDING = { top: 30, right: 28, bottom: 80, left: 56 };
 
 const getLieBarColor = (category: ClubCategory): string => {
   switch (category) {
@@ -88,6 +95,17 @@ type LieTooltipState = {
     standardLieAngle: number;
     deviationFromStandard: number;
     lieStatus: LieAngleStatus;
+  };
+};
+
+type SwingTooltipState = {
+  x: number;
+  y: number;
+  club: GolfClub & {
+    category: ClubCategory;
+    swingWeightNumeric: number;
+    swingDeviation: number;
+    swingStatus: '良好' | 'やや重い' | 'やや軽い' | '調整推奨';
   };
 };
 
@@ -209,6 +227,84 @@ const getWeightLengthDotRadius = (club: GolfClub) => {
   return 7;
 };
 
+const swingWeightToNumeric = (swingWeightRaw: string): number => {
+  const normalized = (swingWeightRaw ?? '').trim().toUpperCase();
+  const match = normalized.match(/^([A-F])\s*([0-9])$/);
+  if (!match) return 0;
+  const letter = match[1];
+  const point = Number(match[2]);
+  const letterOffset = (letter.charCodeAt(0) - 'D'.charCodeAt(0)) * 10;
+  return letterOffset + point;
+};
+
+const getSwingStatus = (
+  deviation: number,
+): '良好' | 'やや重い' | 'やや軽い' | '調整推奨' => {
+  const abs = Math.abs(deviation);
+  if (abs <= SWING_GOOD_TOLERANCE) return '良好';
+  if (abs > SWING_ADJUST_THRESHOLD) return '調整推奨';
+  return deviation > 0 ? 'やや重い' : 'やや軽い';
+};
+
+const getSwingStatusColor = (status: '良好' | 'やや重い' | 'やや軽い' | '調整推奨') => {
+  if (status === '良好') return '#2e7d32';
+  if (status === '調整推奨') return '#c62828';
+  return '#ef6c00';
+};
+
+const getSwingBarColor = (
+  category: ClubCategory,
+  deviation: number,
+): { fill: string; stroke: string; strokeWidth: number } => {
+  const abs = Math.abs(deviation);
+  if (abs > SWING_ADJUST_THRESHOLD) {
+    return { fill: '#e53935', stroke: '#b71c1c', strokeWidth: 2 };
+  }
+  if (abs > SWING_GOOD_TOLERANCE) {
+    return { fill: '#fb8c00', stroke: '#e65100', strokeWidth: 1.8 };
+  }
+  return { fill: getCategoryColor(category), stroke: 'none', strokeWidth: 0 };
+};
+
+const getClubOrderGroup = (club: GolfClub): number => {
+  const type = (club.clubType ?? '').trim().toUpperCase();
+  const name = (club.name ?? '').toLowerCase();
+  const category = getClubCategoryByType(type);
+  const numberMatch = `${type} ${name}`.match(/(\d{1,2})/);
+  const clubNumber = numberMatch ? Number(numberMatch[1]) : Number.NaN;
+
+  if (name.includes('driver') || type === 'D') return 0;
+  if (category === 'wood') return 1;
+  if (category === 'hybrid') return 2;
+  if (category === 'iron' && Number.isFinite(clubNumber) && clubNumber <= 4) return 3;
+  if (category === 'iron' && Number.isFinite(clubNumber) && clubNumber <= 7) return 4;
+  if (category === 'iron') return 5;
+  if (category === 'wedge') return 6;
+  if (category === 'putter') return 7;
+  return 8;
+};
+
+const getClubOrderRank = (club: GolfClub): number => {
+  const type = (club.clubType ?? '').trim().toUpperCase();
+  const name = (club.name ?? '').toLowerCase();
+  const category = getClubCategoryByType(type);
+  const numberMatch = `${type} ${name}`.match(/(\d{1,2})/);
+  const clubNumber = numberMatch ? Number(numberMatch[1]) : 99;
+
+  if (category === 'wood' || category === 'hybrid' || category === 'iron') {
+    return clubNumber;
+  }
+  if (category === 'wedge') {
+    if (name.includes('pw') || name.includes('pitch')) return 0;
+    if (name.includes('aw') || name.includes('approach')) return 1;
+    if (name.includes('gw') || name.includes('gap')) return 2;
+    if (name.includes('sw') || name.includes('sand')) return 3;
+    if (name.includes('lw') || name.includes('lob')) return 4;
+    return clubNumber;
+  }
+  return 99;
+};
+
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 const getTooltipPosition = (
@@ -247,6 +343,9 @@ export const AnalysisScreen = ({
   onUpdateActualDistance,
   headSpeed,
   onHeadSpeedChange,
+  swingWeightTarget,
+  onSetSwingWeightTarget,
+  onResetSwingWeightTarget,
   userLieAngleStandards,
   onSetLieTypeStandard,
   onSetLieClubStandard,
@@ -254,22 +353,28 @@ export const AnalysisScreen = ({
   onClearLieClubStandard,
   onResetLieStandards,
 }: AnalysisScreenProps) => {
-  const [activeTab, setActiveTab] = useState<'weightLength' | 'loftDistance' | 'lieAngle'>('weightLength');
+  const [activeTab, setActiveTab] = useState<'weightLength' | 'loftDistance' | 'lieAngle' | 'swingWeight'>('weightLength');
   const [showLieSettings, setShowLieSettings] = useState(false);
+  const [showSwingSettings, setShowSwingSettings] = useState(false);
   const [loftTooltip, setLoftTooltip] = useState<LoftTooltipState | null>(null);
   const [weightTooltip, setWeightTooltip] = useState<WeightTooltipState | null>(null);
+  const [swingTooltip, setSwingTooltip] = useState<SwingTooltipState | null>(null);
   const [loftTooltipBox, setLoftTooltipBox] = useState<TooltipBoxSize>({ width: 200, height: 120 });
   const [weightTooltipBox, setWeightTooltipBox] = useState<TooltipBoxSize>({ width: 200, height: 110 });
+  const [swingTooltipBox, setSwingTooltipBox] = useState<TooltipBoxSize>({ width: 220, height: 130 });
   const [loftChartSize, setLoftChartSize] = useState({ width: CHART_WIDTH, height: CHART_HEIGHT });
   const [weightChartSize, setWeightChartSize] = useState({ width: CHART_WIDTH, height: CHART_HEIGHT });
+  const [swingChartSize, setSwingChartSize] = useState({ width: CHART_WIDTH, height: CHART_HEIGHT });
   const [lieTooltip, setLieTooltip] = useState<LieTooltipState | null>(null);
   const [lieTooltipBox, setLieTooltipBox] = useState<TooltipBoxSize>({ width: 200, height: 110 });
   const [lieChartSize, setLieChartSize] = useState({ width: CHART_WIDTH, height: CHART_HEIGHT });
   const loftChartContainerRef = useRef<HTMLDivElement | null>(null);
   const weightChartContainerRef = useRef<HTMLDivElement | null>(null);
+  const swingChartContainerRef = useRef<HTMLDivElement | null>(null);
   const lieChartContainerRef = useRef<HTMLDivElement | null>(null);
   const loftTooltipRef = useRef<HTMLDivElement | null>(null);
   const weightTooltipRef = useRef<HTMLDivElement | null>(null);
+  const swingTooltipRef = useRef<HTMLDivElement | null>(null);
   const lieTooltipRef = useRef<HTMLDivElement | null>(null);
 
   const chartClubs = clubs
@@ -295,6 +400,30 @@ export const AnalysisScreen = ({
     }));
 
   const hasWeightLengthData = weightLengthClubs.length > 0;
+
+  const swingWeightClubs = [...clubs]
+    .sort((a, b) => {
+      const groupDiff = getClubOrderGroup(a) - getClubOrderGroup(b);
+      if (groupDiff !== 0) return groupDiff;
+      const rankDiff = getClubOrderRank(a) - getClubOrderRank(b);
+      if (rankDiff !== 0) return rankDiff;
+      return (a.name ?? '').localeCompare(b.name ?? '');
+    })
+    .map((club) => {
+      const category = getClubCategory(club);
+      const swingWeightNumeric = swingWeightToNumeric(club.swingWeight ?? '');
+      const swingDeviation = swingWeightNumeric - swingWeightTarget;
+      const swingStatus = getSwingStatus(swingDeviation);
+      return {
+        ...club,
+        category,
+        swingWeightNumeric,
+        swingDeviation,
+        swingStatus,
+      };
+    });
+
+  const hasSwingWeightData = swingWeightClubs.length > 0;
 
   const catOrder: ClubCategory[] = ['wood', 'hybrid', 'iron', 'wedge', 'putter'];
   const lieAngleClubs = [...clubs]
@@ -394,6 +523,43 @@ export const AnalysisScreen = ({
   }, [weightTooltip]);
 
   useEffect(() => {
+    if (activeTab !== 'swingWeight') return;
+    const container = swingChartContainerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return;
+
+    const updateSize = (nextWidth: number) => {
+      const width = clamp(Math.round(nextWidth), 320, 1120);
+      const height = clamp(Math.round(width * 0.43), 260, 430);
+      setSwingChartSize((prev) => {
+        if (prev.width === width && prev.height === height) return prev;
+        return { width, height };
+      });
+    };
+
+    updateSize(container.clientWidth);
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        updateSize(entry.contentRect.width);
+      }
+    });
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!swingTooltip || !swingTooltipRef.current) return;
+    const rect = swingTooltipRef.current.getBoundingClientRect();
+    const width = Math.ceil(rect.width);
+    const height = Math.ceil(rect.height);
+    if (width <= 0 || height <= 0) return;
+    setSwingTooltipBox((prev) => {
+      if (prev.width === width && prev.height === height) return prev;
+      return { width, height };
+    });
+  }, [swingTooltip]);
+
+  useEffect(() => {
     if (activeTab !== 'lieAngle') return;
     const container = lieChartContainerRef.current;
     if (!container || typeof ResizeObserver === 'undefined') return;
@@ -464,6 +630,10 @@ export const AnalysisScreen = ({
     ? getTooltipPosition(weightTooltip.x, weightTooltip.y, weightChartSize, weightTooltipBox)
     : null;
 
+  const swingTooltipPos = swingTooltip
+    ? getTooltipPosition(swingTooltip.x, swingTooltip.y, swingChartSize, swingTooltipBox)
+    : null;
+
   const loftTooltipPos = loftTooltip
     ? getTooltipPosition(loftTooltip.x, loftTooltip.y, loftChartSize, loftTooltipBox)
     : null;
@@ -471,6 +641,43 @@ export const AnalysisScreen = ({
   const lieTooltipPos = lieTooltip
     ? getTooltipPosition(lieTooltip.x, lieTooltip.y, lieChartSize, lieTooltipBox)
     : null;
+
+  const swingMinValue = hasSwingWeightData
+    ? Math.min(...swingWeightClubs.map((club) => club.swingWeightNumeric), swingWeightTarget)
+    : -2;
+  const swingMaxValue = hasSwingWeightData
+    ? Math.max(...swingWeightClubs.map((club) => club.swingWeightNumeric), swingWeightTarget)
+    : 4;
+  const swingChartMin = Math.floor(swingMinValue - 2);
+  const swingChartMax = Math.ceil(swingMaxValue + 2);
+  const swingTicks = Array.from(
+    { length: Math.max(2, swingChartMax - swingChartMin + 1) },
+    (_, index) => swingChartMin + index,
+  ).filter((tick) => tick % 2 === 0);
+
+  const mapSwingY = (value: number) => {
+    const plotHeight = swingChartSize.height - SWING_PADDING.top - SWING_PADDING.bottom;
+    return (
+      swingChartSize.height -
+      SWING_PADDING.bottom -
+      ((value - swingChartMin) / (swingChartMax - swingChartMin || 1)) * plotHeight
+    );
+  };
+
+  const mapSwingX = (index: number) => {
+    const plotWidth = swingChartSize.width - SWING_PADDING.left - SWING_PADDING.right;
+    return SWING_PADDING.left + (plotWidth / Math.max(1, swingWeightClubs.length)) * (index + 0.5);
+  };
+
+  const swingBarWidth = Math.min(
+    30,
+    Math.max(
+      12,
+      ((swingChartSize.width - SWING_PADDING.left - SWING_PADDING.right) /
+        Math.max(1, swingWeightClubs.length)) *
+        0.52,
+    ),
+  );
 
   const mapLieY = (deg: number) => {
     const plotHeight = lieChartSize.height - LIE_PADDING.top - LIE_PADDING.bottom;
@@ -517,7 +724,13 @@ export const AnalysisScreen = ({
         <div>
           <p className="analysis-eyebrow">分析ビュー</p>
           <h1>
-            {activeTab === 'weightLength' ? '重量 - 長さ' : activeTab === 'loftDistance' ? 'ロフト - 飛距離' : 'ライ角分布'}
+            {activeTab === 'weightLength'
+              ? '重量 - 長さ'
+              : activeTab === 'loftDistance'
+                ? 'ロフト - 飛距離'
+                : activeTab === 'swingWeight'
+                  ? 'スイングウェイト分布'
+                  : 'ライ角分布'}
           </h1>
           {activeTab === 'weightLength' ? (
             <p className="analysis-subtitle">
@@ -526,6 +739,10 @@ export const AnalysisScreen = ({
           ) : activeTab === 'loftDistance' ? (
             <p className="analysis-subtitle">
               推定飛距離はクラブ種別ごとの個別カーブを使い、42 m/s 基準でヘッドスピード補正しています。
+            </p>
+          ) : activeTab === 'swingWeight' ? (
+            <p className="analysis-subtitle">
+              D2 を基準にスイングウェイトのばらつきを可視化し、調整が必要なクラブを特定できます。
             </p>
           ) : (
             <p className="analysis-subtitle">
@@ -550,6 +767,15 @@ export const AnalysisScreen = ({
               onClick={() => setActiveTab('loftDistance')}
             >
               ロフトと飛距離
+            </button>
+            <button
+              className={`analysis-tab-btn ${activeTab === 'swingWeight' ? 'active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'swingWeight'}
+              onClick={() => setActiveTab('swingWeight')}
+            >
+              SW分布
             </button>
             <button
               className={`analysis-tab-btn ${activeTab === 'lieAngle' ? 'active' : ''}`}
@@ -579,6 +805,11 @@ export const AnalysisScreen = ({
                 <em>m/s</em>
               </div>
             </label>
+          )}
+          {activeTab === 'swingWeight' && (
+            <button className="btn-secondary" onClick={() => setShowSwingSettings((prev) => !prev)}>
+              {showSwingSettings ? 'SW目安設定を閉じる' : 'SW目安設定を開く'}
+            </button>
           )}
           {activeTab === 'lieAngle' && (
             <button className="btn-secondary" onClick={() => setShowLieSettings((prev) => !prev)}>
@@ -1116,6 +1347,233 @@ export const AnalysisScreen = ({
             </div>
           </div>
         </>
+      ) : activeTab === 'swingWeight' ? (
+        <>
+          {showSwingSettings && (
+            <div className="analysis-card lie-settings-card">
+              <div className="analysis-table-header">
+                <h2>スイングウェイト目安設定</h2>
+                <p>目安ターゲットを設定すると、偏差とステータス判定に即時反映されます。</p>
+              </div>
+              <div className="lie-settings-guide" role="note" aria-label="スイングウェイト目安設定の使い方">
+                <div className="lie-settings-guide-title">使い方</div>
+                <ul className="lie-settings-guide-list">
+                  <li>1. 目安ターゲットを 0.1 刻みで入力する</li>
+                  <li>2. 棒グラフの目安ラインと偏差表示でバランスを確認する</li>
+                  <li>3. 必要に応じて「初期値に戻す」で D2 (= 2.0) に戻す</li>
+                </ul>
+              </div>
+              <div className="lie-settings-grid">
+                <div className="lie-settings-section">
+                  <div className="lie-settings-section-title">目安ターゲット</div>
+                  <SwingTargetInputRow
+                    value={swingWeightTarget}
+                    onCommit={onSetSwingWeightTarget}
+                    onReset={onResetSwingWeightTarget}
+                  />
+                </div>
+              </div>
+              <div className="lie-settings-actions">
+                <button className="btn-secondary" onClick={onResetSwingWeightTarget}>初期値に戻す</button>
+              </div>
+            </div>
+          )}
+
+          <div className="analysis-card chart-card swing-weight-frame">
+            {hasSwingWeightData ? (
+              <>
+                <div className="analysis-legend">
+                  <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
+                  <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
+                  <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
+                  <span><i style={{ backgroundColor: '#ef6c00' }} />ウェッジ</span>
+                  <span><i style={{ backgroundColor: '#424242' }} />パター</span>
+                  <span><i style={{ backgroundColor: '#fb8c00' }} />軽微なズレ</span>
+                  <span><i style={{ backgroundColor: '#e53935' }} />調整推奨</span>
+                </div>
+                <div
+                  className="chart-scroll interactive-chart-scroll"
+                  ref={swingChartContainerRef}
+                  onMouseLeave={() => setSwingTooltip(null)}
+                >
+                  <svg
+                    viewBox={`0 0 ${swingChartSize.width} ${swingChartSize.height}`}
+                    className="analysis-chart swing-analysis-chart"
+                    role="img"
+                    aria-label="スイングウェイト分布の棒グラフ"
+                  >
+                    <rect
+                      x={SWING_PADDING.left}
+                      y={SWING_PADDING.top}
+                      width={swingChartSize.width - SWING_PADDING.left - SWING_PADDING.right}
+                      height={swingChartSize.height - SWING_PADDING.top - SWING_PADDING.bottom}
+                      fill="#ffffff"
+                      rx="18"
+                    />
+
+                    {swingTicks.map((tick) => (
+                      <g key={`sw-y-${tick}`}>
+                        <line
+                          x1={SWING_PADDING.left}
+                          x2={swingChartSize.width - SWING_PADDING.right}
+                          y1={mapSwingY(tick)}
+                          y2={mapSwingY(tick)}
+                          className="chart-grid chart-grid-animated"
+                        />
+                        <text
+                          x={SWING_PADDING.left - 8}
+                          y={mapSwingY(tick) + 4}
+                          textAnchor="end"
+                          className="chart-axis-label"
+                        >
+                          {tick}
+                        </text>
+                      </g>
+                    ))}
+
+                    <line
+                      x1={SWING_PADDING.left}
+                      x2={swingChartSize.width - SWING_PADDING.right}
+                      y1={mapSwingY(swingWeightTarget)}
+                      y2={mapSwingY(swingWeightTarget)}
+                      stroke="#2e7d32"
+                      strokeWidth="2"
+                      strokeDasharray="8 4"
+                      className="chart-standard-line"
+                    />
+                    <text
+                      x={swingChartSize.width - SWING_PADDING.right - 4}
+                      y={mapSwingY(swingWeightTarget) - 6}
+                      textAnchor="end"
+                      className="chart-axis-label"
+                    >
+                      {`目安ターゲット ${swingWeightTarget.toFixed(1)}`}
+                    </text>
+
+                    {swingWeightClubs.map((club, index) => {
+                      const cx = mapSwingX(index);
+                      const bw = swingBarWidth;
+                      const barBottom = mapSwingY(swingChartMin);
+                      const barTop = mapSwingY(club.swingWeightNumeric);
+                      const barHeight = Math.max(0, barBottom - barTop);
+                      const color = getSwingBarColor(club.category, club.swingDeviation);
+
+                      return (
+                        <g key={`swing-bar-${club.id ?? club.name}`}>
+                          <rect
+                            x={cx - bw / 2}
+                            y={barTop}
+                            width={bw}
+                            height={barHeight}
+                            fill={color.fill}
+                            stroke={color.stroke}
+                            strokeWidth={color.strokeWidth}
+                            rx="5"
+                            className="swing-weight-bar"
+                            style={{ '--point-delay': `${index * 45}ms` } as CSSProperties}
+                            onMouseEnter={() => setSwingTooltip({ x: cx, y: barTop, club })}
+                            onClick={() => setSwingTooltip({ x: cx, y: barTop, club })}
+                          >
+                            <title>{`${club.name} | ${club.swingWeight || '-'} | 目安偏差 ${(club.swingDeviation >= 0 ? '+' : '') + club.swingDeviation.toFixed(1)}`}</title>
+                          </rect>
+                          <g transform={`translate(${cx}, ${swingChartSize.height - SWING_PADDING.bottom + 12})`}>
+                            <text textAnchor="end" transform="rotate(-40)" className="chart-axis-label">
+                              {club.name}
+                            </text>
+                          </g>
+                        </g>
+                      );
+                    })}
+
+                    <text
+                      x={swingChartSize.width / 2}
+                      y={swingChartSize.height - 2}
+                      textAnchor="middle"
+                      className="chart-title-label"
+                    >
+                      クラブ
+                    </text>
+                    <text
+                      x="20"
+                      y={swingChartSize.height / 2}
+                      textAnchor="middle"
+                      transform={`rotate(-90 20 ${swingChartSize.height / 2})`}
+                      className="chart-title-label"
+                    >
+                      スイングウェイト数値
+                    </text>
+                  </svg>
+                  {swingTooltip && (
+                    <div
+                      ref={swingTooltipRef}
+                      className="chart-tooltip"
+                      style={{
+                        left: swingTooltipPos?.left,
+                        top: swingTooltipPos?.top,
+                      }}
+                    >
+                      <div className="chart-tooltip-title">{swingTooltip.club.name}</div>
+                      <div className="chart-tooltip-row">種類: {getCategoryLabel(swingTooltip.club.category)}</div>
+                      <div className="chart-tooltip-row">スイングウェイト: {swingTooltip.club.swingWeight || '-'}</div>
+                      <div className="chart-tooltip-row">
+                        目安偏差: {(swingTooltip.club.swingDeviation >= 0 ? '+' : '') + swingTooltip.club.swingDeviation.toFixed(1)}
+                      </div>
+                      <div className="chart-tooltip-row">状態: {swingTooltip.club.swingStatus}</div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="analysis-empty">クラブがまだ追加されていません</div>
+            )}
+          </div>
+
+          <div className="analysis-card table-card">
+            <div className="analysis-table-header">
+              <h2>スイングウェイト詳細</h2>
+              <p>目安値 {swingWeightTarget.toFixed(1)} を基準に、クラブごとの偏差と調整優先度を表示します。</p>
+            </div>
+            <div className="analysis-table-wrap">
+              <table className="analysis-table">
+                <thead>
+                  <tr>
+                    <th>クラブ名</th>
+                    <th>種類</th>
+                    <th>スイングウェイト</th>
+                    <th>目安偏差</th>
+                    <th>ステータス</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {hasSwingWeightData ? (
+                    swingWeightClubs.map((club) => (
+                      <tr key={`sw-row-${club.id ?? club.name}`}>
+                        <td>
+                          <div className="analysis-club-name">
+                            <span className="analysis-club-type">{club.clubType || getClubTypeShort(club.name)}</span>
+                            <span>{club.name}</span>
+                          </div>
+                        </td>
+                        <td>{getCategoryLabel(club.category)}</td>
+                        <td>{club.swingWeight || '-'}</td>
+                        <td>{club.swingDeviation >= 0 ? '+' : ''}{club.swingDeviation.toFixed(1)}</td>
+                        <td>
+                          <span style={{ color: getSwingStatusColor(club.swingStatus), fontWeight: 700 }}>
+                            {club.swingStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="analysis-empty-cell">クラブがまだ追加されていません</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       ) : (
         <>
           <div className="analysis-card chart-card weight-length-frame">
@@ -1311,6 +1769,12 @@ type LieStandardInputRowProps = {
   subLabel?: string;
 };
 
+type SwingTargetInputRowProps = {
+  value: number;
+  onCommit: (value: number) => void;
+  onReset: () => void;
+};
+
 const LieStandardInputRow = ({
   label,
   defaultValue,
@@ -1364,6 +1828,57 @@ const LieStandardInputRow = ({
         onClick={onClear}
       >
         解除
+      </button>
+    </div>
+  );
+};
+
+const SwingTargetInputRow = ({
+  value,
+  onCommit,
+  onReset,
+}: SwingTargetInputRowProps) => {
+  const [draft, setDraft] = useState(value.toFixed(1));
+
+  useEffect(() => {
+    setDraft(value.toFixed(1));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = Number(draft);
+    if (!Number.isFinite(parsed)) return;
+    onCommit(parsed);
+  };
+
+  return (
+    <div className="lie-setting-row">
+      <div className="lie-setting-labels">
+        <strong>目安ターゲット数値</strong>
+        <span>既定値: 2.0（D2相当）</span>
+        <em className="lie-setting-state">0.1 刻みで設定できます</em>
+      </div>
+      <input
+        className="analysis-input lie-setting-input"
+        type="number"
+        step="0.1"
+        min="-30"
+        max="30"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commit();
+            (event.currentTarget as HTMLInputElement).blur();
+          }
+        }}
+        onBlur={commit}
+      />
+      <button
+        className="btn-secondary lie-setting-reset"
+        type="button"
+        onClick={onReset}
+      >
+        リセット
       </button>
     </div>
   );

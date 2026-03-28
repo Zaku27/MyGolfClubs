@@ -12,6 +12,8 @@ import { useClubStore } from './store/clubStore';
 import './App.css';
 
 const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
+const SWING_TARGET_STORAGE_KEY = 'golfbag-swing-weight-target';
+const DEFAULT_SWING_TARGET = 2.0;
 
 function App() {
         const { clearAllClubs } = useClubStore();
@@ -76,6 +78,12 @@ function App() {
         return DEFAULT_USER_LIE_ANGLE_STANDARDS;
       }
     });
+  const [swingWeightTarget, setSwingWeightTarget] = useState<number>(() => {
+    const saved = window.localStorage.getItem(SWING_TARGET_STORAGE_KEY);
+    const parsed = saved ? Number(saved) : DEFAULT_SWING_TARGET;
+    if (!Number.isFinite(parsed)) return DEFAULT_SWING_TARGET;
+    return Math.round(parsed * 10) / 10;
+  });
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
   const { clubs, loading, error, loadClubs, addClub, updateClub, deleteClub, initializeDefaults, resetToDefaults } = useClubStore();
@@ -98,6 +106,23 @@ function App() {
       JSON.stringify(userLieAngleStandards),
     );
   }, [userLieAngleStandards]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      SWING_TARGET_STORAGE_KEY,
+      String(swingWeightTarget),
+    );
+  }, [swingWeightTarget]);
+
+  const handleSetSwingWeightTarget = (value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    const clamped = Math.max(-30, Math.min(30, rounded));
+    setSwingWeightTarget(clamped);
+  };
+
+  const handleResetSwingWeightTarget = () => {
+    setSwingWeightTarget(DEFAULT_SWING_TARGET);
+  };
 
   const handleSetLieTypeStandard = (clubType: string, value: number) => {
     const key = normalizeLieStandardKey(clubType);
@@ -225,6 +250,9 @@ function App() {
           onUpdateActualDistance={handleActualDistanceChange}
           headSpeed={headSpeed}
           onHeadSpeedChange={setHeadSpeed}
+          swingWeightTarget={swingWeightTarget}
+          onSetSwingWeightTarget={handleSetSwingWeightTarget}
+          onResetSwingWeightTarget={handleResetSwingWeightTarget}
           userLieAngleStandards={userLieAngleStandards}
           onSetLieTypeStandard={handleSetLieTypeStandard}
           onSetLieClubStandard={handleSetLieClubStandard}
