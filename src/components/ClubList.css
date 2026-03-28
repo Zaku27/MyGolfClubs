@@ -20,6 +20,24 @@
   min-width: 260px;
 }
 
+.club-list-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.club-list-title .title-main {
+  display: inline-block;
+}
+
+.club-list-title .title-sub {
+  font-size: clamp(13px, 1.6vw, 18px);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-soft);
+}
+
 .club-count {
   background: linear-gradient(140deg, var(--primary), #2b9b66);
   color: #ffffff;
@@ -32,15 +50,9 @@
 }
 
 .btn-add-club {
-  background: linear-gradient(135deg, var(--primary), #2b9b66);
+  background: linear-gradient(135deg, var(--primary), #2b9b66) !important;
   color: #ffffff;
-  padding: 12px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  border: 1px solid var(--primary);
+  border-color: var(--primary) !important;
 }
 
 .club-list-actions .btn-icon,
@@ -51,6 +63,7 @@
   border-radius: 12px;
   width: 44px;
   height: 44px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -58,13 +71,25 @@
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+.club-list-actions .btn-icon svg,
+.club-list-actions .btn-import-json svg {
+  color: currentColor;
 }
 
 .club-list-actions .btn-icon:hover:not(:disabled),
 .club-list-actions .btn-import-json:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   background-color: var(--surface-2);
   border-color: #c3d4c8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.club-list-actions .btn-icon:active:not(:disabled),
+.club-list-actions .btn-import-json:active {
+  transform: translateY(-1px);
 }
 
 .club-list-actions .btn-icon:disabled {
@@ -73,48 +98,86 @@
 }
 
 .btn-toggle-view {
-  background: #2b8db5;
+  background: #2b8db5 !important;
   color: #ffffff;
-  border-color: #2b8db5;
+  border-color: #2b8db5 !important;
+}
+
+.btn-toggle-view:hover:not(:disabled) {
+  background: #1e6a8c !important;
+  border-color: #1e6a8c !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+}
+
+.btn-toggle-view:active:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .btn-analysis {
-  background: #7a5af8;
+  background: #7a5af8 !important;
   color: #ffffff;
-  border-color: #7a5af8;
+  border-color: #7a5af8 !important;
 }
 
 .btn-analysis:hover:not(:disabled) {
-  background: #6948eb;
-  border-color: #6948eb;
+  background: #6948eb !important;
+  border-color: #6948eb !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(122, 90, 248, 0.2) !important;
+}
+
+.btn-analysis:active:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .btn-add-club:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--primary-strong), #208955);
-  border-color: var(--primary-strong);
+  background: linear-gradient(135deg, var(--primary-strong), #208955) !important;
+  border-color: var(--primary-strong) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(47, 128, 82, 0.2) !important;
+}
+
+.btn-add-club:active:not(:disabled) {
   transform: translateY(-1px);
 }
 
 .club-list-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
+  align-items: center;
 }
 
 .btn-reset-clubs {
-  background-color: #ffefef;
+  background-color: #ffffff;
   color: var(--danger);
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
-  border: 1px solid #ffd2d2;
+  border: 1.5px solid var(--danger-light, #f0d4d4);
   border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: auto;
+  line-height: 1;
+}
+
+.btn-reset-clubs svg {
+  flex-shrink: 0;
+  color: currentColor;
 }
 
 .btn-reset-clubs:hover:not(:disabled) {
   background-color: #ffe4e4;
   color: var(--danger-strong);
+  border-color: #ff9e9e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .btn-reset-clubs:disabled {
@@ -123,26 +186,37 @@
 }
 
 .btn-clearall-clubs {
-  background-color: var(--danger);
+  background: linear-gradient(135deg, var(--danger), #d32f2f);
   color: #ffffff;
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
-  border: 1px solid var(--danger);
+  border: 1.5px solid var(--danger);
   border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: auto;
+  line-height: 1;
+}
+
+.btn-clearall-clubs svg {
+  flex-shrink: 0;
+  color: currentColor;
 }
 
 .btn-clearall-clubs:hover:not(:disabled) {
-  background-color: var(--danger-strong);
+  background: linear-gradient(135deg, var(--danger-strong), #b71c1c);
   border-color: var(--danger-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
-.btn-import-json {
-  position: relative;
-}
-
-.btn-import-json input[type="file"] {
-  display: none;
+.btn-clearall-clubs:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .club-list-bottom {
@@ -186,6 +260,11 @@
   gap: 14px;
 }
 
+.club-list.compact {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 6px;
+}
+
 @media (max-width: 768px) {
   .club-list-header {
     justify-content: flex-start;
@@ -202,5 +281,10 @@
 
   .club-list-bottom button {
     width: 100%;
+  }
+
+  .club-list.compact {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 }
