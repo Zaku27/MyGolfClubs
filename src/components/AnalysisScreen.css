@@ -368,7 +368,7 @@
 
   .analysis-tab-nav {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     width: 100%;
   }
 
@@ -421,4 +421,34 @@
     stroke-dashoffset: 0;
     opacity: 1;
   }
+}
+
+.lie-angle-frame {
+  border: 1px solid #9ccc9c;
+  background: linear-gradient(145deg, #f7fff7 0%, #eef8ee 100%);
+}
+
+.lie-analysis-chart {
+  min-width: 0;
+}
+
+.lie-angle-bar {
+  opacity: 0;
+  animation: chartGridFade 0.5s ease forwards;
+  animation-delay: var(--point-delay, 0ms);
+  cursor: pointer;
+}
+
+.lie-angle-bar:hover {
+  filter: brightness(1.12);
+}
+
+.lie-status-good {
+  color: #2e7d32;
+  font-weight: 700;
+}
+
+.lie-status-adjust {
+  color: #d84315;
+  font-weight: 700;
 }

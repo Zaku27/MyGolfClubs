@@ -13,6 +13,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../models/golf_club.dart';
 import '../providers/club_providers.dart';
+import '../widgets/lie_angle_distribution_chart.dart';
 import '../widgets/weight_vs_length_chart.dart';
 
 // ============================================================================
@@ -24,7 +25,7 @@ class AnalysisScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       initialIndex: 1,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
@@ -33,8 +34,11 @@ class AnalysisScreen extends ConsumerWidget {
           centerTitle: false,
           bottom: const TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.scatter_plot_outlined), text: 'Loft vs Distance'),
+              Tab(
+                  icon: Icon(Icons.scatter_plot_outlined),
+                  text: 'Loft vs Distance'),
               Tab(icon: Icon(Icons.straighten), text: 'Weight vs Length'),
+              Tab(icon: Icon(Icons.bar_chart_rounded), text: 'Lie Angle'),
             ],
           ),
         ),
@@ -42,6 +46,7 @@ class AnalysisScreen extends ConsumerWidget {
           children: [
             LoftDistanceTab(),
             WeightLengthTab(),
+            LieAngleTab(),
           ],
         ),
       ),
@@ -59,6 +64,20 @@ class WeightLengthTab extends ConsumerWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: WeightVsLengthChart(clubs: clubs),
+    );
+  }
+}
+
+class LieAngleTab extends ConsumerWidget {
+  const LieAngleTab({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clubs = ref.watch(clubsProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: LieAngleDistributionChart(clubs: clubs),
     );
   }
 }
@@ -101,11 +120,13 @@ class LoftDistanceTab extends ConsumerWidget {
 
           // ── Scatter chart ────────────────────────────────────────────────
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 2,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(8, 20, 24, 8),
-              child: _LoftVsDistanceChart(clubs: chartClubs, headSpeed: headSpeed),
+              child:
+                  _LoftVsDistanceChart(clubs: chartClubs, headSpeed: headSpeed),
             ),
           ),
           const SizedBox(height: 12),
@@ -165,7 +186,8 @@ class _LoftVsDistanceChart extends StatelessWidget {
   static const double _bottomAxisName = 20;
 
   List<FlSpot> _buildActualLineSpots() {
-    final sorted = [...clubs]..sort((a, b) => a.loftAngle.compareTo(b.loftAngle));
+    final sorted = [...clubs]
+      ..sort((a, b) => a.loftAngle.compareTo(b.loftAngle));
     return [
       for (final c in sorted)
         if (c.distance > 0) FlSpot(c.loftAngle, c.distance),
@@ -231,7 +253,8 @@ class _LoftVsDistanceChart extends StatelessWidget {
           ),
         ),
         bottomTitles: AxisTitles(
-          axisNameWidget: const Text('Loft Angle (°)', style: TextStyle(fontSize: 11)),
+          axisNameWidget:
+              const Text('Loft Angle (°)', style: TextStyle(fontSize: 11)),
           axisNameSize: _bottomAxisName,
           sideTitles: SideTitles(
             showTitles: true,
@@ -244,7 +267,8 @@ class _LoftVsDistanceChart extends StatelessWidget {
           ),
         ),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles:
+            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
       gridData: FlGridData(
         show: true,
@@ -263,7 +287,8 @@ class _LoftVsDistanceChart extends StatelessWidget {
         enabled: true,
         touchTooltipData: ScatterTouchTooltipData(
           getTooltipColor: (_) => const Color(0xDD1C1C1E),
-          tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          tooltipPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           getTooltipItems: (ScatterSpot spot) {
             // Match club by loftAngle (which is our X value — unique per club)
             final club = clubs.firstWhere(
@@ -305,14 +330,17 @@ class _LoftVsDistanceChart extends StatelessWidget {
       titlesData: FlTitlesData(
         leftTitles: AxisTitles(
           axisNameSize: _leftAxisName,
-          sideTitles: SideTitles(showTitles: false, reservedSize: _leftReserved),
+          sideTitles:
+              SideTitles(showTitles: false, reservedSize: _leftReserved),
         ),
         bottomTitles: AxisTitles(
           axisNameSize: _bottomAxisName,
-          sideTitles: SideTitles(showTitles: false, reservedSize: _bottomReserved),
+          sideTitles:
+              SideTitles(showTitles: false, reservedSize: _bottomReserved),
         ),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles:
+            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
       lineBarsData: canDrawLine
           ? [
@@ -355,10 +383,10 @@ class _ChartLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const categories = [
-      (ClubCategory.wood,   'Woods'),
+      (ClubCategory.wood, 'Woods'),
       (ClubCategory.hybrid, 'Hybrids'),
-      (ClubCategory.iron,   'Irons'),
-      (ClubCategory.wedge,  'Wedges'),
+      (ClubCategory.iron, 'Irons'),
+      (ClubCategory.wedge, 'Wedges'),
       (ClubCategory.putter, 'Putter'),
     ];
 
@@ -470,7 +498,8 @@ class _HeadSpeedInputState extends State<_HeadSpeedInput> {
               width: 88,
               child: TextField(
                 controller: _controller,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,1}')),
                   LengthLimitingTextInputFormatter(4),
@@ -478,14 +507,16 @@ class _HeadSpeedInputState extends State<_HeadSpeedInput> {
                 decoration: const InputDecoration(
                   isDense: true,
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 ),
                 onSubmitted: (_) => _commit(),
                 onTapOutside: (_) => _commit(),
               ),
             ),
             const SizedBox(width: 8),
-            Text('m/s', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            Text('m/s',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           ],
         ),
       ),
@@ -566,7 +597,8 @@ class _LoftDistanceTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...clubs]..sort((a, b) => a.loftAngle.compareTo(b.loftAngle));
+    final sorted = [...clubs]
+      ..sort((a, b) => a.loftAngle.compareTo(b.loftAngle));
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -595,7 +627,8 @@ class _LoftDistanceTable extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: const Color(0xFFEAF4ED),
                         borderRadius: BorderRadius.circular(6),
@@ -629,8 +662,8 @@ class _LoftDistanceTable extends StatelessWidget {
                 // Estimated distance (read-only, blue-grey)
                 DataCell(Text(
                   '${club.estimatedDistanceFor(headSpeed).toStringAsFixed(0)} y',
-                  style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF546E7A)),
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF546E7A)),
                 )),
                 // Actual distance (editable)
                 DataCell(_EditableDistanceCell(
@@ -651,8 +684,8 @@ class _HeaderCell extends StatelessWidget {
   final String text;
   const _HeaderCell(this.text);
   @override
-  Widget build(BuildContext context) =>
-      Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13));
+  Widget build(BuildContext context) => Text(text,
+      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13));
 }
 
 // ============================================================================
@@ -682,9 +715,8 @@ class _EditableDistanceCellState extends State<_EditableDistanceCell> {
   void initState() {
     super.initState();
     _ctrl = TextEditingController(
-      text: widget.currentValue > 0
-          ? widget.currentValue.toStringAsFixed(0)
-          : '',
+      text:
+          widget.currentValue > 0 ? widget.currentValue.toStringAsFixed(0) : '',
     );
   }
 
@@ -693,9 +725,8 @@ class _EditableDistanceCellState extends State<_EditableDistanceCell> {
     super.didUpdateWidget(old);
     // Keep the text field in sync when the value is updated externally
     if (!_editing && old.currentValue != widget.currentValue) {
-      _ctrl.text = widget.currentValue > 0
-          ? widget.currentValue.toStringAsFixed(0)
-          : '';
+      _ctrl.text =
+          widget.currentValue > 0 ? widget.currentValue.toStringAsFixed(0) : '';
     }
   }
 
@@ -711,9 +742,8 @@ class _EditableDistanceCellState extends State<_EditableDistanceCell> {
       widget.onCommit(parsed);
     } else {
       // Revert to last valid value on bad input
-      _ctrl.text = widget.currentValue > 0
-          ? widget.currentValue.toStringAsFixed(0)
-          : '';
+      _ctrl.text =
+          widget.currentValue > 0 ? widget.currentValue.toStringAsFixed(0) : '';
     }
     setState(() => _editing = false);
   }
@@ -736,8 +766,7 @@ class _EditableDistanceCellState extends State<_EditableDistanceCell> {
             isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             suffixText: 'y',
             suffixStyle: TextStyle(fontSize: 11, color: Colors.grey[600]),
           ),
@@ -779,8 +808,7 @@ class _EditableDistanceCellState extends State<_EditableDistanceCell> {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.edit_outlined,
-                size: 13, color: Colors.grey.shade400),
+            Icon(Icons.edit_outlined, size: 13, color: Colors.grey.shade400),
           ],
         ),
       ),
