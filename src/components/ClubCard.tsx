@@ -12,9 +12,10 @@ interface ClubCardProps {
 
 export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, viewMode = 'full' }) => {
   const clubTypeShort = club.clubType || getClubTypeShort(club.name);
+  const compactLoft = club.loftAngle != null ? `${club.loftAngle}°` : '-';
 
   return (
-    <div className="club-card">
+    <div className={`club-card ${viewMode === 'compact' ? 'compact' : ''}`}>
       <div className="club-card-header">
         <h3>
           <span className="club-type">{clubTypeShort}</span>
@@ -90,8 +91,11 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
               )}
             </>
           ) : (
-            <div className="compact-view">
-              {/* 簡易表示ではロフト角・ライ角を非表示 */}
+            <div className="compact-view" aria-label="簡易スペック">
+              <span className="compact-item"><strong>L</strong>{club.length}"</span>
+              <span className="compact-item"><strong>W</strong>{club.weight}g</span>
+              <span className="compact-item"><strong>Loft</strong>{compactLoft}</span>
+              <span className="compact-item"><strong>SW</strong>{club.swingWeight}</span>
             </div>
           )}
       </div>

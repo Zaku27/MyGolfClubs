@@ -19,7 +19,7 @@ class MyGolfBagApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'My Golf Bag',
+      title: 'クラブラボ- 自分のクラブを楽しく分析',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

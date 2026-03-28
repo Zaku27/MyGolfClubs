@@ -1,5 +1,5 @@
 name: my_golf_bag
-description: Golf club bag manager — track clubs, specs, and distance analysis.
+description: クラブラボ- 自分のクラブを楽しく分析。スペック、距離、バランスを管理。
 publish_to: 'none'
 version: 1.0.0+1
 

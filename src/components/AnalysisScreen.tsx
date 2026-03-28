@@ -353,7 +353,7 @@ export const AnalysisScreen = ({
   onClearLieClubStandard,
   onResetLieStandards,
 }: AnalysisScreenProps) => {
-  const [activeTab, setActiveTab] = useState<'weightLength' | 'loftDistance' | 'lieAngle' | 'swingWeight'>('weightLength');
+  const [activeTab, setActiveTab] = useState<'weightLength' | 'loftDistance' | 'lieAngle' | 'swingWeight'>('loftDistance');
   const [showLieSettings, setShowLieSettings] = useState(false);
   const [showSwingSettings, setShowSwingSettings] = useState(false);
   const [loftTooltip, setLoftTooltip] = useState<LoftTooltipState | null>(null);
@@ -751,15 +751,6 @@ export const AnalysisScreen = ({
           )}
           <div className="analysis-tab-nav" role="tablist" aria-label="分析タブ">
             <button
-              className={`analysis-tab-btn ${activeTab === 'weightLength' ? 'active' : ''}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'weightLength'}
-              onClick={() => setActiveTab('weightLength')}
-            >
-              重量と長さ
-            </button>
-            <button
               className={`analysis-tab-btn ${activeTab === 'loftDistance' ? 'active' : ''}`}
               type="button"
               role="tab"
@@ -769,15 +760,6 @@ export const AnalysisScreen = ({
               ロフトと飛距離
             </button>
             <button
-              className={`analysis-tab-btn ${activeTab === 'swingWeight' ? 'active' : ''}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'swingWeight'}
-              onClick={() => setActiveTab('swingWeight')}
-            >
-              SW分布
-            </button>
-            <button
               className={`analysis-tab-btn ${activeTab === 'lieAngle' ? 'active' : ''}`}
               type="button"
               role="tab"
@@ -785,6 +767,24 @@ export const AnalysisScreen = ({
               onClick={() => setActiveTab('lieAngle')}
             >
               ライ角分布
+            </button>
+            <button
+              className={`analysis-tab-btn ${activeTab === 'weightLength' ? 'active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'weightLength'}
+              onClick={() => setActiveTab('weightLength')}
+            >
+              重量と長さ
+            </button>
+            <button
+              className={`analysis-tab-btn ${activeTab === 'swingWeight' ? 'active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'swingWeight'}
+              onClick={() => setActiveTab('swingWeight')}
+            >
+              SW分布
             </button>
           </div>
         </div>
