@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState, type CSSProperties, type ChangeEvent } from 'react';
 import type { GolfClub } from '../types/golf';
 import { getClubTypeShort } from '../utils/clubUtils';
-import standardLieAnglesJson from '../../flutter/assets/lie_angle_standards.json';
+import {
+  DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE,
+  type LieAngleStatus,
+  lieStatusColor,
+  lieStatusLabelJa,
+  lieStatusFromDeviation,
+  makePerClubLieStandardKey,
+  normalizeLieStandardKey,
+  resolveStandardLieAngle,
+  type UserLieAngleStandards,
+} from '../types/lieStandards';
 import './AnalysisScreen.css';
 
 type AnalysisScreenProps = {
@@ -10,6 +20,12 @@ type AnalysisScreenProps = {
   onUpdateActualDistance: (clubId: number, distance: number) => void;
   headSpeed: number;
   onHeadSpeedChange: (value: number) => void;
+  userLieAngleStandards: UserLieAngleStandards;
+  onSetLieTypeStandard: (clubType: string, value: number) => void;
+  onSetLieClubStandard: (clubName: string, value: number) => void;
+  onClearLieTypeStandard: (clubType: string) => void;
+  onClearLieClubStandard: (clubName: string) => void;
+  onResetLieStandards: () => void;
 };
 
 type ClubCategory = 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
@@ -28,22 +44,16 @@ const MAX_WEIGHT = 550;
 
 const LIE_MIN = 50;
 const LIE_MAX = 70;
+const LIE_GOOD_TOLERANCE = 1.5;
 const LIE_PADDING = { top: 30, right: 28, bottom: 80, left: 56 };
-
-const STANDARD_LIE_ANGLE_BY_TYPE = Object.freeze(
-  Object.fromEntries(
-    Object.entries(standardLieAnglesJson).map(([clubType, value]) => [
-      clubType.toUpperCase(),
-      Number(value),
-    ]),
-  ) as Record<string, number>,
-);
+const LIE_STANDARD_LINE_COLOR = '#00897b';
 
 const getLieBarColor = (category: ClubCategory): string => {
   switch (category) {
     case 'wood':
-    case 'hybrid':
       return '#1976d2';
+    case 'hybrid':
+      return '#26c6da';
     case 'iron':
       return '#2e7d32';
     case 'wedge':
@@ -77,6 +87,7 @@ type LieTooltipState = {
     category: ClubCategory;
     standardLieAngle: number;
     deviationFromStandard: number;
+    lieStatus: LieAngleStatus;
   };
 };
 
@@ -162,30 +173,35 @@ const getCategoryLabel = (category: ClubCategory) => {
   }
 };
 
-const getStandardLieAngle = (club: GolfClub): number => {
-  const clubType = (club.clubType ?? '').toUpperCase().trim();
-  const directMatch = STANDARD_LIE_ANGLE_BY_TYPE[clubType];
-  if (directMatch != null) {
-    return directMatch;
+const getClubTypeSortKey = (clubTypeRaw: string): [number, number, string] => {
+  const clubType = normalizeLieStandardKey(clubTypeRaw);
+  if (clubType === 'D') return [0, 0, clubType];
+  if (clubType === 'PW') return [3, 10, clubType];
+  if (clubType.endsWith('W')) {
+    const n = Number(clubType.replace('W', ''));
+    return [1, Number.isFinite(n) ? n : 999, clubType];
   }
-
+  if (clubType.endsWith('H')) {
+    const n = Number(clubType.replace('H', ''));
+    return [2, Number.isFinite(n) ? n : 999, clubType];
+  }
+  if (clubType.endsWith('I')) {
+    const n = Number(clubType.replace('I', ''));
+    return [3, Number.isFinite(n) ? n : 999, clubType];
+  }
   if (/^\d+(\.\d+)?$/.test(clubType)) {
-    return 64.0;
+    return [5, Number(clubType), clubType];
   }
+  if (clubType === 'P') return [6, 0, clubType];
+  return [7, 999, clubType];
+};
 
-  const category = getClubCategory(club);
-  switch (category) {
-    case 'wood':
-      return 57.0;
-    case 'hybrid':
-      return 59.5;
-    case 'iron':
-      return 63.0;
-    case 'wedge':
-      return 64.0;
-    case 'putter':
-      return 70.0;
-  }
+const compareClubTypeOrder = (a: string, b: string): number => {
+  const [ag, av, as] = getClubTypeSortKey(a);
+  const [bg, bv, bs] = getClubTypeSortKey(b);
+  if (ag !== bg) return ag - bg;
+  if (av !== bv) return av - bv;
+  return as.localeCompare(bs);
 };
 
 const getWeightLengthDotRadius = (club: GolfClub) => {
@@ -225,8 +241,21 @@ const getTooltipPosition = (
   return { left, top };
 };
 
-export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpeed, onHeadSpeedChange }: AnalysisScreenProps) => {
+export const AnalysisScreen = ({
+  clubs,
+  onBack,
+  onUpdateActualDistance,
+  headSpeed,
+  onHeadSpeedChange,
+  userLieAngleStandards,
+  onSetLieTypeStandard,
+  onSetLieClubStandard,
+  onClearLieTypeStandard,
+  onClearLieClubStandard,
+  onResetLieStandards,
+}: AnalysisScreenProps) => {
   const [activeTab, setActiveTab] = useState<'weightLength' | 'loftDistance' | 'lieAngle'>('weightLength');
+  const [showLieSettings, setShowLieSettings] = useState(false);
   const [loftTooltip, setLoftTooltip] = useState<LoftTooltipState | null>(null);
   const [weightTooltip, setWeightTooltip] = useState<WeightTooltipState | null>(null);
   const [loftTooltipBox, setLoftTooltipBox] = useState<TooltipBoxSize>({ width: 200, height: 120 });
@@ -278,16 +307,20 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
     })
     .map((club) => {
       const category = getClubCategory(club);
-      const standardLieAngle = getStandardLieAngle(club);
+      const standardLieAngle = resolveStandardLieAngle(club, userLieAngleStandards);
+      const deviationFromStandard = club.lieAngle - standardLieAngle;
+      const lieStatus = lieStatusFromDeviation(deviationFromStandard);
       return {
         ...club,
         category,
         standardLieAngle,
-        deviationFromStandard: club.lieAngle - standardLieAngle,
+        deviationFromStandard,
+        lieStatus,
       };
     });
 
   useEffect(() => {
+    if (activeTab !== 'loftDistance') return;
     const container = loftChartContainerRef.current;
     if (!container || typeof ResizeObserver === 'undefined') return;
 
@@ -309,9 +342,10 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab !== 'weightLength') return;
     const container = weightChartContainerRef.current;
     if (!container || typeof ResizeObserver === 'undefined') return;
 
@@ -333,7 +367,7 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!loftTooltip || !loftTooltipRef.current) return;
@@ -360,6 +394,7 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
   }, [weightTooltip]);
 
   useEffect(() => {
+    if (activeTab !== 'lieAngle') return;
     const container = lieChartContainerRef.current;
     if (!container || typeof ResizeObserver === 'undefined') return;
     const updateSize = (nextWidth: number) => {
@@ -378,7 +413,7 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!lieTooltip || !lieTooltipRef.current) return;
@@ -449,6 +484,17 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
 
   const lieBarWidth = Math.min(32, Math.max(12, ((lieChartSize.width - LIE_PADDING.left - LIE_PADDING.right) / Math.max(1, lieAngleClubs.length)) * 0.55));
   const lieTicks = [50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70];
+  const standardLieLinePoints = lieAngleClubs
+    .map((club, index) => `${mapLieX(index)},${mapLieY(club.standardLieAngle)}`)
+    .join(' ');
+  const upperGoodRangePoints = lieAngleClubs
+    .map((club, index) => `${mapLieX(index)},${mapLieY(Math.min(LIE_MAX, club.standardLieAngle + LIE_GOOD_TOLERANCE))}`)
+    .join(' ');
+  const goodRangePolygonPoints = lieAngleClubs.length > 1
+    ? `${upperGoodRangePoints} ${lieAngleClubs
+      .map((club, index) => `${mapLieX(lieAngleClubs.length - 1 - index)},${mapLieY(Math.max(LIE_MIN, club.standardLieAngle - LIE_GOOD_TOLERANCE))}`)
+      .join(' ')}`
+    : '';
 
   const handleActualDistanceChange = (clubId: number | undefined, event: ChangeEvent<HTMLInputElement>) => {
     if (clubId == null) return;
@@ -533,6 +579,11 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
                 <em>m/s</em>
               </div>
             </label>
+          )}
+          {activeTab === 'lieAngle' && (
+            <button className="btn-secondary" onClick={() => setShowLieSettings((prev) => !prev)}>
+              {showLieSettings ? '基準値設定を閉じる' : '基準値設定を開く'}
+            </button>
           )}
           <button className="btn-secondary" onClick={onBack}>
             クラブ一覧へ戻る
@@ -772,15 +823,82 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
         </>
       ) : activeTab === 'lieAngle' ? (
         <>
+          {showLieSettings && (
+            <div className="analysis-card lie-settings-card">
+              <div className="analysis-table-header">
+                <h2>ライ角基準値設定</h2>
+                <p>まずはクラブタイプ別を設定し、必要なクラブだけ個別上書きを入れてください。</p>
+              </div>
+              <div className="lie-settings-guide" role="note" aria-label="ライ角基準値設定の使い方">
+                <div className="lie-settings-guide-title">使い方（おすすめ手順）</div>
+                <ul className="lie-settings-guide-list">
+                  <li>1. 先に「クラブタイプ別（基本）」を設定する</li>
+                  <li>2. ずれが気になるクラブだけ「クラブ別 override」を設定する</li>
+                  <li>3. 入力後は Enter またはフォーカス移動で保存。解除で元に戻せます</li>
+                </ul>
+              </div>
+              <div className="lie-settings-grid">
+                <div className="lie-settings-section">
+                  <div className="lie-settings-section-title">1) クラブタイプ別（基本）</div>
+                  {[...new Set([...Object.keys(DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE), ...clubs.map((c) => normalizeLieStandardKey(c.clubType))])]
+                    .sort(compareClubTypeOrder)
+                    .map((clubType) => (
+                      <LieStandardInputRow
+                        key={`type-${clubType}`}
+                        label={clubType}
+                        defaultValue={DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE[clubType] ?? 64}
+                        currentValue={userLieAngleStandards.byClubType[clubType]}
+                        onCommit={(value) => onSetLieTypeStandard(clubType, value)}
+                        onClear={() => onClearLieTypeStandard(clubType)}
+                      />
+                    ))}
+                </div>
+                <div className="lie-settings-section">
+                  <div className="lie-settings-section-title">2) クラブ別 override（必要なものだけ）</div>
+                  {lieAngleClubs.map((club) => (
+                    <LieStandardInputRow
+                      key={`club-${club.id ?? club.name}`}
+                      label={club.name}
+                      subLabel={club.clubType}
+                      defaultValue={club.standardLieAngle}
+                      currentValue={
+                        userLieAngleStandards.byClubName[
+                          makePerClubLieStandardKey(club.name, club.clubType)
+                        ]
+                      }
+                      onCommit={(value) =>
+                        onSetLieClubStandard(
+                          makePerClubLieStandardKey(club.name, club.clubType),
+                          value,
+                        )
+                      }
+                      onClear={() =>
+                        onClearLieClubStandard(
+                          makePerClubLieStandardKey(club.name, club.clubType),
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="lie-settings-actions">
+                <button className="btn-secondary" onClick={onResetLieStandards}>全てリセット</button>
+              </div>
+            </div>
+          )}
+
           <div className="analysis-card chart-card lie-angle-frame">
             {lieAngleClubs.length > 0 ? (
               <>
                 <div className="analysis-legend">
                   <span><i style={{ backgroundColor: '#2e7d32' }} />アイアン</span>
-                  <span><i style={{ backgroundColor: '#1976d2' }} />ウッド / ハイブリッド</span>
+                  <span><i style={{ backgroundColor: '#1976d2' }} />ウッド</span>
+                  <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
                   <span><i style={{ backgroundColor: '#ef6c00' }} />ウェッジ</span>
                   <span><i style={{ backgroundColor: '#424242' }} />パター</span>
-                  <span><i style={{ backgroundColor: '#c62828' }} />基準値 ±2° 外</span>
+                  <span><i className="legend-good-range" />良好範囲 ±1.5°</span>
+                  <span><i className="legend-standard-line" />基準値ライン</span>
+                  <span><i style={{ backgroundColor: '#c62828' }} />調整推奨</span>
                 </div>
                 <div
                   className="chart-scroll interactive-chart-scroll"
@@ -820,6 +938,22 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
                         </text>
                       </g>
                     ))}
+                    {goodRangePolygonPoints && (
+                      <polygon
+                        points={goodRangePolygonPoints}
+                        fill="#2e7d32"
+                        fillOpacity="0.16"
+                      />
+                    )}
+                    {standardLieLinePoints && (
+                      <polyline
+                        points={standardLieLinePoints}
+                        fill="none"
+                        stroke={LIE_STANDARD_LINE_COLOR}
+                        strokeWidth="3"
+                        className="chart-standard-line"
+                      />
+                    )}
                     {lieAngleClubs.map((club, index) => {
                       const cx = mapLieX(index);
                       const bw = lieBarWidth;
@@ -827,11 +961,24 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
                       const lieVal = club.lieAngle;
                       const barTop = mapLieY(Math.min(Math.max(lieVal, LIE_MIN), LIE_MAX));
                       const barHeight = Math.max(0, barBottom - barTop);
-                      const outOfRange = Math.abs(club.deviationFromStandard) > 2;
+                      const standardY = mapLieY(club.standardLieAngle);
+                      const status = club.lieStatus;
+                      const outOfRange = status === 'Adjust Recommended';
                       const barColor = outOfRange ? '#c62828' : getLieBarColor(club.category);
                       const deviation = club.deviationFromStandard;
                       return (
                         <g key={`lie-bar-${club.id ?? club.name}`}>
+                          <circle
+                            cx={cx}
+                            cy={standardY}
+                            r="4"
+                            fill={LIE_STANDARD_LINE_COLOR}
+                            stroke="#ffffff"
+                            strokeWidth="1.5"
+                            className="chart-standard-point"
+                          >
+                            <title>{`${club.name} | 基準ライ角 ${club.standardLieAngle.toFixed(1)}°`}</title>
+                          </circle>
                           <rect
                             x={cx - bw / 2}
                             y={mapLieY(LIE_MAX)}
@@ -847,8 +994,8 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
                             height={barHeight}
                             fill={barColor}
                             rx="4"
-                            stroke={outOfRange ? '#8e0000' : 'none'}
-                            strokeWidth={outOfRange ? 2 : 0}
+                            stroke={status === 'Slightly Off' ? '#ef6c00' : outOfRange ? '#8e0000' : 'none'}
+                            strokeWidth={status === 'Slightly Off' || outOfRange ? 2 : 0}
                             className="lie-angle-bar"
                             style={{ '--point-delay': `${index * 45}ms` } as CSSProperties}
                             onMouseEnter={() => setLieTooltip({ x: cx, y: barTop, club })}
@@ -903,6 +1050,7 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
                         偏差: {lieTooltip.club.deviationFromStandard >= 0 ? '+' : ''}
                         {lieTooltip.club.deviationFromStandard.toFixed(1)}°
                       </div>
+                      <div className="chart-tooltip-row">状態: {lieStatusLabelJa(lieTooltip.club.lieStatus)}</div>
                       <div className="chart-tooltip-row">種別: {lieTooltip.club.clubType}</div>
                     </div>
                   )}
@@ -924,15 +1072,16 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
                   <tr>
                     <th>クラブ名</th>
                     <th>種類</th>
-                    <th>ライ角（°）</th>
-                    <th>基準値との偏差</th>
+                    <th>計測値（°）</th>
+                    <th>基準値（°）</th>
+                    <th>偏差（°）</th>
                     <th>ステータス</th>
                   </tr>
                 </thead>
                 <tbody>
                   {lieAngleClubs.map((club) => {
                     const deviation = club.deviationFromStandard;
-                    const isGood = Math.abs(deviation) <= 2;
+                    const status = club.lieStatus;
                     return (
                       <tr key={`lie-row-${club.id ?? club.name}`}>
                         <td>
@@ -943,10 +1092,20 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
                         </td>
                         <td>{getCategoryLabel(club.category)}</td>
                         <td>{club.lieAngle.toFixed(1)}</td>
+                        <td>{club.standardLieAngle.toFixed(1)}</td>
                         <td>{deviation >= 0 ? '+' : ''}{deviation.toFixed(1)}°</td>
                         <td>
-                          <span className={isGood ? 'lie-status-good' : 'lie-status-adjust'}>
-                            {isGood ? '良好' : '調整推奨'}
+                          <span
+                            className={
+                              status === 'Good'
+                                ? 'lie-status-good'
+                                : status === 'Slightly Off'
+                                  ? 'lie-status-slight'
+                                  : 'lie-status-adjust'
+                            }
+                            style={{ color: lieStatusColor(status) }}
+                          >
+                            {lieStatusLabelJa(status)}
                           </span>
                         </td>
                       </tr>
@@ -1139,6 +1298,73 @@ export const AnalysisScreen = ({ clubs, onBack, onUpdateActualDistance, headSpee
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+type LieStandardInputRowProps = {
+  label: string;
+  defaultValue: number;
+  currentValue?: number;
+  onCommit: (value: number) => void;
+  onClear: () => void;
+  subLabel?: string;
+};
+
+const LieStandardInputRow = ({
+  label,
+  defaultValue,
+  currentValue,
+  onCommit,
+  onClear,
+  subLabel,
+}: LieStandardInputRowProps) => {
+  const [value, setValue] = useState((currentValue ?? defaultValue).toFixed(1));
+  const isOverridden = currentValue != null;
+
+  useEffect(() => {
+    setValue((currentValue ?? defaultValue).toFixed(1));
+  }, [currentValue, defaultValue]);
+
+  const commit = () => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    onCommit(parsed);
+  };
+
+  return (
+    <div className="lie-setting-row">
+      <div className="lie-setting-labels">
+        <strong>{label}</strong>
+        {subLabel ? <span>{subLabel}</span> : null}
+        <em className={isOverridden ? 'lie-setting-state is-overridden' : 'lie-setting-state'}>
+          {isOverridden
+            ? `上書き中: ${currentValue!.toFixed(1)}°`
+            : `未設定（標準値 ${defaultValue.toFixed(1)}° を使用）`}
+        </em>
+      </div>
+      <input
+        className="analysis-input lie-setting-input"
+        type="number"
+        step="0.1"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commit();
+            (event.currentTarget as HTMLInputElement).blur();
+          }
+        }}
+        onBlur={commit}
+      />
+      <button
+        className="btn-secondary lie-setting-reset"
+        type="button"
+        title="この行の上書きを解除"
+        onClick={onClear}
+      >
+        解除
+      </button>
     </div>
   );
 };

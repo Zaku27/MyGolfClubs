@@ -13,6 +13,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../models/golf_club.dart';
 import '../providers/club_providers.dart';
+import 'lie_angle_settings_screen.dart';
 import '../widgets/lie_angle_distribution_chart.dart';
 import '../widgets/weight_vs_length_chart.dart';
 
@@ -32,6 +33,19 @@ class AnalysisScreen extends ConsumerWidget {
         appBar: AppBar(
           title: const Text('クラブ分析'),
           centerTitle: false,
+          actions: [
+            IconButton(
+              tooltip: 'Lie angle standards settings',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const LieAngleSettingsScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.tune_rounded),
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(

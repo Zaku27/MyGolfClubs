@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import type { GolfClub } from './types/golf';
+import {
+  DEFAULT_USER_LIE_ANGLE_STANDARDS,
+  normalizeLieStandardKey,
+  type UserLieAngleStandards,
+} from './types/lieStandards';
 import { ClubList } from './components/ClubList';
 import { ClubForm } from './components/ClubForm';
 import { AnalysisScreen } from './components/AnalysisScreen';
 import { useClubStore } from './store/clubStore';
 import './App.css';
+
+const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
 
 function App() {
         const { clearAllClubs } = useClubStore();
@@ -55,6 +62,20 @@ function App() {
     const parsed = saved ? Number(saved) : 42;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 42;
   });
+  const [userLieAngleStandards, setUserLieAngleStandards] =
+    useState<UserLieAngleStandards>(() => {
+      const raw = window.localStorage.getItem(LIE_STANDARDS_STORAGE_KEY);
+      if (!raw) return DEFAULT_USER_LIE_ANGLE_STANDARDS;
+      try {
+        const parsed = JSON.parse(raw) as Partial<UserLieAngleStandards>;
+        return {
+          byClubType: parsed.byClubType ?? {},
+          byClubName: parsed.byClubName ?? {},
+        };
+      } catch {
+        return DEFAULT_USER_LIE_ANGLE_STANDARDS;
+      }
+    });
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
   const { clubs, loading, error, loadClubs, addClub, updateClub, deleteClub, initializeDefaults, resetToDefaults } = useClubStore();
@@ -70,6 +91,63 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem('golfbag-head-speed-ms', String(headSpeed));
   }, [headSpeed]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      LIE_STANDARDS_STORAGE_KEY,
+      JSON.stringify(userLieAngleStandards),
+    );
+  }, [userLieAngleStandards]);
+
+  const handleSetLieTypeStandard = (clubType: string, value: number) => {
+    const key = normalizeLieStandardKey(clubType);
+    setUserLieAngleStandards((prev) => ({
+      ...prev,
+      byClubType: {
+        ...prev.byClubType,
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleSetLieClubStandard = (clubName: string, value: number) => {
+    const key = normalizeLieStandardKey(clubName);
+    setUserLieAngleStandards((prev) => ({
+      ...prev,
+      byClubName: {
+        ...prev.byClubName,
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleClearLieTypeStandard = (clubType: string) => {
+    const key = normalizeLieStandardKey(clubType);
+    setUserLieAngleStandards((prev) => {
+      const nextByType = { ...prev.byClubType };
+      delete nextByType[key];
+      return {
+        ...prev,
+        byClubType: nextByType,
+      };
+    });
+  };
+
+  const handleClearLieClubStandard = (clubName: string) => {
+    const key = normalizeLieStandardKey(clubName);
+    setUserLieAngleStandards((prev) => {
+      const nextByName = { ...prev.byClubName };
+      delete nextByName[key];
+      return {
+        ...prev,
+        byClubName: nextByName,
+      };
+    });
+  };
+
+  const handleResetLieStandards = () => {
+    setUserLieAngleStandards(DEFAULT_USER_LIE_ANGLE_STANDARDS);
+  };
 
   const handleAddClub = () => {
     setShowAnalysis(false);
@@ -147,6 +225,12 @@ function App() {
           onUpdateActualDistance={handleActualDistanceChange}
           headSpeed={headSpeed}
           onHeadSpeedChange={setHeadSpeed}
+          userLieAngleStandards={userLieAngleStandards}
+          onSetLieTypeStandard={handleSetLieTypeStandard}
+          onSetLieClubStandard={handleSetLieClubStandard}
+          onClearLieTypeStandard={handleClearLieTypeStandard}
+          onClearLieClubStandard={handleClearLieClubStandard}
+          onResetLieStandards={handleResetLieStandards}
         />
       ) : (
         <ClubList
