@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { GolfClub } from '../types/golf';
 import { ClubService } from '../db/clubService';
+import { sortClubsForDisplay } from '../utils/clubSort';
 
 interface ClubStore {
   clubs: GolfClub[];
@@ -93,3 +94,7 @@ export const useClubStore = create<ClubStore>((set) => ({
     }
   },
 }));
+
+export const selectSortedClubsForDisplay = (state: ClubStore): GolfClub[] => {
+  return sortClubsForDisplay(state.clubs);
+};

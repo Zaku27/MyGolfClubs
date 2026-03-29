@@ -12,6 +12,7 @@ import {
 
 import type { GolfClub } from '../types/golf';
 import './ClubList.css';
+import { sortClubsForDisplay } from '../utils/clubSort';
 
 interface ClubListProps {
   clubs: GolfClub[];
@@ -43,60 +44,7 @@ export const ClubList: React.FC<ClubListProps> = ({
   onShowAnalysis,
   loading = false,
 }) => {
-  const normalizeClubType = (club: GolfClub): string => {
-    return (club.clubType ?? '').toUpperCase().replace(/\s|-/g, '');
-  };
-
-  const getClubOrderRank = (club: GolfClub): number => {
-    const type = normalizeClubType(club);
-    const name = (club.name ?? '').toUpperCase();
-
-    if (type === 'D' || name.includes('DRIVER')) return 0;
-    if (/^\d+W$/.test(type) || name.includes('WOOD')) return 1;
-    if (/^\d+H$/.test(type) || type === 'UT' || name.includes('HYBRID')) return 2;
-    if (/^\d+I$/.test(type) || type === 'PW' || name.includes('IRON')) return 3;
-    if (['AW', 'GW', 'SW', 'LW'].includes(type) || name.includes('WEDGE') || /^\d{2}$/.test(type)) return 4;
-    if (type === 'P' || name.includes('PUTTER')) return 5;
-    return 6;
-  };
-
-  const getWithinTypeOrder = (club: GolfClub): number => {
-    const type = normalizeClubType(club);
-
-    const numberMatch = type.match(/^(\d+)/);
-    const typeNumber = numberMatch ? Number(numberMatch[1]) : Number.MAX_SAFE_INTEGER;
-
-    if (type === 'D') return 0;
-    if (/^\d+W$/.test(type)) return typeNumber;
-    if (/^\d+H$/.test(type)) return typeNumber;
-    if (/^\d+I$/.test(type)) return typeNumber;
-    if (type === 'PW') return 10;
-    if (/^\d{2}$/.test(type)) return Number(type);
-
-    const wedgeOrder: Record<string, number> = {
-      AW: 48,
-      GW: 50,
-      SW: 56,
-      LW: 60,
-    };
-    if (wedgeOrder[type] != null) return wedgeOrder[type];
-
-    return Number.MAX_SAFE_INTEGER;
-  };
-
-  const sortedClubs = [...clubs].sort((a, b) => {
-    const rankDiff = getClubOrderRank(a) - getClubOrderRank(b);
-    if (rankDiff !== 0) return rankDiff;
-
-    const withinTypeDiff = getWithinTypeOrder(a) - getWithinTypeOrder(b);
-    if (withinTypeDiff !== 0) return withinTypeDiff;
-
-    const loftA = a.loftAngle ?? Number.MAX_SAFE_INTEGER;
-    const loftB = b.loftAngle ?? Number.MAX_SAFE_INTEGER;
-    if (loftA !== loftB) return loftA - loftB;
-
-    return (a.length ?? 0) - (b.length ?? 0);
-  });
+  const sortedClubs = sortClubsForDisplay(clubs);
 
   return (
     <div className="club-list-container">
@@ -132,9 +80,15 @@ export const ClubList: React.FC<ClubListProps> = ({
       ) : clubs.length === 0 ? (
         <div className="empty-state">
           <p>クラブが見つかりません。バッグにクラブを追加してください!</p>
-          <button className="btn-primary" onClick={onAdd}>
-            最初のクラブを追加
-          </button>
+          <div className="empty-state-buttons">
+            <button className="btn-primary" onClick={onAdd}>
+              最初のクラブを追加
+            </button>
+            <button className="btn-reset-clubs" onClick={onReset} disabled={loading} title="初期14本に戻す">
+              <ResetIcon size={18} />
+              <span>初期14本に戻す</span>
+            </button>
+          </div>
         </div>
       ) : (
         <>

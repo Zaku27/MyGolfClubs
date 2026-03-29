@@ -35,33 +35,162 @@ export const normalizeLieStandardKey = (value: string): string =>
 export const makePerClubLieStandardKey = (
   clubName: string,
   clubType: string,
-): string => `${normalizeLieStandardKey(clubName)}|${normalizeLieStandardKey(clubType)}`;
+  clubNumber = '',
+): string => {
+  const normalizedName = normalizeLieStandardKey(clubName);
+  const normalizedType = normalizeLieStandardKey(clubType);
+  const normalizedNumber = normalizeLieStandardKey(clubNumber);
+
+  if (!normalizedNumber) {
+    return `${normalizedName}|${normalizedType}`;
+  }
+
+  return `${normalizedName}|${normalizedType}|${normalizedNumber}`;
+};
+
+export const getLieStandardTypeKeyForClub = (club: GolfClub): string => {
+  const normalizedName = normalizeLieStandardKey(club.name ?? '');
+  const normalizedNumber = normalizeLieStandardKey(club.number ?? '');
+  const legacyType = normalizeLieStandardKey(club.clubType ?? '');
+
+  switch (club.clubType) {
+    case 'Driver':
+      return 'D';
+    case 'Wood': {
+      const woodNumber = extractLeadingNumber(normalizedNumber);
+      if (Number.isFinite(woodNumber)) {
+        return woodNumber === 1 ? 'D' : `${woodNumber}W`;
+      }
+      break;
+    }
+    case 'Hybrid': {
+      const hybridNumber = extractLeadingNumber(normalizedNumber);
+      if (Number.isFinite(hybridNumber)) {
+        return `${hybridNumber}H`;
+      }
+      break;
+    }
+    case 'Iron': {
+      if (normalizedNumber === 'PW') return 'PW';
+      const ironNumber = extractLeadingNumber(normalizedNumber);
+      if (Number.isFinite(ironNumber)) {
+        return `${ironNumber}I`;
+      }
+      break;
+    }
+    case 'Wedge': {
+      if (normalizedNumber === 'PW') return 'PW';
+      const wedgeKey = getWedgeLieTypeKey(Number(club.loftAngle ?? 0), normalizedNumber);
+      if (wedgeKey) {
+        return wedgeKey;
+      }
+      break;
+    }
+    case 'Putter':
+      return 'P';
+  }
+
+  const inferredType = inferClubTypeFromNameOrLoft(club, normalizedName);
+  if (inferredType) {
+    return inferredType;
+  }
+
+  if (Number.isFinite(DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE[legacyType])) {
+    return legacyType;
+  }
+
+  switch (legacyType) {
+    case 'D':
+    case 'DRIVER':
+      return 'D';
+    case 'WOOD':
+      return '3W';
+    case 'H':
+    case 'HYBRID':
+      return '5H';
+    case 'I':
+    case 'IRON':
+      return '7I';
+    case 'WEDGE':
+      return '54';
+    case 'P':
+    case 'PUTTER':
+      return 'P';
+    default:
+      return '54';
+  }
+};
+
+export const displayLieStandardTypeLabel = (clubTypeKey: string): string => {
+  const normalized = normalizeLieStandardKey(clubTypeKey);
+  if (normalized === 'D') return 'Driver';
+  if (normalized === 'P') return 'Putter';
+  return normalized;
+};
+
+export const fallbackLieStandardForType = (clubTypeKey: string): number => {
+  const normalized = normalizeLieStandardKey(clubTypeKey);
+  const defaultByType = DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE[normalized];
+  if (Number.isFinite(defaultByType)) {
+    return defaultByType;
+  }
+  if (/^\d+(\.\d+)?$/.test(normalized)) {
+    return 64.0;
+  }
+  if (normalized === 'D' || normalized === 'DRIVER') {
+    return 57.0;
+  }
+  if (normalized === 'P' || normalized === 'PUTTER') {
+    return 70.0;
+  }
+  if (normalized === 'WOOD' || normalized.endsWith('W')) {
+    return 57.0;
+  }
+  if (normalized === 'HYBRID' || normalized.endsWith('H')) {
+    return 59.5;
+  }
+  if (normalized === 'IRON' || normalized.endsWith('I') || normalized === 'PW') {
+    return 62.0;
+  }
+  return 64.0;
+};
+
+export const compareLieStandardTypeOrder = (a: string, b: string): number => {
+  const [ag, av, as] = getLieStandardTypeSortKey(a);
+  const [bg, bv, bs] = getLieStandardTypeSortKey(b);
+  if (ag !== bg) return ag - bg;
+  if (av !== bv) return av - bv;
+  return as.localeCompare(bs);
+};
 
 export const resolveStandardLieAngle = (
   club: GolfClub,
   standards: UserLieAngleStandards,
 ): number => {
-  const perClubKey = makePerClubLieStandardKey(club.name ?? '', club.clubType ?? '');
+  const perClubKey = makePerClubLieStandardKey(
+    club.name ?? '',
+    club.clubType ?? '',
+    club.number ?? '',
+  );
+  const legacyPerClubKey = makePerClubLieStandardKey(club.name ?? '', club.clubType ?? '');
   const normalizedName = normalizeLieStandardKey(club.name ?? '');
-  const normalizedType = normalizeLieStandardKey(club.clubType ?? '');
+  const normalizedType = getLieStandardTypeKeyForClub(club);
+  const legacyType = normalizeLieStandardKey(club.clubType ?? '');
 
-  const byName = standards.byClubName[perClubKey];
+  const byName = standards.byClubName[perClubKey] ?? standards.byClubName[legacyPerClubKey];
   if (Number.isFinite(byName)) {
     return byName;
   }
 
-  const byType = standards.byClubType[normalizedType];
+  const byType = standards.byClubType[normalizedType] ?? standards.byClubType[legacyType];
   if (Number.isFinite(byType)) {
     return byType;
   }
 
-  const defaultByType = DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE[normalizedType];
+  const defaultByType = DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE[normalizedType]
+    ?? DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE[legacyType];
   if (Number.isFinite(defaultByType)) {
     return defaultByType;
-  }
-
-  if (/^\d+(\.\d+)?$/.test(normalizedType)) {
-    return 64.0;
   }
 
   const inferredType = inferClubTypeFromNameOrLoft(club, normalizedName);
@@ -72,20 +201,50 @@ export const resolveStandardLieAngle = (
     }
   }
 
-  if (normalizedType === 'D' || normalizedType.endsWith('W')) {
-    return 57.0;
-  }
-  if (normalizedType.endsWith('H')) {
-    return 59.5;
-  }
-  if (normalizedType.endsWith('I') || normalizedType === 'PW') {
-    return 62.0;
-  }
-  if (normalizedType === 'P') {
-    return 70.0;
-  }
+  return fallbackLieStandardForType(normalizedType);
+};
 
-  return 64.0;
+const extractLeadingNumber = (value: string): number => {
+  const match = value.match(/^(\d+)/);
+  if (!match) return Number.NaN;
+  return Number(match[1]);
+};
+
+const getWedgeLieTypeKey = (loftAngle: number, normalizedNumber: string): string | null => {
+  const numericLoft = Number(normalizedNumber) || loftAngle;
+  if (!Number.isFinite(numericLoft) || numericLoft <= 0) {
+    return null;
+  }
+  if (numericLoft <= 52) return '50';
+  if (numericLoft <= 56) return '54';
+  return '58';
+};
+
+const getLieStandardTypeSortKey = (clubTypeRaw: string): [number, number, string] => {
+  const clubType = normalizeLieStandardKey(clubTypeRaw);
+  if (clubType === 'D' || clubType === 'DRIVER') return [0, 0, clubType];
+  if (clubType === 'WOOD') return [1, 999, clubType];
+  if (clubType === 'HYBRID') return [2, 999, clubType];
+  if (clubType === 'PW') return [3, 10, clubType];
+  if (clubType === 'IRON') return [3, 999, clubType];
+  if (clubType.endsWith('W')) {
+    const n = Number(clubType.replace('W', ''));
+    return [1, Number.isFinite(n) ? n : 999, clubType];
+  }
+  if (clubType.endsWith('H')) {
+    const n = Number(clubType.replace('H', ''));
+    return [2, Number.isFinite(n) ? n : 999, clubType];
+  }
+  if (clubType.endsWith('I')) {
+    const n = Number(clubType.replace('I', ''));
+    return [3, Number.isFinite(n) ? n : 999, clubType];
+  }
+  if (clubType === 'WEDGE') return [5, 999, clubType];
+  if (/^\d+(\.\d+)?$/.test(clubType)) {
+    return [5, Number(clubType), clubType];
+  }
+  if (clubType === 'P' || clubType === 'PUTTER') return [6, 0, clubType];
+  return [7, 999, clubType];
 };
 
 const inferClubTypeFromNameOrLoft = (

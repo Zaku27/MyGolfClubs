@@ -163,6 +163,10 @@ function App() {
     setUserLieAngleStandards((prev) => {
       const nextByName = { ...prev.byClubName };
       delete nextByName[key];
+      const keyParts = key.split('|');
+      if (keyParts.length >= 3) {
+        delete nextByName[keyParts.slice(0, 2).join('|')];
+      }
       return {
         ...prev,
         byClubName: nextByName,

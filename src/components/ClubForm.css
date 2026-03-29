@@ -43,6 +43,52 @@
   box-sizing: border-box;
 }
 
+/* Section Container */
+.form-section {
+  background: #fafbfc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.form-section-title {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a202c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #cbd5e0;
+  padding-bottom: 8px;
+}
+
+.form-section-description {
+  margin: -6px 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #556b59;
+}
+
+.form-section:last-of-type {
+  margin-bottom: 24px;
+}
+
+.form-group input.error,
+.form-group textarea.error,
+.form-group select.error {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.form-help-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #718096;
+  font-style: italic;
+}
+
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
@@ -50,6 +96,149 @@
   border-color: var(--primary);
   background: #ffffff;
   box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* Helper Section */
+.helper-section {
+  background-color: #f5f7fa;
+  border: 1px solid #d7e7d5;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.helper-title {
+  margin: 0 0 8px 0;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1b2e1f;
+}
+
+.helper-note {
+  margin: 0;
+  font-size: 12px;
+  color: #556b59;
+  line-height: 1.4;
+}
+
+.club-type-select-wrap {
+  position: relative;
+}
+
+.field-help-wrap {
+  position: relative;
+}
+
+.field-help-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 20;
+  min-width: min(320px, 100%);
+  padding: 12px;
+  border: 1px solid #d7e7d5;
+  border-radius: 12px;
+  background-color: #f5f7fa;
+  box-shadow: 0 16px 36px rgba(35, 54, 39, 0.16);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+  pointer-events: none;
+}
+
+.field-help-wrap:hover .field-help-panel,
+.field-help-wrap:focus-within .field-help-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.field-help-title {
+  margin: 0 0 6px 0;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1b2e1f;
+}
+
+.field-help-note {
+  margin: 0;
+  font-size: 12px;
+  color: #556b59;
+  line-height: 1.45;
+}
+
+.club-type-examples {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 20;
+  min-width: min(320px, 100%);
+  padding: 12px;
+  border: 1px solid #ffe082;
+  border-radius: 12px;
+  background-color: #fff9e6;
+  box-shadow: 0 16px 36px rgba(35, 54, 39, 0.16);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+  pointer-events: none;
+}
+
+.club-type-select-wrap:hover .club-type-examples,
+.club-type-select-wrap:focus-within .club-type-examples {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.club-type-examples-title {
+  margin: 0 0 8px 0;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1b2e1f;
+}
+
+.club-type-examples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.club-type-example-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.example-name {
+  font-size: 12px;
+  color: #344b3e;
+}
+
+.example-type {
+  background-color: rgba(255, 255, 255, 0.45);
+  border: 1px solid #ffb300;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.club-number-stack {
+  display: grid;
+  gap: 10px;
+}
+
+/* Error Message */
+.error-message {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #dc2626;
 }
 
 .form-row {
@@ -96,5 +285,48 @@
 
   .form-actions button {
     width: 100%;
+  }
+
+  .club-type-examples {
+    position: static;
+    min-width: 0;
+    margin-top: 10px;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    pointer-events: auto;
+    box-shadow: none;
+  }
+
+  .field-help-panel {
+    position: static;
+    min-width: 0;
+    margin-top: 10px;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    pointer-events: auto;
+    box-shadow: none;
+  }
+
+  .club-type-examples-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .club-type-example-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .form-section {
+    padding: 16px;
+  }
+
+  .form-section-title {
+    font-size: 13px;
+    margin-bottom: 12px;
   }
 }

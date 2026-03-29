@@ -251,6 +251,14 @@
   color: var(--text-soft);
 }
 
+.empty-state-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
 .empty-state .btn-primary {
   display: inline-block;
 }
@@ -280,6 +288,14 @@
   }
 
   .club-list-bottom button {
+    width: 100%;
+  }
+
+  .empty-state-buttons {
+    flex-direction: column;
+  }
+
+  .empty-state-buttons button {
     width: 100%;
   }
 

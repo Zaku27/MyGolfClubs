@@ -3,15 +3,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/golf_club.dart';
 import '../models/user_lie_angle_standards.dart';
+import '../utils/club_sort.dart';
 
 // ---------------------------------------------------------------------------
-// Default club list — mirrors the TypeScript DEFAULT_CLUBS data
+// Default club list — Updated with new structure: separate name and number
 // ---------------------------------------------------------------------------
 const List<GolfClub> _defaultClubs = [
   GolfClub(
       id: 1,
-      clubType: 'D',
+      clubType: 'Driver',
       name: 'Driver',
+      number: '1',
       loftAngle: 10.5,
       length: 45.5,
       weight: 310,
@@ -23,8 +25,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 230),
   GolfClub(
       id: 2,
-      clubType: '3W',
-      name: '3-Wood',
+      clubType: 'Wood',
+      name: 'Wood',
+      number: '3',
       loftAngle: 15.0,
       length: 43.0,
       weight: 315,
@@ -36,8 +39,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 210),
   GolfClub(
       id: 3,
-      clubType: '5W',
-      name: '5-Wood',
+      clubType: 'Wood',
+      name: 'Wood',
+      number: '5',
       loftAngle: 18.0,
       length: 42.5,
       weight: 314,
@@ -49,8 +53,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 200),
   GolfClub(
       id: 4,
-      clubType: '4H',
-      name: 'Hybrid (4H)',
+      clubType: 'Hybrid',
+      name: 'Hybrid',
+      number: '4',
       loftAngle: 22.0,
       length: 39.75,
       weight: 345,
@@ -62,8 +67,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 190),
   GolfClub(
       id: 5,
-      clubType: '5H',
-      name: 'Hybrid (5H)',
+      clubType: 'Hybrid',
+      name: 'Hybrid',
+      number: '5',
       loftAngle: 25.0,
       length: 39.25,
       weight: 345,
@@ -75,8 +81,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 180),
   GolfClub(
       id: 6,
-      clubType: '6I',
-      name: '6-Iron',
+      clubType: 'Iron',
+      name: 'Iron',
+      number: '6',
       loftAngle: 27.0,
       length: 37.5,
       weight: 418,
@@ -88,8 +95,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 170),
   GolfClub(
       id: 7,
-      clubType: '7I',
-      name: '7-Iron',
+      clubType: 'Iron',
+      name: 'Iron',
+      number: '7',
       loftAngle: 31.0,
       length: 37.0,
       weight: 424,
@@ -101,8 +109,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 160),
   GolfClub(
       id: 8,
-      clubType: '8I',
-      name: '8-Iron',
+      clubType: 'Iron',
+      name: 'Iron',
+      number: '8',
       loftAngle: 35.0,
       length: 36.5,
       weight: 430,
@@ -114,8 +123,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 150),
   GolfClub(
       id: 9,
-      clubType: '9I',
-      name: '9-Iron',
+      clubType: 'Iron',
+      name: 'Iron',
+      number: '9',
       loftAngle: 39.0,
       length: 36.0,
       weight: 436,
@@ -127,8 +137,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 140),
   GolfClub(
       id: 10,
-      clubType: 'PW',
-      name: 'PW',
+      clubType: 'Wedge',
+      name: 'Wedge',
+      number: 'PW',
       loftAngle: 44.0,
       length: 35.5,
       weight: 442,
@@ -140,8 +151,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 120),
   GolfClub(
       id: 11,
-      clubType: '50',
-      name: '50 Wedge',
+      clubType: 'Wedge',
+      name: 'Wedge',
+      number: 'GW',
       loftAngle: 50.0,
       length: 35.25,
       weight: 424,
@@ -153,8 +165,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 110),
   GolfClub(
       id: 12,
-      clubType: '54',
-      name: '54 Wedge',
+      clubType: 'Wedge',
+      name: 'Wedge',
+      number: 'SW',
       loftAngle: 54.0,
       length: 35.0,
       weight: 424,
@@ -166,8 +179,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 100),
   GolfClub(
       id: 13,
-      clubType: '58',
-      name: '58 Wedge',
+      clubType: 'Wedge',
+      name: 'Wedge',
+      number: 'LW',
       loftAngle: 58.0,
       length: 34.75,
       weight: 424,
@@ -179,8 +193,9 @@ const List<GolfClub> _defaultClubs = [
       distance: 90),
   GolfClub(
       id: 14,
-      clubType: 'P',
+      clubType: 'Putter',
       name: 'Putter',
+      number: 'P',
       loftAngle: 3.0,
       length: 33.0,
       weight: 350,
@@ -213,6 +228,11 @@ class ClubsNotifier extends Notifier<List<GolfClub>> {
 final clubsProvider = NotifierProvider<ClubsNotifier, List<GolfClub>>(
   ClubsNotifier.new,
 );
+
+final sortedClubsProvider = Provider<List<GolfClub>>((ref) {
+  final clubs = ref.watch(clubsProvider);
+  return sortClubsForDisplay(clubs);
+});
 
 class HeadSpeedNotifier extends Notifier<double> {
   @override
@@ -304,6 +324,7 @@ final userLieAngleStandardsProvider =
 // ---------------------------------------------------------------------------
 final chartClubsProvider = Provider<List<GolfClub>>((ref) {
   final clubs = ref.watch(clubsProvider);
-  return clubs.where((c) => c.loftAngle >= 5 && c.loftAngle <= 60).toList()
-    ..sort((a, b) => a.loftAngle.compareTo(b.loftAngle));
+  return sortClubsForDisplay(
+    clubs.where((c) => c.loftAngle >= 5 && c.loftAngle <= 60).toList(),
+  );
 });

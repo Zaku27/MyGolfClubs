@@ -7,6 +7,7 @@ export class ClubService {
      const clubs = await db.clubs.toArray();
      return clubs.map((c) => ({
       ...c,
+      number:      c.number      ?? '',
       torque:      c.torque      ?? 0,
       flex:        c.flex        ?? 'R',
       distance:    c.distance    ?? 0,

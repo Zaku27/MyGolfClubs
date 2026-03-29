@@ -4,11 +4,13 @@ import 'dart:math' as math;
 // ---------------------------------------------------------------------------
 // Club category enum with display label and chart color
 // ---------------------------------------------------------------------------
-enum ClubCategory { wood, hybrid, iron, wedge, putter }
+enum ClubCategory { driver, wood, hybrid, iron, wedge, putter }
 
 extension ClubCategoryExtension on ClubCategory {
   String get label {
     switch (this) {
+      case ClubCategory.driver:
+        return 'Driver';
       case ClubCategory.wood:
         return 'Wood';
       case ClubCategory.hybrid:
@@ -24,6 +26,8 @@ extension ClubCategoryExtension on ClubCategory {
 
   Color get color {
     switch (this) {
+      case ClubCategory.driver:
+        return const Color(0xFF1976D2); // Blue
       case ClubCategory.wood:
         return const Color(0xFF1565C0); // Blue
       case ClubCategory.hybrid:
@@ -39,12 +43,13 @@ extension ClubCategoryExtension on ClubCategory {
 }
 
 // ---------------------------------------------------------------------------
-// GolfClub model
+// GolfClub model - Updated structure with separate name and number
 // ---------------------------------------------------------------------------
 class GolfClub {
   final int id;
-  final String clubType; // 'D', '3W', '5W', '4H', '6I', 'PW', '50', 'P', …
-  final String name;
+  final String clubType; // "Driver", "Wood", "Hybrid", "Iron", "Wedge", "Putter"
+  final String name; // Manufacturer + Model only, e.g. "Ping G430", "Titleist T150"
+  final String number; // Club number / loft designation, e.g. "7", "PW", "W", "3W", "4H", "SW"
   final double loftAngle; // degrees
   final double length; // inches
   final double weight; // grams
@@ -60,6 +65,7 @@ class GolfClub {
     required this.id,
     required this.clubType,
     required this.name,
+    required this.number,
     required this.loftAngle,
     this.length = 0,
     this.weight = 0,
@@ -76,6 +82,7 @@ class GolfClub {
   // Each category has a separate loft-distance curve plus speed scaling.
   double estimatedDistanceFor(double headSpeedMps) {
     final categoryBaseline = switch (category) {
+      ClubCategory.driver => 270.0 - 5.0 * loftAngle,
       ClubCategory.wood => 300.0 - 8.2222 * loftAngle + 0.1481 * loftAngle * loftAngle,
       ClubCategory.hybrid => 263.3333 - 3.3333 * loftAngle,
       ClubCategory.iron => 177.88 + 1.2559 * loftAngle - 0.0581 * loftAngle * loftAngle,
@@ -83,6 +90,7 @@ class GolfClub {
       ClubCategory.putter => 10.0,
     };
     final speedPower = switch (category) {
+      ClubCategory.driver => 1.15,
       ClubCategory.wood => 1.14,
       ClubCategory.hybrid => 1.12,
       ClubCategory.iron => 1.08,
@@ -97,32 +105,50 @@ class GolfClub {
   double get estimatedDistance => estimatedDistanceFor(42.0);
 
   ClubCategory get category {
-    if (clubType == 'PW') return ClubCategory.iron;
-    if (clubType == 'D' || clubType.endsWith('W')) return ClubCategory.wood;
-    if (clubType.endsWith('H')) return ClubCategory.hybrid;
-    if (clubType.endsWith('I')) return ClubCategory.iron;
-    if (clubType == 'P') return ClubCategory.putter;
-    // Numeric types like '50', '54', '58' are wedges
-    if (double.tryParse(clubType) != null) return ClubCategory.wedge;
-    return ClubCategory.iron;
+    return switch (clubType) {
+      'Driver' => ClubCategory.driver,
+      'Wood' => ClubCategory.wood,
+      'Hybrid' => ClubCategory.hybrid,
+      'Iron' => ClubCategory.iron,
+      'Wedge' => ClubCategory.wedge,
+      'Putter' => ClubCategory.putter,
+      _ => ClubCategory.iron, // fallback
+    };
   }
 
-  GolfClub copyWith({double? distance}) => GolfClub(
-        id: id,
-        clubType: clubType,
-        name: name,
-        loftAngle: loftAngle,
-        length: length,
-        weight: weight,
-        swingWeight: swingWeight,
-        lieAngle: lieAngle,
-        shaftType: shaftType,
-        torque: torque,
-        flex: flex,
+  GolfClub copyWith({
+    int? id,
+    String? clubType,
+    String? name,
+    String? number,
+    double? loftAngle,
+    double? length,
+    double? weight,
+    String? swingWeight,
+    double? lieAngle,
+    String? shaftType,
+    double? torque,
+    String? flex,
+    double? distance,
+    String? notes,
+  }) =>
+      GolfClub(
+        id: id ?? this.id,
+        clubType: clubType ?? this.clubType,
+        name: name ?? this.name,
+        number: number ?? this.number,
+        loftAngle: loftAngle ?? this.loftAngle,
+        length: length ?? this.length,
+        weight: weight ?? this.weight,
+        swingWeight: swingWeight ?? this.swingWeight,
+        lieAngle: lieAngle ?? this.lieAngle,
+        shaftType: shaftType ?? this.shaftType,
+        torque: torque ?? this.torque,
+        flex: flex ?? this.flex,
         distance: distance ?? this.distance,
-        notes: notes,
+        notes: notes ?? this.notes,
       );
 
   @override
-  String toString() => 'GolfClub($clubType, loft: $loftAngle°, dist: ${distance}y)';
+  String toString() => 'GolfClub($name #$number, $clubType, loft: $loftAngle°, dist: ${distance}y)';
 }

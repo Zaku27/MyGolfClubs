@@ -18,6 +18,7 @@ import 'swing_weight_settings_screen.dart';
 import '../widgets/lie_angle_distribution_chart.dart';
 import '../widgets/swing_weight_distribution_chart.dart';
 import '../widgets/weight_vs_length_chart.dart';
+import '../utils/club_sort.dart';
 
 // ============================================================================
 // AnalysisScreen — top-level screen with a TabBar
@@ -78,6 +79,9 @@ class SwingWeightTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final clubs = ref.watch(clubsProvider);
+    final swingWeightClubs = clubs
+        .where((club) => club.category != ClubCategory.putter)
+        .toList(growable: false);
     final swingWeightTarget = ref.watch(swingWeightTargetProvider);
 
     return SingleChildScrollView(
@@ -101,7 +105,7 @@ class SwingWeightTab extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           SwingWeightDistributionChart(
-            clubs: clubs,
+            clubs: swingWeightClubs,
             targetValue: swingWeightTarget,
           ),
         ],
@@ -687,8 +691,7 @@ class _LoftDistanceTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...clubs]
-      ..sort((a, b) => a.loftAngle.compareTo(b.loftAngle));
+    final sorted = sortClubsForDisplay(clubs);
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

@@ -389,11 +389,15 @@ class WeightVsLengthChart extends StatelessWidget {
         sideTitles: SideTitles(
           showTitles: true,
           interval: bounds.xInterval,
-          reservedSize: 36,
-          getTitlesWidget: (value, meta) => tickLabel(
-            value % 1 == 0
-                ? value.toInt().toString()
-                : value.toStringAsFixed(1),
+          reservedSize: 46,
+          getTitlesWidget: (value, meta) => SideTitleWidget(
+            meta: meta,
+            space: 16,
+            child: tickLabel(
+              value % 1 == 0
+                  ? value.toInt().toString()
+                  : value.toStringAsFixed(1),
+            ),
           ),
         ),
       ),

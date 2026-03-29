@@ -1,25 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import type { GolfClub } from '../types/golf';
+import type { GolfClub, ClubCategory } from '../types/golf';
 import { DEFAULT_CLUBS } from '../types/golf';
 import './ClubForm.css';
 
-const CLUB_TYPE_OPTIONS = [
-  { value: 'D', label: 'Driver' },
-  { value: '3W', label: '3W' },
-  { value: '5W', label: '5W' },
-  { value: '4H', label: '4H' },
-  { value: '5H', label: '5H' },
-  { value: '6I', label: '6I' },
-  { value: '7I', label: '7I' },
-  { value: '8I', label: '8I' },
-  { value: '9I', label: '9I' },
-  { value: 'PW', label: 'PW' },
-  { value: '50', label: '50' },
-  { value: '54', label: '54' },
-  { value: '58', label: '58' },
-  { value: 'P', label: 'Putter' },
-  { value: 'Custom', label: 'その他（手入力）' },
+const CLUB_TYPE_OPTIONS: { value: ClubCategory; label: string }[] = [
+  { value: 'Driver', label: 'Driver' },
+  { value: 'Wood', label: 'Wood' },
+  { value: 'Hybrid', label: 'Hybrid' },
+  { value: 'Iron', label: 'Iron' },
+  { value: 'Wedge', label: 'Wedge' },
+  { value: 'Putter', label: 'Putter' },
 ];
+
+const CLUB_NUMBER_OPTIONS: Partial<Record<ClubCategory, string[]>> = {
+  Driver: ['1W'],
+  Wood: ['3W', '5W', '7W', '9W'],
+  Hybrid: ['2H', '3H', '4H', '5H', '6H'],
+  Iron: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+  Wedge: ['PW', 'GW', 'AW', 'SW', 'LW'],
+};
+
+const CLUB_NUMBER_DEFAULT: Record<ClubCategory, string> = {
+  Driver: '1W',
+  Wood: '3W',
+  Hybrid: '3H',
+  Iron: '7',
+  Wedge: 'PW',
+  Putter: 'Putter',
+};
 
 interface ClubFormProps {
   club?: GolfClub;
@@ -28,15 +36,122 @@ interface ClubFormProps {
   isLoading?: boolean;
 }
 
+type ClubFormData = Omit<GolfClub, 'id' | 'clubType'> & {
+  clubType: ClubCategory | '';
+};
+
+const buildClubDefaults = (clubType: ClubCategory): Omit<GolfClub, 'id'> => {
+  const source = DEFAULT_CLUBS.find((defaultClub) => defaultClub.clubType === clubType);
+
+  if (source) {
+    return {
+      ...source,
+      clubType,
+      name: '',
+      number: CLUB_NUMBER_DEFAULT[clubType],
+    };
+  }
+
+  return {
+    clubType,
+    name: '',
+    number: CLUB_NUMBER_DEFAULT[clubType],
+    length: 0,
+    weight: 0,
+    swingWeight: '',
+    lieAngle: 0,
+    loftAngle: 0,
+    shaftType: '',
+    torque: 0,
+    flex: 'S',
+    distance: 0,
+    notes: '',
+  };
+};
+
+const normalizeNumberForMatch = (clubType: ClubCategory, value: string): string => {
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
+
+  if (clubType === 'Driver') {
+    return normalized.replace(/W$/, '') || '1';
+  }
+
+  if (clubType === 'Wood') {
+    const match = normalized.match(/^(\d+)/);
+    return match?.[1] ?? normalized.replace(/W$/, '');
+  }
+
+  if (clubType === 'Hybrid') {
+    const match = normalized.match(/^(\d+)/);
+    return match?.[1] ?? normalized.replace(/H$/, '');
+  }
+
+  if (clubType === 'Putter') {
+    return 'P';
+  }
+
+  return normalized;
+};
+
+const buildClubDefaultsByTypeAndNumber = (
+  clubType: ClubCategory,
+  selectedNumber: string,
+): Omit<GolfClub, 'id'> => {
+  const candidates = DEFAULT_CLUBS.filter((defaultClub) => defaultClub.clubType === clubType);
+  if (candidates.length === 0) {
+    return {
+      ...buildClubDefaults(clubType),
+      number: selectedNumber,
+    };
+  }
+
+  const selectedNormalized = normalizeNumberForMatch(clubType, selectedNumber);
+  const exact = candidates.find(
+    (candidate) => normalizeNumberForMatch(clubType, candidate.number) === selectedNormalized,
+  );
+
+  if (exact) {
+    return {
+      ...exact,
+      number: selectedNumber,
+    };
+  }
+
+  const selectedNumeric = Number(selectedNormalized);
+  if (Number.isFinite(selectedNumeric)) {
+    const nearest = candidates
+      .map((candidate) => ({
+        candidate,
+        numeric: Number(normalizeNumberForMatch(clubType, candidate.number)),
+      }))
+      .filter((entry) => Number.isFinite(entry.numeric))
+      .sort((left, right) => Math.abs(left.numeric - selectedNumeric) - Math.abs(right.numeric - selectedNumeric))[0];
+
+    if (nearest) {
+      return {
+        ...nearest.candidate,
+        number: selectedNumber,
+      };
+    }
+  }
+
+  return {
+    ...candidates[0],
+    number: selectedNumber,
+  };
+};
+
 export const ClubForm: React.FC<ClubFormProps> = ({
   club,
   onSubmit,
   onCancel,
   isLoading = false,
 }) => {
-  const [formData, setFormData] = useState<Omit<GolfClub, 'id'>>({
+  const [numberPreset, setNumberPreset] = useState<string>('Custom');
+  const [formData, setFormData] = useState<ClubFormData>({
     clubType: '',
     name: '',
+    number: '',
     length: 0,
     weight: 0,
     swingWeight: '',
@@ -48,22 +163,66 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     distance: 0,
     notes: '',
   });
-  const [clubType, setClubType] = useState<string>('');
-  const [customClubType, setCustomClubType] = useState<string>('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const normalizeClubNumber = (clubType: ClubCategory, value: string): string => {
+    if (clubType === 'Putter') {
+      return 'Putter';
+    }
+    const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
+    if (clubType === 'Driver' && !normalized) {
+      return '1W';
+    }
+    return normalized;
+  };
+
+  const inferPreset = (clubType: ClubCategory, value: string): string => {
+    const options = CLUB_NUMBER_OPTIONS[clubType] ?? [];
+    const normalized = normalizeClubNumber(clubType, value);
+    return options.includes(normalized) ? normalized : 'Custom';
+  };
+
+  const applyClubTypeChange = (clubType: ClubCategory) => {
+    const nextNumber = CLUB_NUMBER_DEFAULT[clubType];
+    if (club) {
+      setFormData((prev) => ({
+        ...prev,
+        clubType,
+        number: nextNumber,
+        swingWeight: clubType === 'Putter' ? '' : prev.swingWeight,
+      }));
+    } else {
+      const defaults = buildClubDefaults(clubType);
+      setFormData((prev) => ({
+        ...defaults,
+        name: prev.name,
+        swingWeight: clubType === 'Putter' ? '' : defaults.swingWeight,
+      }));
+    }
+    setNumberPreset(clubType === 'Putter' ? 'Putter' : inferPreset(clubType, nextNumber));
+    setErrors((prev) => ({ ...prev, clubType: '', number: '' }));
+  };
+
+  const clearClubTypeSelection = () => {
+    setFormData((prev) => ({
+      ...prev,
+      clubType: '',
+      number: '',
+    }));
+    setNumberPreset('Custom');
+    setErrors((prev) => ({ ...prev, clubType: '', number: '' }));
+  };
 
   useEffect(() => {
     if (club) {
       const { id, createdAt, updatedAt, ...rest } = club;
       setFormData(rest);
-      const initialType = rest.clubType && CLUB_TYPE_OPTIONS.some(option => option.value === rest.clubType)
-        ? rest.clubType
-        : 'Custom';
-      setClubType(initialType);
-      setCustomClubType(initialType === 'Custom' ? rest.clubType : '');
+      setNumberPreset(inferPreset(rest.clubType, rest.number));
     } else {
-      setFormData({
+      const initial: ClubFormData = {
         clubType: '',
         name: '',
+        number: '',
         length: 0,
         weight: 0,
         swingWeight: '',
@@ -74,16 +233,19 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         flex: 'S',
         distance: 0,
         notes: '',
-      });
-      setClubType('');
-      setCustomClubType('');
+      };
+      setFormData(initial);
+      setNumberPreset('Custom');
     }
+    setErrors({});
   }, [club]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
+    setErrors((prev) => ({ ...prev, [name]: '' }));
+
     setFormData((prev) => {
       if (name === 'torque') {
         return { ...prev, [name]: parseFloat(value) || 0 };
@@ -94,6 +256,9 @@ export const ClubForm: React.FC<ClubFormProps> = ({
       if (name === 'flex') {
         return { ...prev, [name]: value as GolfClub['flex'] };
       }
+      if (name === 'clubType') {
+        return prev;
+      }
       if (name.includes('Angle') || name === 'length' || name === 'weight') {
         return { ...prev, [name]: parseFloat(value) || 0 };
       }
@@ -101,136 +266,223 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     });
   };
 
-  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedType = e.target.value;
-    setClubType(selectedType);
+  const handleNumberTextChange = (value: string) => {
+    setFormData((prev) => ({ ...prev, number: value }));
+    setErrors((prev) => ({ ...prev, number: '' }));
+  };
 
-    if (selectedType === 'Custom') {
-      setCustomClubType('');
-      setFormData((prev) => ({
-        ...prev,
-        clubType: '',
-        // クラブ名は保持する（リセットしない）
-      }));
-    } else {
-      setCustomClubType('');
-      const defaultClub = DEFAULT_CLUBS.find((c) => c.clubType === selectedType);
-      if (defaultClub) {
-        setFormData((prev) => ({
-          ...prev,
-          clubType: selectedType,
-          length: defaultClub.length,
-          weight: defaultClub.weight,
-          swingWeight: defaultClub.swingWeight,
-          lieAngle: defaultClub.lieAngle,
-          loftAngle: defaultClub.loftAngle,
-          shaftType: defaultClub.shaftType,
-          torque: defaultClub.torque,
-          distance: defaultClub.distance,
-          notes: defaultClub.notes,
-          // nameはそのまま保持（デフォルトには置き換えない）
+  const handleNumberPresetChange = (value: string) => {
+    setNumberPreset(value);
+    if (value !== 'Custom') {
+      setFormData((prev) => {
+        if (!prev.clubType) {
+          return { ...prev, number: value };
+        }
+
+        if (club) {
+          return { ...prev, number: value };
+        }
+
+        const defaults = buildClubDefaultsByTypeAndNumber(prev.clubType, value);
+        return {
+          ...defaults,
+          clubType: prev.clubType,
           name: prev.name,
-        }));
-      } else {
-        setFormData((prev) => ({
-          ...prev,
-          clubType: selectedType,
-          // nameは保持
-          name: prev.name,
-        }));
-      }
+          number: value,
+        };
+      });
     }
+    setErrors((prev) => ({ ...prev, number: '' }));
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.clubType) {
+      newErrors.clubType = 'クラブの種類を選択してください';
+    }
+    if (!formData.name.trim()) {
+      newErrors.name = 'クラブ名を入力してください';
+    }
+    if (!formData.number.trim()) {
+      newErrors.number = 'クラブ番号を入力してください';
+    }
+    if (!formData.loftAngle) {
+      newErrors.loftAngle = 'ロフト角を入力してください';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    if (validateForm()) {
+      const selectedClubType = formData.clubType as ClubCategory;
+      onSubmit({
+        ...formData,
+        clubType: selectedClubType,
+        number: normalizeClubNumber(selectedClubType, formData.number),
+        swingWeight: selectedClubType === 'Putter' ? '' : formData.swingWeight.trim(),
+      });
+    }
+  };
+
+  const renderClubNumberField = () => {
+    if (!formData.clubType) {
+      return null;
+    }
+
+    if (formData.clubType === 'Putter') {
+      return (
+        <div className="form-group">
+          <label htmlFor="number">クラブ番号</label>
+          <input
+            type="text"
+            id="number"
+            name="number"
+            value="Putter"
+            disabled
+          />
+        </div>
+      );
+    }
+
+    if (formData.clubType === 'Driver') {
+      return (
+        <div className="form-group">
+          <label htmlFor="driverNumber">クラブ番号 *</label>
+          <select
+            id="driverNumber"
+            value={formData.number || CLUB_NUMBER_DEFAULT.Driver}
+            onChange={(e) => handleNumberPresetChange(e.target.value)}
+            required
+            className={errors.number ? 'error' : ''}
+          >
+            {(CLUB_NUMBER_OPTIONS.Driver ?? []).map((num) => (
+              <option key={num} value={num}>
+                {num}
+              </option>
+            ))}
+          </select>
+          {errors.number && <span className="error-message">{errors.number}</span>}
+        </div>
+      );
+    }
+
+    const suggestions = CLUB_NUMBER_OPTIONS[formData.clubType] ?? [];
+
+    return (
+      <div className="form-group">
+        <label htmlFor="number">クラブ番号 *</label>
+        <div className="club-number-stack">
+          <select
+            id="numberSuggestion"
+            value={numberPreset}
+            onChange={(e) => handleNumberPresetChange(e.target.value)}
+          >
+            {suggestions.map((num) => {
+              const label = formData.clubType === 'Iron' && num === '1'
+                ? '1 (Rare 1I)'
+                : formData.clubType === 'Iron' && num === '2'
+                ? '2 (Rare 2I)'
+                : num;
+              return (
+                <option key={num} value={num}>
+                  {label}
+                </option>
+              );
+            })}
+            <option value="Custom">Custom (free text)</option>
+          </select>
+          {numberPreset === 'Custom' && (
+            <input
+              type="text"
+              id="number"
+              name="number"
+              value={formData.number}
+              onChange={(e) => handleNumberTextChange(e.target.value)}
+              placeholder="例: 7, PW, 3W, 4H"
+              required
+              className={errors.number ? 'error' : ''}
+            />
+          )}
+        </div>
+        {errors.number && <span className="error-message">{errors.number}</span>}
+      </div>
+    );
   };
 
   return (
     <form className="club-form" onSubmit={handleSubmit}>
       <h2>{club ? 'クラブ編集' : 'クラブ追加'}</h2>
 
-      <div className="form-group">
-        <label htmlFor="clubType">クラブ種別 *</label>
-        <select
-          id="clubType"
-          name="clubType"
-          value={clubType}
-          onChange={handleTypeChange}
-          required
-        >
-          <option value="">選択してください</option>
-          {CLUB_TYPE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {clubType === 'Custom' && (
+      {/* Section 1: Basic Information */}
+      <div className="form-section">
+        <h3 className="form-section-title">基本情報</h3>
+        
+        {/* Club Type */}
         <div className="form-group">
-          <label htmlFor="customClubType">クラブ種別（手入力） *</label>
+          <label htmlFor="clubType">クラブの種類 *</label>
+          <div className="club-type-select-wrap">
+            <select
+              id="clubType"
+              name="clubType"
+              value={formData.clubType}
+              onChange={(e) => {
+                const selected = e.target.value;
+                if (!selected) {
+                  clearClubTypeSelection();
+                  return;
+                }
+                applyClubTypeChange(selected as ClubCategory);
+              }}
+              required
+              className={errors.clubType ? 'error' : ''}
+            >
+              <option value="">種類を選択してください</option>
+              {CLUB_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {errors.clubType && (
+            <span className="error-message">{errors.clubType}</span>
+          )}
+          {!formData.clubType && !errors.clubType && (
+            <span className="form-help-text">種類を選択すると、クラブ名以外の項目にデフォルト値を読み込みます。</span>
+          )}
+        </div>
+        
+        {/* Club Name */}
+        <div className="form-group">
+          <label htmlFor="name">クラブ名 *</label>
           <input
             type="text"
-            id="customClubType"
-            name="customClubType"
-            value={customClubType}
-            onChange={(e) => {
-              const value = e.target.value;
-              setCustomClubType(value);
-              setFormData((prev) => ({ ...prev, clubType: value }));
-            }}
-            placeholder="例: 3.5W"
+            id="name"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="例: Ping G430、Titleist T150"
             required
+            className={errors.name ? 'error' : ''}
           />
+          {errors.name && (
+            <span className="error-message">{errors.name}</span>
+          )}
         </div>
-      )}
 
-      <div className="form-group">
-        <label htmlFor="name">クラブ名 *</label>
-        <input
-          type="text"
-          id="name"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder="例: メーカー、モデル名など"
-          required
-        />
-        {clubType && (
-          <small className="club-type-hint">クラブ種別: {clubType === 'Custom' ? customClubType : clubType}</small>
-        )}
+        {/* Club Number */}
+        {renderClubNumberField()}
       </div>
 
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="length">長さ(インチ) *</label>
-          <input
-            type="number"
-            id="length"
-            name="length"
-            value={formData.length || ''}
-            onChange={handleChange}
-            step="0.5"
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="weight">重さ(グラム) *</label>
-          <input
-            type="number"
-            id="weight"
-            name="weight"
-            value={formData.weight || ''}
-            onChange={handleChange}
-            step="1"
-            required
-          />
-        </div>
-      </div>
-
+      {/* Section 2: Specifications */}
+      <div className="form-section">
+        <h3 className="form-section-title">スペック</h3>
+        
+        {/* Loft, Length, Weight Row */}
       <div className="form-row">
         <div className="form-group">
           <label htmlFor="loftAngle">ロフト角(度数) *</label>
@@ -242,10 +494,40 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             onChange={handleChange}
             step="0.5"
             required
+            className={errors.loftAngle ? 'error' : ''}
+          />
+          {errors.loftAngle && (
+            <span className="error-message">{errors.loftAngle}</span>
+          )}
+        </div>
+        <div className="form-group">
+          <label htmlFor="length">長さ(インチ)</label>
+          <input
+            type="number"
+            id="length"
+            name="length"
+            value={formData.length || ''}
+            onChange={handleChange}
+            step="0.5"
           />
         </div>
         <div className="form-group">
-          <label htmlFor="lieAngle">ライ角(度数) *</label>
+          <label htmlFor="weight">重さ(グラム)</label>
+          <input
+            type="number"
+            id="weight"
+            name="weight"
+            value={formData.weight || ''}
+            onChange={handleChange}
+            step="1"
+          />
+        </div>
+      </div>
+
+      {/* Lie Angle, Swing Weight Row */}
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="lieAngle">ライ角(度数)</label>
           <input
             type="number"
             id="lieAngle"
@@ -253,26 +535,27 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             value={formData.lieAngle || ''}
             onChange={handleChange}
             step="0.5"
-            required
           />
         </div>
+        {formData.clubType !== 'Putter' && (
+          <div className="form-group">
+            <label htmlFor="swingWeight">バランス</label>
+            <input
+              type="text"
+              id="swingWeight"
+              name="swingWeight"
+              value={formData.swingWeight}
+              onChange={handleChange}
+              placeholder="例: C9, D0.5, E1"
+            />
+          </div>
+        )}
       </div>
 
+      {/* Shaft, Torque, Flex Row */}
       <div className="form-row">
         <div className="form-group">
-          <label htmlFor="swingWeight">バランス *</label>
-          <input
-            type="text"
-            id="swingWeight"
-            name="swingWeight"
-            value={formData.swingWeight}
-            onChange={handleChange}
-            placeholder="例: D0, D2"
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="shaftType">シャフト名 *</label>
+          <label htmlFor="shaftType">シャフト名</label>
           <input
             type="text"
             id="shaftType"
@@ -280,11 +563,10 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             value={formData.shaftType}
             onChange={handleChange}
             placeholder="例: VENTUS TR"
-            required
           />
         </div>
         <div className="form-group">
-          <label htmlFor="torque">トルク *</label>
+          <label htmlFor="torque">トルク</label>
           <input
             type="number"
             id="torque"
@@ -293,17 +575,15 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             onChange={handleChange}
             step="0.1"
             min="0"
-            required
           />
         </div>
         <div className="form-group">
-          <label htmlFor="flex">フレックス *</label>
+          <label htmlFor="flex">フレックス</label>
           <select
             id="flex"
             name="flex"
             value={formData.flex}
             onChange={handleChange}
-            required
           >
             <option value="S">S</option>
             <option value="SR">SR</option>
@@ -312,8 +592,16 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             <option value="L">L</option>
           </select>
         </div>
+      </div>
+
+      </div>
+
+      <div className="form-section">
+        <h3 className="form-section-title">追加情報</h3>
+        <p className="form-section-description">飛距離やノートなど、プレー時の記録をまとめます。</p>
+
         <div className="form-group">
-          <label htmlFor="distance">飛距離 *</label>
+          <label htmlFor="distance">飛距離</label>
           <input
             type="number"
             id="distance"
@@ -321,23 +609,24 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             value={formData.distance || ''}
             onChange={handleChange}
             min="0"
-            required
+          />
+        </div>
+
+        {/* Notes */}
+        <div className="form-group">
+          <label htmlFor="notes">ノート</label>
+          <textarea
+            id="notes"
+            name="notes"
+            value={formData.notes}
+            onChange={handleChange}
+            placeholder="このクラブについての簡単なメモを入力できます。"
+            rows={3}
           />
         </div>
       </div>
 
-      <div className="form-group">
-        <label htmlFor="notes">ノート</label>
-        <textarea
-          id="notes"
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
-          placeholder="このクラブについての簡単なメモを入力できます。"
-          rows={3}
-        />
-      </div>
-
+      {/* Action Buttons */}
       <div className="form-actions">
         <button type="submit" className="btn-primary" disabled={isLoading}>
           {isLoading ? '保存中...' : club ? 'クラブ更新' : 'クラブ追加'}

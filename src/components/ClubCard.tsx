@@ -1,6 +1,6 @@
 import React from 'react';
 import type { GolfClub } from '../types/golf';
-import { getClubTypeShort } from '../utils/clubUtils';
+import { getClubTypeDisplay } from '../utils/clubUtils';
 import './ClubCard.css';
 
 interface ClubCardProps {
@@ -11,14 +11,14 @@ interface ClubCardProps {
 }
 
 export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, viewMode = 'full' }) => {
-  const clubTypeShort = club.clubType || getClubTypeShort(club.name);
+  const clubTypeDisplay = getClubTypeDisplay(club.clubType, club.number);
   const compactLoft = club.loftAngle != null ? `${club.loftAngle}°` : '-';
 
   return (
     <div className={`club-card ${viewMode === 'compact' ? 'compact' : ''}`}>
       <div className="club-card-header">
         <h3>
-          <span className="club-type">{clubTypeShort}</span>
+          <span className="club-type">{clubTypeDisplay}</span>
           <span className="club-fullname">{club.name}</span>
         </h3>
         <div className="club-card-actions">
@@ -67,10 +67,12 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
                 <span className="spec-label">ライ角:</span>
                   <span className="spec-value">{club.lieAngle ?? '-'}°</span>
               </div>
-              <div className="spec-row">
-                <span className="spec-label">バランス:</span>
-                <span className="spec-value">{club.swingWeight}</span>
-              </div>
+              {club.clubType !== 'Putter' && (
+                <div className="spec-row">
+                  <span className="spec-label">バランス:</span>
+                  <span className="spec-value">{club.swingWeight}</span>
+                </div>
+              )}
               <div className="spec-row">
                 <span className="spec-label">シャフト:</span>
                 <span className="spec-value">{club.shaftType}</span>
@@ -95,7 +97,9 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
               <span className="compact-item"><strong>L</strong>{club.length}"</span>
               <span className="compact-item"><strong>W</strong>{club.weight}g</span>
               <span className="compact-item"><strong>Loft</strong>{compactLoft}</span>
-              <span className="compact-item"><strong>SW</strong>{club.swingWeight}</span>
+              {club.clubType !== 'Putter' && (
+                <span className="compact-item"><strong>SW</strong>{club.swingWeight}</span>
+              )}
             </div>
           )}
       </div>

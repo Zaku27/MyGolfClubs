@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState, type CSSProperties, type ChangeEvent } from 'react';
 import type { GolfClub } from '../types/golf';
-import { getClubTypeShort } from '../utils/clubUtils';
+import { getClubTypeDisplay } from '../utils/clubUtils';
+import { sortClubsForDisplay } from '../utils/clubSort';
 import {
   DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE,
+  compareLieStandardTypeOrder,
+  displayLieStandardTypeLabel,
+  fallbackLieStandardForType,
+  getLieStandardTypeKeyForClub,
   type LieAngleStatus,
   lieStatusColor,
   lieStatusLabelJa,
   lieStatusFromDeviation,
   makePerClubLieStandardKey,
-  normalizeLieStandardKey,
   resolveStandardLieAngle,
   type UserLieAngleStandards,
 } from '../types/lieStandards';
@@ -31,7 +35,7 @@ type AnalysisScreenProps = {
   onResetLieStandards: () => void;
 };
 
-type ClubCategory = 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
+type ClubCategory = 'driver' | 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
 
 const CHART_WIDTH = 920;
 const CHART_HEIGHT = 360;
@@ -59,6 +63,8 @@ const SWING_PADDING = { top: 30, right: 28, bottom: 80, left: 56 };
 
 const getLieBarColor = (category: ClubCategory): string => {
   switch (category) {
+    case 'driver':
+      return '#1976d2';
     case 'wood':
       return '#1976d2';
     case 'hybrid':
@@ -122,6 +128,14 @@ type TooltipBoxSize = {
 };
 
 const getClubCategoryByType = (clubType: string): ClubCategory => {
+  // New category format (post-2026 update)
+  if (clubType === 'Driver' || clubType === 'Putter') return clubType.toLowerCase() as ClubCategory;
+  if (clubType === 'Wood') return 'wood';
+  if (clubType === 'Hybrid') return 'hybrid';
+  if (clubType === 'Iron') return 'iron';
+  if (clubType === 'Wedge') return 'wedge';
+  
+  // Legacy format support (pre-2026)
   if (clubType === 'P') return 'putter';
   if (clubType === 'PW') return 'iron';
   if (clubType.endsWith('W') || clubType === 'D') return 'wood';
@@ -138,6 +152,10 @@ const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   let speedPower = 1.0;
 
   switch (category) {
+    case 'driver':
+      baseline = 270.0 - 5.0 * loftAngle;
+      speedPower = 1.15;
+      break;
     case 'wood':
       baseline = 300.0 - 8.2222 * loftAngle + 0.1481 * loftAngle * loftAngle;
       speedPower = 1.14;
@@ -171,6 +189,8 @@ const getClubCategory = (club: GolfClub): ClubCategory => getClubCategoryByType(
 
 const getCategoryColor = (category: ClubCategory) => {
   switch (category) {
+    case 'driver':
+      return '#1976d2';
     case 'wood':
       return '#0d47a1';
     case 'hybrid':
@@ -186,6 +206,8 @@ const getCategoryColor = (category: ClubCategory) => {
 
 const getCategoryLabel = (category: ClubCategory) => {
   switch (category) {
+    case 'driver':
+      return 'ドライバー';
     case 'wood':
       return 'ウッド';
     case 'hybrid':
@@ -199,39 +221,9 @@ const getCategoryLabel = (category: ClubCategory) => {
   }
 };
 
-const getClubTypeSortKey = (clubTypeRaw: string): [number, number, string] => {
-  const clubType = normalizeLieStandardKey(clubTypeRaw);
-  if (clubType === 'D') return [0, 0, clubType];
-  if (clubType === 'PW') return [3, 10, clubType];
-  if (clubType.endsWith('W')) {
-    const n = Number(clubType.replace('W', ''));
-    return [1, Number.isFinite(n) ? n : 999, clubType];
-  }
-  if (clubType.endsWith('H')) {
-    const n = Number(clubType.replace('H', ''));
-    return [2, Number.isFinite(n) ? n : 999, clubType];
-  }
-  if (clubType.endsWith('I')) {
-    const n = Number(clubType.replace('I', ''));
-    return [3, Number.isFinite(n) ? n : 999, clubType];
-  }
-  if (/^\d+(\.\d+)?$/.test(clubType)) {
-    return [5, Number(clubType), clubType];
-  }
-  if (clubType === 'P') return [6, 0, clubType];
-  return [7, 999, clubType];
-};
-
-const compareClubTypeOrder = (a: string, b: string): number => {
-  const [ag, av, as] = getClubTypeSortKey(a);
-  const [bg, bv, bs] = getClubTypeSortKey(b);
-  if (ag !== bg) return ag - bg;
-  if (av !== bv) return av - bv;
-  return as.localeCompare(bs);
-};
-
 const getWeightLengthDotRadius = (club: Pick<GolfClub, 'clubType'>) => {
-  if (club.clubType === 'D' || club.clubType === 'P') return 7;
+  const normalizedType = (club.clubType ?? '').toUpperCase();
+  if (normalizedType === 'D' || normalizedType === 'P' || normalizedType === 'DRIVER' || normalizedType === 'PUTTER') return 7;
   return 5.8;
 };
 
@@ -409,12 +401,29 @@ const makeTickValues = (min: number, max: number, interval: number) => {
 
 const swingWeightToNumeric = (swingWeightRaw: string): number => {
   const normalized = (swingWeightRaw ?? '').trim().toUpperCase();
-  const match = normalized.match(/^([A-F])\s*([0-9])$/);
+  const match = normalized.match(/^([A-F])\s*([0-9](?:\.[05])?)$/);
   if (!match) return 0;
-  const letter = match[1];
+
+  // D0 is the baseline (0), so C9 becomes -1 and E1 becomes +11.
+  const letterIndex = match[1].charCodeAt(0) - 'D'.charCodeAt(0);
   const point = Number(match[2]);
-  const letterOffset = (letter.charCodeAt(0) - 'D'.charCodeAt(0)) * 10;
-  return letterOffset + point;
+  if (!Number.isFinite(point) || point < 0 || point > 9.5) return 0;
+
+  return letterIndex * 10 + point;
+};
+
+const numericToSwingWeightLabel = (value: number): string => {
+  const rounded = Math.round(value * 2) / 2;
+  const letterIndex = Math.floor(rounded / 10);
+  const point = rounded - letterIndex * 10;
+  const letterCode = 'D'.charCodeAt(0) + letterIndex;
+
+  if (letterCode < 'A'.charCodeAt(0) || letterCode > 'Z'.charCodeAt(0)) {
+    return rounded.toFixed(1);
+  }
+
+  const pointLabel = Number.isInteger(point) ? point.toFixed(0) : point.toFixed(1);
+  return `${String.fromCharCode(letterCode)}${pointLabel}`;
 };
 
 const getSwingStatus = (
@@ -444,45 +453,6 @@ const getSwingBarColor = (
     return { fill: '#fb8c00', stroke: '#e65100', strokeWidth: 1.8 };
   }
   return { fill: getCategoryColor(category), stroke: 'none', strokeWidth: 0 };
-};
-
-const getClubOrderGroup = (club: GolfClub): number => {
-  const type = (club.clubType ?? '').trim().toUpperCase();
-  const name = (club.name ?? '').toLowerCase();
-  const category = getClubCategoryByType(type);
-  const numberMatch = `${type} ${name}`.match(/(\d{1,2})/);
-  const clubNumber = numberMatch ? Number(numberMatch[1]) : Number.NaN;
-
-  if (name.includes('driver') || type === 'D') return 0;
-  if (category === 'wood') return 1;
-  if (category === 'hybrid') return 2;
-  if (category === 'iron' && Number.isFinite(clubNumber) && clubNumber <= 4) return 3;
-  if (category === 'iron' && Number.isFinite(clubNumber) && clubNumber <= 7) return 4;
-  if (category === 'iron') return 5;
-  if (category === 'wedge') return 6;
-  if (category === 'putter') return 7;
-  return 8;
-};
-
-const getClubOrderRank = (club: GolfClub): number => {
-  const type = (club.clubType ?? '').trim().toUpperCase();
-  const name = (club.name ?? '').toLowerCase();
-  const category = getClubCategoryByType(type);
-  const numberMatch = `${type} ${name}`.match(/(\d{1,2})/);
-  const clubNumber = numberMatch ? Number(numberMatch[1]) : 99;
-
-  if (category === 'wood' || category === 'hybrid' || category === 'iron') {
-    return clubNumber;
-  }
-  if (category === 'wedge') {
-    if (name.includes('pw') || name.includes('pitch')) return 0;
-    if (name.includes('aw') || name.includes('approach')) return 1;
-    if (name.includes('gw') || name.includes('gap')) return 2;
-    if (name.includes('sw') || name.includes('sand')) return 3;
-    if (name.includes('lw') || name.includes('lob')) return 4;
-    return clubNumber;
-  }
-  return 99;
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -557,9 +527,9 @@ export const AnalysisScreen = ({
   const swingTooltipRef = useRef<HTMLDivElement | null>(null);
   const lieTooltipRef = useRef<HTMLDivElement | null>(null);
 
-  const chartClubs = clubs
-    .filter((club) => club.loftAngle >= MIN_LOFT && club.loftAngle <= MAX_LOFT)
-    .sort((left, right) => left.loftAngle - right.loftAngle)
+  const chartClubs = sortClubsForDisplay(
+    clubs.filter((club) => club.loftAngle >= MIN_LOFT && club.loftAngle <= MAX_LOFT),
+  )
     .map((club) => ({
       ...club,
       estimatedDistance: getEstimatedDistance(club, headSpeed),
@@ -618,14 +588,9 @@ export const AnalysisScreen = ({
     weightBounds.yInterval,
   );
 
-  const swingWeightClubs = [...clubs]
-    .sort((a, b) => {
-      const groupDiff = getClubOrderGroup(a) - getClubOrderGroup(b);
-      if (groupDiff !== 0) return groupDiff;
-      const rankDiff = getClubOrderRank(a) - getClubOrderRank(b);
-      if (rankDiff !== 0) return rankDiff;
-      return (a.name ?? '').localeCompare(b.name ?? '');
-    })
+  const swingWeightClubs = sortClubsForDisplay(
+    clubs.filter((club) => getClubCategory(club) !== 'putter'),
+  )
     .map((club) => {
       const category = getClubCategory(club);
       const swingWeightNumeric = swingWeightToNumeric(club.swingWeight ?? '');
@@ -642,15 +607,7 @@ export const AnalysisScreen = ({
 
   const hasSwingWeightData = swingWeightClubs.length > 0;
 
-  const catOrder: ClubCategory[] = ['wood', 'hybrid', 'iron', 'wedge', 'putter'];
-  const lieAngleClubs = [...clubs]
-    .sort((a, b) => {
-      const catDiff =
-        catOrder.indexOf(getClubCategoryByType(a.clubType ?? '')) -
-        catOrder.indexOf(getClubCategoryByType(b.clubType ?? ''));
-      if (catDiff !== 0) return catDiff;
-      return (a.loftAngle ?? 0) - (b.loftAngle ?? 0);
-    })
+  const lieAngleClubs = sortClubsForDisplay(clubs)
     .map((club) => {
       const category = getClubCategory(club);
       const standardLieAngle = resolveStandardLieAngle(club, userLieAngleStandards);
@@ -1057,6 +1014,7 @@ export const AnalysisScreen = ({
         <>
           <div className="analysis-card chart-card">
             <div className="analysis-legend">
+              <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
               <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
               <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
               <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
@@ -1110,7 +1068,7 @@ export const AnalysisScreen = ({
                       y2={loftChartSize.height - PADDING.bottom}
                       className="chart-grid chart-grid-animated"
                     />
-                    <text x={mapLoftX(tick)} y={loftChartSize.height - 16} textAnchor="middle" className="chart-axis-label">
+                    <text x={mapLoftX(tick)} y={loftChartSize.height - 24} textAnchor="middle" className="chart-axis-label">
                       {tick}°
                     </text>
                   </g>
@@ -1228,7 +1186,7 @@ export const AnalysisScreen = ({
                   <div className="chart-tooltip-list">
                     <div className="chart-tooltip-row">
                       <span className="chart-tooltip-label">クラブ種別</span>
-                      <span className="chart-tooltip-value">{loftTooltip.club.clubType || getClubTypeShort(loftTooltip.club.name)}</span>
+                      <span className="chart-tooltip-value">{getClubTypeDisplay(loftTooltip.club.clubType, loftTooltip.club.number)}</span>
                     </div>
                     <div className="chart-tooltip-row">
                       <span className="chart-tooltip-label">ロフト</span>
@@ -1274,7 +1232,7 @@ export const AnalysisScreen = ({
                     <tr key={`row-${club.id ?? club.name}`}>
                       <td>
                         <div className="analysis-club-name">
-                          <span className="analysis-club-type">{club.clubType || getClubTypeShort(club.name)}</span>
+                          <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
                           <span>{club.name}</span>
                         </div>
                       </td>
@@ -1316,13 +1274,13 @@ export const AnalysisScreen = ({
               <div className="lie-settings-grid">
                 <div className="lie-settings-section">
                   <div className="lie-settings-section-title">1) クラブタイプ別（基本）</div>
-                  {[...new Set([...Object.keys(DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE), ...clubs.map((c) => normalizeLieStandardKey(c.clubType))])]
-                    .sort(compareClubTypeOrder)
+                  {[...new Set([...Object.keys(DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE), ...clubs.map(getLieStandardTypeKeyForClub)])]
+                    .sort(compareLieStandardTypeOrder)
                     .map((clubType) => (
                       <LieStandardInputRow
                         key={`type-${clubType}`}
-                        label={clubType}
-                        defaultValue={DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE[clubType] ?? 64}
+                        label={displayLieStandardTypeLabel(clubType)}
+                        defaultValue={DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE[clubType] ?? fallbackLieStandardForType(clubType)}
                         currentValue={userLieAngleStandards.byClubType[clubType]}
                         onCommit={(value) => onSetLieTypeStandard(clubType, value)}
                         onClear={() => onClearLieTypeStandard(clubType)}
@@ -1334,23 +1292,25 @@ export const AnalysisScreen = ({
                   {lieAngleClubs.map((club) => (
                     <LieStandardInputRow
                       key={`club-${club.id ?? club.name}`}
-                      label={club.name}
+                      label={`${club.name} ${club.number}`.trim()}
                       subLabel={club.clubType}
                       defaultValue={club.standardLieAngle}
                       currentValue={
                         userLieAngleStandards.byClubName[
+                          makePerClubLieStandardKey(club.name, club.clubType, club.number)
+                        ] ?? userLieAngleStandards.byClubName[
                           makePerClubLieStandardKey(club.name, club.clubType)
                         ]
                       }
                       onCommit={(value) =>
                         onSetLieClubStandard(
-                          makePerClubLieStandardKey(club.name, club.clubType),
+                          makePerClubLieStandardKey(club.name, club.clubType, club.number),
                           value,
                         )
                       }
                       onClear={() =>
                         onClearLieClubStandard(
-                          makePerClubLieStandardKey(club.name, club.clubType),
+                          makePerClubLieStandardKey(club.name, club.clubType, club.number),
                         )
                       }
                     />
@@ -1367,9 +1327,10 @@ export const AnalysisScreen = ({
             {lieAngleClubs.length > 0 ? (
               <>
                 <div className="analysis-legend">
-                  <span><i style={{ backgroundColor: '#2e7d32' }} />アイアン</span>
-                  <span><i style={{ backgroundColor: '#1976d2' }} />ウッド</span>
+                  <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
+                  <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
                   <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
+                  <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
                   <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
                   <span><i style={{ backgroundColor: '#424242' }} />パター</span>
                   <span><i className="legend-good-range" />良好範囲 ±1.5°</span>
@@ -1479,7 +1440,7 @@ export const AnalysisScreen = ({
                           >
                             <title>{`${club.name} | ライ角 ${lieVal.toFixed(1)}° | 基準 ${club.standardLieAngle.toFixed(1)}° | 偏差 ${deviation >= 0 ? '+' : ''}${deviation.toFixed(1)}°`}</title>
                           </rect>
-                          <g transform={`translate(${cx}, ${lieChartSize.height - LIE_PADDING.bottom + 12})`}>
+                          <g transform={`translate(${cx}, ${lieChartSize.height - LIE_PADDING.bottom + 20})`}>
                             <text
                               textAnchor="end"
                               transform="rotate(-40)"
@@ -1522,7 +1483,7 @@ export const AnalysisScreen = ({
                       <div className="chart-tooltip-list">
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">クラブ種別</span>
-                          <span className="chart-tooltip-value">{lieTooltip.club.clubType || getClubTypeShort(lieTooltip.club.name)}</span>
+                          <span className="chart-tooltip-value">{getClubTypeDisplay(lieTooltip.club.clubType, lieTooltip.club.number)}</span>
                         </div>
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">基準</span>
@@ -1582,7 +1543,7 @@ export const AnalysisScreen = ({
                       <tr key={`lie-row-${club.id ?? club.name}`}>
                         <td>
                           <div className="analysis-club-name">
-                            <span className="analysis-club-type">{club.clubType || getClubTypeShort(club.name)}</span>
+                            <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
                             <span>{club.name}</span>
                           </div>
                         </td>
@@ -1648,13 +1609,19 @@ export const AnalysisScreen = ({
             {hasSwingWeightData ? (
               <>
                 <div className="analysis-legend">
+                  <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
                   <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
                   <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
                   <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
                   <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
-                  <span><i style={{ backgroundColor: '#424242' }} />パター</span>
                   <span><i style={{ backgroundColor: '#fb8c00' }} />軽微なズレ</span>
                   <span><i style={{ backgroundColor: '#e53935' }} />調整推奨</span>
+                </div>
+                <div className="swing-chart-toolbar">
+                  <span className="swing-target-badge">
+                    <i className="legend-standard-line" />
+                    {`目安ターゲット: ${numericToSwingWeightLabel(swingWeightTarget)}`}
+                  </span>
                 </div>
                 <div
                   className="chart-scroll interactive-chart-scroll"
@@ -1706,14 +1673,6 @@ export const AnalysisScreen = ({
                       strokeDasharray="8 4"
                       className="chart-standard-line"
                     />
-                    <text
-                      x={swingChartSize.width - SWING_PADDING.right - 4}
-                      y={mapSwingY(swingWeightTarget) - 6}
-                      textAnchor="end"
-                      className="chart-axis-label"
-                    >
-                      {`目安ターゲット ${swingWeightTarget.toFixed(1)}`}
-                    </text>
 
                     {swingWeightClubs.map((club, index) => {
                       const cx = mapSwingX(index);
@@ -1741,7 +1700,7 @@ export const AnalysisScreen = ({
                           >
                             <title>{`${club.name} | ${club.swingWeight || '-'} | 目安偏差 ${(club.swingDeviation >= 0 ? '+' : '') + club.swingDeviation.toFixed(1)}`}</title>
                           </rect>
-                          <g transform={`translate(${cx}, ${swingChartSize.height - SWING_PADDING.bottom + 12})`}>
+                          <g transform={`translate(${cx}, ${swingChartSize.height - SWING_PADDING.bottom + 20})`}>
                             <text textAnchor="end" transform="rotate(-40)" className="chart-axis-label">
                               {club.name}
                             </text>
@@ -1781,7 +1740,7 @@ export const AnalysisScreen = ({
                       <div className="chart-tooltip-list">
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">クラブ種別</span>
-                          <span className="chart-tooltip-value">{swingTooltip.club.clubType || getClubTypeShort(swingTooltip.club.name)}</span>
+                          <span className="chart-tooltip-value">{getClubTypeDisplay(swingTooltip.club.clubType, swingTooltip.club.number)}</span>
                         </div>
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">SW</span>
@@ -1829,7 +1788,7 @@ export const AnalysisScreen = ({
                       <tr key={`sw-row-${club.id ?? club.name}`}>
                         <td>
                           <div className="analysis-club-name">
-                            <span className="analysis-club-type">{club.clubType || getClubTypeShort(club.name)}</span>
+                            <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
                             <span>{club.name}</span>
                           </div>
                         </td>
@@ -1861,6 +1820,7 @@ export const AnalysisScreen = ({
                 <div className="chart-section-heading">
                   </div>
                 <div className="analysis-legend">
+                  <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
                   <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
                   <span><i style={{ backgroundColor: '#00acc1' }} />ハイブリッド</span>
                   <span><i style={{ backgroundColor: '#0b8f5b' }} />アイアン</span>
@@ -1923,7 +1883,7 @@ export const AnalysisScreen = ({
                         />
                         <text
                           x={mapWeightLengthX(tick)}
-                          y={weightChartSize.height - 16}
+                          y={weightChartSize.height - 24}
                           textAnchor="middle"
                           className="chart-axis-label"
                         >
@@ -2010,7 +1970,7 @@ export const AnalysisScreen = ({
                       <div className="chart-tooltip-list">
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">クラブ種別</span>
-                          <span className="chart-tooltip-value">{weightTooltip.club.clubType || getClubTypeShort(weightTooltip.club.name)}</span>
+                          <span className="chart-tooltip-value">{getClubTypeDisplay(weightTooltip.club.clubType, weightTooltip.club.number)}</span>
                         </div>
                         <div className="chart-tooltip-row">
                           <span className="chart-tooltip-label">長さ</span>
@@ -2065,7 +2025,7 @@ export const AnalysisScreen = ({
                       <tr key={`wl-row-${club.id ?? club.name}`}>
                         <td>
                           <div className="analysis-club-name">
-                            <span className="analysis-club-type">{club.clubType || getClubTypeShort(club.name)}</span>
+                            <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
                             <span>{club.name}</span>
                           </div>
                         </td>

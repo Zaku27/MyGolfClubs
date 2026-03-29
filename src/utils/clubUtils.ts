@@ -1,3 +1,11 @@
+export const getClubTypeDisplay = (clubType: string, number: string): string => {
+  if (clubType === 'Wood') return `${number}Wood`;
+  if (clubType === 'Hybrid') return `${number}Hybrid`;
+  if (clubType === 'Iron') return `${number}Iron`;
+  if (clubType === 'Wedge') return number;
+  return clubType || 'Unknown';
+};
+
 export const getClubTypeShort = (name: string): string => {
   const normalized = name.trim();
 

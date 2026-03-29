@@ -200,7 +200,7 @@ class LieAngleDistributionChart extends ConsumerWidget {
                             final club = clubEntries[index].club;
                             return SideTitleWidget(
                               meta: meta,
-                              space: 12,
+                              space: 20,
                               child: Transform.rotate(
                                 angle: -0.45,
                                 child: Text(

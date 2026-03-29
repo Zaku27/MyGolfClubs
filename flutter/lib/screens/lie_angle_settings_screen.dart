@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/golf_club.dart';
 import '../models/user_lie_angle_standards.dart';
 import '../providers/club_providers.dart';
 
@@ -13,14 +14,13 @@ class LieAngleSettingsScreen extends ConsumerWidget {
     final userStandards = ref.watch(userLieAngleStandardsProvider);
     final notifier = ref.read(userLieAngleStandardsProvider.notifier);
 
-    final clubTypes = {
+    final clubTypeKeys = {
       ...kDefaultLieAngleStandardsByClubType.keys,
-      ...clubs.map((club) => club.clubType.trim().toUpperCase()),
+      ...clubs.map(UserLieAngleStandards.standardTypeKeyForClub),
     }.toList()
-      ..sort(_compareClubTypeOrder);
+      ..sort(UserLieAngleStandards.compareClubTypeOrder);
 
-    final sortedClubs = [...clubs]
-      ..sort((a, b) => a.loftAngle.compareTo(b.loftAngle));
+    final sortedClubs = ref.watch(sortedClubsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -55,19 +55,24 @@ class LieAngleSettingsScreen extends ConsumerWidget {
           const SizedBox(height: 18),
           _SectionCard(
             title: '1) クラブタイプ別（基本）',
-            subtitle: 'ここで決めた値が基本になります。個別上書きがある場合のみ、そちらが優先されます。',
+            subtitle:
+                '現在の clubType・番手・ロフトから基準タイプを自動判定しています。個別上書きがある場合のみ、そちらが優先されます。',
             child: Column(
               children: [
-                for (final clubType in clubTypes)
+                for (final clubTypeKey in clubTypeKeys)
                   _StandardInputRow(
-                    label: clubType,
+                    label: UserLieAngleStandards.displayLabelForClubType(
+                      clubTypeKey,
+                    ),
                     defaultValue:
-                        kDefaultLieAngleStandardsByClubType[clubType] ??
-                            _fallbackForClubType(clubType),
-                    currentValue: userStandards.byClubType[clubType],
+                        kDefaultLieAngleStandardsByClubType[clubTypeKey] ??
+                            UserLieAngleStandards.fallbackForClubType(
+                              clubTypeKey,
+                            ),
+                    currentValue: userStandards.byClubType[clubTypeKey],
                     onChanged: (value) =>
-                        notifier.setClubTypeStandard(clubType, value),
-                    onReset: () => notifier.clearClubTypeStandard(clubType),
+                        notifier.setClubTypeStandard(clubTypeKey, value),
+                    onReset: () => notifier.clearClubTypeStandard(clubTypeKey),
                   ),
               ],
             ),
@@ -81,18 +86,20 @@ class LieAngleSettingsScreen extends ConsumerWidget {
                 for (final club in sortedClubs)
                   // Keep per-club overrides unique even when model names repeat across lofts.
                   _StandardInputRow(
-                    label: club.name,
+                    label: '${club.name} ${club.number}'.trim(),
                     supportingText: club.clubType,
                     defaultValue: userStandards.standardFor(club),
                     currentValue: userStandards
                         .byClubName[UserLieAngleStandards.perClubKey(
                       club.name,
                       club.clubType,
+                      club.number,
                     )],
                     onChanged: (value) => notifier.setClubNameStandard(
                       UserLieAngleStandards.perClubKey(
                         club.name,
                         club.clubType,
+                        club.number,
                       ),
                       value,
                     ),
@@ -100,6 +107,7 @@ class LieAngleSettingsScreen extends ConsumerWidget {
                       UserLieAngleStandards.perClubKey(
                         club.name,
                         club.clubType,
+                        club.number,
                       ),
                     ),
                   ),
@@ -109,57 +117,6 @@ class LieAngleSettingsScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  static double _fallbackForClubType(String clubType) {
-    if (double.tryParse(clubType) != null) {
-      return 64.0;
-    }
-    if (clubType.endsWith('W') || clubType == 'D') {
-      return 57.0;
-    }
-    if (clubType.endsWith('H')) {
-      return 59.5;
-    }
-    if (clubType.endsWith('I') || clubType == 'PW') {
-      return 62.0;
-    }
-    if (clubType == 'P') {
-      return 70.0;
-    }
-    return 64.0;
-  }
-
-  static int _compareClubTypeOrder(String a, String b) {
-    final ak = _clubTypeSortKey(a);
-    final bk = _clubTypeSortKey(b);
-    if (ak.$1 != bk.$1) return ak.$1.compareTo(bk.$1);
-    if (ak.$2 != bk.$2) return ak.$2.compareTo(bk.$2);
-    return a.compareTo(b);
-  }
-
-  static (int, int) _clubTypeSortKey(String clubTypeRaw) {
-    final clubType = clubTypeRaw.trim().toUpperCase();
-    if (clubType == 'D') return (0, 0);
-    if (clubType == 'PW') return (3, 10);
-    if (clubType.endsWith('W')) {
-      final n = int.tryParse(clubType.replaceAll('W', '')) ?? 999;
-      return (1, n);
-    }
-    if (clubType.endsWith('H')) {
-      final n = int.tryParse(clubType.replaceAll('H', '')) ?? 999;
-      return (2, n);
-    }
-    if (clubType.endsWith('I')) {
-      final n = int.tryParse(clubType.replaceAll('I', '')) ?? 999;
-      return (3, n);
-    }
-    final wedgeLoft = double.tryParse(clubType);
-    if (wedgeLoft != null) {
-      return (5, wedgeLoft.round());
-    }
-    if (clubType == 'P') return (6, 0);
-    return (7, 999);
   }
 }
 

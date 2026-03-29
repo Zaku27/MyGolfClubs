@@ -61,6 +61,7 @@ class SwingWeightDistributionChart extends StatelessWidget {
     final entries = sortedClubs
         .map((club) => _SwingWeightEntry.fromClub(club, targetValue))
         .toList(growable: false);
+    final targetLabel = numericToSwingWeightLabel(targetValue);
 
     final minY = _resolveMinY(entries, targetValue);
     final maxY = _resolveMaxY(entries, targetValue);
@@ -108,6 +109,41 @@ class SwingWeightDistributionChart extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF4EA),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: const Color(0xFF66BB6A)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 18,
+                  height: 0,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: Color(0xFF2E7D32),
+                        width: 2,
+                        style: BorderStyle.solid,
+                      ),
+                    ),
+                  ),
+                ),
+                Text(
+                  '目安ターゲット: $targetLabel',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF1B5E20),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             height: 360,
@@ -124,17 +160,6 @@ class SwingWeightDistributionChart extends StatelessWidget {
                       color: const Color(0xFF2E7D32),
                       strokeWidth: 2,
                       dashArray: const [8, 4],
-                      label: HorizontalLineLabel(
-                        show: true,
-                        alignment: Alignment.topRight,
-                        padding: const EdgeInsets.only(right: 8, bottom: 4),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: const Color(0xFF1B5E20),
-                          fontWeight: FontWeight.w700,
-                        ),
-                        labelResolver: (_) =>
-                            '目安ターゲット ${targetValue.toStringAsFixed(1)}',
-                      ),
                     ),
                   ],
                 ),
@@ -182,7 +207,7 @@ class SwingWeightDistributionChart extends StatelessWidget {
 
                         return SideTitleWidget(
                           meta: meta,
-                          space: 10,
+                          space: 20,
                           child: Transform.rotate(
                             angle: -0.45,
                             child: Text(
@@ -618,14 +643,35 @@ class _StatusLegend extends StatelessWidget {
 
 double swingWeightToNumeric(String swingWeight) {
   final normalized = swingWeight.trim().toUpperCase();
-  final match = RegExp(r'^([A-F])\s*([0-9])$').firstMatch(normalized);
+  final match = RegExp(r'^([A-F])\s*([0-9](?:\.[05])?)$').firstMatch(
+    normalized,
+  );
   if (match == null) {
     return 0.0;
   }
 
-  final letter = match.group(1)!;
-  final point = int.parse(match.group(2)!);
+  // D0 is the baseline (0), so C9 becomes -1 and E1 becomes +11.
+  final letterIndex = match.group(1)!.codeUnitAt(0) - 'D'.codeUnitAt(0);
+  final point = double.parse(match.group(2)!);
+  if (point < 0 || point > 9.5) {
+    return 0.0;
+  }
 
-  final letterOffset = (letter.codeUnitAt(0) - 'D'.codeUnitAt(0)) * 10;
-  return (letterOffset + point).toDouble();
+  return letterIndex * 10 + point;
+}
+
+String numericToSwingWeightLabel(double value) {
+  final rounded = (value * 2).roundToDouble() / 2;
+  final letterIndex = (rounded / 10).floor();
+  final point = rounded - letterIndex * 10;
+  final letterCode = 'D'.codeUnitAt(0) + letterIndex;
+
+  if (letterCode < 'A'.codeUnitAt(0) || letterCode > 'Z'.codeUnitAt(0)) {
+    return rounded.toStringAsFixed(1);
+  }
+
+  final pointLabel = point == point.roundToDouble()
+      ? point.toStringAsFixed(0)
+      : point.toStringAsFixed(1);
+  return '${String.fromCharCode(letterCode)}$pointLabel';
 }
