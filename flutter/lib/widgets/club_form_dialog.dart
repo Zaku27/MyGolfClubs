@@ -222,17 +222,6 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
     return null;
   }
 
-  String? _validateLength(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    final v = double.tryParse(value);
-    if (v == null) return '有効な数値を入力してください';
-    final times4 = (v * 4).round();
-    if ((times4 / 4.0 - v).abs() > 0.001) {
-      return '0.25刻みで入力してください（例: 45.0, 45.25, 45.5, 45.75）';
-    }
-    return null;
-  }
-
   void _handleSave() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -345,7 +334,6 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
                         FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*\.?\d{0,2}$')),
                       ],
-                      validator: _validateLength,
                     ),
                     second: TextFormField(
                       controller: _weightController,

@@ -554,16 +554,16 @@ export const AnalysisScreen = ({
   const [activeTab, setActiveTab] = useState<'weightLength' | 'loftDistance' | 'lieAngle' | 'swingWeight'>('loftDistance');
   const [showLieSettings, setShowLieSettings] = useState(false);
   const [showSwingSettings, setShowSwingSettings] = useState(false);
-  const [loftTooltip, setLoftTooltip] = useState<LoftTooltipState | null>(null);
-  const [weightTooltip, setWeightTooltip] = useState<WeightTooltipState | null>(null);
-  const [swingTooltip, setSwingTooltip] = useState<SwingTooltipState | null>(null);
+  const [rawLoftTooltip, setLoftTooltip] = useState<LoftTooltipState | null>(null);
+  const [rawWeightTooltip, setWeightTooltip] = useState<WeightTooltipState | null>(null);
+  const [rawSwingTooltip, setSwingTooltip] = useState<SwingTooltipState | null>(null);
   const [loftTooltipBox, setLoftTooltipBox] = useState<TooltipBoxSize>({ width: 200, height: 120 });
   const [weightTooltipBox, setWeightTooltipBox] = useState<TooltipBoxSize>({ width: 200, height: 110 });
   const [swingTooltipBox, setSwingTooltipBox] = useState<TooltipBoxSize>({ width: 220, height: 130 });
   const [loftChartSize, setLoftChartSize] = useState({ width: CHART_WIDTH, height: CHART_HEIGHT });
   const [weightChartSize, setWeightChartSize] = useState({ width: CHART_WIDTH, height: CHART_HEIGHT });
   const [swingChartSize, setSwingChartSize] = useState({ width: CHART_WIDTH, height: CHART_HEIGHT });
-  const [lieTooltip, setLieTooltip] = useState<LieTooltipState | null>(null);
+  const [rawLieTooltip, setLieTooltip] = useState<LieTooltipState | null>(null);
   const [lieTooltipBox, setLieTooltipBox] = useState<TooltipBoxSize>({ width: 200, height: 110 });
   const [lieChartSize, setLieChartSize] = useState({ width: CHART_WIDTH, height: CHART_HEIGHT });
   const loftChartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -577,6 +577,14 @@ export const AnalysisScreen = ({
 
   const hiddenClubKeySet = new Set(hiddenAnalysisClubKeys);
   const isClubVisible = (club: GolfClub) => !hiddenClubKeySet.has(getAnalysisClubKey(club));
+  const loftTooltip = rawLoftTooltip && isClubVisible(rawLoftTooltip.club) ? rawLoftTooltip : null;
+  const weightTooltip = rawWeightTooltip && isClubVisible(rawWeightTooltip.club)
+    ? rawWeightTooltip
+    : null;
+  const swingTooltip = rawSwingTooltip && isClubVisible(rawSwingTooltip.club)
+    ? rawSwingTooltip
+    : null;
+  const lieTooltip = rawLieTooltip && isClubVisible(rawLieTooltip.club) ? rawLieTooltip : null;
 
   const loftTableClubs = sortClubsForDisplay(
     clubs.filter((club) => club.loftAngle >= MIN_LOFT && club.loftAngle <= MAX_LOFT),
@@ -689,21 +697,6 @@ export const AnalysisScreen = ({
     });
   const lieAngleClubs = lieAngleTableClubs.filter(isClubVisible);
   const hasAnyLieAngleData = lieAngleTableClubs.length > 0;
-
-  useEffect(() => {
-    if (loftTooltip && !isClubVisible(loftTooltip.club)) {
-      setLoftTooltip(null);
-    }
-    if (weightTooltip && !isClubVisible(weightTooltip.club)) {
-      setWeightTooltip(null);
-    }
-    if (swingTooltip && !isClubVisible(swingTooltip.club)) {
-      setSwingTooltip(null);
-    }
-    if (lieTooltip && !isClubVisible(lieTooltip.club)) {
-      setLieTooltip(null);
-    }
-  }, [hiddenAnalysisClubKeys, loftTooltip, weightTooltip, swingTooltip, lieTooltip]);
 
   useEffect(() => {
     if (activeTab !== 'loftDistance') return;
@@ -1877,7 +1870,7 @@ export const AnalysisScreen = ({
                           top: swingTooltipPos?.top,
                         }}
                       >
-                        <div className="chart-tooltip-title">{getSwingClubLabel(swingTooltip.club)}</div>
+                        <div className="chart-tooltip-title">{swingTooltip.club.name || getSwingClubLabel(swingTooltip.club)}</div>
                         <div className="chart-tooltip-list">
                           <div className="chart-tooltip-row">
                             <span className="chart-tooltip-label">クラブ種別</span>
@@ -2235,15 +2228,10 @@ const LieStandardInputRow = ({
   onClear,
   subLabel,
 }: LieStandardInputRowProps) => {
-  const [value, setValue] = useState((currentValue ?? defaultValue).toFixed(1));
   const isOverridden = currentValue != null;
 
-  useEffect(() => {
-    setValue((currentValue ?? defaultValue).toFixed(1));
-  }, [currentValue, defaultValue]);
-
-  const commit = () => {
-    const parsed = Number(value);
+  const commit = (rawValue: string) => {
+    const parsed = Number(rawValue);
     if (!Number.isFinite(parsed)) return;
     onCommit(parsed);
   };
@@ -2260,18 +2248,18 @@ const LieStandardInputRow = ({
         </em>
       </div>
       <input
+        key={`${currentValue ?? 'default'}-${defaultValue}`}
         className="analysis-input lie-setting-input"
         type="number"
         step="0.1"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
+        defaultValue={(currentValue ?? defaultValue).toFixed(1)}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
-            commit();
+            commit((event.currentTarget as HTMLInputElement).value);
             (event.currentTarget as HTMLInputElement).blur();
           }
         }}
-        onBlur={commit}
+        onBlur={(event) => commit(event.target.value)}
       />
       <button
         className="btn-secondary lie-setting-reset"

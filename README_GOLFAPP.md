@@ -1,5 +1,7 @@
 # ⛳ My Golf Bag - Golf Club Data Management App
 
+> Status (2026-03): Active development is Web-only (React + TypeScript). Flutter development is paused and no new Flutter features are planned for now.
+
 A simple, clean web application for managing your golf club collection. Track specifications for up to 14 standard clubs or add custom clubs beyond the standard set.
 
 ## Features
@@ -132,7 +134,7 @@ Edit `src/types/golf.ts` and update the `DEFAULT_CLUBS` array. The app will auto
 - ☐ Multiple bag profiles
 - ☐ Handicap tracking
 - ☐ Cloud sync
-- ☐ Mobile app (React Native or Flutter)
+- ☐ Mobile app support (on hold)
 
 ## License
 

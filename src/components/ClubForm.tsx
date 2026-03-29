@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { GolfClub, ClubCategory } from '../types/golf';
 import { DEFAULT_CLUBS } from '../types/golf';
 import './ClubForm.css';
@@ -38,6 +38,61 @@ interface ClubFormProps {
 
 type ClubFormData = Omit<GolfClub, 'id' | 'clubType'> & {
   clubType: ClubCategory | '';
+};
+
+const EMPTY_FORM_DATA: ClubFormData = {
+  clubType: '',
+  name: '',
+  number: '',
+  length: 0,
+  weight: 0,
+  swingWeight: '',
+  lieAngle: 0,
+  loftAngle: 0,
+  shaftType: '',
+  torque: 0,
+  flex: 'S',
+  distance: 0,
+  notes: '',
+};
+
+const normalizeClubNumberForPreset = (clubType: ClubCategory, value: string): string => {
+  if (clubType === 'Putter') {
+    return 'Putter';
+  }
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
+  if (clubType === 'Driver' && !normalized) {
+    return '1W';
+  }
+  return normalized;
+};
+
+const inferNumberPreset = (clubType: ClubCategory, value: string): string => {
+  const options = CLUB_NUMBER_OPTIONS[clubType] ?? [];
+  const normalized = normalizeClubNumberForPreset(clubType, value);
+  return options.includes(normalized) ? normalized : 'Custom';
+};
+
+const toFormData = (source?: GolfClub): ClubFormData => {
+  if (!source) {
+    return { ...EMPTY_FORM_DATA };
+  }
+
+  return {
+    clubType: source.clubType,
+    name: source.name,
+    number: source.number,
+    length: source.length,
+    weight: source.weight,
+    swingWeight: source.swingWeight,
+    lieAngle: source.lieAngle,
+    loftAngle: source.loftAngle,
+    shaftType: source.shaftType,
+    torque: source.torque,
+    flex: source.flex,
+    distance: source.distance,
+    notes: source.notes,
+  };
 };
 
 const buildClubDefaults = (clubType: ClubCategory): Omit<GolfClub, 'id'> => {
@@ -157,40 +212,11 @@ export const ClubForm: React.FC<ClubFormProps> = ({
   onCancel,
   isLoading = false,
 }) => {
-  const [numberPreset, setNumberPreset] = useState<string>('Custom');
-  const [formData, setFormData] = useState<ClubFormData>({
-    clubType: '',
-    name: '',
-    number: '',
-    length: 0,
-    weight: 0,
-    swingWeight: '',
-    lieAngle: 0,
-    loftAngle: 0,
-    shaftType: '',
-    torque: 0,
-    flex: 'S',
-    distance: 0,
-    notes: '',
-  });
+  const [numberPreset, setNumberPreset] = useState<string>(() => (
+    club ? inferNumberPreset(club.clubType, club.number) : 'Custom'
+  ));
+  const [formData, setFormData] = useState<ClubFormData>(() => toFormData(club));
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const normalizeClubNumber = (clubType: ClubCategory, value: string): string => {
-    if (clubType === 'Putter') {
-      return 'Putter';
-    }
-    const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
-    if (clubType === 'Driver' && !normalized) {
-      return '1W';
-    }
-    return normalized;
-  };
-
-  const inferPreset = (clubType: ClubCategory, value: string): string => {
-    const options = CLUB_NUMBER_OPTIONS[clubType] ?? [];
-    const normalized = normalizeClubNumber(clubType, value);
-    return options.includes(normalized) ? normalized : 'Custom';
-  };
 
   const applyClubTypeChange = (clubType: ClubCategory) => {
     const nextNumber = CLUB_NUMBER_DEFAULT[clubType];
@@ -209,7 +235,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         swingWeight: clubType === 'Putter' ? '' : defaults.swingWeight,
       }));
     }
-    setNumberPreset(clubType === 'Putter' ? 'Putter' : inferPreset(clubType, nextNumber));
+    setNumberPreset(clubType === 'Putter' ? 'Putter' : inferNumberPreset(clubType, nextNumber));
     setErrors((prev) => ({ ...prev, clubType: '', number: '' }));
   };
 
@@ -222,33 +248,6 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     setNumberPreset('Custom');
     setErrors((prev) => ({ ...prev, clubType: '', number: '' }));
   };
-
-  useEffect(() => {
-    if (club) {
-      const { id, createdAt, updatedAt, ...rest } = club;
-      setFormData(rest);
-      setNumberPreset(inferPreset(rest.clubType, rest.number));
-    } else {
-      const initial: ClubFormData = {
-        clubType: '',
-        name: '',
-        number: '',
-        length: 0,
-        weight: 0,
-        swingWeight: '',
-        lieAngle: 0,
-        loftAngle: 0,
-        shaftType: '',
-        torque: 0,
-        flex: 'S',
-        distance: 0,
-        notes: '',
-      };
-      setFormData(initial);
-      setNumberPreset('Custom');
-    }
-    setErrors({});
-  }, [club]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -334,13 +333,6 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         newErrors.loftAngle = '0°〜60°の範囲で入力してください';
       }
     }
-    if (formData.length > 0) {
-      const times4 = Math.round(formData.length * 4);
-      if (Math.abs(times4 / 4 - formData.length) > 0.001) {
-        newErrors.length = '0.25刻みで入力してください（例: 45.0, 45.25, 45.5, 45.75）';
-      }
-    }
-
     if (formData.clubType && formData.clubType !== 'Putter') {
       const swingWeight = formData.swingWeight.trim();
       if (swingWeight) {
@@ -362,7 +354,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
       onSubmit({
         ...formData,
         clubType: selectedClubType,
-        number: normalizeClubNumber(selectedClubType, formData.number),
+        number: normalizeClubNumberForPreset(selectedClubType, formData.number),
         swingWeight: selectedClubType === 'Putter' ? '' : formData.swingWeight.trim(),
         torque: selectedClubType === 'Putter' ? 0 : formData.torque,
       });
