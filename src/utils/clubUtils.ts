@@ -1,3 +1,5 @@
+import type { GolfClub } from '../types/golf';
+
 export const getClubTypeDisplay = (clubType: string, number: string): string => {
   const normalizedNumber = (number ?? '').trim();
 
@@ -58,4 +60,14 @@ export const getClubTypeShort = (name: string): string => {
   }
 
   return normalized;
+};
+
+export const getAnalysisClubKey = (
+  club: Pick<GolfClub, 'id' | 'clubType' | 'name' | 'number' | 'createdAt'>,
+): string => {
+  if (club.id != null) {
+    return `id:${club.id}`;
+  }
+
+  return [club.clubType, club.name, club.number, club.createdAt ?? ''].join('|');
 };

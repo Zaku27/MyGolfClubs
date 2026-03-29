@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ChangeEvent } from 'react';
 import type { GolfClub } from '../types/golf';
-import { getClubTypeDisplay } from '../utils/clubUtils';
+import { getAnalysisClubKey, getClubTypeDisplay } from '../utils/clubUtils';
 import { sortClubsForDisplay } from '../utils/clubSort';
 import {
   DEFAULT_LIE_ANGLE_STANDARDS_BY_TYPE,
@@ -24,6 +24,8 @@ type AnalysisScreenProps = {
   onUpdateActualDistance: (clubId: number, distance: number) => void;
   headSpeed: number;
   onHeadSpeedChange: (value: number) => void;
+  hiddenAnalysisClubKeys: string[];
+  onSetAnalysisClubVisible: (clubKey: string, visible: boolean) => void;
   swingWeightTarget: number;
   onSetSwingWeightTarget: (value: number) => void;
   onResetSwingWeightTarget: () => void;
@@ -493,6 +495,8 @@ export const AnalysisScreen = ({
   onUpdateActualDistance,
   headSpeed,
   onHeadSpeedChange,
+  hiddenAnalysisClubKeys,
+  onSetAnalysisClubVisible,
   swingWeightTarget,
   onSetSwingWeightTarget,
   onResetSwingWeightTarget,
@@ -527,15 +531,22 @@ export const AnalysisScreen = ({
   const swingTooltipRef = useRef<HTMLDivElement | null>(null);
   const lieTooltipRef = useRef<HTMLDivElement | null>(null);
 
-  const chartClubs = sortClubsForDisplay(
+  const hiddenClubKeySet = new Set(hiddenAnalysisClubKeys);
+  const isClubVisible = (club: GolfClub) => !hiddenClubKeySet.has(getAnalysisClubKey(club));
+
+  const loftTableClubs = sortClubsForDisplay(
     clubs.filter((club) => club.loftAngle >= MIN_LOFT && club.loftAngle <= MAX_LOFT),
-  )
-    .map((club) => ({
-      ...club,
-      estimatedDistance: getEstimatedDistance(club, headSpeed),
-      actualDistance: club.distance ?? 0,
-      category: getClubCategory(club),
-    }));
+  ).map((club) => ({
+    ...club,
+    estimatedDistance: getEstimatedDistance(club, headSpeed),
+    actualDistance: club.distance ?? 0,
+    category: getClubCategory(club),
+  }));
+
+  const chartClubs = loftTableClubs.filter(isClubVisible);
+
+  const hasAnyLoftData = loftTableClubs.length > 0;
+  const hasLoftData = chartClubs.length > 0;
 
   const loftTicks = [10, 20, 30, 40, 50, 60];
   const distanceTicks = [0, 50, 100, 150, 200, 250, 300];
@@ -554,8 +565,11 @@ export const AnalysisScreen = ({
       category: getClubCategory(club),
     }));
 
-  const weightRegression = getWeightRegression(weightLengthBaseClubs);
-  const weightLengthClubs = weightLengthBaseClubs.map((club) => {
+  const visibleWeightLengthBaseClubs = weightLengthBaseClubs.filter(isClubVisible);
+  const weightRegression = getWeightRegression(
+    visibleWeightLengthBaseClubs.length > 0 ? visibleWeightLengthBaseClubs : weightLengthBaseClubs,
+  );
+  const weightLengthTableClubs = weightLengthBaseClubs.map((club) => {
     const expectedWeight = getExpectedWeight(club.length, weightRegression);
     const deviation = club.weight - expectedWeight;
     return {
@@ -565,7 +579,9 @@ export const AnalysisScreen = ({
       weightTrendMessage: getWeightTrendMessage(deviation),
     };
   });
+  const weightLengthClubs = weightLengthTableClubs.filter(isClubVisible);
 
+  const hasAnyWeightLengthData = weightLengthTableClubs.length > 0;
   const hasWeightLengthData = weightLengthClubs.length > 0;
   const weightBounds = hasWeightLengthData
     ? getWeightChartBounds(weightLengthClubs, weightRegression)
@@ -588,7 +604,7 @@ export const AnalysisScreen = ({
     weightBounds.yInterval,
   );
 
-  const swingWeightClubs = sortClubsForDisplay(
+  const swingWeightTableClubs = sortClubsForDisplay(
     clubs.filter((club) => getClubCategory(club) !== 'putter'),
   )
     .map((club) => {
@@ -604,10 +620,12 @@ export const AnalysisScreen = ({
         swingStatus,
       };
     });
+  const swingWeightClubs = swingWeightTableClubs.filter(isClubVisible);
 
+  const hasAnySwingWeightData = swingWeightTableClubs.length > 0;
   const hasSwingWeightData = swingWeightClubs.length > 0;
 
-  const lieAngleClubs = sortClubsForDisplay(clubs)
+  const lieAngleTableClubs = sortClubsForDisplay(clubs)
     .map((club) => {
       const category = getClubCategory(club);
       const standardLieAngle = resolveStandardLieAngle(club, userLieAngleStandards);
@@ -621,6 +639,23 @@ export const AnalysisScreen = ({
         lieStatus,
       };
     });
+  const lieAngleClubs = lieAngleTableClubs.filter(isClubVisible);
+  const hasAnyLieAngleData = lieAngleTableClubs.length > 0;
+
+  useEffect(() => {
+    if (loftTooltip && !isClubVisible(loftTooltip.club)) {
+      setLoftTooltip(null);
+    }
+    if (weightTooltip && !isClubVisible(weightTooltip.club)) {
+      setWeightTooltip(null);
+    }
+    if (swingTooltip && !isClubVisible(swingTooltip.club)) {
+      setSwingTooltip(null);
+    }
+    if (lieTooltip && !isClubVisible(lieTooltip.club)) {
+      setLieTooltip(null);
+    }
+  }, [hiddenAnalysisClubKeys, loftTooltip, weightTooltip, swingTooltip, lieTooltip]);
 
   useEffect(() => {
     if (activeTab !== 'loftDistance') return;
@@ -906,6 +941,25 @@ export const AnalysisScreen = ({
     onHeadSpeedChange(Math.max(30, Math.min(60, nextValue)));
   };
 
+  const renderSelectionHeader = () => <th className="analysis-select-column">表示</th>;
+
+  const renderSelectionCell = (club: GolfClub) => {
+    const clubKey = getAnalysisClubKey(club);
+    const checked = !hiddenClubKeySet.has(clubKey);
+
+    return (
+      <td className="analysis-select-cell">
+        <input
+          type="checkbox"
+          className="analysis-checkbox"
+          checked={checked}
+          onChange={(event) => onSetAnalysisClubVisible(clubKey, event.target.checked)}
+          aria-label={`${getClubTypeDisplay(club.clubType, club.number)} ${club.name} をグラフに表示`}
+        />
+      </td>
+    );
+  };
+
   return (
     <div className="analysis-screen">
       <div className="analysis-header">
@@ -1013,203 +1067,213 @@ export const AnalysisScreen = ({
       {activeTab === 'loftDistance' ? (
         <>
           <div className="analysis-card chart-card">
-            <div className="analysis-legend">
-              <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
-              <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
-              <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
-              <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
-              <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
-              <span><i className="legend-estimated" />推定</span>
-              <span><i className="legend-actual" />実測</span>
-              <span><i className="legend-actual-line" />実測ライン</span>
-            </div>
-
-            <div
-              className="chart-scroll interactive-chart-scroll"
-              ref={loftChartContainerRef}
-              onMouseLeave={() => setLoftTooltip(null)}
-            >
-              <svg
-                viewBox={`0 0 ${loftChartSize.width} ${loftChartSize.height}`}
-                className="analysis-chart loft-analysis-chart"
-                role="img"
-                aria-label="ロフトと飛距離の散布図"
-              >
-                <rect
-                  x={PADDING.left}
-                  y={PADDING.top}
-                  width={loftChartSize.width - PADDING.left - PADDING.right}
-                  height={loftChartSize.height - PADDING.top - PADDING.bottom}
-                  fill="#ffffff"
-                  rx="18"
-                />
-
-                {distanceTicks.map((tick) => (
-                  <g key={`y-${tick}`}>
-                    <line
-                      x1={PADDING.left}
-                      x2={CHART_WIDTH - PADDING.right}
-                      y1={mapLoftY(tick)}
-                      y2={mapLoftY(tick)}
-                      className="chart-grid chart-grid-animated"
-                    />
-                    <text x={PADDING.left - 12} y={mapLoftY(tick) + 4} textAnchor="end" className="chart-axis-label">
-                      {tick}
-                    </text>
-                  </g>
-                ))}
-
-                {loftTicks.map((tick) => (
-                  <g key={`x-${tick}`}>
-                    <line
-                      x1={mapLoftX(tick)}
-                      x2={mapLoftX(tick)}
-                      y1={PADDING.top}
-                      y2={loftChartSize.height - PADDING.bottom}
-                      className="chart-grid chart-grid-animated"
-                    />
-                    <text x={mapLoftX(tick)} y={loftChartSize.height - 24} textAnchor="middle" className="chart-axis-label">
-                      {tick}°
-                    </text>
-                  </g>
-                ))}
-
-                {actualLinePoints && (
-                  <polyline
-                    points={actualLinePoints}
-                    fill="none"
-                    stroke="#ff8f00"
-                    strokeWidth="2.5"
-                    className="chart-line-animated"
-                  />
-                )}
-
-                {chartClubs.map((club, index) => (
-                  <g
-                    key={club.id ?? club.name}
-                    style={{ '--point-delay': `${index * 50}ms` } as CSSProperties}
-                  >
-                    <circle
-                      cx={mapLoftX(club.loftAngle)}
-                      cy={mapLoftY(club.estimatedDistance)}
-                      r="8.5"
-                      fill="#ffffff"
-                      stroke={getCategoryColor(club.category)}
-                      strokeWidth="3"
-                      className="chart-point-circle"
-                      onMouseEnter={() =>
-                        setLoftTooltip({
-                          x: mapLoftX(club.loftAngle),
-                          y: mapLoftY(club.estimatedDistance),
-                          club,
-                          pointType: 'estimated',
-                        })
-                      }
-                      onClick={() =>
-                        setLoftTooltip({
-                          x: mapLoftX(club.loftAngle),
-                          y: mapLoftY(club.estimatedDistance),
-                          club,
-                          pointType: 'estimated',
-                        })
-                      }
-                    >
-                      <title>{`${club.name} | ロフト ${club.loftAngle}° | 推定 ${club.estimatedDistance.toFixed(0)}y`}</title>
-                    </circle>
-                    {club.actualDistance > 0 && (
-                      <circle
-                        cx={mapLoftX(club.loftAngle)}
-                        cy={mapLoftY(club.actualDistance)}
-                        r="8.5"
-                        fill={getCategoryColor(club.category)}
-                        stroke="#ffffff"
-                        strokeWidth="2"
-                        className="chart-point-circle"
-                        onMouseEnter={() =>
-                          setLoftTooltip({
-                            x: mapLoftX(club.loftAngle),
-                            y: mapLoftY(club.actualDistance),
-                            club,
-                            pointType: 'actual',
-                          })
-                        }
-                        onClick={() =>
-                          setLoftTooltip({
-                            x: mapLoftX(club.loftAngle),
-                            y: mapLoftY(club.actualDistance),
-                            club,
-                            pointType: 'actual',
-                          })
-                        }
-                      >
-                        <title>{`${club.name} | ロフト ${club.loftAngle}° | 実測 ${club.actualDistance.toFixed(0)}y`}</title>
-                      </circle>
-                    )}
-                    <text
-                      x={mapLoftX(club.loftAngle) + 10}
-                      y={mapLoftY(club.estimatedDistance) - 10}
-                      className="chart-point-label"
-                    >
-                      {club.name}
-                    </text>
-                  </g>
-                ))}
-
-                <text
-                  x={loftChartSize.width / 2}
-                  y={loftChartSize.height - 2}
-                  textAnchor="middle"
-                  className="chart-title-label"
-                >
-                  ロフト角（度）
-                </text>
-                <text
-                  x="10"
-                  y={loftChartSize.height / 2}
-                  textAnchor="middle"
-                  transform={`rotate(-90 10 ${loftChartSize.height / 2})`}
-                  className="chart-title-label"
-                >
-                  飛距離（ヤード）
-                </text>
-              </svg>
-              {loftTooltip && (
-                <div
-                  ref={loftTooltipRef}
-                  className="chart-tooltip"
-                  style={{
-                    left: loftTooltipPos?.left,
-                    top: loftTooltipPos?.top,
-                  }}
-                >
-                  <div className="chart-tooltip-title">{loftTooltip.club.name}</div>
-                  <div className="chart-tooltip-list">
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">クラブ種別</span>
-                      <span className="chart-tooltip-value">{getClubTypeDisplay(loftTooltip.club.clubType, loftTooltip.club.number)}</span>
-                    </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">ロフト</span>
-                      <span className="chart-tooltip-value">{loftTooltip.club.loftAngle.toFixed(1)}°</span>
-                    </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">推定</span>
-                      <span className="chart-tooltip-value">{loftTooltip.club.estimatedDistance.toFixed(0)} y</span>
-                    </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">実測</span>
-                      <span className="chart-tooltip-value">
-                        {loftTooltip.club.actualDistance > 0 ? `${loftTooltip.club.actualDistance.toFixed(0)} y` : '-'}
-                      </span>
-                    </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">選択点</span>
-                      <span className="chart-tooltip-value">{loftTooltip.pointType === 'estimated' ? '推定ポイント' : '実測ポイント'}</span>
-                    </div>
-                  </div>
+            {hasAnyLoftData ? (
+              <>
+                <div className="analysis-legend">
+                  <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
+                  <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
+                  <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
+                  <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
+                  <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
+                  <span><i className="legend-estimated" />推定</span>
+                  <span><i className="legend-actual" />実測</span>
+                  <span><i className="legend-actual-line" />実測ライン</span>
                 </div>
-              )}
-            </div>
+
+                {hasLoftData ? (
+                  <div
+                    className="chart-scroll interactive-chart-scroll"
+                    ref={loftChartContainerRef}
+                    onMouseLeave={() => setLoftTooltip(null)}
+                  >
+                    <svg
+                      viewBox={`0 0 ${loftChartSize.width} ${loftChartSize.height}`}
+                      className="analysis-chart loft-analysis-chart"
+                      role="img"
+                      aria-label="ロフトと飛距離の散布図"
+                    >
+                      <rect
+                        x={PADDING.left}
+                        y={PADDING.top}
+                        width={loftChartSize.width - PADDING.left - PADDING.right}
+                        height={loftChartSize.height - PADDING.top - PADDING.bottom}
+                        fill="#ffffff"
+                        rx="18"
+                      />
+
+                      {distanceTicks.map((tick) => (
+                        <g key={`y-${tick}`}>
+                          <line
+                            x1={PADDING.left}
+                            x2={CHART_WIDTH - PADDING.right}
+                            y1={mapLoftY(tick)}
+                            y2={mapLoftY(tick)}
+                            className="chart-grid chart-grid-animated"
+                          />
+                          <text x={PADDING.left - 12} y={mapLoftY(tick) + 4} textAnchor="end" className="chart-axis-label">
+                            {tick}
+                          </text>
+                        </g>
+                      ))}
+
+                      {loftTicks.map((tick) => (
+                        <g key={`x-${tick}`}>
+                          <line
+                            x1={mapLoftX(tick)}
+                            x2={mapLoftX(tick)}
+                            y1={PADDING.top}
+                            y2={loftChartSize.height - PADDING.bottom}
+                            className="chart-grid chart-grid-animated"
+                          />
+                          <text x={mapLoftX(tick)} y={loftChartSize.height - 24} textAnchor="middle" className="chart-axis-label">
+                            {tick}°
+                          </text>
+                        </g>
+                      ))}
+
+                      {actualLinePoints && (
+                        <polyline
+                          points={actualLinePoints}
+                          fill="none"
+                          stroke="#ff8f00"
+                          strokeWidth="2.5"
+                          className="chart-line-animated"
+                        />
+                      )}
+
+                      {chartClubs.map((club, index) => (
+                        <g
+                          key={club.id ?? club.name}
+                          style={{ '--point-delay': `${index * 50}ms` } as CSSProperties}
+                        >
+                          <circle
+                            cx={mapLoftX(club.loftAngle)}
+                            cy={mapLoftY(club.estimatedDistance)}
+                            r="8.5"
+                            fill="#ffffff"
+                            stroke={getCategoryColor(club.category)}
+                            strokeWidth="3"
+                            className="chart-point-circle"
+                            onMouseEnter={() =>
+                              setLoftTooltip({
+                                x: mapLoftX(club.loftAngle),
+                                y: mapLoftY(club.estimatedDistance),
+                                club,
+                                pointType: 'estimated',
+                              })
+                            }
+                            onClick={() =>
+                              setLoftTooltip({
+                                x: mapLoftX(club.loftAngle),
+                                y: mapLoftY(club.estimatedDistance),
+                                club,
+                                pointType: 'estimated',
+                              })
+                            }
+                          >
+                            <title>{`${club.name} | ロフト ${club.loftAngle}° | 推定 ${club.estimatedDistance.toFixed(0)}y`}</title>
+                          </circle>
+                          {club.actualDistance > 0 && (
+                            <circle
+                              cx={mapLoftX(club.loftAngle)}
+                              cy={mapLoftY(club.actualDistance)}
+                              r="8.5"
+                              fill={getCategoryColor(club.category)}
+                              stroke="#ffffff"
+                              strokeWidth="2"
+                              className="chart-point-circle"
+                              onMouseEnter={() =>
+                                setLoftTooltip({
+                                  x: mapLoftX(club.loftAngle),
+                                  y: mapLoftY(club.actualDistance),
+                                  club,
+                                  pointType: 'actual',
+                                })
+                              }
+                              onClick={() =>
+                                setLoftTooltip({
+                                  x: mapLoftX(club.loftAngle),
+                                  y: mapLoftY(club.actualDistance),
+                                  club,
+                                  pointType: 'actual',
+                                })
+                              }
+                            >
+                              <title>{`${club.name} | ロフト ${club.loftAngle}° | 実測 ${club.actualDistance.toFixed(0)}y`}</title>
+                            </circle>
+                          )}
+                          <text
+                            x={mapLoftX(club.loftAngle) + 10}
+                            y={mapLoftY(club.estimatedDistance) - 10}
+                            className="chart-point-label"
+                          >
+                            {club.name}
+                          </text>
+                        </g>
+                      ))}
+
+                      <text
+                        x={loftChartSize.width / 2}
+                        y={loftChartSize.height - 2}
+                        textAnchor="middle"
+                        className="chart-title-label"
+                      >
+                        ロフト角（度）
+                      </text>
+                      <text
+                        x="10"
+                        y={loftChartSize.height / 2}
+                        textAnchor="middle"
+                        transform={`rotate(-90 10 ${loftChartSize.height / 2})`}
+                        className="chart-title-label"
+                      >
+                        飛距離（ヤード）
+                      </text>
+                    </svg>
+                    {loftTooltip && (
+                      <div
+                        ref={loftTooltipRef}
+                        className="chart-tooltip"
+                        style={{
+                          left: loftTooltipPos?.left,
+                          top: loftTooltipPos?.top,
+                        }}
+                      >
+                        <div className="chart-tooltip-title">{loftTooltip.club.name}</div>
+                        <div className="chart-tooltip-list">
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">クラブ種別</span>
+                            <span className="chart-tooltip-value">{getClubTypeDisplay(loftTooltip.club.clubType, loftTooltip.club.number)}</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">ロフト</span>
+                            <span className="chart-tooltip-value">{loftTooltip.club.loftAngle.toFixed(1)}°</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">推定</span>
+                            <span className="chart-tooltip-value">{loftTooltip.club.estimatedDistance.toFixed(0)} y</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">実測</span>
+                            <span className="chart-tooltip-value">
+                              {loftTooltip.club.actualDistance > 0 ? `${loftTooltip.club.actualDistance.toFixed(0)} y` : '-'}
+                            </span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">選択点</span>
+                            <span className="chart-tooltip-value">{loftTooltip.pointType === 'estimated' ? '推定ポイント' : '実測ポイント'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="analysis-empty">表示するクラブを選択してください</div>
+                )}
+              </>
+            ) : (
+              <div className="analysis-empty">クラブがまだ追加されていません</div>
+            )}
           </div>
 
           <div className="analysis-card table-card">
@@ -1221,6 +1285,7 @@ export const AnalysisScreen = ({
               <table className="analysis-table">
                 <thead>
                   <tr>
+                    {renderSelectionHeader()}
                     <th>クラブ</th>
                     <th>ロフト</th>
                     <th>推定</th>
@@ -1228,8 +1293,9 @@ export const AnalysisScreen = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {chartClubs.map((club) => (
+                  {loftTableClubs.map((club) => (
                     <tr key={`row-${club.id ?? club.name}`}>
+                      {renderSelectionCell(club)}
                       <td>
                         <div className="analysis-club-name">
                           <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
@@ -1289,7 +1355,7 @@ export const AnalysisScreen = ({
                 </div>
                 <div className="lie-settings-section">
                   <div className="lie-settings-section-title">2) クラブ別 override（必要なものだけ）</div>
-                  {lieAngleClubs.map((club) => (
+                  {lieAngleTableClubs.map((club) => (
                     <LieStandardInputRow
                       key={`club-${club.id ?? club.name}`}
                       label={`${club.name} ${club.number}`.trim()}
@@ -1324,7 +1390,7 @@ export const AnalysisScreen = ({
           )}
 
           <div className="analysis-card chart-card lie-angle-frame">
-            {lieAngleClubs.length > 0 ? (
+            {hasAnyLieAngleData ? (
               <>
                 <div className="analysis-legend">
                   <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
@@ -1337,17 +1403,18 @@ export const AnalysisScreen = ({
                   <span><i className="legend-standard-line" />基準値ライン</span>
                   <span><i style={{ backgroundColor: '#c62828' }} />調整推奨</span>
                 </div>
-                <div
-                  className="chart-scroll interactive-chart-scroll"
-                  ref={lieChartContainerRef}
-                  onMouseLeave={() => setLieTooltip(null)}
-                >
-                  <svg
-                    viewBox={`0 0 ${lieChartSize.width} ${lieChartSize.height}`}
-                    className="analysis-chart lie-analysis-chart"
-                    role="img"
-                    aria-label="ライ角分布の棒グラフ"
+                {lieAngleClubs.length > 0 ? (
+                  <div
+                    className="chart-scroll interactive-chart-scroll"
+                    ref={lieChartContainerRef}
+                    onMouseLeave={() => setLieTooltip(null)}
                   >
+                    <svg
+                      viewBox={`0 0 ${lieChartSize.width} ${lieChartSize.height}`}
+                      className="analysis-chart lie-analysis-chart"
+                      role="img"
+                      aria-label="ライ角分布の棒グラフ"
+                    >
                     <rect
                       x={LIE_PADDING.left}
                       y={LIE_PADDING.top}
@@ -1469,49 +1536,52 @@ export const AnalysisScreen = ({
                     >
                       ライ角（度）
                     </text>
-                  </svg>
-                  {lieTooltip && (
-                    <div
-                      ref={lieTooltipRef}
-                      className="chart-tooltip"
-                      style={{
-                        left: lieTooltipPos?.left,
-                        top: lieTooltipPos?.top,
-                      }}
-                    >
-                      <div className="chart-tooltip-title">{lieTooltip.club.name}</div>
-                      <div className="chart-tooltip-list">
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">クラブ種別</span>
-                          <span className="chart-tooltip-value">{getClubTypeDisplay(lieTooltip.club.clubType, lieTooltip.club.number)}</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">基準</span>
-                          <span className="chart-tooltip-value">{lieTooltip.club.standardLieAngle.toFixed(1)}°</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">ライ角</span>
-                          <span className="chart-tooltip-value">{lieTooltip.club.lieAngle.toFixed(1)}°</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">偏差</span>
-                          <span className="chart-tooltip-value">
-                            {lieTooltip.club.deviationFromStandard >= 0 ? '+' : ''}
-                            {lieTooltip.club.deviationFromStandard.toFixed(1)}°
-                          </span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">状態</span>
-                          <span className="chart-tooltip-value">{lieStatusLabelJa(lieTooltip.club.lieStatus)}</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">種別</span>
-                          <span className="chart-tooltip-value">{lieTooltip.club.clubType}</span>
+                    </svg>
+                    {lieTooltip && (
+                      <div
+                        ref={lieTooltipRef}
+                        className="chart-tooltip"
+                        style={{
+                          left: lieTooltipPos?.left,
+                          top: lieTooltipPos?.top,
+                        }}
+                      >
+                        <div className="chart-tooltip-title">{lieTooltip.club.name}</div>
+                        <div className="chart-tooltip-list">
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">クラブ種別</span>
+                            <span className="chart-tooltip-value">{getClubTypeDisplay(lieTooltip.club.clubType, lieTooltip.club.number)}</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">基準</span>
+                            <span className="chart-tooltip-value">{lieTooltip.club.standardLieAngle.toFixed(1)}°</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">ライ角</span>
+                            <span className="chart-tooltip-value">{lieTooltip.club.lieAngle.toFixed(1)}°</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">偏差</span>
+                            <span className="chart-tooltip-value">
+                              {lieTooltip.club.deviationFromStandard >= 0 ? '+' : ''}
+                              {lieTooltip.club.deviationFromStandard.toFixed(1)}°
+                            </span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">状態</span>
+                            <span className="chart-tooltip-value">{lieStatusLabelJa(lieTooltip.club.lieStatus)}</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">種別</span>
+                            <span className="chart-tooltip-value">{lieTooltip.club.clubType}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="analysis-empty">表示するクラブを選択してください</div>
+                )}
               </>
             ) : (
               <div className="analysis-empty">クラブがまだ追加されていません</div>
@@ -1527,6 +1597,7 @@ export const AnalysisScreen = ({
               <table className="analysis-table">
                 <thead>
                   <tr>
+                    {renderSelectionHeader()}
                     <th>クラブ名</th>
                     <th>種類</th>
                     <th>計測値（°）</th>
@@ -1536,11 +1607,12 @@ export const AnalysisScreen = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {lieAngleClubs.map((club) => {
+                  {lieAngleTableClubs.map((club) => {
                     const deviation = club.deviationFromStandard;
                     const status = club.lieStatus;
                     return (
                       <tr key={`lie-row-${club.id ?? club.name}`}>
+                        {renderSelectionCell(club)}
                         <td>
                           <div className="analysis-club-name">
                             <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
@@ -1606,7 +1678,7 @@ export const AnalysisScreen = ({
           )}
 
           <div className="analysis-card chart-card swing-weight-frame">
-            {hasSwingWeightData ? (
+            {hasAnySwingWeightData ? (
               <>
                 <div className="analysis-legend">
                   <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
@@ -1623,17 +1695,18 @@ export const AnalysisScreen = ({
                     {`目安ターゲット: ${numericToSwingWeightLabel(swingWeightTarget)}`}
                   </span>
                 </div>
-                <div
-                  className="chart-scroll interactive-chart-scroll"
-                  ref={swingChartContainerRef}
-                  onMouseLeave={() => setSwingTooltip(null)}
-                >
-                  <svg
-                    viewBox={`0 0 ${swingChartSize.width} ${swingChartSize.height}`}
-                    className="analysis-chart swing-analysis-chart"
-                    role="img"
-                    aria-label="スイングウェイト分布の棒グラフ"
+                {hasSwingWeightData ? (
+                  <div
+                    className="chart-scroll interactive-chart-scroll"
+                    ref={swingChartContainerRef}
+                    onMouseLeave={() => setSwingTooltip(null)}
                   >
+                    <svg
+                      viewBox={`0 0 ${swingChartSize.width} ${swingChartSize.height}`}
+                      className="analysis-chart swing-analysis-chart"
+                      role="img"
+                      aria-label="スイングウェイト分布の棒グラフ"
+                    >
                     <rect
                       x={SWING_PADDING.left}
                       y={SWING_PADDING.top}
@@ -1726,40 +1799,43 @@ export const AnalysisScreen = ({
                     >
                       スイングウェイト数値
                     </text>
-                  </svg>
-                  {swingTooltip && (
-                    <div
-                      ref={swingTooltipRef}
-                      className="chart-tooltip"
-                      style={{
-                        left: swingTooltipPos?.left,
-                        top: swingTooltipPos?.top,
-                      }}
-                    >
-                      <div className="chart-tooltip-title">{swingTooltip.club.name}</div>
-                      <div className="chart-tooltip-list">
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">クラブ種別</span>
-                          <span className="chart-tooltip-value">{getClubTypeDisplay(swingTooltip.club.clubType, swingTooltip.club.number)}</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">SW</span>
-                          <span className="chart-tooltip-value">{swingTooltip.club.swingWeight || '-'}</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">目安偏差</span>
-                          <span className="chart-tooltip-value">
-                            {(swingTooltip.club.swingDeviation >= 0 ? '+' : '') + swingTooltip.club.swingDeviation.toFixed(1)}
-                          </span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">状態</span>
-                          <span className="chart-tooltip-value">{swingTooltip.club.swingStatus}</span>
+                    </svg>
+                    {swingTooltip && (
+                      <div
+                        ref={swingTooltipRef}
+                        className="chart-tooltip"
+                        style={{
+                          left: swingTooltipPos?.left,
+                          top: swingTooltipPos?.top,
+                        }}
+                      >
+                        <div className="chart-tooltip-title">{swingTooltip.club.name}</div>
+                        <div className="chart-tooltip-list">
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">クラブ種別</span>
+                            <span className="chart-tooltip-value">{getClubTypeDisplay(swingTooltip.club.clubType, swingTooltip.club.number)}</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">SW</span>
+                            <span className="chart-tooltip-value">{swingTooltip.club.swingWeight || '-'}</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">目安偏差</span>
+                            <span className="chart-tooltip-value">
+                              {(swingTooltip.club.swingDeviation >= 0 ? '+' : '') + swingTooltip.club.swingDeviation.toFixed(1)}
+                            </span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">状態</span>
+                            <span className="chart-tooltip-value">{swingTooltip.club.swingStatus}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="analysis-empty">表示するクラブを選択してください</div>
+                )}
               </>
             ) : (
               <div className="analysis-empty">クラブがまだ追加されていません</div>
@@ -1775,6 +1851,7 @@ export const AnalysisScreen = ({
               <table className="analysis-table">
                 <thead>
                   <tr>
+                    {renderSelectionHeader()}
                     <th>クラブ名</th>
                     <th>種類</th>
                     <th>スイングウェイト</th>
@@ -1783,9 +1860,10 @@ export const AnalysisScreen = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {hasSwingWeightData ? (
-                    swingWeightClubs.map((club) => (
+                  {hasAnySwingWeightData ? (
+                    swingWeightTableClubs.map((club) => (
                       <tr key={`sw-row-${club.id ?? club.name}`}>
+                        {renderSelectionCell(club)}
                         <td>
                           <div className="analysis-club-name">
                             <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
@@ -1804,7 +1882,7 @@ export const AnalysisScreen = ({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="analysis-empty-cell">クラブがまだ追加されていません</td>
+                      <td colSpan={6} className="analysis-empty-cell">クラブがまだ追加されていません</td>
                     </tr>
                   )}
                 </tbody>
@@ -1815,7 +1893,7 @@ export const AnalysisScreen = ({
       ) : (
         <>
           <div className="analysis-card chart-card weight-length-frame">
-            {hasWeightLengthData ? (
+            {hasAnyWeightLengthData ? (
               <>
                 <div className="chart-section-heading">
                   </div>
@@ -1830,17 +1908,18 @@ export const AnalysisScreen = ({
                   <span><i className="legend-trend-line" />トレンド線</span>
                   <span><i className="legend-expected-band" />期待帯 ±12g</span>
                 </div>
-                <div
-                  className="chart-scroll interactive-chart-scroll"
-                  ref={weightChartContainerRef}
-                  onMouseLeave={() => setWeightTooltip(null)}
-                >
-                  <svg
-                    viewBox={`0 0 ${weightChartSize.width} ${weightChartSize.height}`}
-                    className="analysis-chart weight-analysis-chart"
-                    role="img"
-                    aria-label="重量と長さの散布図"
+                {hasWeightLengthData ? (
+                  <div
+                    className="chart-scroll interactive-chart-scroll"
+                    ref={weightChartContainerRef}
+                    onMouseLeave={() => setWeightTooltip(null)}
                   >
+                    <svg
+                      viewBox={`0 0 ${weightChartSize.width} ${weightChartSize.height}`}
+                      className="analysis-chart weight-analysis-chart"
+                      role="img"
+                      aria-label="重量と長さの散布図"
+                    >
                     <rect
                       x={weightPadding.left}
                       y={weightPadding.top}
@@ -1956,46 +2035,49 @@ export const AnalysisScreen = ({
                     >
                       クラブ重量（グラム）
                     </text>
-                  </svg>
-                  {weightTooltip && (
-                    <div
-                      ref={weightTooltipRef}
-                      className="chart-tooltip"
-                      style={{
-                        left: weightTooltipPos?.left,
-                        top: weightTooltipPos?.top,
-                      }}
-                    >
-                      <div className="chart-tooltip-title">{weightTooltip.club.name}</div>
-                      <div className="chart-tooltip-list">
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">クラブ種別</span>
-                          <span className="chart-tooltip-value">{getClubTypeDisplay(weightTooltip.club.clubType, weightTooltip.club.number)}</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">長さ</span>
-                          <span className="chart-tooltip-value">{weightTooltip.club.length.toFixed(2)} in</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">重量</span>
-                          <span className="chart-tooltip-value">{weightTooltip.club.weight.toFixed(1)} g</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">期待値</span>
-                          <span className="chart-tooltip-value">{weightTooltip.club.expectedWeight.toFixed(1)} g</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">偏差</span>
-                          <span className="chart-tooltip-value">{getWeightDeviationLabel(weightTooltip.club.deviation)}</span>
-                        </div>
-                        <div className="chart-tooltip-row">
-                          <span className="chart-tooltip-label">示唆</span>
-                          <span className="chart-tooltip-value">{weightTooltip.club.weightTrendMessage}</span>
+                    </svg>
+                    {weightTooltip && (
+                      <div
+                        ref={weightTooltipRef}
+                        className="chart-tooltip"
+                        style={{
+                          left: weightTooltipPos?.left,
+                          top: weightTooltipPos?.top,
+                        }}
+                      >
+                        <div className="chart-tooltip-title">{weightTooltip.club.name}</div>
+                        <div className="chart-tooltip-list">
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">クラブ種別</span>
+                            <span className="chart-tooltip-value">{getClubTypeDisplay(weightTooltip.club.clubType, weightTooltip.club.number)}</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">長さ</span>
+                            <span className="chart-tooltip-value">{weightTooltip.club.length.toFixed(2)} in</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">重量</span>
+                            <span className="chart-tooltip-value">{weightTooltip.club.weight.toFixed(1)} g</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">期待値</span>
+                            <span className="chart-tooltip-value">{weightTooltip.club.expectedWeight.toFixed(1)} g</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">偏差</span>
+                            <span className="chart-tooltip-value">{getWeightDeviationLabel(weightTooltip.club.deviation)}</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">示唆</span>
+                            <span className="chart-tooltip-value">{weightTooltip.club.weightTrendMessage}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="analysis-empty">表示するクラブを選択してください</div>
+                )}
               </>
             ) : (
               <div className="analysis-empty">クラブがまだ追加されていません</div>
@@ -2011,6 +2093,7 @@ export const AnalysisScreen = ({
               <table className="analysis-table">
                 <thead>
                   <tr>
+                    {renderSelectionHeader()}
                     <th>クラブ名</th>
                     <th>種類</th>
                     <th>長さ（in）</th>
@@ -2020,9 +2103,10 @@ export const AnalysisScreen = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {hasWeightLengthData ? (
-                    weightLengthClubs.map((club) => (
+                  {hasAnyWeightLengthData ? (
+                    weightLengthTableClubs.map((club) => (
                       <tr key={`wl-row-${club.id ?? club.name}`}>
+                        {renderSelectionCell(club)}
                         <td>
                           <div className="analysis-club-name">
                             <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
@@ -2040,7 +2124,7 @@ export const AnalysisScreen = ({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="analysis-empty-cell">クラブがまだ追加されていません</td>
+                      <td colSpan={7} className="analysis-empty-cell">クラブがまだ追加されていません</td>
                     </tr>
                   )}
                 </tbody>

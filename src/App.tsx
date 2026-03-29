@@ -5,6 +5,7 @@ import {
   normalizeLieStandardKey,
   type UserLieAngleStandards,
 } from './types/lieStandards';
+import { getAnalysisClubKey } from './utils/clubUtils';
 import { ClubList } from './components/ClubList';
 import { ClubForm } from './components/ClubForm';
 import { AnalysisScreen } from './components/AnalysisScreen';
@@ -13,6 +14,7 @@ import './App.css';
 
 const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
 const SWING_TARGET_STORAGE_KEY = 'golfbag-swing-weight-target';
+const ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY = 'golfbag-analysis-hidden-clubs';
 const DEFAULT_SWING_TARGET = 2.0;
 
 function App() {
@@ -84,6 +86,19 @@ function App() {
     if (!Number.isFinite(parsed)) return DEFAULT_SWING_TARGET;
     return Math.round(parsed * 10) / 10;
   });
+  const [hiddenAnalysisClubKeys, setHiddenAnalysisClubKeys] = useState<string[]>(() => {
+    const raw = window.localStorage.getItem(ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY);
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === 'string')
+        : [];
+    } catch {
+      return [];
+    }
+  });
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
   const sortedClubs = useClubStore(selectSortedClubsForDisplay);
@@ -124,6 +139,13 @@ function App() {
     );
   }, [swingWeightTarget]);
 
+  useEffect(() => {
+    window.localStorage.setItem(
+      ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY,
+      JSON.stringify(hiddenAnalysisClubKeys),
+    );
+  }, [hiddenAnalysisClubKeys]);
+
   const handleSetSwingWeightTarget = (value: number) => {
     const rounded = Math.round(value * 10) / 10;
     const clamped = Math.max(-30, Math.min(30, rounded));
@@ -132,6 +154,17 @@ function App() {
 
   const handleResetSwingWeightTarget = () => {
     setSwingWeightTarget(DEFAULT_SWING_TARGET);
+  };
+
+  const handleSetAnalysisClubVisible = (clubKey: string, visible: boolean) => {
+    setHiddenAnalysisClubKeys((prev) => {
+      const exists = prev.includes(clubKey);
+      if (visible) {
+        return exists ? prev.filter((key) => key !== clubKey) : prev;
+      }
+
+      return exists ? prev : [...prev, clubKey];
+    });
   };
 
   const handleSetLieTypeStandard = (clubType: string, value: number) => {
@@ -264,6 +297,10 @@ function App() {
           onUpdateActualDistance={handleActualDistanceChange}
           headSpeed={headSpeed}
           onHeadSpeedChange={setHeadSpeed}
+          hiddenAnalysisClubKeys={hiddenAnalysisClubKeys.filter((clubKey) =>
+            sortedClubs.some((club) => getAnalysisClubKey(club) === clubKey),
+          )}
+          onSetAnalysisClubVisible={handleSetAnalysisClubVisible}
           swingWeightTarget={swingWeightTarget}
           onSetSwingWeightTarget={handleSetSwingWeightTarget}
           onResetSwingWeightTarget={handleResetSwingWeightTarget}

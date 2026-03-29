@@ -529,6 +529,19 @@
   text-transform: uppercase;
 }
 
+.analysis-select-column,
+.analysis-select-cell {
+  width: 68px;
+  text-align: center;
+}
+
+.analysis-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #1b5e20;
+  cursor: pointer;
+}
+
 .analysis-empty-cell {
   text-align: center;
   color: #607468;
