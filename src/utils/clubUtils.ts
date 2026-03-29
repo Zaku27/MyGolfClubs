@@ -1,6 +1,14 @@
 export const getClubTypeDisplay = (clubType: string, number: string): string => {
   const normalizedNumber = (number ?? '').trim();
 
+  if (clubType === 'Driver') {
+    if (/^mini(?:\s*driver)?$/i.test(normalizedNumber)) {
+      return 'miniDriver';
+    }
+
+    return 'Driver';
+  }
+
   if (clubType === 'Wood') {
     const base = normalizedNumber
       .replace(/\s*wood\s*$/i, '')

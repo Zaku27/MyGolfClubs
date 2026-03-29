@@ -181,7 +181,7 @@ const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   const speedRatio = Math.max(0.7, Math.min(1.35, headSpeed / 42));
   const speedFactor = Math.pow(speedRatio, speedPower);
   const estimated = baseline * speedFactor;
-  const categoryAdjustment = category === 'wedge' ? 0.90 : category === 'iron' ? 0.95 : category === 'hybrid' ? 0.96 : 1.0;
+  const categoryAdjustment = category === 'driver' ? 1.05 : category === 'wood' ? 1.02 : category === 'wedge' ? 0.90 : category === 'iron' ? 0.95 : category === 'hybrid' ? 0.96 : 1.0;
   return Math.max(0, Math.min(290, estimated * categoryAdjustment));
 };
 

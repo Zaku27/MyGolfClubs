@@ -233,6 +233,34 @@
   gap: 10px;
 }
 
+.wedge-help-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.wedge-help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #e7eef9;
+  border: 1px solid #96afd8;
+  color: #2f4d7d;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.wedge-help-panel {
+  left: -10px;
+  min-width: min(320px, calc(100vw - 52px));
+}
+
 .length-stepper {
   display: flex;
   align-items: center;

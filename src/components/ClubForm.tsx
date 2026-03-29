@@ -13,7 +13,7 @@ const CLUB_TYPE_OPTIONS: { value: ClubCategory; label: string }[] = [
 ];
 
 const CLUB_NUMBER_OPTIONS: Partial<Record<ClubCategory, string[]>> = {
-  Driver: ['1W'],
+  Driver: ['1W', 'mini'],
   Wood: ['3W', '5W', '7W', '9W'],
   Hybrid: ['2H', '3H', '4H', '5H', '6H'],
   Iron: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
@@ -291,6 +291,13 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           number: value,
         };
       });
+    } else {
+      setFormData((prev) => {
+        if (prev.clubType === 'Wedge') {
+          return { ...prev, number: '' };
+        }
+        return prev;
+      });
     }
     setErrors((prev) => ({ ...prev, number: '' }));
   };
@@ -377,7 +384,17 @@ export const ClubForm: React.FC<ClubFormProps> = ({
 
     return (
       <div className="form-group">
-        <label htmlFor="number">クラブ番号 *</label>
+        <label htmlFor="number">
+          クラブ番号 *
+          {formData.clubType === 'Wedge' && (
+            <span className="field-help-wrap wedge-help-trigger" aria-label="Pingウェッジ表記のヒント">
+              <span className="wedge-help-icon" aria-hidden="true">?</span>
+              <span className="field-help-panel wedge-help-panel" role="note">
+                Pingのクラブ表記では、WはGW、UはAW、SはSWの目安です。
+              </span>
+            </span>
+          )}
+        </label>
         <div className="club-number-stack">
           <select
             id="numberSuggestion"
@@ -405,7 +422,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               name="number"
               value={formData.number}
               onChange={(e) => handleNumberTextChange(e.target.value)}
-              placeholder="例: 7, PW, 3W, 4H"
+              placeholder={formData.clubType === 'Wedge' ? '例: 52, 58' : '例: 7, PW, 3W, 4H'}
               required
               className={errors.number ? 'error' : ''}
             />
