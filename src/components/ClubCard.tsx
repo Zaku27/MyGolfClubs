@@ -52,16 +52,16 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
           {viewMode === 'full' ? (
             <>
               <div className="spec-row">
+                <span className="spec-label">ロフト角:</span>
+                  <span className="spec-value">{club.loftAngle ?? '-'}°</span>
+              </div>
+              <div className="spec-row">
                 <span className="spec-label">長さ:</span>
                 <span className="spec-value">{club.length}"</span>
               </div>
               <div className="spec-row">
                 <span className="spec-label">重さ:</span>
                 <span className="spec-value">{club.weight}g</span>
-              </div>
-              <div className="spec-row">
-                <span className="spec-label">ロフト角:</span>
-                  <span className="spec-value">{club.loftAngle ?? '-'}°</span>
               </div>
               <div className="spec-row">
                 <span className="spec-label">ライ角:</span>
@@ -78,12 +78,12 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
                 <span className="spec-value">{club.shaftType}</span>
               </div>
               <div className="spec-row">
-                <span className="spec-label">トルク:</span>
-                  <span className="spec-value">{club.torque != null ? club.torque.toFixed(1) : '-'}</span>
-              </div>
-              <div className="spec-row">
                 <span className="spec-label">フレックス:</span>
                 <span className="spec-value">{club.flex}</span>
+              </div>
+              <div className="spec-row">
+                <span className="spec-label">トルク:</span>
+                  <span className="spec-value">{club.torque != null ? club.torque.toFixed(1) : '-'}</span>
               </div>
               {club.notes && (
                 <div className="spec-row notes">
@@ -94,9 +94,9 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
             </>
           ) : (
             <div className="compact-view" aria-label="簡易スペック">
+              <span className="compact-item"><strong>Loft</strong>{compactLoft}</span>
               <span className="compact-item"><strong>L</strong>{club.length}"</span>
               <span className="compact-item"><strong>W</strong>{club.weight}g</span>
-              <span className="compact-item"><strong>Loft</strong>{compactLoft}</span>
               {club.clubType !== 'Putter' && (
                 <span className="compact-item"><strong>SW</strong>{club.swingWeight}</span>
               )}

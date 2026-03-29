@@ -233,6 +233,44 @@
   gap: 10px;
 }
 
+.length-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.length-stepper input {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.stepper-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 38px;
+  border: 1px solid #d4e0d7;
+  border-radius: 10px;
+  background: #f0f5f2;
+  color: #344b3e;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.stepper-btn:hover {
+  background: #ddf0e4;
+  border-color: #4caf82;
+}
+
+.stepper-btn:active {
+  background: #c6e6d2;
+}
+
 /* Error Message */
 .error-message {
   display: block;

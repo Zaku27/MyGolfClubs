@@ -95,6 +95,14 @@ export const useClubStore = create<ClubStore>((set) => ({
   },
 }));
 
+let lastClubsRef: GolfClub[] | null = null;
+let lastSortedClubs: GolfClub[] = [];
+
 export const selectSortedClubsForDisplay = (state: ClubStore): GolfClub[] => {
-  return sortClubsForDisplay(state.clubs);
+  if (state.clubs === lastClubsRef) {
+    return lastSortedClubs;
+  }
+  lastClubsRef = state.clubs;
+  lastSortedClubs = sortClubsForDisplay(state.clubs);
+  return lastSortedClubs;
 };

@@ -1,6 +1,22 @@
 export const getClubTypeDisplay = (clubType: string, number: string): string => {
-  if (clubType === 'Wood') return `${number}Wood`;
-  if (clubType === 'Hybrid') return `${number}Hybrid`;
+  const normalizedNumber = (number ?? '').trim();
+
+  if (clubType === 'Wood') {
+    const base = normalizedNumber
+      .replace(/\s*wood\s*$/i, '')
+      .replace(/\s*w\s*$/i, '')
+      .trim();
+    return `${base || normalizedNumber}Wood`;
+  }
+
+  if (clubType === 'Hybrid') {
+    const base = normalizedNumber
+      .replace(/\s*hybrid\s*$/i, '')
+      .replace(/\s*h\s*$/i, '')
+      .trim();
+    return `${base || normalizedNumber}Hybrid`;
+  }
+
   if (clubType === 'Iron') return `${number}Iron`;
   if (clubType === 'Wedge') return number;
   return clubType || 'Unknown';

@@ -160,6 +160,7 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
   void _applyPutterRules() {
     if (_isPutterSelected) {
       _swingWeightController.clear();
+      _torqueController.clear();
     }
   }
 
@@ -209,6 +210,29 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
     return normalized;
   }
 
+  String? _validateLoft(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final v = double.tryParse(value);
+    if (v == null) return '有効な数値を入力してください';
+    if (v < 0 || v > 60) return '0°〜60°の範囲で入力してください';
+    final times10 = (v * 10).round();
+    if ((times10 / 10.0 - v).abs() > 0.001) {
+      return '0.1刻みで入力してください（例: 10.5, 11.0）';
+    }
+    return null;
+  }
+
+  String? _validateLength(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final v = double.tryParse(value);
+    if (v == null) return '有効な数値を入力してください';
+    final times4 = (v * 4).round();
+    if ((times4 / 4.0 - v).abs() > 0.001) {
+      return '0.25刻みで入力してください（例: 45.0, 45.25, 45.5, 45.75）';
+    }
+    return null;
+  }
+
   void _handleSave() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -229,7 +253,9 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
       swingWeight: _isPutterSelected ? '' : _swingWeightController.text.trim(),
       lieAngle: double.tryParse(_lieAngleController.text) ?? 0.0,
       shaftType: _shaftTypeController.text.trim(),
-      torque: double.tryParse(_torqueController.text) ?? 0.0,
+        torque: _isPutterSelected
+          ? 0.0
+          : (double.tryParse(_torqueController.text) ?? 0.0),
       flex: _flexController.text.trim(),
       distance: double.tryParse(_distanceController.text) ?? 0.0,
       notes: _notesController.text.trim(),
@@ -298,8 +324,10 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,1}$')),
                     ],
+                    validator: _validateLoft,
                   ),
                   const SizedBox(height: 16),
                   _buildResponsivePair(
@@ -315,8 +343,9 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
                           const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d*$')),
+                            RegExp(r'^\d*\.?\d{0,2}$')),
                       ],
+                      validator: _validateLength,
                     ),
                     second: TextFormField(
                       controller: _weightController,
@@ -377,38 +406,57 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
                           ),
                         ),
                   const SizedBox(height: 16),
-                  _buildResponsiveTriple(
-                    first: TextFormField(
-                      controller: _shaftTypeController,
-                      decoration: _inputDecoration(
-                        context,
-                        label: 'シャフト',
-                        hint: 'Graphite S',
-                      ),
-                    ),
-                    second: TextFormField(
-                      controller: _torqueController,
-                      decoration: _inputDecoration(
-                        context,
-                        label: 'トルク',
-                        hint: '4.5',
-                      ),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d*$')),
-                      ],
-                    ),
-                    third: TextFormField(
-                      controller: _flexController,
-                      decoration: _inputDecoration(
-                        context,
-                        label: 'フレックス',
-                        hint: 'R',
-                      ),
-                    ),
-                  ),
+                  _isPutterSelected
+                      ? _buildResponsivePair(
+                          first: TextFormField(
+                            controller: _shaftTypeController,
+                            decoration: _inputDecoration(
+                              context,
+                              label: 'シャフト',
+                              hint: 'Graphite S',
+                            ),
+                          ),
+                          second: TextFormField(
+                            controller: _flexController,
+                            decoration: _inputDecoration(
+                              context,
+                              label: 'フレックス',
+                              hint: 'R',
+                            ),
+                          ),
+                        )
+                      : _buildResponsiveTriple(
+                          first: TextFormField(
+                            controller: _shaftTypeController,
+                            decoration: _inputDecoration(
+                              context,
+                              label: 'シャフト',
+                              hint: 'Graphite S',
+                            ),
+                          ),
+                          second: TextFormField(
+                            controller: _flexController,
+                            decoration: _inputDecoration(
+                              context,
+                              label: 'フレックス',
+                              hint: 'R',
+                            ),
+                          ),
+                          third: TextFormField(
+                            controller: _torqueController,
+                            decoration: _inputDecoration(
+                              context,
+                              label: 'トルク',
+                              hint: '4.5',
+                            ),
+                            keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d*$')),
+                            ],
+                          ),
+                        ),
                   const SizedBox(height: 16),
                   _buildSectionHeading(context, '追加情報'),
                   const SizedBox(height: 12),
@@ -491,16 +539,7 @@ class _ClubFormDialogState extends State<ClubFormDialog> {
     final clubType = _selectedClubType ?? 'Driver';
 
     if (clubType == 'Putter') {
-      return TextFormField(
-        key: const ValueKey<String>('putter-number'),
-        enabled: false,
-        initialValue: 'Putter',
-        decoration: _inputDecoration(
-          context,
-          label: 'クラブ番号',
-          hint: 'Putter',
-        ),
-      );
+      return const SizedBox.shrink(key: ValueKey<String>('putter-number-hidden'));
     }
 
     if (clubType == 'Driver') {

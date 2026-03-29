@@ -8,7 +8,7 @@ import {
 import { ClubList } from './components/ClubList';
 import { ClubForm } from './components/ClubForm';
 import { AnalysisScreen } from './components/AnalysisScreen';
-import { useClubStore } from './store/clubStore';
+import { selectSortedClubsForDisplay, useClubStore } from './store/clubStore';
 import './App.css';
 
 const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
@@ -46,7 +46,7 @@ function App() {
       };
     // クラブデータをJSONでエクスポート
     const handleExportJSON = () => {
-      const dataStr = JSON.stringify(clubs, null, 2);
+      const dataStr = JSON.stringify(sortedClubs, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -86,7 +86,17 @@ function App() {
   });
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
-  const { clubs, loading, error, loadClubs, addClub, updateClub, deleteClub, initializeDefaults, resetToDefaults } = useClubStore();
+  const sortedClubs = useClubStore(selectSortedClubsForDisplay);
+  const {
+    loading,
+    error,
+    loadClubs,
+    addClub,
+    updateClub,
+    deleteClub,
+    initializeDefaults,
+    resetToDefaults,
+  } = useClubStore();
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -249,7 +259,7 @@ function App() {
         />
       ) : showAnalysis ? (
         <AnalysisScreen
-          clubs={clubs}
+          clubs={sortedClubs}
           onBack={handleBackToList}
           onUpdateActualDistance={handleActualDistanceChange}
           headSpeed={headSpeed}
@@ -266,7 +276,7 @@ function App() {
         />
       ) : (
         <ClubList
-          clubs={clubs}
+          clubs={sortedClubs}
           onEdit={handleEditClub}
           onDelete={handleDeleteClub}
           onAdd={handleAddClub}

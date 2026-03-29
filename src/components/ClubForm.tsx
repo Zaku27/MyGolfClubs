@@ -309,6 +309,19 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     }
     if (!formData.loftAngle) {
       newErrors.loftAngle = 'ロフト角を入力してください';
+    } else {
+      const times10 = Math.round(formData.loftAngle * 10);
+      if (Math.abs(times10 / 10 - formData.loftAngle) > 0.001) {
+        newErrors.loftAngle = '0.1刻みで入力してください（例: 10.5, 11.0）';
+      } else if (formData.loftAngle < 0 || formData.loftAngle > 60) {
+        newErrors.loftAngle = '0°〜60°の範囲で入力してください';
+      }
+    }
+    if (formData.length > 0) {
+      const times4 = Math.round(formData.length * 4);
+      if (Math.abs(times4 / 4 - formData.length) > 0.001) {
+        newErrors.length = '0.25刻みで入力してください（例: 45.0, 45.25, 45.5, 45.75）';
+      }
     }
 
     setErrors(newErrors);
@@ -324,6 +337,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         clubType: selectedClubType,
         number: normalizeClubNumber(selectedClubType, formData.number),
         swingWeight: selectedClubType === 'Putter' ? '' : formData.swingWeight.trim(),
+        torque: selectedClubType === 'Putter' ? 0 : formData.torque,
       });
     }
   };
@@ -334,18 +348,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     }
 
     if (formData.clubType === 'Putter') {
-      return (
-        <div className="form-group">
-          <label htmlFor="number">クラブ番号</label>
-          <input
-            type="text"
-            id="number"
-            name="number"
-            value="Putter"
-            disabled
-          />
-        </div>
-      );
+      return null;
     }
 
     if (formData.clubType === 'Driver') {
@@ -482,8 +485,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
       <div className="form-section">
         <h3 className="form-section-title">スペック</h3>
         
-        {/* Loft, Length, Weight Row */}
-      <div className="form-row">
+        {/* Loft Row (alone) */}
         <div className="form-group">
           <label htmlFor="loftAngle">ロフト角(度数) *</label>
           <input
@@ -492,7 +494,9 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             name="loftAngle"
             value={formData.loftAngle || ''}
             onChange={handleChange}
-            step="0.5"
+            step="0.1"
+            min="0"
+            max="60"
             required
             className={errors.loftAngle ? 'error' : ''}
           />
@@ -500,29 +504,34 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             <span className="error-message">{errors.loftAngle}</span>
           )}
         </div>
-        <div className="form-group">
-          <label htmlFor="length">長さ(インチ)</label>
-          <input
-            type="number"
-            id="length"
-            name="length"
-            value={formData.length || ''}
-            onChange={handleChange}
-            step="0.5"
-          />
+
+        {/* Length, Weight Row */}
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="length">長さ(インチ)</label>
+            <input
+              type="number"
+              id="length"
+              name="length"
+              value={formData.length || ''}
+              onChange={handleChange}
+              step="0.25"
+              className={errors.length ? 'error' : ''}
+            />
+            {errors.length && <span className="error-message">{errors.length}</span>}
+          </div>
+          <div className="form-group">
+            <label htmlFor="weight">重さ(グラム)</label>
+            <input
+              type="number"
+              id="weight"
+              name="weight"
+              value={formData.weight || ''}
+              onChange={handleChange}
+              step="1"
+            />
+          </div>
         </div>
-        <div className="form-group">
-          <label htmlFor="weight">重さ(グラム)</label>
-          <input
-            type="number"
-            id="weight"
-            name="weight"
-            value={formData.weight || ''}
-            onChange={handleChange}
-            step="1"
-          />
-        </div>
-      </div>
 
       {/* Lie Angle, Swing Weight Row */}
       <div className="form-row">
@@ -566,18 +575,6 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           />
         </div>
         <div className="form-group">
-          <label htmlFor="torque">トルク</label>
-          <input
-            type="number"
-            id="torque"
-            name="torque"
-            value={formData.torque || ''}
-            onChange={handleChange}
-            step="0.1"
-            min="0"
-          />
-        </div>
-        <div className="form-group">
           <label htmlFor="flex">フレックス</label>
           <select
             id="flex"
@@ -592,6 +589,20 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             <option value="L">L</option>
           </select>
         </div>
+        {formData.clubType !== 'Putter' && (
+          <div className="form-group">
+            <label htmlFor="torque">トルク</label>
+            <input
+              type="number"
+              id="torque"
+              name="torque"
+              value={formData.torque || ''}
+              onChange={handleChange}
+              step="0.1"
+              min="0"
+            />
+          </div>
+        )}
       </div>
 
       </div>
