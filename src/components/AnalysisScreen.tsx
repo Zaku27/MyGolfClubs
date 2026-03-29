@@ -71,7 +71,7 @@ const getLieBarColor = (category: ClubCategory): string => {
     case 'driver':
       return '#1976d2';
     case 'wood':
-      return '#1976d2';
+      return '#0d47a1';
     case 'hybrid':
       return '#26c6da';
     case 'iron':
@@ -1555,7 +1555,7 @@ export const AnalysisScreen = ({
                               transform="rotate(-40)"
                               className="chart-axis-label"
                             >
-                              {club.name}
+                              {getClubTypeDisplay(club.clubType, club.number)}
                             </text>
                           </g>
                         </g>
