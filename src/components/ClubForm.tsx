@@ -93,6 +93,16 @@ const normalizeNumberForMatch = (clubType: ClubCategory, value: string): string 
   return normalized;
 };
 
+const normalizeSwingWeightInput = (value: string): string => {
+  return (value ?? '')
+    .trim()
+    .replace(/[Ａ-Ｚａ-ｚ０-９．]/g, (char) =>
+      String.fromCharCode(char.charCodeAt(0) - 0xfee0),
+    )
+    .toUpperCase()
+    .replace(/\s+/g, '');
+};
+
 const buildClubDefaultsByTypeAndNumber = (
   clubType: ClubCategory,
   selectedNumber: string,
@@ -328,6 +338,16 @@ export const ClubForm: React.FC<ClubFormProps> = ({
       const times4 = Math.round(formData.length * 4);
       if (Math.abs(times4 / 4 - formData.length) > 0.001) {
         newErrors.length = '0.25刻みで入力してください（例: 45.0, 45.25, 45.5, 45.75）';
+      }
+    }
+
+    if (formData.clubType && formData.clubType !== 'Putter') {
+      const swingWeight = formData.swingWeight.trim();
+      if (swingWeight) {
+        const normalizedSwingWeight = normalizeSwingWeightInput(swingWeight);
+        if (!/^[A-F][0-9](?:\.[0-9])?$/.test(normalizedSwingWeight)) {
+          newErrors.swingWeight = 'バランスは A0〜F9.9 形式で入力してください（例: C9, D0, D1.1, E1）';
+        }
       }
     }
 
@@ -573,7 +593,9 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               value={formData.swingWeight}
               onChange={handleChange}
               placeholder="例: C9, D0.5, E1"
+              className={errors.swingWeight ? 'error' : ''}
             />
+            {errors.swingWeight && <span className="error-message">{errors.swingWeight}</span>}
           </div>
         )}
       </div>

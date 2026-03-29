@@ -27,8 +27,13 @@ type AnalysisScreenProps = {
   hiddenAnalysisClubKeys: string[];
   onSetAnalysisClubVisible: (clubKey: string, visible: boolean) => void;
   swingWeightTarget: number;
+  swingGoodTolerance: number;
+  swingAdjustThreshold: number;
   onSetSwingWeightTarget: (value: number) => void;
+  onSetSwingGoodTolerance: (value: number) => void;
+  onSetSwingAdjustThreshold: (value: number) => void;
   onResetSwingWeightTarget: () => void;
+  onResetSwingThresholds: () => void;
   userLieAngleStandards: UserLieAngleStandards;
   onSetLieTypeStandard: (clubType: string, value: number) => void;
   onSetLieClubStandard: (clubName: string, value: number) => void;
@@ -59,8 +64,6 @@ const LIE_GOOD_TOLERANCE = 1.5;
 const LIE_PADDING = { top: 30, right: 28, bottom: 80, left: 56 };
 const LIE_STANDARD_LINE_COLOR = '#00897b';
 
-const SWING_GOOD_TOLERANCE = 1.5;
-const SWING_ADJUST_THRESHOLD = 2.0;
 const SWING_PADDING = { top: 30, right: 28, bottom: 80, left: 56 };
 
 const getLieBarColor = (category: ClubCategory): string => {
@@ -401,21 +404,33 @@ const makeTickValues = (min: number, max: number, interval: number) => {
   return ticks;
 };
 
+const normalizeSwingWeightText = (value: string): string => {
+  return (value ?? '')
+    .trim()
+    .replace(/[Ａ-Ｚａ-ｚ０-９．]/g, (char) =>
+      String.fromCharCode(char.charCodeAt(0) - 0xfee0),
+    )
+    .toUpperCase()
+    .replace(/\s+/g, '');
+};
+
 const swingWeightToNumeric = (swingWeightRaw: string): number => {
-  const normalized = (swingWeightRaw ?? '').trim().toUpperCase();
-  const match = normalized.match(/^([A-F])\s*([0-9](?:\.[05])?)$/);
-  if (!match) return 0;
+  const normalized = normalizeSwingWeightText(swingWeightRaw);
+  const fullMatch = normalized.match(/^([A-F])([0-9](?:\.[0-9])?)$/);
+  const legacyMatch = normalized.match(/^([0-9](?:\.[0-9])?)$/);
+  if (!fullMatch && !legacyMatch) return 0;
 
   // D0 is the baseline (0), so C9 becomes -1 and E1 becomes +11.
-  const letterIndex = match[1].charCodeAt(0) - 'D'.charCodeAt(0);
-  const point = Number(match[2]);
-  if (!Number.isFinite(point) || point < 0 || point > 9.5) return 0;
+  const letter = fullMatch ? fullMatch[1] : 'D';
+  const letterIndex = letter.charCodeAt(0) - 'D'.charCodeAt(0);
+  const point = Number(fullMatch ? fullMatch[2] : legacyMatch?.[1]);
+  if (!Number.isFinite(point) || point < 0 || point > 9.9) return 0;
 
   return letterIndex * 10 + point;
 };
 
 const numericToSwingWeightLabel = (value: number): string => {
-  const rounded = Math.round(value * 2) / 2;
+  const rounded = Math.round(value * 10) / 10;
   const letterIndex = Math.floor(rounded / 10);
   const point = rounded - letterIndex * 10;
   const letterCode = 'D'.charCodeAt(0) + letterIndex;
@@ -428,12 +443,25 @@ const numericToSwingWeightLabel = (value: number): string => {
   return `${String.fromCharCode(letterCode)}${pointLabel}`;
 };
 
+const parseSwingWeightInput = (value: string): number | null => {
+  const normalized = normalizeSwingWeightText(value);
+  if (!normalized) return null;
+
+  const fullMatch = normalized.match(/^([A-F])([0-9](?:\.[0-9])?)$/);
+  const legacyMatch = normalized.match(/^([0-9](?:\.[0-9])?)$/);
+  if (!fullMatch && !legacyMatch) return null;
+
+  return swingWeightToNumeric(normalized);
+};
+
 const getSwingStatus = (
   deviation: number,
+  goodTolerance: number,
+  adjustThreshold: number,
 ): '良好' | 'やや重い' | 'やや軽い' | '調整推奨' => {
   const abs = Math.abs(deviation);
-  if (abs <= SWING_GOOD_TOLERANCE) return '良好';
-  if (abs > SWING_ADJUST_THRESHOLD) return '調整推奨';
+  if (abs <= goodTolerance) return '良好';
+  if (abs > adjustThreshold) return '調整推奨';
   return deviation > 0 ? 'やや重い' : 'やや軽い';
 };
 
@@ -443,15 +471,26 @@ const getSwingStatusColor = (status: '良好' | 'やや重い' | 'やや軽い' 
   return '#ef6c00';
 };
 
+const getSwingClubLabel = (club: Pick<GolfClub, 'clubType' | 'number' | 'name'>): string => {
+  const typeLabel = getClubTypeDisplay(club.clubType, club.number).trim();
+  if (typeLabel) return typeLabel;
+  return (club.name ?? '').trim() || '-';
+};
+
 const getSwingBarColor = (
   category: ClubCategory,
   deviation: number,
+  goodTolerance: number,
+  adjustThreshold: number,
 ): { fill: string; stroke: string; strokeWidth: number } => {
   const abs = Math.abs(deviation);
-  if (abs > SWING_ADJUST_THRESHOLD) {
+  if (abs > adjustThreshold) {
     return { fill: '#e53935', stroke: '#b71c1c', strokeWidth: 2 };
   }
-  if (abs > SWING_GOOD_TOLERANCE) {
+  if (deviation < -goodTolerance && abs <= adjustThreshold) {
+    return { fill: getCategoryColor(category), stroke: '#ef6c00', strokeWidth: 2 };
+  }
+  if (abs > goodTolerance) {
     return { fill: '#fb8c00', stroke: '#e65100', strokeWidth: 1.8 };
   }
   return { fill: getCategoryColor(category), stroke: 'none', strokeWidth: 0 };
@@ -498,8 +537,13 @@ export const AnalysisScreen = ({
   hiddenAnalysisClubKeys,
   onSetAnalysisClubVisible,
   swingWeightTarget,
+  swingGoodTolerance,
+  swingAdjustThreshold,
   onSetSwingWeightTarget,
+  onSetSwingGoodTolerance,
+  onSetSwingAdjustThreshold,
   onResetSwingWeightTarget,
+  onResetSwingThresholds,
   userLieAngleStandards,
   onSetLieTypeStandard,
   onSetLieClubStandard,
@@ -611,7 +655,11 @@ export const AnalysisScreen = ({
       const category = getClubCategory(club);
       const swingWeightNumeric = swingWeightToNumeric(club.swingWeight ?? '');
       const swingDeviation = swingWeightNumeric - swingWeightTarget;
-      const swingStatus = getSwingStatus(swingDeviation);
+      const swingStatus = getSwingStatus(
+        swingDeviation,
+        swingGoodTolerance,
+        swingAdjustThreshold,
+      );
       return {
         ...club,
         category,
@@ -1143,7 +1191,7 @@ export const AnalysisScreen = ({
 
                       {chartClubs.map((club, index) => (
                         <g
-                          key={club.id ?? club.name}
+                          key={getAnalysisClubKey(club)}
                           style={{ '--point-delay': `${index * 50}ms` } as CSSProperties}
                         >
                           <circle
@@ -1294,7 +1342,7 @@ export const AnalysisScreen = ({
                 </thead>
                 <tbody>
                   {loftTableClubs.map((club) => (
-                    <tr key={`row-${club.id ?? club.name}`}>
+                    <tr key={`row-${getAnalysisClubKey(club)}`}>
                       {renderSelectionCell(club)}
                       <td>
                         <div className="analysis-club-name">
@@ -1357,7 +1405,7 @@ export const AnalysisScreen = ({
                   <div className="lie-settings-section-title">2) クラブ別 override（必要なものだけ）</div>
                   {lieAngleTableClubs.map((club) => (
                     <LieStandardInputRow
-                      key={`club-${club.id ?? club.name}`}
+                      key={`club-${getAnalysisClubKey(club)}`}
                       label={`${club.name} ${club.number}`.trim()}
                       subLabel={club.clubType}
                       defaultValue={club.standardLieAngle}
@@ -1401,6 +1449,7 @@ export const AnalysisScreen = ({
                   <span><i style={{ backgroundColor: '#424242' }} />パター</span>
                   <span><i className="legend-good-range" />良好範囲 ±1.5°</span>
                   <span><i className="legend-standard-line" />基準値ライン</span>
+                  <span><i style={{ backgroundColor: '#fb8c00', border: '1.5px solid #e65100', boxSizing: 'border-box' }} />ややズレ</span>
                   <span><i style={{ backgroundColor: '#c62828' }} />調整推奨</span>
                 </div>
                 {lieAngleClubs.length > 0 ? (
@@ -1471,7 +1520,7 @@ export const AnalysisScreen = ({
                       const barColor = outOfRange ? '#c62828' : getLieBarColor(club.category);
                       const deviation = club.deviationFromStandard;
                       return (
-                        <g key={`lie-bar-${club.id ?? club.name}`}>
+                        <g key={`lie-bar-${getAnalysisClubKey(club)}`}>
                           <circle
                             cx={cx}
                             cy={standardY}
@@ -1553,12 +1602,12 @@ export const AnalysisScreen = ({
                             <span className="chart-tooltip-value">{getClubTypeDisplay(lieTooltip.club.clubType, lieTooltip.club.number)}</span>
                           </div>
                           <div className="chart-tooltip-row">
-                            <span className="chart-tooltip-label">基準</span>
-                            <span className="chart-tooltip-value">{lieTooltip.club.standardLieAngle.toFixed(1)}°</span>
-                          </div>
-                          <div className="chart-tooltip-row">
                             <span className="chart-tooltip-label">ライ角</span>
                             <span className="chart-tooltip-value">{lieTooltip.club.lieAngle.toFixed(1)}°</span>
+                          </div>
+                          <div className="chart-tooltip-row">
+                            <span className="chart-tooltip-label">基準値</span>
+                            <span className="chart-tooltip-value">{lieTooltip.club.standardLieAngle.toFixed(1)}°</span>
                           </div>
                           <div className="chart-tooltip-row">
                             <span className="chart-tooltip-label">偏差</span>
@@ -1570,10 +1619,6 @@ export const AnalysisScreen = ({
                           <div className="chart-tooltip-row">
                             <span className="chart-tooltip-label">状態</span>
                             <span className="chart-tooltip-value">{lieStatusLabelJa(lieTooltip.club.lieStatus)}</span>
-                          </div>
-                          <div className="chart-tooltip-row">
-                            <span className="chart-tooltip-label">種別</span>
-                            <span className="chart-tooltip-value">{lieTooltip.club.clubType}</span>
                           </div>
                         </div>
                       </div>
@@ -1611,7 +1656,7 @@ export const AnalysisScreen = ({
                     const deviation = club.deviationFromStandard;
                     const status = club.lieStatus;
                     return (
-                      <tr key={`lie-row-${club.id ?? club.name}`}>
+                      <tr key={`lie-row-${getAnalysisClubKey(club)}`}>
                         {renderSelectionCell(club)}
                         <td>
                           <div className="analysis-club-name">
@@ -1657,8 +1702,8 @@ export const AnalysisScreen = ({
                 <div className="lie-settings-guide-title">使い方</div>
                 <ul className="lie-settings-guide-list">
                   <li>1. 目安ターゲットを 0.1 刻みで入力する</li>
-                  <li>2. 棒グラフの目安ラインと偏差表示でバランスを確認する</li>
-                  <li>3. 必要に応じて「初期値に戻す」で D2 (= 2.0) に戻す</li>
+                  <li>2. 良好範囲と調整推奨の閾値を必要に応じて変更する</li>
+                  <li>3. 棒グラフの目安ラインと偏差表示でバランスを確認する</li>
                 </ul>
               </div>
               <div className="lie-settings-grid">
@@ -1670,9 +1715,25 @@ export const AnalysisScreen = ({
                     onReset={onResetSwingWeightTarget}
                   />
                 </div>
+                <div className="lie-settings-section">
+                  <div className="lie-settings-section-title">ステータス判定閾値</div>
+                  <SwingThresholdInputRow
+                    label="良好範囲"
+                    value={swingGoodTolerance}
+                    description="偏差の絶対値がこの値以下なら良好"
+                    onCommit={onSetSwingGoodTolerance}
+                  />
+                  <SwingThresholdInputRow
+                    label="調整推奨"
+                    value={swingAdjustThreshold}
+                    description="偏差の絶対値がこの値を超えると調整推奨"
+                    onCommit={onSetSwingAdjustThreshold}
+                  />
+                </div>
               </div>
               <div className="lie-settings-actions">
-                <button className="btn-secondary" onClick={onResetSwingWeightTarget}>初期値に戻す</button>
+                <button className="btn-secondary" onClick={onResetSwingWeightTarget}>目安ターゲットを初期値に戻す</button>
+                <button className="btn-secondary" onClick={onResetSwingThresholds}>閾値を初期値に戻す</button>
               </div>
             </div>
           )}
@@ -1688,6 +1749,7 @@ export const AnalysisScreen = ({
                   <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
                   <span><i style={{ backgroundColor: '#fb8c00' }} />軽微なズレ</span>
                   <span><i style={{ backgroundColor: '#e53935' }} />調整推奨</span>
+                  <span><i className="legend-good-range" />良好範囲 ±{swingGoodTolerance.toFixed(1)}</span>
                 </div>
                 <div className="swing-chart-toolbar">
                   <span className="swing-target-badge">
@@ -1731,7 +1793,7 @@ export const AnalysisScreen = ({
                           textAnchor="end"
                           className="chart-axis-label"
                         >
-                          {tick}
+                          {numericToSwingWeightLabel(tick)}
                         </text>
                       </g>
                     ))}
@@ -1753,10 +1815,16 @@ export const AnalysisScreen = ({
                       const barBottom = mapSwingY(swingChartMin);
                       const barTop = mapSwingY(club.swingWeightNumeric);
                       const barHeight = Math.max(0, barBottom - barTop);
-                      const color = getSwingBarColor(club.category, club.swingDeviation);
+                      const color = getSwingBarColor(
+                        club.category,
+                        club.swingDeviation,
+                        swingGoodTolerance,
+                        swingAdjustThreshold,
+                      );
+                      const clubLabel = getSwingClubLabel(club);
 
                       return (
-                        <g key={`swing-bar-${club.id ?? club.name}`}>
+                        <g key={`swing-bar-${getAnalysisClubKey(club)}`}>
                           <rect
                             x={cx - bw / 2}
                             y={barTop}
@@ -1771,11 +1839,11 @@ export const AnalysisScreen = ({
                             onMouseEnter={() => setSwingTooltip({ x: cx, y: barTop, club })}
                             onClick={() => setSwingTooltip({ x: cx, y: barTop, club })}
                           >
-                            <title>{`${club.name} | ${club.swingWeight || '-'} | 目安偏差 ${(club.swingDeviation >= 0 ? '+' : '') + club.swingDeviation.toFixed(1)}`}</title>
+                            <title>{`${clubLabel} | ${club.swingWeight || '-'} | 目安偏差 ${(club.swingDeviation >= 0 ? '+' : '') + club.swingDeviation.toFixed(1)}`}</title>
                           </rect>
                           <g transform={`translate(${cx}, ${swingChartSize.height - SWING_PADDING.bottom + 20})`}>
                             <text textAnchor="end" transform="rotate(-40)" className="chart-axis-label">
-                              {club.name}
+                              {clubLabel}
                             </text>
                           </g>
                         </g>
@@ -1809,14 +1877,14 @@ export const AnalysisScreen = ({
                           top: swingTooltipPos?.top,
                         }}
                       >
-                        <div className="chart-tooltip-title">{swingTooltip.club.name}</div>
+                        <div className="chart-tooltip-title">{getSwingClubLabel(swingTooltip.club)}</div>
                         <div className="chart-tooltip-list">
                           <div className="chart-tooltip-row">
                             <span className="chart-tooltip-label">クラブ種別</span>
                             <span className="chart-tooltip-value">{getClubTypeDisplay(swingTooltip.club.clubType, swingTooltip.club.number)}</span>
                           </div>
                           <div className="chart-tooltip-row">
-                            <span className="chart-tooltip-label">SW</span>
+                            <span className="chart-tooltip-label">スイングウェイト</span>
                             <span className="chart-tooltip-value">{swingTooltip.club.swingWeight || '-'}</span>
                           </div>
                           <div className="chart-tooltip-row">
@@ -1845,7 +1913,7 @@ export const AnalysisScreen = ({
           <div className="analysis-card table-card">
             <div className="analysis-table-header">
               <h2>スイングウェイト詳細</h2>
-              <p>目安値 {swingWeightTarget.toFixed(1)} を基準に、クラブごとの偏差と調整優先度を表示します。</p>
+              <p>目安値 {numericToSwingWeightLabel(swingWeightTarget)} を基準に、クラブごとの偏差と調整優先度を表示します。</p>
             </div>
             <div className="analysis-table-wrap">
               <table className="analysis-table">
@@ -1862,7 +1930,7 @@ export const AnalysisScreen = ({
                 <tbody>
                   {hasAnySwingWeightData ? (
                     swingWeightTableClubs.map((club) => (
-                      <tr key={`sw-row-${club.id ?? club.name}`}>
+                      <tr key={`sw-row-${getAnalysisClubKey(club)}`}>
                         {renderSelectionCell(club)}
                         <td>
                           <div className="analysis-club-name">
@@ -1985,7 +2053,7 @@ export const AnalysisScreen = ({
                       const style = getWeightPointStyle(club, club.deviation);
                       return (
                         <g
-                          key={`wl-${club.id ?? club.name}`}
+                          key={`wl-${getAnalysisClubKey(club)}`}
                           className="weight-point-group"
                           style={{ '--point-delay': `${index * 45}ms` } as CSSProperties}
                         >
@@ -2105,7 +2173,7 @@ export const AnalysisScreen = ({
                 <tbody>
                   {hasAnyWeightLengthData ? (
                     weightLengthTableClubs.map((club) => (
-                      <tr key={`wl-row-${club.id ?? club.name}`}>
+                      <tr key={`wl-row-${getAnalysisClubKey(club)}`}>
                         {renderSelectionCell(club)}
                         <td>
                           <div className="analysis-club-name">
@@ -2150,6 +2218,13 @@ type SwingTargetInputRowProps = {
   value: number;
   onCommit: (value: number) => void;
   onReset: () => void;
+};
+
+type SwingThresholdInputRowProps = {
+  label: string;
+  value: number;
+  description: string;
+  onCommit: (value: number) => void;
 };
 
 const LieStandardInputRow = ({
@@ -2215,6 +2290,56 @@ const SwingTargetInputRow = ({
   onCommit,
   onReset,
 }: SwingTargetInputRowProps) => {
+  const [draft, setDraft] = useState(numericToSwingWeightLabel(value));
+
+  useEffect(() => {
+    setDraft(numericToSwingWeightLabel(value));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = parseSwingWeightInput(draft);
+    if (parsed == null) return;
+    onCommit(parsed);
+  };
+
+  return (
+    <div className="lie-setting-row">
+      <div className="lie-setting-labels">
+        <strong>目安ターゲット</strong>
+        <span>既定値: D2</span>
+        <em className="lie-setting-state">D1 や D1.5 の形式で設定できます</em>
+      </div>
+      <input
+        className="analysis-input lie-setting-input"
+        type="text"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commit();
+            (event.currentTarget as HTMLInputElement).blur();
+          }
+        }}
+        onBlur={commit}
+        placeholder="D2"
+      />
+      <button
+        className="btn-secondary lie-setting-reset"
+        type="button"
+        onClick={onReset}
+      >
+        リセット
+      </button>
+    </div>
+  );
+};
+
+const SwingThresholdInputRow = ({
+  label,
+  value,
+  description,
+  onCommit,
+}: SwingThresholdInputRowProps) => {
   const [draft, setDraft] = useState(value.toFixed(1));
 
   useEffect(() => {
@@ -2230,15 +2355,15 @@ const SwingTargetInputRow = ({
   return (
     <div className="lie-setting-row">
       <div className="lie-setting-labels">
-        <strong>目安ターゲット数値</strong>
-        <span>既定値: 2.0（D2相当）</span>
+        <strong>{label}</strong>
+        <span>{description}</span>
         <em className="lie-setting-state">0.1 刻みで設定できます</em>
       </div>
       <input
         className="analysis-input lie-setting-input"
         type="number"
         step="0.1"
-        min="-30"
+        min="0.1"
         max="30"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
@@ -2250,13 +2375,7 @@ const SwingTargetInputRow = ({
         }}
         onBlur={commit}
       />
-      <button
-        className="btn-secondary lie-setting-reset"
-        type="button"
-        onClick={onReset}
-      >
-        リセット
-      </button>
+      <div />
     </div>
   );
 };

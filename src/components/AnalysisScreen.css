@@ -305,7 +305,7 @@
 
 .chart-tooltip-row {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: 98px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   font-size: 12px;
@@ -323,6 +323,7 @@
   color: #9ec8ad;
   font-weight: 700;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .chart-tooltip-value {

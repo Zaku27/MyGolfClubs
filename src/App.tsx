@@ -14,8 +14,12 @@ import './App.css';
 
 const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
 const SWING_TARGET_STORAGE_KEY = 'golfbag-swing-weight-target';
+const SWING_GOOD_TOLERANCE_STORAGE_KEY = 'golfbag-swing-good-tolerance';
+const SWING_ADJUST_THRESHOLD_STORAGE_KEY = 'golfbag-swing-adjust-threshold';
 const ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY = 'golfbag-analysis-hidden-clubs';
 const DEFAULT_SWING_TARGET = 2.0;
+const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
+const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
 
 function App() {
         const { clearAllClubs } = useClubStore();
@@ -86,6 +90,18 @@ function App() {
     if (!Number.isFinite(parsed)) return DEFAULT_SWING_TARGET;
     return Math.round(parsed * 10) / 10;
   });
+  const [swingGoodTolerance, setSwingGoodTolerance] = useState<number>(() => {
+    const saved = window.localStorage.getItem(SWING_GOOD_TOLERANCE_STORAGE_KEY);
+    const parsed = saved ? Number(saved) : DEFAULT_SWING_GOOD_TOLERANCE;
+    if (!Number.isFinite(parsed)) return DEFAULT_SWING_GOOD_TOLERANCE;
+    return Math.round(parsed * 10) / 10;
+  });
+  const [swingAdjustThreshold, setSwingAdjustThreshold] = useState<number>(() => {
+    const saved = window.localStorage.getItem(SWING_ADJUST_THRESHOLD_STORAGE_KEY);
+    const parsed = saved ? Number(saved) : DEFAULT_SWING_ADJUST_THRESHOLD;
+    if (!Number.isFinite(parsed)) return DEFAULT_SWING_ADJUST_THRESHOLD;
+    return Math.round(parsed * 10) / 10;
+  });
   const [hiddenAnalysisClubKeys, setHiddenAnalysisClubKeys] = useState<string[]>(() => {
     const raw = window.localStorage.getItem(ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY);
     if (!raw) return [];
@@ -141,6 +157,20 @@ function App() {
 
   useEffect(() => {
     window.localStorage.setItem(
+      SWING_GOOD_TOLERANCE_STORAGE_KEY,
+      String(swingGoodTolerance),
+    );
+  }, [swingGoodTolerance]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      SWING_ADJUST_THRESHOLD_STORAGE_KEY,
+      String(swingAdjustThreshold),
+    );
+  }, [swingAdjustThreshold]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
       ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY,
       JSON.stringify(hiddenAnalysisClubKeys),
     );
@@ -154,6 +184,24 @@ function App() {
 
   const handleResetSwingWeightTarget = () => {
     setSwingWeightTarget(DEFAULT_SWING_TARGET);
+  };
+
+  const handleSetSwingGoodTolerance = (value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    const clamped = Math.max(0.1, Math.min(30, rounded));
+    setSwingGoodTolerance(clamped);
+    setSwingAdjustThreshold((prev) => Math.max(clamped, prev));
+  };
+
+  const handleSetSwingAdjustThreshold = (value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    const clamped = Math.max(swingGoodTolerance, Math.min(30, rounded));
+    setSwingAdjustThreshold(clamped);
+  };
+
+  const handleResetSwingThresholds = () => {
+    setSwingGoodTolerance(DEFAULT_SWING_GOOD_TOLERANCE);
+    setSwingAdjustThreshold(DEFAULT_SWING_ADJUST_THRESHOLD);
   };
 
   const handleSetAnalysisClubVisible = (clubKey: string, visible: boolean) => {
@@ -302,8 +350,13 @@ function App() {
           )}
           onSetAnalysisClubVisible={handleSetAnalysisClubVisible}
           swingWeightTarget={swingWeightTarget}
+          swingGoodTolerance={swingGoodTolerance}
+          swingAdjustThreshold={swingAdjustThreshold}
           onSetSwingWeightTarget={handleSetSwingWeightTarget}
+          onSetSwingGoodTolerance={handleSetSwingGoodTolerance}
+          onSetSwingAdjustThreshold={handleSetSwingAdjustThreshold}
           onResetSwingWeightTarget={handleResetSwingWeightTarget}
+          onResetSwingThresholds={handleResetSwingThresholds}
           userLieAngleStandards={userLieAngleStandards}
           onSetLieTypeStandard={handleSetLieTypeStandard}
           onSetLieClubStandard={handleSetLieClubStandard}

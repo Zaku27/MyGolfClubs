@@ -97,9 +97,6 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
               <span className="compact-item"><strong>Loft</strong>{compactLoft}</span>
               <span className="compact-item"><strong>L</strong>{club.length}"</span>
               <span className="compact-item"><strong>W</strong>{club.weight}g</span>
-              {club.clubType !== 'Putter' && (
-                <span className="compact-item"><strong>SW</strong>{club.swingWeight}</span>
-              )}
             </div>
           )}
       </div>
