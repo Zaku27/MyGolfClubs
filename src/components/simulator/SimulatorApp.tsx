@@ -178,12 +178,7 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
         handleClubSelect={handleClubSelect}
       />
 
-      {showResultModal && (
-        <ShotResultModal
-          onDismiss={dismissResult}
-          onAdvance={phase === "hole_complete" ? advanceHole : undefined}
-        />
-      )}
+      {/* ショット結果モーダルの表示を廃止 */}
     </>
   );
 }

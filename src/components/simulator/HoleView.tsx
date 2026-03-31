@@ -35,6 +35,7 @@ export function HoleView({ onBack }: Props) {
     setShotPowerPercent,
     selectClub,
     takeShot,
+    lastShotResult,
   } = useGameStore();
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [showMobileScorecard, setShowMobileScorecard] = useState(false);
@@ -245,6 +246,7 @@ export function HoleView({ onBack }: Props) {
               </p>
             </div>
 
+
             {/* ショットボタン */}
             <button
               type="button"
@@ -263,6 +265,87 @@ export function HoleView({ onBack }: Props) {
             >
               ショット
             </button>
+
+            {/* ショット結果表示（モーダル廃止・インライン表示＋続けるボタン） */}
+            {lastShotResult && (
+              <div className="mt-6 w-full max-w-md mx-auto rounded-2xl border border-emerald-300 bg-emerald-50/95 p-5 shadow-xl shadow-emerald-300/40">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="text-4xl leading-none">
+                    {(() => {
+                      const iconMap = { excellent: "🌟", good: "✅", average: "👍", poor: "😬", mishit: "💥" };
+                      return iconMap[lastShotResult.shotQuality] || "";
+                    })()}
+                  </span>
+                  <div>
+                    <p className="text-lg font-bold text-emerald-900">
+                      {lastShotResult.penalty
+                        ? "ペナルティ"
+                        : lastShotResult.newRemainingDistance === 0
+                        ? "カップイン"
+                        : lastShotResult.shotQuality === "excellent"
+                        ? "会心のショット"
+                        : lastShotResult.shotQuality === "good"
+                        ? "ナイスショット"
+                        : lastShotResult.shotQuality === "average"
+                        ? "まずまずの一打"
+                        : lastShotResult.shotQuality === "poor"
+                        ? "ミス気味"
+                        : "苦しい結果"}
+                    </p>
+                    <p className="text-sm text-emerald-700">飛距離: {lastShotResult.distanceHit}ヤード</p>
+                  </div>
+                  {lastShotResult.penalty && (
+                    <div className="ml-auto rounded-md border border-red-300/70 bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
+                      +1
+                    </div>
+                  )}
+                </div>
+                <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-100/80 p-3 text-sm leading-relaxed text-emerald-800">
+                  {lastShotResult.outcomeMessage}
+                </p>
+                <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
+                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                    実効成功率 {lastShotResult.effectiveSuccessRate}%
+                  </span>
+                  {lastShotResult.confidenceBoostApplied && (
+                    <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
+                      勢いボーナス適用
+                    </span>
+                  )}
+                  {!lastShotResult.confidenceBoostApplied && confidenceBoost > 0 && (
+                    <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
+                      次の1打 +{confidenceBoost}%
+                    </span>
+                  )}
+                </div>
+
+                {/* 続ける/次のホールへ/スコアカードを見るボタン */}
+                <div className="mt-4">
+                  {phase === "hole_complete" ? (
+                    <button
+                      onClick={useGameStore.getState().advanceHole}
+                      className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+                    >
+                      次のホールへ
+                    </button>
+                  ) : phase === "round_complete" ? (
+                    <button
+                      onClick={useGameStore.getState().dismissResult}
+                      className="w-full rounded-xl bg-amber-400 py-3 text-sm font-bold text-emerald-950 transition hover:bg-amber-300"
+                    >
+                      スコアカードを見る
+                    </button>
+                  ) : (
+                    <button
+                      onClick={useGameStore.getState().dismissResult}
+                      className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
+                    >
+                      続ける
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* パワー調整スライダー */}
             <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-4 py-4">
