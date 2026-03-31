@@ -16,6 +16,7 @@ import {
 import { ClubList } from './components/ClubList';
 import { ClubForm } from './components/ClubForm';
 import { AnalysisScreen } from './components/AnalysisScreen';
+import { SimulatorApp } from './components/simulator/SimulatorApp';
 import { selectSortedClubsForDisplay, useClubStore } from './store/clubStore';
 import './App.css';
 
@@ -52,6 +53,7 @@ const parseHiddenAnalysisClubKeys = (value: unknown): string[] => {
 function App() {
   const [showForm, setShowForm] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showSimulator, setShowSimulator] = useState(false);
   const [headSpeed, setHeadSpeed] = useState<number>(() => {
     return readStoredNumber(HEAD_SPEED_STORAGE_KEY, 42, { min: 0.1 });
   });
@@ -90,10 +92,15 @@ function App() {
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
   const sortedClubs = useClubStore(selectSortedClubsForDisplay);
+  const visibleAnalysisClubs = sortedClubs.filter(
+    (club) => !hiddenAnalysisClubKeys.includes(getAnalysisClubKey(club)),
+  );
   const {
     loading,
     error,
     loadClubs,
+    loadPersonalData,
+    loadPlayerSkillLevel,
     addClub,
     updateClub,
     deleteClub,
@@ -139,9 +146,10 @@ function App() {
     const initializeApp = async () => {
       await initializeDefaults();
       await loadClubs();
+      await Promise.all([loadPersonalData(), loadPlayerSkillLevel()]);
     };
     initializeApp();
-  }, [initializeDefaults, loadClubs]);
+  }, [initializeDefaults, loadClubs, loadPersonalData, loadPlayerSkillLevel]);
 
   useEffect(() => {
     writeStoredValue(HEAD_SPEED_STORAGE_KEY, headSpeed);
@@ -316,6 +324,15 @@ function App() {
     setEditingClub(undefined);
   };
 
+  if (showSimulator) {
+    return (
+      <SimulatorApp
+        onBack={() => setShowSimulator(false)}
+        selectedClubs={visibleAnalysisClubs}
+      />
+    );
+  }
+
   return (
     <div className="app-container">
       {error && <div className="error-message">{error}</div>}
@@ -366,6 +383,7 @@ function App() {
           onExport={handleExportJSON}
           onImport={handleImportJSON}
           onShowAnalysis={handleShowAnalysis}
+          onShowSimulator={() => setShowSimulator(true)}
           loading={loading}
         />
       )}

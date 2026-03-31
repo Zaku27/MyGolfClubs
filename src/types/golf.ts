@@ -19,6 +19,12 @@ export interface GolfClub {
   updatedAt?: string;
 }
 
+export interface ClubPersonalData {
+  clubId: string;
+  missRate: number;        // 0-100 (user input, e.g. 35 = 35% miss)
+  weaknessFactor: number;  // 0.0-1.0 (0 = no weakness, 0.3 = moderate weakness)
+}
+
 export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
   { clubType: 'Driver', name: 'Driver', number: '1', length: 45.5, weight: 310, swingWeight: 'D1', lieAngle: 58, loftAngle: 10.5, shaftType: 'Graphite', torque: 4.5, flex: 'S', distance: 230, notes: '' },
   { clubType: 'Wood', name: 'Wood', number: '3', length: 43, weight: 315, swingWeight: 'D1', lieAngle: 56, loftAngle: 15, shaftType: 'Graphite', torque: 4.0, flex: 'S', distance: 210, notes: '' },

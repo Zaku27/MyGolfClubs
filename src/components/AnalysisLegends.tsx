@@ -54,8 +54,8 @@ export const WeightLegend = () => (
     <span><i style={{ backgroundColor: '#00acc1' }} />ハイブリッド</span>
     <span><i style={{ backgroundColor: '#0b8f5b' }} />アイアン</span>
     <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
-    <span><i className="legend-heavy-outlier" />重い外れ値</span>
-    <span><i className="legend-light-outlier" />軽い外れ値</span>
+    <span><i className="legend-heavy-outlier" />重い</span>
+    <span><i className="legend-light-outlier" />軽い</span>
     <span><i className="legend-trend-line" />トレンド線</span>
     <span><i className="legend-expected-band" />期待帯 ±12g</span>
   </div>

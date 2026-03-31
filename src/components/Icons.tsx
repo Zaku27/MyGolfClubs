@@ -69,3 +69,23 @@ export const DeleteIcon: React.FC<IconProps> = ({ size = 24, className = '', str
     <line x1="14" y1="11" x2="14" y2="17"></line>
   </svg>
 );
+
+/** Golf flag / pin icon for the Course Simulator button. */
+export const SimulatorIcon: React.FC<IconProps> = ({ size = 24, className = '', strokeWidth = 2 }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} className={className} width={size} height={size}>
+    {/* Flag pole */}
+    <line x1="7" y1="2" x2="7" y2="22"></line>
+    {/* Flag */}
+    <polyline points="7 2 18 6 7 10"></polyline>
+    {/* Ground / ball */}
+    <circle cx="7" cy="22" r="1.5" fill="currentColor" stroke="none"></circle>
+  </svg>
+);
+
+/** User-profile style icon for Personal Data settings. */
+export const PersonalDataIcon: React.FC<IconProps> = ({ size = 24, className = '', strokeWidth = 2 }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} className={className} width={size} height={size}>
+    <circle cx="12" cy="8" r="3.5"></circle>
+    <path d="M4 19a8 8 0 0 1 16 0"></path>
+  </svg>
+);

@@ -65,7 +65,8 @@ type ChartPadding = {
 };
 
 const WEIGHT_NORMAL_BAND_TOLERANCE = 12;
-const WEIGHT_OUTLIER_THRESHOLD = 15;
+const WEIGHT_HEAVY_OUTLIER_THRESHOLD = 15;
+const WEIGHT_LIGHT_OUTLIER_THRESHOLD = 15;
 
 export const getLieBarColor = (category: ClubCategory): string => {
   switch (category) {
@@ -257,10 +258,10 @@ export const formatSignedGrams = (value: number) =>
   `${value > 0 ? '+' : ''}${value.toFixed(1)} g`;
 
 export const getWeightTrendMessage = (deviation: number) => {
-  if (deviation > WEIGHT_OUTLIER_THRESHOLD) {
+  if (deviation > WEIGHT_HEAVY_OUTLIER_THRESHOLD) {
     return 'バランス確認推奨';
   }
-  if (deviation < -WEIGHT_OUTLIER_THRESHOLD) {
+  if (deviation < -WEIGHT_LIGHT_OUTLIER_THRESHOLD) {
     return '軽量側の確認推奨';
   }
   if (Math.abs(deviation) <= WEIGHT_NORMAL_BAND_TOLERANCE) {
@@ -282,7 +283,7 @@ export const getWeightPointStyle = (
   club: Pick<GolfClub, 'clubType'> & { category: ClubCategory },
   deviation: number,
 ) => {
-  if (deviation > WEIGHT_OUTLIER_THRESHOLD) {
+  if (deviation > WEIGHT_HEAVY_OUTLIER_THRESHOLD) {
     return {
       fill: '#e53935',
       stroke: '#000000',
@@ -291,10 +292,10 @@ export const getWeightPointStyle = (
     };
   }
 
-  if (deviation < -WEIGHT_OUTLIER_THRESHOLD) {
+  if (deviation < -WEIGHT_LIGHT_OUTLIER_THRESHOLD) {
     return {
-      fill: '#ff9800',
-      stroke: '#8d4e00',
+      fill: '#ec407a',
+      stroke: '#ad1457',
       strokeWidth: 3,
       radius: 7,
     };

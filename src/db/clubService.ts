@@ -1,5 +1,5 @@
 import { db } from './database';
-import type { GolfClub } from '../types/golf';
+import type { GolfClub, ClubPersonalData } from '../types/golf';
 import { DEFAULT_CLUBS } from '../types/golf';
 
 const CLUB_VALUE_DEFAULTS = {
@@ -86,5 +86,42 @@ export class ClubService {
   static async resetToDefaults(): Promise<void> {
     await this.deleteAllClubs();
     await this.initializeDefaultClubs();
+  }
+
+  // ─── Personal Data (Miss Rate & Weakness Factor) ─────────────────────────────
+
+  static async getAllPersonalData(): Promise<Record<string, ClubPersonalData>> {
+    const records = await db.personalData.toArray();
+    const map: Record<string, ClubPersonalData> = {};
+    for (const record of records) {
+      map[record.clubId] = record;
+    }
+    return map;
+  }
+
+  static async setPersonalData(data: ClubPersonalData): Promise<void> {
+    await db.personalData.put(data);
+  }
+
+  static async deletePersonalData(clubId: string): Promise<void> {
+    await db.personalData.delete(clubId);
+  }
+
+  static async clearAllPersonalData(): Promise<void> {
+    await db.personalData.clear();
+  }
+
+  // ─── App Settings ─────────────────────────────────────────────────────────────
+
+  static async getPlayerSkillLevel(): Promise<number> {
+    const settings = await db.appSettings.get('app');
+    return settings?.playerSkillLevel ?? 0.5;
+  }
+
+  static async setPlayerSkillLevel(level: number): Promise<void> {
+    await db.appSettings.put({
+      id: 'app',
+      playerSkillLevel: Math.max(0, Math.min(1, Math.round(level * 100) / 100)),
+    });
   }
 }

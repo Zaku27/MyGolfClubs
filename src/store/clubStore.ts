@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GolfClub } from '../types/golf';
+import type { ClubPersonalData, GolfClub } from '../types/golf';
 import { ClubService } from '../db/clubService';
 import { sortClubsForDisplay } from '../utils/clubSort';
 
@@ -7,6 +7,8 @@ type ClubStoreState = {
   clubs: GolfClub[];
   loading: boolean;
   error: string | null;
+  personalData: Record<string, ClubPersonalData>;
+  playerSkillLevel: number;
 };
 
 type ClubStoreActions = {
@@ -17,6 +19,11 @@ type ClubStoreActions = {
   initializeDefaults: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
   clearAllClubs: () => Promise<void>;
+  loadPersonalData: () => Promise<void>;
+  setPersonalData: (data: ClubPersonalData) => Promise<void>;
+  removePersonalData: (clubId: string) => Promise<void>;
+  loadPlayerSkillLevel: () => Promise<void>;
+  setPlayerSkillLevel: (level: number) => Promise<void>;
 };
 
 type ClubStore = ClubStoreState & ClubStoreActions;
@@ -25,10 +32,19 @@ const INITIAL_STATE: ClubStoreState = {
   clubs: [],
   loading: false,
   error: null,
+  personalData: {},
+  playerSkillLevel: 0.5,
 };
 
 const toErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : 'Unknown error';
+};
+
+const clampSkillLevel = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 0.5;
+  }
+  return Math.max(0, Math.min(1, Math.round(value * 100) / 100));
 };
 
 const createTimestamp = (): string => new Date().toISOString();
@@ -124,6 +140,63 @@ export const useClubStore = create<ClubStore>((set) => ({
     try {
       await ClubService.resetToDefaults();
       await refreshClubs(set);
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  loadPersonalData: async () => {
+    set({ error: null });
+    try {
+      const personalData = await ClubService.getAllPersonalData();
+      set({ personalData });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  setPersonalData: async (data) => {
+    set({ error: null });
+    try {
+      await ClubService.setPersonalData(data);
+      set((state) => ({
+        personalData: { ...state.personalData, [data.clubId]: data },
+      }));
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  removePersonalData: async (clubId) => {
+    set({ error: null });
+    try {
+      await ClubService.deletePersonalData(clubId);
+      set((state) => {
+        const next = { ...state.personalData };
+        delete next[clubId];
+        return { personalData: next };
+      });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  loadPlayerSkillLevel: async () => {
+    set({ error: null });
+    try {
+      const playerSkillLevel = await ClubService.getPlayerSkillLevel();
+      set({ playerSkillLevel });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  setPlayerSkillLevel: async (level) => {
+    set({ error: null });
+    try {
+      const clamped = clampSkillLevel(level);
+      await ClubService.setPlayerSkillLevel(clamped);
+      set({ playerSkillLevel: clamped });
     } catch (error) {
       setStoreError(set, error);
     }

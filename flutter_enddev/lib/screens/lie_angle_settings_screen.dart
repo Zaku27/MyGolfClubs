@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/golf_club.dart';
 import '../models/user_lie_angle_standards.dart';
 import '../providers/club_providers.dart';
 

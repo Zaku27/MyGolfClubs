@@ -1,4 +1,5 @@
 import { ClubCard } from './ClubCard';
+import { Link } from 'react-router-dom';
 import {
   AddIcon,
   ToggleViewIcon,
@@ -8,6 +9,8 @@ import {
   AnalysisIcon,
   ResetIcon,
   DeleteIcon,
+  SimulatorIcon,
+  PersonalDataIcon,
 } from './Icons';
 
 import type { GolfClub } from '../types/golf';
@@ -26,6 +29,7 @@ interface ClubListProps {
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onShowAnalysis: () => void;
+  onShowSimulator: () => void;
   loading?: boolean;
 }
 
@@ -42,6 +46,7 @@ export const ClubList: React.FC<ClubListProps> = ({
   onExport,
   onImport,
   onShowAnalysis,
+  onShowSimulator,
   loading = false,
 }) => {
   const sortedClubs = sortClubsForDisplay(clubs);
@@ -73,6 +78,12 @@ export const ClubList: React.FC<ClubListProps> = ({
         <button className="btn-icon btn-analysis" onClick={onShowAnalysis} disabled={loading} title="分析画面" aria-label="分析画面">
           <AnalysisIcon size={20} />
         </button>
+        <button className="btn-icon btn-simulator" onClick={onShowSimulator} disabled={loading} title="コースシミュレーター" aria-label="コースシミュレーター">
+          <SimulatorIcon size={20} />
+        </button>
+        <Link className="btn-icon btn-personal-data" to="/personal-data" title="パーソナルデータ" aria-label="パーソナルデータ">
+          <PersonalDataIcon size={20} />
+        </Link>
       </div>
 
       {loading ? (
