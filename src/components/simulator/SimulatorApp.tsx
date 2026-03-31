@@ -1,5 +1,5 @@
 import type { Hole } from "../../types/game";
-import type { RiskLevel, SimClub } from "../../types/game";
+import type { SimClub } from "../../types/game";
 import type { GolfClub } from "../../types/golf";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -8,7 +8,7 @@ import { toSimClub } from "../../utils/clubSimAdapter";
 import { COURSE_3HOLES, COURSE_9HOLES, COURSE_18HOLES } from "../../data/defaultCourses";
 import { HoleView } from "./HoleView";
 import { PostRoundAnalysis } from "./PostRoundAnalysis";
-import { RiskSelectionSheet } from "./RiskSelectionSheet";
+
 import { Scorecard } from "./Scorecard";
 import { ShotResultModal } from "./ShotResultModal";
 
@@ -114,7 +114,6 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
     dismissResult,
     advanceHole,
   } = useGameStore();
-  const [pendingClub, setPendingClub] = useState<SimClub | null>(null);
   const [showDetailedScorecard, setShowDetailedScorecard] = useState(false);
   const bagSource = selectedClubs;
 
@@ -124,24 +123,11 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
     startRound(holes, bag);
   };
 
+  // クラブ選択後すぐショット実行（リスクは常にnormal）
   const handleClubSelect = (club: SimClub) => {
-    if (club.type === "Putter") {
-      selectClub(club.id);
-      setRiskLevel("normal");
-      takeShot();
-      setPendingClub(null);
-      return;
-    }
-
-    setPendingClub(club);
-  };
-
-  const handleRiskSelect = (risk: RiskLevel) => {
-    if (!pendingClub) return;
-    selectClub(pendingClub.id);
-    setRiskLevel(risk);
+    selectClub(club.id);
+    setRiskLevel("normal");
     takeShot();
-    setPendingClub(null);
   };
 
   if (phase === "setup") {
@@ -190,12 +176,6 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
       <HoleView
         onBack={() => { resetGame(); onBack(); }}
         handleClubSelect={handleClubSelect}
-      />
-
-      <RiskSelectionSheet
-        club={pendingClub}
-        onClose={() => setPendingClub(null)}
-        onSelectRisk={handleRiskSelect}
       />
 
       {showResultModal && (

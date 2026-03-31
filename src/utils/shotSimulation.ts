@@ -178,7 +178,7 @@ function getNearCupLeaveDistance(shotQuality: ShotQuality): number {
   return 3 + Math.floor(Math.random() * 6); // 3-8y
 }
 
-const LIE_LABELS: Record<LieType, string> = {
+export const LIE_LABELS: Record<LieType, string> = {
   tee: "ティー", fairway: "フェアウェイ", rough: "ラフ",
   bunker: "バンカー", green: "グリーン", penalty: "ペナルティ",
 };

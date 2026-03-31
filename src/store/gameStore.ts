@@ -44,6 +44,7 @@ interface GameStoreState {
   bag: SimClub[];
   lastShotResult: ShotResult | null;
   selectedClubId: string | null;
+  shotPowerPercent: number;
   riskLevel: RiskLevel;
   showResultModal: boolean;
   currentHoleShots: ShotLog[];
@@ -57,6 +58,7 @@ interface GameStoreState {
 interface GameStoreActions {
   startRound: (course: Hole[], bag: SimClub[]) => void;
   selectClub: (clubId: string) => void;
+  setShotPowerPercent: (powerPercent: number) => void;
   setRiskLevel: (risk: RiskLevel) => void;
   takeShot: () => void;
   dismissResult: () => void;
@@ -81,6 +83,7 @@ const INITIAL_STATE: GameStoreState = {
   bag: [],
   lastShotResult: null,
   selectedClubId: null,
+  shotPowerPercent: 100,
   riskLevel: "normal",
   showResultModal: false,
   currentHoleShots: [],
@@ -175,11 +178,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   selectClub: (clubId) => set({ selectedClubId: clubId }),
 
+  setShotPowerPercent: (powerPercent) => set({
+    shotPowerPercent: Math.max(0, Math.min(110, Math.round(powerPercent))),
+  }),
+
   setRiskLevel: (risk) => set({ riskLevel: risk }),
 
   takeShot: () => {
     const {
       selectedClubId,
+      shotPowerPercent,
       bag,
       shotContext,
       riskLevel,
@@ -201,6 +209,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const personalData = useClubStore.getState().personalData;
     const result = simulateShot(club, shotContext, riskLevel, {
       confidenceBoost,
+      shotPowerPercent,
       personalData: resolvePersonalDataForSimClub(club, personalData),
       playerSkillLevel: useClubStore.getState().playerSkillLevel,
     });
@@ -253,6 +262,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         phase: isRoundComplete ? "round_complete" : "hole_complete",
         showResultModal: true,
         selectedClubId: null,
+        shotPowerPercent: 100,
         currentHoleShots: nextHoleShots,
         roundShots: nextRoundShots,
         lastHoleSummary: holeSummary,
@@ -273,6 +283,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         },
         showResultModal: true,
         selectedClubId: null,
+        shotPowerPercent: 100,
         currentHoleShots: nextHoleShots,
         roundShots: nextRoundShots,
         goodShotStreak: streakAfterShot,
