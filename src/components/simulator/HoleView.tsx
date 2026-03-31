@@ -191,6 +191,8 @@ export function HoleView({ onBack }: Props) {
         )}
 
 
+
+
         <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-10 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-14">
           <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
           <h1 className="mt-4 text-4xl font-extrabold leading-tight text-emerald-900 sm:text-6xl">
@@ -217,166 +219,160 @@ export function HoleView({ onBack }: Props) {
             )}
           </div>
 
-          {/* まとめたショット操作セクション */}
-          <div className="mt-8 w-full max-w-md mx-auto flex flex-col gap-5 items-stretch">
-            {/* ショット方針の注意案内 */}
-            <div className={[
-              "rounded-xl px-4 py-3 text-left",
-              selectedClub && selectedClubIsUnstable ? "border border-amber-300/70 bg-amber-50 text-amber-900" : "border border-emerald-300/70 bg-emerald-100/70 text-emerald-900"
-            ].join(" ")}>
-              <p className={["text-[11px] font-bold tracking-[0.16em]",
-                selectedClub && selectedClubIsUnstable ? "text-amber-700" : "text-emerald-700"
-              ].join(" ")}>ショット方針の注意</p>
-              <p className="mt-1 text-xs sm:text-sm">
-                {!selectedClub && "クラブを選ぶと、この位置にショット前の注意が表示されます。"}
-                {selectedClub && !selectedClubIsUnstable && (
-                  selectedEffectiveRate !== null
-                    ? `ショットは有効成功率:${selectedEffectiveRate}%で実行されます。`
-                    : "ショットは有効成功率:--%で実行されます。"
-                )}
-                {selectedClub && selectedClubIsUnstable && (
-                  <>
-                    {formatSimClubLabel(selectedClub)} は安定度が低めです。
-                    {selectedEffectiveRate !== null ? ` 有効成功率 ${selectedEffectiveRate}%` : ""}
-                    {selectedTodayRate !== null && selectedTodayStats
-                      ? ` / 今日 ${selectedTodayStats.successes}/${selectedTodayStats.attempts}本 (${selectedTodayRate}%)`
-                      : ""}
-                  </>
-                )}
-              </p>
+
+
+        {/* ショット結果表示（インライン） */}
+        {lastShotResult && (
+          <div className="mt-8 w-full max-w-md mx-auto rounded-2xl border border-emerald-300 bg-emerald-50/95 p-5 shadow-xl shadow-emerald-300/40">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="text-4xl leading-none">
+                {(() => {
+                  const iconMap = { excellent: "🌟", good: "✅", average: "👍", poor: "😬", mishit: "💥" };
+                  return iconMap[lastShotResult.shotQuality] || "";
+                })()}
+              </span>
+              <div>
+                <p className="text-lg font-bold text-emerald-900">
+                  {lastShotResult.penalty
+                    ? "ペナルティ"
+                    : lastShotResult.newRemainingDistance === 0
+                    ? "カップイン"
+                    : lastShotResult.shotQuality === "excellent"
+                    ? "会心のショット"
+                    : lastShotResult.shotQuality === "good"
+                    ? "ナイスショット"
+                    : lastShotResult.shotQuality === "average"
+                    ? "まずまずの一打"
+                    : lastShotResult.shotQuality === "poor"
+                    ? "ミス気味"
+                    : "苦しい結果"}
+                </p>
+                <p className="text-sm text-emerald-700">飛距離: {lastShotResult.distanceHit}ヤード</p>
+            </div>
+              {lastShotResult.penalty && (
+                <div className="ml-auto rounded-md border border-red-300/70 bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
+                  +1
+                </div>
+              )}
+            </div>
+            <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
+              <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                実効成功率 {lastShotResult.effectiveSuccessRate}%
+              </span>
+              {lastShotResult.confidenceBoostApplied && (
+                <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
+                  勢いボーナス適用
+                </span>
+              )}
+              {!lastShotResult.confidenceBoostApplied && confidenceBoost > 0 && (
+                <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
+                  次の1打 +{confidenceBoost}%
+                </span>
+              )}
             </div>
 
+            {/* 続ける/次のホールへ/スコアカードを見るボタン */}
+            <div className="mt-4">
+              {phase === "hole_complete" ? (
+                <button
+                  onClick={useGameStore.getState().advanceHole}
+                  className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+                >
+                  次のホールへ
+                </button>
+              ) : phase === "round_complete" ? (
+                <button
+                  onClick={useGameStore.getState().dismissResult}
+                  className="w-full rounded-xl bg-amber-400 py-3 text-sm font-bold text-emerald-950 transition hover:bg-amber-300"
+                >
+                  スコアカードを見る
+                </button>
+              ) : null}
+              {/* 通常時は自動でdismissResultを呼ぶ */}
+              {lastShotResult && phase !== "hole_complete" && phase !== "round_complete" && (
+                (() => { setTimeout(() => useGameStore.getState().dismissResult(), 800); return null; })()
+              )}
+            </div>
+          </div>
+        )}
+        </section>
+        
+        {/* おすすめクラブセクション ...existing code... */}
 
-            {/* ショットボタン */}
-            <button
-              type="button"
+        {/* ショット操作グループ */}
+        <section className="mt-8 w-full max-w-md mx-auto flex flex-col gap-5 items-stretch">
+          {/* ショット方針の注意案内 */}
+          <div className={[
+            "rounded-xl px-4 py-3 text-left",
+            selectedClub && selectedClubIsUnstable ? "border border-amber-300/70 bg-amber-50 text-amber-900" : "border border-emerald-300/70 bg-emerald-100/70 text-emerald-900"
+          ].join(" ")}>
+            <p className={["text-[11px] font-bold tracking-[0.16em]",
+              selectedClub && selectedClubIsUnstable ? "text-amber-700" : "text-emerald-700"
+            ].join(" ")}>ショット方針の注意</p>
+            <p className="mt-1 text-xs sm:text-sm">
+              {!selectedClub && "クラブを選ぶと、この位置にショット前の注意が表示されます。"}
+              {selectedClub && !selectedClubIsUnstable && (
+                selectedEffectiveRate !== null
+                  ? `ショットは有効成功率:${selectedEffectiveRate}%で実行されます。`
+                  : "ショットは有効成功率:--%で実行されます。"
+              )}
+              {selectedClub && selectedClubIsUnstable && (
+                <>
+                  {formatSimClubLabel(selectedClub)} は安定度が低めです。
+                  {selectedEffectiveRate !== null ? ` 有効成功率 ${selectedEffectiveRate}%` : ""}
+                  {selectedTodayRate !== null && selectedTodayStats
+                    ? ` / 今日 ${selectedTodayStats.successes}/${selectedTodayStats.attempts}本 (${selectedTodayRate}%)`
+                    : ""}
+                </>
+              )}
+            </p>
+          </div>
+
+          {/* ショットボタン */}
+          <button
+            type="button"
+            disabled={!selectedClub}
+            onClick={() => {
+              if (selectedClub) {
+                selectClub(selectedClub.id);
+                takeShot();
+              }
+            }}
+            className={[
+              "w-full rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
+              "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
+              selectedClub ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500" : "cursor-not-allowed bg-emerald-200 text-emerald-500"
+            ].join(" ")}
+          >
+            ショット
+          </button>
+
+          {/* パワー調整スライダー */}
+          <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-4 py-4">
+            <div className="mb-2 flex items-center justify-between text-xs font-bold tracking-[0.08em] text-emerald-800">
+              <span>パワー</span>
+              <span>{shotPowerPercent}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={110}
+              step={1}
+              value={shotPowerPercent}
+              onChange={e => setShotPowerPercent(Number(e.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
+              aria-label="ショットパワー"
               disabled={!selectedClub}
-              onClick={() => {
-                if (selectedClub) {
-                  selectClub(selectedClub.id);
-                  takeShot();
-                }
-              }}
-              className={[
-                "w-full rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
-                "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
-                selectedClub ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500" : "cursor-not-allowed bg-emerald-200 text-emerald-500"
-              ].join(" ")}
-            >
-              ショット
-            </button>
+            />
+            <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
+              <span>0%</span>
 
-            {/* ショット結果表示（モーダル廃止・インライン表示＋続けるボタン） */}
-            {lastShotResult && (
-              <div className="mt-6 w-full max-w-md mx-auto rounded-2xl border border-emerald-300 bg-emerald-50/95 p-5 shadow-xl shadow-emerald-300/40">
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="text-4xl leading-none">
-                    {(() => {
-                      const iconMap = { excellent: "🌟", good: "✅", average: "👍", poor: "😬", mishit: "💥" };
-                      return iconMap[lastShotResult.shotQuality] || "";
-                    })()}
-                  </span>
-                  <div>
-                    <p className="text-lg font-bold text-emerald-900">
-                      {lastShotResult.penalty
-                        ? "ペナルティ"
-                        : lastShotResult.newRemainingDistance === 0
-                        ? "カップイン"
-                        : lastShotResult.shotQuality === "excellent"
-                        ? "会心のショット"
-                        : lastShotResult.shotQuality === "good"
-                        ? "ナイスショット"
-                        : lastShotResult.shotQuality === "average"
-                        ? "まずまずの一打"
-                        : lastShotResult.shotQuality === "poor"
-                        ? "ミス気味"
-                        : "苦しい結果"}
-                    </p>
-                    <p className="text-sm text-emerald-700">飛距離: {lastShotResult.distanceHit}ヤード</p>
-                  </div>
-                  {lastShotResult.penalty && (
-                    <div className="ml-auto rounded-md border border-red-300/70 bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
-                      +1
-                    </div>
-                  )}
-                </div>
-                <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-100/80 p-3 text-sm leading-relaxed text-emerald-800">
-                  {lastShotResult.outcomeMessage}
-                </p>
-                <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
-                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                    実効成功率 {lastShotResult.effectiveSuccessRate}%
-                  </span>
-                  {lastShotResult.confidenceBoostApplied && (
-                    <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
-                      勢いボーナス適用
-                    </span>
-                  )}
-                  {!lastShotResult.confidenceBoostApplied && confidenceBoost > 0 && (
-                    <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
-                      次の1打 +{confidenceBoost}%
-                    </span>
-                  )}
-                </div>
-
-                {/* 続ける/次のホールへ/スコアカードを見るボタン */}
-                <div className="mt-4">
-                  {phase === "hole_complete" ? (
-                    <button
-                      onClick={useGameStore.getState().advanceHole}
-                      className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
-                    >
-                      次のホールへ
-                    </button>
-                  ) : phase === "round_complete" ? (
-                    <button
-                      onClick={useGameStore.getState().dismissResult}
-                      className="w-full rounded-xl bg-amber-400 py-3 text-sm font-bold text-emerald-950 transition hover:bg-amber-300"
-                    >
-                      スコアカードを見る
-                    </button>
-                  ) : (
-                    <button
-                      onClick={useGameStore.getState().dismissResult}
-                      className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
-                    >
-                      続ける
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* パワー調整スライダー */}
-            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-4 py-4">
-              <div className="mb-2 flex items-center justify-between text-xs font-bold tracking-[0.08em] text-emerald-800">
-                <span>パワー</span>
-                <span>{shotPowerPercent}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={110}
-                step={1}
-                value={shotPowerPercent}
-                onChange={e => setShotPowerPercent(Number(e.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
-                aria-label="ショットパワー"
-                disabled={!selectedClub}
-              />
-              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
-                <span>0%</span>
-                <span>100%</span>
-                <span>110%</span>
-              </div>
-              <div className="mt-2 text-xs text-emerald-700">
-                パワー × 平均飛距離 = 実際の飛距離
-              </div>
+              <span>110%</span>
             </div>
           </div>
 
-          {/* ...existing code... */}
         </section>
+
 
         <section className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 sm:mt-8 sm:px-6">
           <div className="flex items-center justify-between gap-3">
@@ -449,17 +445,17 @@ export function HoleView({ onBack }: Props) {
         </section>
           </div>
 
-          <aside className="hidden lg:sticky lg:top-24 lg:block">
-            <CompactScorecard
-              course={course}
-              scores={scores}
-              currentHoleIndex={currentHoleIndex}
-              holeStrokes={holeStrokes}
-              phase={phase}
-            />
-          </aside>
-        </div>
-      </main>
-    </div>
+        <aside className="hidden lg:sticky lg:top-24 lg:block">
+          <CompactScorecard
+            course={course}
+            scores={scores}
+            currentHoleIndex={currentHoleIndex}
+            holeStrokes={holeStrokes}
+            phase={phase}
+          />
+        </aside>
+      </div>
+    </main>
+  </div>
   );
 }

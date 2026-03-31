@@ -13,6 +13,13 @@ const QUALITY_ICON: Record<ShotQuality, string>  = {
 export function ShotResultModal({ onDismiss, onAdvance }: Props) {
   const { lastShotResult, phase, scores, lastHoleSummary, confidenceBoost } = useGameStore();
 
+  // 自動で進める: phaseがhole_completeまたはround_complete以外ならonDismissを即時実行
+  if (lastShotResult && phase !== "hole_complete" && phase !== "round_complete") {
+    setTimeout(() => {
+      onDismiss();
+    }, 800); // 0.8秒だけ表示して自動で閉じる
+  }
+
   if (!lastShotResult) return null;
 
   const {
@@ -128,14 +135,7 @@ export function ShotResultModal({ onDismiss, onAdvance }: Props) {
           >
             スコアカードを見る
           </button>
-        ) : (
-          <button
-            onClick={onDismiss}
-            className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
-          >
-            続ける
-          </button>
-        )}
+        ) : null}
       </div>
     </div>
   );
