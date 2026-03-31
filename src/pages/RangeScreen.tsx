@@ -67,7 +67,8 @@ export default function RangeScreen() {
     };
   };
   const simClub = toSimClub(selectedClub);
-  const clubPersonal = simClub && simClub.id !== undefined ? personalData[simClub.id] : null;
+  const clubPersonal: import('../types/golf').ClubPersonalData | undefined =
+    simClub && simClub.id !== undefined ? personalData[simClub.id] ?? undefined : undefined;
   // スキルレベルを個人データから取得（なければ0.5）
   const playerSkillLevel = 0.5;
   // DB保存値があればそれを優先、なければ従来通り計算値を使う
