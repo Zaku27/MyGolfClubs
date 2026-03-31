@@ -189,41 +189,17 @@ export function HoleView({ onBack }: Props) {
           </section>
         )}
 
+
         <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-10 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-14">
           <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
           <h1 className="mt-4 text-4xl font-extrabold leading-tight text-emerald-900 sm:text-6xl">
             ピンまで {remainingDistance}ヤード
           </h1>
           <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">ライ: {LIE_LABEL[lie]}</p>
-          <p className="mt-1 text-base text-emerald-700">{holeStrokes + 1}打目</p>
+          <p className="mt-1 text-lg font-medium text-emerald-800 sm:text-2xl">{holeStrokes + 1}打目</p>
 
-          {/* ショット方針の注意案内 */}
-          <div className={["mt-8 w-full max-w-md mx-auto rounded-xl px-4 py-3 text-left",
-            selectedClub && selectedClubIsUnstable ? "border border-amber-300/70 bg-amber-50 text-amber-900" : "border border-emerald-300/70 bg-emerald-100/70 text-emerald-900"
-          ].join(" ")}>
-            <p className={["text-[11px] font-bold tracking-[0.16em]",
-              selectedClub && selectedClubIsUnstable ? "text-amber-700" : "text-emerald-700"
-            ].join(" ")}>ショット方針の注意</p>
-            <p className="mt-1 text-xs sm:text-sm">
-              {!selectedClub && "クラブを選ぶと、この位置にショット前の注意が表示されます。"}
-              {selectedClub && !selectedClubIsUnstable && (
-                selectedEffectiveRate !== null
-                  ? `ショットは有効成功率:${selectedEffectiveRate}%で実行されます。`
-                  : "ショットは有効成功率:--%で実行されます。"
-              )}
-              {selectedClub && selectedClubIsUnstable && (
-                <>
-                  {formatSimClubLabel(selectedClub)} は安定度が低めです。
-                  {selectedEffectiveRate !== null ? ` 有効成功率 ${selectedEffectiveRate}%` : ""}
-                  {selectedTodayRate !== null && selectedTodayStats
-                    ? ` / 今日 ${selectedTodayStats.successes}/${selectedTodayStats.attempts}本 (${selectedTodayRate}%)`
-                    : ""}
-                </>
-              )}
-            </p>
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 sm:mt-8">
+          {/* ハザード表示（OB等）を打数の下に移動 */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             {hazards.length > 0 ? (
               hazards.map((hazard, index) => (
                 <span
@@ -239,6 +215,84 @@ export function HoleView({ onBack }: Props) {
               </span>
             )}
           </div>
+
+          {/* まとめたショット操作セクション */}
+          <div className="mt-8 w-full max-w-md mx-auto flex flex-col gap-5 items-stretch">
+            {/* ショット方針の注意案内 */}
+            <div className={[
+              "rounded-xl px-4 py-3 text-left",
+              selectedClub && selectedClubIsUnstable ? "border border-amber-300/70 bg-amber-50 text-amber-900" : "border border-emerald-300/70 bg-emerald-100/70 text-emerald-900"
+            ].join(" ")}>
+              <p className={["text-[11px] font-bold tracking-[0.16em]",
+                selectedClub && selectedClubIsUnstable ? "text-amber-700" : "text-emerald-700"
+              ].join(" ")}>ショット方針の注意</p>
+              <p className="mt-1 text-xs sm:text-sm">
+                {!selectedClub && "クラブを選ぶと、この位置にショット前の注意が表示されます。"}
+                {selectedClub && !selectedClubIsUnstable && (
+                  selectedEffectiveRate !== null
+                    ? `ショットは有効成功率:${selectedEffectiveRate}%で実行されます。`
+                    : "ショットは有効成功率:--%で実行されます。"
+                )}
+                {selectedClub && selectedClubIsUnstable && (
+                  <>
+                    {formatSimClubLabel(selectedClub)} は安定度が低めです。
+                    {selectedEffectiveRate !== null ? ` 有効成功率 ${selectedEffectiveRate}%` : ""}
+                    {selectedTodayRate !== null && selectedTodayStats
+                      ? ` / 今日 ${selectedTodayStats.successes}/${selectedTodayStats.attempts}本 (${selectedTodayRate}%)`
+                      : ""}
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* ショットボタン */}
+            <button
+              type="button"
+              disabled={!selectedClub}
+              onClick={() => {
+                if (selectedClub) {
+                  selectClub(selectedClub.id);
+                  takeShot();
+                }
+              }}
+              className={[
+                "w-full rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
+                "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
+                selectedClub ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500" : "cursor-not-allowed bg-emerald-200 text-emerald-500"
+              ].join(" ")}
+            >
+              ショット
+            </button>
+
+            {/* パワー調整スライダー */}
+            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-4 py-4">
+              <div className="mb-2 flex items-center justify-between text-xs font-bold tracking-[0.08em] text-emerald-800">
+                <span>パワー</span>
+                <span>{shotPowerPercent}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={110}
+                step={1}
+                value={shotPowerPercent}
+                onChange={e => setShotPowerPercent(Number(e.target.value))}
+                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
+                aria-label="ショットパワー"
+                disabled={!selectedClub}
+              />
+              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
+                <span>0%</span>
+                <span>100%</span>
+                <span>110%</span>
+              </div>
+              <div className="mt-2 text-xs text-emerald-700">
+                パワー × 平均飛距離 = 実際の飛距離
+              </div>
+            </div>
+          </div>
+
+          {/* ...existing code... */}
         </section>
 
         <section className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 sm:mt-8 sm:px-6">
@@ -308,52 +362,7 @@ export function HoleView({ onBack }: Props) {
             })}
           </div>
 
-          {/* ショットボタンとパワー調整 */}
-          <div className="mt-8 flex flex-col items-center w-full max-w-md mx-auto">
-            <button
-              type="button"
-              disabled={!selectedClub}
-              onClick={() => {
-                if (selectedClub) {
-                  selectClub(selectedClub.id);
-                  takeShot();
-                }
-              }}
-              className={["w-full rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
-                "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
-                selectedClub ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500" : "cursor-not-allowed bg-emerald-200 text-emerald-500"
-              ].join(" ")}
-            >
-              ショット
-            </button>
-
-            {/* パワー調整スライダー */}
-            <div className="mt-6 w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-4 py-4">
-              <div className="mb-2 flex items-center justify-between text-xs font-bold tracking-[0.08em] text-emerald-800">
-                <span>パワー</span>
-                <span>{shotPowerPercent}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={110}
-                step={1}
-                value={shotPowerPercent}
-                onChange={e => setShotPowerPercent(Number(e.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
-                aria-label="ショットパワー"
-                disabled={!selectedClub}
-              />
-              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
-                <span>0%</span>
-                <span>100%</span>
-                <span>110%</span>
-              </div>
-              <div className="mt-2 text-xs text-emerald-700">
-                パワー × 平均飛距離 = 実際の飛距離
-              </div>
-            </div>
-          </div>
+          {/* ...existing code... */}
         </section>
           </div>
 
