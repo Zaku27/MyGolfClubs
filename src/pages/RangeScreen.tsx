@@ -28,7 +28,7 @@ const outcomeColor = (outcome: string) => {
 
 export default function RangeScreen() {
   const { clubs, personalData, updatePersonalData } = useClubStore();
-  const { playerSkillLevel } = useGameStore();
+  // const { playerSkillLevel } = useGameStore();
   const [selectedClubId, setSelectedClubId] = useState<string>('');
   const [lie, setLie] = useState<string>('Fairway');
   const [windSpeed, setWindSpeed] = useState<number>(0);
@@ -39,8 +39,16 @@ export default function RangeScreen() {
   const [calibrated, setCalibrated] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
 
-  const selectedClub = clubs.find((c) => String(c.id) === String(selectedClubId));
+  // avgDistanceが無い場合はdistanceをavgDistanceとして使う
+  let selectedClub = clubs.find((c) => String(c.id) === String(selectedClubId));
+  if (selectedClub && selectedClub.avgDistance === undefined && selectedClub.distance !== undefined) {
+    selectedClub = { ...selectedClub, avgDistance: selectedClub.distance };
+  }
   const clubPersonal = selectedClub ? personalData[selectedClub.id] : null;
+  // スキルレベルを個人データから取得（なければ0.5）
+  const playerSkillLevel = clubPersonal && typeof clubPersonal.playerSkillLevel === 'number'
+    ? clubPersonal.playerSkillLevel
+    : 0.5;
   const effectiveSuccess = selectedClub && clubPersonal
     ? calculateEffectiveSuccessRate(selectedClub, clubPersonal, playerSkillLevel)
     : null;
@@ -49,33 +57,134 @@ export default function RangeScreen() {
     if (!selectedClub) return;
     setIsSimulating(true);
     const shotResults = [];
+    // デバッグ用: 各ショットの途中計算値を格納
+    const debugShots = [];
     for (let i = 0; i < numShots; i++) {
+      // simulateShotの中身を再現し、途中値を取得
+      const club = selectedClub;
+      const context = {
+        lie,
+        wind: windDir,
+        windStrength: windSpeed,
+        remainingDistance: selectedClub.avgDistance,
+        hazards: [],
+        shotPowerPercent: 100,
+      };
+      const riskLevel = "normal";
+      const options = { personalData: clubPersonal, playerSkillLevel };
+      // --- ここからsimulateShotの主要計算 ---
+      const { remainingDistance, lie: _lie, wind, windStrength = 7, hazards = [] } = context;
+      const confidenceBoost = options.confidenceBoost ?? 0;
+      const weakClub = club.isWeakClub === true || club.successRate < 65;
+      // effectiveRate
+      const effectiveRate = (() => {
+        let rate = calculateEffectiveSuccessRate(
+          club.successRate,
+          options.personalData,
+          weakClub,
+          options.playerSkillLevel,
+        );
+        if (_lie === "rough")   rate -= 12;
+        if (_lie === "bunker")  rate -= 20;
+        if (_lie === "penalty") rate -= 30;
+        if (riskLevel === "aggressive") rate -= 15;
+        if (riskLevel === "safe")       rate +=  8;
+        if (weakClub) {
+          const weakPenaltyBase = club.successRate < 60 ? 16 : 14;
+          rate -= weakPenaltyBase * 0.5;
+        }
+        rate += confidenceBoost;
+        return Math.max(15, Math.min(95, rate));
+      })();
+      const roll = Math.random() * 100;
+      const isGoodShot = roll < effectiveRate;
+      let shotQuality;
+      if (isGoodShot) {
+        if      (roll < effectiveRate * 0.12) shotQuality = "excellent";
+        else if (roll < effectiveRate * 0.55) shotQuality = "good";
+        else                                  shotQuality = "average";
+      } else {
+        shotQuality = roll < effectiveRate + (100 - effectiveRate) * 0.45 ? "poor" : "mishit";
+      }
+      // 距離計算
+      const lieMultiplier  = (() => {
+        switch (_lie) {
+          case "tee":     return 1.00;
+          case "fairway": return 0.98;
+          case "rough":   return 0.82;
+          case "bunker":  return club.type === "Wedge" ? 0.70 : 0.50;
+          case "green":   return 1.00;
+          case "penalty": return 0.60;
+          default:         return 0.95;
+        }
+      })();
+      const windYards = (() => {
+        if (!wind || wind === "none") return 0;
+        switch (wind) {
+          case "headwind":  return -(windStrength * 1.5);
+          case "tailwind":  return  windStrength * 0.8;
+          case "crosswind": return -(windStrength * 0.4);
+          default:           return 0;
+        }
+      })();
+      const weakDistancePenaltyBase = weakClub ? (club.successRate < 60 ? 0.14 : 0.10) : 0;
+      const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * 0.5;
+      const expected = club.avgDistance * lieMultiplier * weakDistanceMultiplier + windYards;
+      const varianceFactor = ((successRate, risk, weak) => {
+        const base = (100 - successRate) / 250;
+        const riskMult = risk === "aggressive" ? 2.0 : risk === "safe" ? 0.4 : 1.0;
+        return base * riskMult + (weak ? 0.06 * 0.5 : 0);
+      })(club.successRate, riskLevel, weakClub);
+      const varRoll = Math.random() * 2 - 1;
+      let actualDistance;
+      if      (shotQuality === "excellent") actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 0.3 + 0.04);
+      else if (isGoodShot)                 actualDistance = expected * (1 + varRoll * varianceFactor);
+      else if (shotQuality === "poor")     actualDistance = expected * (weakClub ? 0.48 + Math.random() * 0.18 : 0.60 + Math.random() * 0.22);
+      else /* mishit */                    actualDistance = expected * (weakClub ? 0.18 + Math.random() * 0.20 : 0.30 + Math.random() * 0.30);
+      actualDistance = Math.round(Math.max(5, actualDistance));
+      // ペナルティ
+      const penaltyBase =
+        shotQuality === "mishit"
+          ? (hazards.length > 0 ? 0.42 : 0.10) + (weakClub ? 0.12 * 0.5 : 0)
+          : shotQuality === "poor"
+            ? (hazards.length > 0 ? 0.18 : 0.04) + (weakClub ? 0.08 * 0.5 : 0)
+            : 0;
+      const penalty = penaltyBase > 0 && Math.random() < penaltyBase;
+      // --- ここまでsimulateShotの主要計算 ---
+      debugShots.push({
+        i,
+        lieMultiplier,
+        windYards,
+        weakDistanceMultiplier,
+        expected,
+        varianceFactor,
+        varRoll,
+        actualDistance,
+        shotQuality,
+        effectiveRate,
+        roll,
+        isGoodShot,
+        penalty,
+      });
       shotResults.push(
         simulateShot(
-          selectedClub,
-          {
-            lie,
-            wind: windDir,
-            windStrength: windSpeed,
-            remainingDistance: selectedClub.avgDistance,
-            hazards: [],
-          },
-          "normal",
-          {
-            personalData: clubPersonal,
-            playerSkillLevel,
-          }
+          club,
+          context,
+          riskLevel,
+          options
         )
       );
     }
     setResults(shotResults);
+    // デバッグ用: 計算途中値をstateに保存
+    setDebugShots(debugShots);
     // Summary
     const distances = shotResults.map((r) => r.distanceHit);
     const avg = distances.reduce((a, b) => a + b, 0) / distances.length;
     const std = Math.sqrt(
       distances.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / distances.length
     );
-    const success = shotResults.filter((r) => r.outcome === 'Great' || r.outcome === 'Good').length / numShots;
+    const success = shotResults.filter((r) => r.wasSuccessful).length / numShots;
     setSummary({ avg, std, success });
     setCalibrated(false);
     setIsSimulating(false);
@@ -87,6 +196,9 @@ export default function RangeScreen() {
     updatePersonalData(selectedClub.id, updated);
     setCalibrated(true);
   };
+
+  // デバッグ用: 計算途中値state
+  const [debugShots, setDebugShots] = useState<any[]>([]);
 
   return (
     <div className="min-h-screen bg-green-50 flex flex-col items-center py-4 px-2">
@@ -101,7 +213,59 @@ export default function RangeScreen() {
         </button>
       </div>
 
-      {/* Club Selector */}
+      {/* Debug Parameters */}
+      {debugShots.length > 0 && (
+        <div className="w-full max-w-xl bg-yellow-100 border border-yellow-400 rounded shadow p-2 mb-4 text-xs text-yellow-900">
+          <div className="font-bold mb-1">[DEBUG] 飛距離計算 途中値</div>
+          <table className="text-[10px]">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>lieM</th>
+                <th>windY</th>
+                <th>weakM</th>
+                <th>expected</th>
+                <th>varF</th>
+                <th>varR</th>
+                <th>actual</th>
+                <th>shotQ</th>
+                <th>effRate</th>
+                <th>roll</th>
+                <th>isGood</th>
+                <th>penalty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {debugShots.map((d) => (
+                <tr key={d.i}>
+                  <td>{d.i+1}</td>
+                  <td>{d.lieMultiplier}</td>
+                  <td>{d.windYards}</td>
+                  <td>{d.weakDistanceMultiplier}</td>
+                  <td>{d.expected}</td>
+                  <td>{d.varianceFactor}</td>
+                  <td>{d.varRoll}</td>
+                  <td>{d.actualDistance}</td>
+                  <td>{d.shotQuality}</td>
+                  <td>{d.effectiveRate}</td>
+                  <td>{d.roll.toFixed(1)}</td>
+                  <td>{d.isGoodShot ? '○' : ''}</td>
+                  <td>{d.penalty ? 'P' : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="w-full max-w-xl bg-yellow-50 border border-yellow-300 rounded shadow p-2 mb-4 text-xs text-yellow-900">
+        <div className="font-bold mb-1">[DEBUG] 飛距離計算パラメータ</div>
+        <div>lie: {String(lie)}</div>
+        <div>windDir: {String(windDir)}</div>
+        <div>windSpeed: {String(windSpeed)}</div>
+        <div>playerSkillLevel: {String(playerSkillLevel)}</div>
+        <div>selectedClub: {selectedClub ? JSON.stringify(selectedClub) : 'null'}</div>
+        <div>clubPersonal: {clubPersonal ? JSON.stringify(clubPersonal) : 'null'}</div>
+      </div>
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
         <label className="block font-semibold mb-2">Select Club</label>
         <div className="mb-2 text-xs text-gray-500">クラブ本数: {clubs.length}</div>
