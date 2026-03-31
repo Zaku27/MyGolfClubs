@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { PersonalDataInput } from './components/simulator/PersonalDataInput'
+import RangeScreen from './pages/RangeScreen'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -11,6 +12,7 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/personal-data" element={<PersonalDataInput />} />
+        <Route path="/range" element={<RangeScreen />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
