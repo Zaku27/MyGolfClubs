@@ -261,7 +261,7 @@ export default function RangeScreen() {
                 <tr className="bg-green-100">
                   <th className="px-2 py-1">#</th>
                   <th className="px-2 py-1">飛距離</th>
-                  <th className="px-2 py-1">品質</th>
+                  <th className="px-2 py-1">ショット品質</th>
                   <th className="px-2 py-1">結果</th>
                 </tr>
               </thead>

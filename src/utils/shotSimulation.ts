@@ -302,7 +302,7 @@ export function simulateShot(
 
   let shotQuality: ShotQuality;
   if (isGoodShot) {
-    if      (roll < effectiveRate * 0.20) shotQuality = "excellent";
+    if      (roll < effectiveRate * 0.12) shotQuality = "excellent";
     else if (roll < effectiveRate * 0.55) shotQuality = "good";
     else                                  shotQuality = "average";
   } else {
@@ -321,16 +321,27 @@ export function simulateShot(
 
   let actualDistance: number;
   if (shotQuality === "excellent") {
-    if (club.type === "Driver" || club.type === "Wood" || club.type === "Hybrid") {
-      // ドライバー・ウッド・ハイブリッドは従来通り上振れあり
-      actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 0.3 + 0.04);
+    if (club.type === "Driver") {
+      // ドライバーはさらに上振れ強化
+      actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 0.8 + 0.04);
+    } else if (club.type === "Wood" || club.type === "Hybrid") {
+      // ウッド・ハイブリッドは0.7
+      actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 0.7 + 0.04);
     } else {
       // アイアン・ウェッジ・パターは理論値±2%の微小ブレのみ
       const microVar = (Math.random() * 0.04) - 0.02; // -0.02〜+0.02
       actualDistance = expected * (1 + microVar);
     }
   } else if (isGoodShot) {
-    actualDistance = expected * (1 + varRoll * varianceFactor);
+    if (shotQuality === "average") {
+      // averageは下振れ補正（ばらつき幅を0.7倍、さらに-0.05オフセット）
+      actualDistance = expected * (1 + varRoll * varianceFactor * 0.7 - 0.05);
+    } else if (shotQuality === "good") {
+      // goodはばらつき幅を0.8倍に抑制
+      actualDistance = expected * (1 + varRoll * varianceFactor * 0.8);
+    } else {
+      actualDistance = expected * (1 + varRoll * varianceFactor);
+    }
   } else if (shotQuality === "poor") {
     actualDistance = expected * (weakClub ? 0.48 + Math.random() * 0.18 : 0.60 + Math.random() * 0.22);
 
