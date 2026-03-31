@@ -392,8 +392,8 @@ export function simulateShot(
     }
   } else if (isGoodShot) {
     if (shotQuality === "average") {
-      // averageは下振れ補正（ばらつき幅を0.7倍、さらに-0.05オフセット）
-      actualDistance = expected * (1 + varRoll * varianceFactor * 0.7 - 0.05);
+      // averageは下振れ補正（ばらつき幅を0.7倍、さらに-0.05オフセット）上振れはしない
+      actualDistance = expected * (1 + Math.min(varRoll, 0) * varianceFactor * 0.7 - 0.05);
     } else if (shotQuality === "good") {
       // goodはばらつき幅を0.8倍に抑制
       actualDistance = expected * (1 + varRoll * varianceFactor * 0.8);

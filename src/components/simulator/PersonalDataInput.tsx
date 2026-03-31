@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useUserProfileStore } from "../../store/userProfileStore";
 import { Link } from "react-router-dom";
 import type { ClubCategory, ClubPersonalData, GolfClub } from "../../types/golf";
 import { useClubStore, selectSortedClubsForDisplay } from "../../store/clubStore";
@@ -53,6 +54,9 @@ const CLUB_CATEGORIES: readonly { category: ClubCategory; label: string }[] = [
 ] as const;
 
 export function PersonalDataInput() {
+  // ユーザープロフィールストア
+  const headSpeed = useUserProfileStore((state) => state.profile.headSpeed);
+  const setHeadSpeed = useUserProfileStore((state) => state.setHeadSpeed);
   const clubs = useClubStore(selectSortedClubsForDisplay);
   const personalData = useClubStore((state) => state.personalData);
   const playerSkillLevel = useClubStore((state) => state.playerSkillLevel);
@@ -222,6 +226,30 @@ export function PersonalDataInput() {
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        {/* ユーザーのヘッドスピード入力欄 */}
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5 mb-4">
+          <h2 className="text-base font-semibold text-emerald-900 mb-2">ユーザーのヘッドスピード</h2>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <span>ヘッドスピード</span>
+              <input
+                type="number"
+                min={20}
+                max={60}
+                step={0.1}
+                value={headSpeed ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value === "" ? null : Number(e.target.value);
+                  setHeadSpeed(v);
+                }}
+                className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-slate-900 focus:border-emerald-500 focus:outline-none"
+                placeholder="例: 40.5"
+              />
+              <span>m/s</span>
+            </label>
+            <span className="text-xs text-slate-500 ml-2">※ あなた自身のヘッドスピード（ドライバー基準）を入力してください</span>
+          </div>
+        </section>
         {!isInitialized && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
             データを読み込み中...

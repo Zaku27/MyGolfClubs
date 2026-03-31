@@ -46,3 +46,9 @@ export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
   { clubType: 'Wedge', name: 'Wedge', number: 'LW', length: 34.75, weight: 460, swingWeight: 'D1', lieAngle: 64, loftAngle: 58, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 90, notes: '' },
   { clubType: 'Putter', name: 'Putter', number: 'P', length: 33, weight: 500, swingWeight: 'D1', lieAngle: 70, loftAngle: 3, shaftType: 'Steel', torque: 1.0, flex: 'S', distance: 10, notes: '' },
 ];
+ 
+// ─── ユーザープロフィール情報 ──────────────────────────────
+export interface UserProfile {
+  headSpeed: number | null; // ユーザーのヘッドスピード（m/s、nullなら未設定）
+  // 今後、年齢・性別・身長・体重なども追加可能
+}

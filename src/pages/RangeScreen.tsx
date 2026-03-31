@@ -167,11 +167,14 @@ export default function RangeScreen() {
               onChange={(e) => setSelectedClubId(e.target.value)}
             >
               <option value="">-- クラブを選択 --</option>
-              {clubs.map((club) => (
-                <option key={club.id} value={club.id}>
-                  {club.name} ({club.number})
-                </option>
-              ))}
+              {clubs
+                .filter(club => club.clubType !== 'Putter')
+                .sort((a, b) => (a.loftAngle ?? 999) - (b.loftAngle ?? 999))
+                .map((club) => (
+                  <option key={club.id} value={club.id}>
+                    {club.name} ({club.number})
+                  </option>
+                ))}
             </select>
             {selectedClub && (
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
