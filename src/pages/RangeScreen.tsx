@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useClubStore } from '../store/clubStore';
-import { useGameStore } from '../store/gameStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
 import { simulateShot } from '../utils/shotSimulation';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
@@ -27,7 +26,7 @@ const outcomeColor = (outcome: string) => {
 };
 
 export default function RangeScreen() {
-  const { clubs, personalData, updatePersonalData } = useClubStore();
+  const { clubs, personalData } = useClubStore();
   // const { playerSkillLevel } = useGameStore();
   const [selectedClubId, setSelectedClubId] = useState<string>('');
   const [lie, setLie] = useState<string>('Fairway');
@@ -41,139 +40,66 @@ export default function RangeScreen() {
 
   // avgDistanceが無い場合はdistanceをavgDistanceとして使う
   let selectedClub = clubs.find((c) => String(c.id) === String(selectedClubId));
-  if (selectedClub && selectedClub.avgDistance === undefined && selectedClub.distance !== undefined) {
-    selectedClub = { ...selectedClub, avgDistance: selectedClub.distance };
-  }
-  const clubPersonal = selectedClub ? personalData[selectedClub.id] : null;
+  // SimClub型に変換（最低限必要なプロパティを補完）
+  const toSimClub = (club: import('../types/golf').GolfClub | undefined) => {
+    if (!club) return undefined;
+    return {
+      ...club,
+      type: (club as any).type ?? "Unknown",
+      avgDistance: (club as any).avgDistance ?? club.distance ?? 0,
+      successRate: (club as any).successRate ?? 70,
+      isWeakClub: (club as any).isWeakClub ?? false,
+      number: club.number ?? "",
+      name: club.name ?? "",
+      id: String(club.id),
+    };
+  };
+  const simClub = toSimClub(selectedClub);
+  const clubPersonal = simClub && simClub.id !== undefined ? personalData[simClub.id] : null;
   // スキルレベルを個人データから取得（なければ0.5）
-  const playerSkillLevel = clubPersonal && typeof clubPersonal.playerSkillLevel === 'number'
-    ? clubPersonal.playerSkillLevel
-    : 0.5;
-  const effectiveSuccess = selectedClub && clubPersonal
-    ? calculateEffectiveSuccessRate(selectedClub, clubPersonal, playerSkillLevel)
+  const playerSkillLevel = 0.5;
+  const effectiveSuccess = simClub && clubPersonal
+    ? calculateEffectiveSuccessRate({ ...simClub, id: Number(simClub.id) }, clubPersonal, playerSkillLevel)
     : null;
 
   const handleSimulate = async () => {
-    if (!selectedClub) return;
+    if (!simClub) return;
     setIsSimulating(true);
     const shotResults = [];
     // デバッグ用: 各ショットの途中計算値を格納
     const debugShots = [];
     for (let i = 0; i < numShots; i++) {
-      // simulateShotの中身を再現し、途中値を取得
-      const club = selectedClub;
+      const club = simClub;
+      // lieをLieTypeに変換
+      let lieType: import('../types/game').LieType = 'fairway';
+      switch (lie) {
+        case 'Fairway': lieType = 'fairway'; break;
+        case 'Rough':
+        case 'Light Rough': lieType = 'rough'; break;
+        case 'Bunker': lieType = 'bunker'; break;
+        case 'Green': lieType = 'green'; break;
+        default: lieType = 'fairway';
+      }
       const context = {
-        lie,
-        wind: windDir,
+        lie: lieType,
+        wind: windDir as any,
         windStrength: windSpeed,
-        remainingDistance: selectedClub.avgDistance,
+        remainingDistance: simClub.avgDistance,
         hazards: [],
         shotPowerPercent: 100,
       };
       const riskLevel = "normal";
-      const options = { personalData: clubPersonal, playerSkillLevel };
-      // --- ここからsimulateShotの主要計算 ---
-      const { remainingDistance, lie: _lie, wind, windStrength = 7, hazards = [] } = context;
-      const confidenceBoost = options.confidenceBoost ?? 0;
-      const weakClub = club.isWeakClub === true || club.successRate < 65;
-      // effectiveRate
-      const effectiveRate = (() => {
-        let rate = calculateEffectiveSuccessRate(
-          club.successRate,
-          options.personalData,
-          weakClub,
-          options.playerSkillLevel,
-        );
-        if (_lie === "rough")   rate -= 12;
-        if (_lie === "bunker")  rate -= 20;
-        if (_lie === "penalty") rate -= 30;
-        if (riskLevel === "aggressive") rate -= 15;
-        if (riskLevel === "safe")       rate +=  8;
-        if (weakClub) {
-          const weakPenaltyBase = club.successRate < 60 ? 16 : 14;
-          rate -= weakPenaltyBase * 0.5;
-        }
-        rate += confidenceBoost;
-        return Math.max(15, Math.min(95, rate));
-      })();
-      const roll = Math.random() * 100;
-      const isGoodShot = roll < effectiveRate;
-      let shotQuality;
-      if (isGoodShot) {
-        if      (roll < effectiveRate * 0.12) shotQuality = "excellent";
-        else if (roll < effectiveRate * 0.55) shotQuality = "good";
-        else                                  shotQuality = "average";
-      } else {
-        shotQuality = roll < effectiveRate + (100 - effectiveRate) * 0.45 ? "poor" : "mishit";
-      }
-      // 距離計算
-      const lieMultiplier  = (() => {
-        switch (_lie) {
-          case "tee":     return 1.00;
-          case "fairway": return 0.98;
-          case "rough":   return 0.82;
-          case "bunker":  return club.type === "Wedge" ? 0.70 : 0.50;
-          case "green":   return 1.00;
-          case "penalty": return 0.60;
-          default:         return 0.95;
-        }
-      })();
-      const windYards = (() => {
-        if (!wind || wind === "none") return 0;
-        switch (wind) {
-          case "headwind":  return -(windStrength * 1.5);
-          case "tailwind":  return  windStrength * 0.8;
-          case "crosswind": return -(windStrength * 0.4);
-          default:           return 0;
-        }
-      })();
-      const weakDistancePenaltyBase = weakClub ? (club.successRate < 60 ? 0.14 : 0.10) : 0;
-      const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * 0.5;
-      const expected = club.avgDistance * lieMultiplier * weakDistanceMultiplier + windYards;
-      const varianceFactor = ((successRate, risk, weak) => {
-        const base = (100 - successRate) / 250;
-        const riskMult = risk === "aggressive" ? 2.0 : risk === "safe" ? 0.4 : 1.0;
-        return base * riskMult + (weak ? 0.06 * 0.5 : 0);
-      })(club.successRate, riskLevel, weakClub);
-      const varRoll = Math.random() * 2 - 1;
-      let actualDistance;
-      if      (shotQuality === "excellent") actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 0.3 + 0.04);
-      else if (isGoodShot)                 actualDistance = expected * (1 + varRoll * varianceFactor);
-      else if (shotQuality === "poor")     actualDistance = expected * (weakClub ? 0.48 + Math.random() * 0.18 : 0.60 + Math.random() * 0.22);
-      else /* mishit */                    actualDistance = expected * (weakClub ? 0.18 + Math.random() * 0.20 : 0.30 + Math.random() * 0.30);
-      actualDistance = Math.round(Math.max(5, actualDistance));
-      // ペナルティ
-      const penaltyBase =
-        shotQuality === "mishit"
-          ? (hazards.length > 0 ? 0.42 : 0.10) + (weakClub ? 0.12 * 0.5 : 0)
-          : shotQuality === "poor"
-            ? (hazards.length > 0 ? 0.18 : 0.04) + (weakClub ? 0.08 * 0.5 : 0)
-            : 0;
-      const penalty = penaltyBase > 0 && Math.random() < penaltyBase;
-      // --- ここまでsimulateShotの主要計算 ---
+      const options = { personalData: clubPersonal ?? undefined, playerSkillLevel };
+      const shotResult = simulateShot(club, context, riskLevel, options);
       debugShots.push({
         i,
-        lieMultiplier,
-        windYards,
-        weakDistanceMultiplier,
-        expected,
-        varianceFactor,
-        varRoll,
-        actualDistance,
-        shotQuality,
-        effectiveRate,
-        roll,
-        isGoodShot,
-        penalty,
+        actualDistance: shotResult.distanceHit,
+        shotQuality: shotResult.shotQuality,
+        effectiveRate: shotResult.effectiveSuccessRate,
+        isGoodShot: shotResult.wasSuccessful,
+        penalty: shotResult.penalty,
       });
-      shotResults.push(
-        simulateShot(
-          club,
-          context,
-          riskLevel,
-          options
-        )
-      );
+      shotResults.push(shotResult);
     }
     setResults(shotResults);
     // デバッグ用: 計算途中値をstateに保存
@@ -191,9 +117,8 @@ export default function RangeScreen() {
   };
 
   const handleCalibrate = () => {
-    if (!selectedClub || !results.length) return;
-    const updated = rangeAutoCalibrate(selectedClub, clubPersonal, results);
-    updatePersonalData(selectedClub.id, updated);
+    if (!simClub || !results.length || !clubPersonal) return;
+    rangeAutoCalibrate({ ...simClub, id: Number(simClub.id) }, clubPersonal, results);
     setCalibrated(true);
   };
 
@@ -221,16 +146,9 @@ export default function RangeScreen() {
             <thead>
               <tr>
                 <th>#</th>
-                <th>lieM</th>
-                <th>windY</th>
-                <th>weakM</th>
-                <th>expected</th>
-                <th>varF</th>
-                <th>varR</th>
                 <th>actual</th>
                 <th>shotQ</th>
                 <th>effRate</th>
-                <th>roll</th>
                 <th>isGood</th>
                 <th>penalty</th>
               </tr>
@@ -239,16 +157,9 @@ export default function RangeScreen() {
               {debugShots.map((d) => (
                 <tr key={d.i}>
                   <td>{d.i+1}</td>
-                  <td>{d.lieMultiplier}</td>
-                  <td>{d.windYards}</td>
-                  <td>{d.weakDistanceMultiplier}</td>
-                  <td>{d.expected}</td>
-                  <td>{d.varianceFactor}</td>
-                  <td>{d.varRoll}</td>
                   <td>{d.actualDistance}</td>
                   <td>{d.shotQuality}</td>
                   <td>{d.effectiveRate}</td>
-                  <td>{d.roll.toFixed(1)}</td>
                   <td>{d.isGoodShot ? '○' : ''}</td>
                   <td>{d.penalty ? 'P' : ''}</td>
                 </tr>
@@ -288,7 +199,7 @@ export default function RangeScreen() {
             {selectedClub && (
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
                 <span className="font-bold">{selectedClub.name}</span>
-                <span>Avg: {selectedClub.avgDistance} yd</span>
+                <span>Avg: {simClub?.avgDistance ?? '-'} yd</span>
                 <span>Success: {effectiveSuccess ? (effectiveSuccess * 100).toFixed(1) : '--'}%</span>
               </div>
             )}
