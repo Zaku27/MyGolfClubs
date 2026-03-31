@@ -204,6 +204,7 @@ export function PersonalDataInput() {
         clubId: row.clubId,
         missRate: row.missRate,
         weaknessFactor: row.weaknessFactor,
+        effectiveSuccessRate: row.effectiveSuccessRate,
       };
       await setPersonalData(payload);
     }

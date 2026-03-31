@@ -23,6 +23,7 @@ export interface ClubPersonalData {
   clubId: string;
   missRate: number;        // 0-100 (user input, e.g. 35 = 35% miss)
   weaknessFactor: number;  // 0.0-1.0 (0 = no weakness, 0.3 = moderate weakness)
+  effectiveSuccessRate?: number; // 0-100 クラブごとの有効成功率（任意）
 }
 
 export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [

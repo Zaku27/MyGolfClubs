@@ -58,15 +58,20 @@ export default function RangeScreen() {
   const clubPersonal = simClub && simClub.id !== undefined ? personalData[simClub.id] : null;
   // スキルレベルを個人データから取得（なければ0.5）
   const playerSkillLevel = 0.5;
-  const effectiveSuccess = simClub && clubPersonal
-    ? calculateEffectiveSuccessRate({ ...simClub, id: Number(simClub.id) }, clubPersonal, playerSkillLevel)
-    : null;
+  // DB保存値があればそれを優先、なければ従来通り計算値を使う
+  let effectiveSuccess: number | null = null;
+  if (simClub && clubPersonal) {
+    if (typeof clubPersonal.effectiveSuccessRate === 'number') {
+      effectiveSuccess = clubPersonal.effectiveSuccessRate / 100;
+    } else {
+      effectiveSuccess = calculateEffectiveSuccessRate({ ...simClub, id: Number(simClub.id) }, clubPersonal, playerSkillLevel);
+    }
+  }
 
   const handleSimulate = async () => {
     if (!simClub) return;
     setIsSimulating(true);
     const shotResults = [];
-    // ...existing code...
     for (let i = 0; i < numShots; i++) {
       const club = simClub;
       // lieをLieTypeに変換
@@ -90,15 +95,16 @@ export default function RangeScreen() {
       const riskLevel = "normal";
       const options = { personalData: clubPersonal ?? undefined, playerSkillLevel };
       const shotResult = simulateShot(club, context, riskLevel, options);
-      debugShots.push({
-        i,
-        actualDistance: shotResult.distanceHit,
-        shotQuality: shotResult.shotQuality,
-        effectiveRate: shotResult.effectiveSuccessRate,
-        isGoodShot: shotResult.wasSuccessful,
-        penalty: shotResult.penalty,
-      });
-      shotResults.push(shotResult);
+      // outcomeを追加
+      let outcome = "";
+      if (shotResult.penalty) {
+        outcome = "Penalty";
+      } else if (!shotResult.wasSuccessful) {
+        outcome = "Miss";
+      } else {
+        outcome = "Good";
+      }
+      shotResults.push({ ...shotResult, outcome });
     }
     setResults(shotResults);
     // ...existing code...
@@ -160,7 +166,7 @@ export default function RangeScreen() {
                 <span className="font-bold">{selectedClub.name}</span>
                 <span>Avg: {simClub?.avgDistance ?? '-'} yd</span>
                 <span>
-                  有効成功率: {effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--'}%
+                  有効成功率: {clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--'}%
                 </span>
               </div>
             )}
@@ -229,7 +235,7 @@ export default function RangeScreen() {
       </button>
 
       {/* Results Section */}
-      {results.length > 0 && (
+      {results.length > 0 && summary && (
         <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
           <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="font-bold text-green-900">セッション結果：</span>
