@@ -13,7 +13,7 @@ function qualityLabel(q: string) {
 }
 import { useClubStore } from '../store/clubStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
-import { simulateShot } from '../utils/shotSimulation';
+import { simulateShot, estimateShotDistance } from '../utils/shotSimulation';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
 
 const LIE_OPTIONS = [
@@ -176,7 +176,14 @@ export default function RangeScreen() {
             {selectedClub && (
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
                 <span className="font-bold">{selectedClub.name}</span>
-                <span>平均: {simClub?.avgDistance ?? '-'} ヤード</span>
+                <span>
+                  目安: {simClub ? estimateShotDistance(
+                    simClub,
+                    { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+                    "normal",
+                    { personalData: clubPersonal, headSpeed: undefined, useTheoretical: true }
+                  ) : '-'} ヤード
+                </span>
                 <span>
                   有効成功率: {clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--'}%
                 </span>
