@@ -364,15 +364,16 @@ export function simulateShot(
   }
 
   // ── Distance calculation ───────────────────────────────────────────────────
-  const lieMultiplier  = getLieDistanceMultiplier(lie, club.type);
-  const windYards      = getWindYards(wind, windStrength);
-  const weakDistancePenaltyBase = weakClub ? (club.successRate < 60 ? 0.14 : 0.10) : 0;
-  const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
-  // ドライバーのベース飛距離をアップ（例: 1.06倍）
-  let expected = club.avgDistance * lieMultiplier * weakDistanceMultiplier + windYards;
-  if (club.type === "Driver") {
-    expected *= 1.06; // ベース飛距離を6%アップ
-  }
+  // 共通ロジックで推定飛距離を算出
+  let expected = estimateShotDistance(
+    club,
+    { lie, wind, windStrength },
+    riskLevel,
+    {
+      personalData,
+      // ヘッドスピードや理論値加味したい場合はここで渡す（現状は未使用）
+    }
+  );
 
   const varianceFactor = getVarianceFactor(club.successRate, riskLevel, weakClub);
   const varRoll        = Math.random() * 2 - 1; // −1 … +1
