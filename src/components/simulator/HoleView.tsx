@@ -1,5 +1,5 @@
 import { useGameStore } from "../../store/gameStore";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { LieType, SimClub } from "../../types/game";
 import { useClubStore } from "../../store/clubStore";
 import { estimateEffectiveSuccessRate } from "../../utils/shotSimulation";
@@ -34,10 +34,20 @@ export function HoleView({ onBack, handleClubSelect }: Props) {
     confidenceBoost,
     shotPowerPercent,
     setShotPowerPercent,
+    selectClub,
+    takeShot,
   } = useGameStore();
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [showMobileScorecard, setShowMobileScorecard] = useState(false);
   const [selectedClub, setSelectedClub] = useState<SimClub | null>(null);
+
+  // ショット結果モーダルが閉じられたらクラブ選択をリセット
+  const showResultModal = useGameStore((state) => state.showResultModal);
+  useEffect(() => {
+    if (!showResultModal) {
+      setSelectedClub(null);
+    }
+  }, [showResultModal]);
   const personalData = useClubStore((state) => state.personalData);
   const playerSkillLevel = useClubStore((state) => state.playerSkillLevel);
 
@@ -308,7 +318,10 @@ export function HoleView({ onBack, handleClubSelect }: Props) {
               type="button"
               disabled={!selectedClub}
               onClick={() => {
-                if (selectedClub) handleClubSelect(selectedClub);
+                if (selectedClub) {
+                  selectClub(selectedClub.id);
+                  takeShot();
+                }
               }}
               className={["w-full rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
                 "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",

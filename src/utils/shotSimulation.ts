@@ -193,19 +193,27 @@ const QUALITY_LABELS: Record<ShotQuality, string> = {
 
 // ─── Putting ──────────────────────────────────────────────────────────────────
 
-function simulatePutt(remaining: number, confidenceBoost: number): {
+function simulatePutt(remaining: number, confidenceBoost: number, playerSkillLevel: number = 0.5): {
   made: boolean;
   newRemaining: number;
   message: string;
   effectiveSuccessRate: number;
 } {
-  let makeChance: number;
-  if      (remaining <=  3) makeChance = 0.92;
-  else if (remaining <=  8) makeChance = 0.70;
-  else if (remaining <= 15) makeChance = 0.45;
-  else if (remaining <= 25) makeChance = 0.28;
-  else                      makeChance = 0.08;
 
+  // 距離ごとの基礎成功率
+  let baseChance: number;
+  if      (remaining <=  3) baseChance = 0.96;
+  else if (remaining <=  5) baseChance = 0.77;
+  else if (remaining <=  8) baseChance = 0.50;
+  else if (remaining <= 10) baseChance = 0.40;
+  else if (remaining <= 15) baseChance = 0.23;
+  else if (remaining <= 20) baseChance = 0.15;
+  else if (remaining <= 30) baseChance = 0.07;
+  else                      baseChance = 0.03;
+
+  // スキルレベルを反映（最低50%保証）
+  let makeChance = baseChance * (0.5 + 0.5 * playerSkillLevel);
+  // 信頼度ブーストも加味
   makeChance = Math.min(0.98, makeChance + confidenceBoost / 100);
 
   if (Math.random() < makeChance) {
@@ -253,7 +261,7 @@ export function simulateShot(
 
   // ── Putter path ────────────────────────────────────────────────────────────
   if (club.type === "Putter") {
-    const putt = simulatePutt(remainingDistance, confidenceBoost);
+    const putt = simulatePutt(remainingDistance, confidenceBoost, playerSkillLevel);
     return {
       newRemainingDistance: putt.newRemaining,
       outcomeMessage: putt.message,
