@@ -9,7 +9,6 @@ import { CompactScorecard } from "./Scorecard";
 
 interface Props {
   onBack: () => void;
-  handleClubSelect: (club: SimClub) => void;
 }
 
 const LIE_LABEL: Record<LieType, string> = {
@@ -21,7 +20,7 @@ const LIE_LABEL: Record<LieType, string> = {
   penalty: "ペナルティ",
 };
 
-export function HoleView({ onBack, handleClubSelect }: Props) {
+export function HoleView({ onBack }: Props) {
   const {
     phase,
     course,
@@ -98,8 +97,8 @@ export function HoleView({ onBack, handleClubSelect }: Props) {
       if (lie === "green") {
         return scoredClubs.filter((club) => club.type === "Putter");
       }
-
-      return scoredClubs.slice(0, 5);
+      // グリーン以外の時はPutterを除外
+      return scoredClubs.filter((club) => club.type !== "Putter").slice(0, 5);
     },
     [bag, lie, remainingDistance],
   );
@@ -196,6 +195,7 @@ export function HoleView({ onBack, handleClubSelect }: Props) {
             ピンまで {remainingDistance}ヤード
           </h1>
           <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">ライ: {LIE_LABEL[lie]}</p>
+          <p className="mt-1 text-base text-emerald-700">{holeStrokes + 1}打目</p>
 
           {/* ショット方針の注意案内 */}
           <div className={["mt-8 w-full max-w-md mx-auto rounded-xl px-4 py-3 text-left",
@@ -266,7 +266,6 @@ export function HoleView({ onBack, handleClubSelect }: Props) {
               const todayRate = todayStats && todayStats.attempts > 0
                 ? Math.round((todayStats.successes / todayStats.attempts) * 100)
                 : null;
-              const distanceGap = Math.abs(club.avgDistance - remainingDistance);
 
               return (
                 <button
@@ -296,9 +295,6 @@ export function HoleView({ onBack, handleClubSelect }: Props) {
                     )}
                   </div>
                   <p className="mt-2 text-sm text-emerald-700">平均飛距離: {club.avgDistance}ヤード</p>
-                  <p className="mt-1 text-sm text-emerald-700">
-                    目標との差: {distanceGap}ヤード
-                  </p>
                   <p className={`mt-1 text-sm ${weakClub ? "text-amber-700" : "text-emerald-700"}`}>
                     有効成功率(通常): {effectiveRate}%
                   </p>
