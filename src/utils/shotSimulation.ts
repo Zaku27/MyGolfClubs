@@ -58,7 +58,6 @@ export function estimateShotDistance(
   if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance));
 
   const lieMultiplier = getLieDistanceMultiplier(context.lie, club.type);
-  const riskMultiplier = getRiskMultiplier(riskLevel);
   const windYards = getWindYards(context.wind, context.windStrength ?? 7);
   const weakDistancePenaltyBase = isWeakClub(club)
     ? (club.successRate < 60 ? 0.14 : 0.10)
@@ -66,7 +65,7 @@ export function estimateShotDistance(
   const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
 
   const expected =
-    club.avgDistance * lieMultiplier * riskMultiplier * weakDistanceMultiplier + windYards;
+    club.avgDistance * lieMultiplier * weakDistanceMultiplier + windYards;
 
   return Math.max(5, Math.round(expected));
 }
@@ -299,11 +298,10 @@ export function simulateShot(
 
   // ── Distance calculation ───────────────────────────────────────────────────
   const lieMultiplier  = getLieDistanceMultiplier(lie, club.type);
-  const riskMultiplier = getRiskMultiplier(riskLevel);
   const windYards      = getWindYards(wind, windStrength);
   const weakDistancePenaltyBase = weakClub ? (club.successRate < 60 ? 0.14 : 0.10) : 0;
   const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
-  const expected = club.avgDistance * lieMultiplier * riskMultiplier * weakDistanceMultiplier + windYards;
+  const expected = club.avgDistance * lieMultiplier * weakDistanceMultiplier + windYards;
 
   const varianceFactor = getVarianceFactor(club.successRate, riskLevel, weakClub);
   const varRoll        = Math.random() * 2 - 1; // −1 … +1
