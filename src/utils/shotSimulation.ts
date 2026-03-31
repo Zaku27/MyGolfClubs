@@ -262,7 +262,7 @@ export function simulateShot(
   club: SimClub,
   context: ShotContext,
   riskLevel: RiskLevel,
-  options: SimulationOptions = {},
+  options: SimulationOptions & { isPractice?: boolean } = {},
 ): ShotResult {
   const { remainingDistance, lie, wind, windStrength = 7, hazards = [] } = context;
   const confidenceBoost = options.confidenceBoost ?? 0;
@@ -302,7 +302,7 @@ export function simulateShot(
 
   let shotQuality: ShotQuality;
   if (isGoodShot) {
-    if      (roll < effectiveRate * 0.12) shotQuality = "excellent";
+    if      (roll < effectiveRate * 0.20) shotQuality = "excellent";
     else if (roll < effectiveRate * 0.55) shotQuality = "good";
     else                                  shotQuality = "average";
   } else {
@@ -320,10 +320,29 @@ export function simulateShot(
   const varRoll        = Math.random() * 2 - 1; // −1 … +1
 
   let actualDistance: number;
-  if      (shotQuality === "excellent") actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 0.3 + 0.04);
-  else if (isGoodShot)                 actualDistance = expected * (1 + varRoll * varianceFactor);
-  else if (shotQuality === "poor")     actualDistance = expected * (weakClub ? 0.48 + Math.random() * 0.18 : 0.60 + Math.random() * 0.22);
-  else /* mishit */                    actualDistance = expected * (weakClub ? 0.18 + Math.random() * 0.20 : 0.30 + Math.random() * 0.30);
+  if (shotQuality === "excellent") {
+    if (club.type === "Driver" || club.type === "Wood" || club.type === "Hybrid") {
+      // ドライバー・ウッド・ハイブリッドは従来通り上振れあり
+      actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 0.3 + 0.04);
+    } else {
+      // アイアン・ウェッジ・パターは理論値±2%の微小ブレのみ
+      const microVar = (Math.random() * 0.04) - 0.02; // -0.02〜+0.02
+      actualDistance = expected * (1 + microVar);
+    }
+  } else if (isGoodShot) {
+    actualDistance = expected * (1 + varRoll * varianceFactor);
+  } else if (shotQuality === "poor") {
+    actualDistance = expected * (weakClub ? 0.48 + Math.random() * 0.18 : 0.60 + Math.random() * 0.22);
+
+  } else { /* mishit */
+    // スキルレベルに応じて減少幅を線形に調整
+    // skillLevel: 0.0（初心者）→0.30〜0.80, 0.5（中級）→0.60〜0.80, 1.0（上級）→0.70〜0.80
+    const skill = typeof playerSkillLevel === "number" ? playerSkillLevel : 0.5;
+    const minRate = 0.30 + 0.40 * skill; // 0.30〜0.70
+    const maxRate = 0.80;
+    const mishitRate = minRate + Math.random() * (maxRate - minRate);
+    actualDistance = expected * mishitRate;
+  }
 
   actualDistance = Math.round(Math.max(5, actualDistance));
 
@@ -338,8 +357,20 @@ export function simulateShot(
 
   // ── New remaining ──────────────────────────────────────────────────────────
   let newRemaining: number;
-  if (penalty) {
-    // Stroke-and-distance: stay at the same spot
+
+  // 池ポチャ判定: hazardsに"water"が含まれていて、練習場でない場合のみ特別処理
+  const isPractice = options.isPractice === true;
+  const isWaterHazard = !isPractice && hazards.some(h => typeof h === "string" && h.toLowerCase().includes("water"));
+  if (penalty && isWaterHazard) {
+    // 池ポチャ: 距離は進めてワンペナ
+    if (actualDistance > remainingDistance + 15) {
+      newRemaining = actualDistance - remainingDistance;
+    } else {
+      newRemaining = Math.max(0, remainingDistance - actualDistance);
+    }
+    newRemaining = Math.round(newRemaining);
+  } else if (penalty) {
+    // OB等: その場に留まる
     newRemaining = remainingDistance;
   } else if (actualDistance > remainingDistance + 15) {
     // Overshoot: ended up past the pin

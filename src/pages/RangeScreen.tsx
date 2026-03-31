@@ -1,20 +1,32 @@
 import { useState } from 'react';
+
+// ショット品質の日本語ラベル関数（ファイル先頭に定義）
+function qualityLabel(q: string) {
+  switch (q) {
+    case "excellent": return "会心の一打！";
+    case "good": return "ナイスショット！";
+    case "average": return "まずまず";
+    case "poor": return "ミス気味...";
+    case "mishit": return "ミスショット";
+    default: return q;
+  }
+}
 import { useClubStore } from '../store/clubStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
 import { simulateShot } from '../utils/shotSimulation';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
 
 const LIE_OPTIONS = [
-  'Fairway',
-  'Rough',
-  'Light Rough',
-  'Bunker',
-  'Green',
+  'フェアウェイ',
+  'ラフ',
+  '薄いラフ',
+  'バンカー',
+  'グリーン',
 ];
 const WIND_DIRECTIONS = [
-  { label: 'Tailwind', value: 'tail' },
-  { label: 'Headwind', value: 'head' },
-  { label: 'Crosswind', value: 'cross' },
+  { label: 'フォロー', value: 'tail' },
+  { label: 'アゲインスト', value: 'head' },
+  { label: '横風', value: 'cross' },
 ];
 const SHOT_COUNTS = [5, 10, 20];
 
@@ -77,11 +89,11 @@ export default function RangeScreen() {
       // lieをLieTypeに変換
       let lieType: import('../types/game').LieType = 'fairway';
       switch (lie) {
-        case 'Fairway': lieType = 'fairway'; break;
-        case 'Rough':
-        case 'Light Rough': lieType = 'rough'; break;
-        case 'Bunker': lieType = 'bunker'; break;
-        case 'Green': lieType = 'green'; break;
+        case 'フェアウェイ': lieType = 'fairway'; break;
+        case 'ラフ':
+        case '薄いラフ': lieType = 'rough'; break;
+        case 'バンカー': lieType = 'bunker'; break;
+        case 'グリーン': lieType = 'green'; break;
         default: lieType = 'fairway';
       }
       const context = {
@@ -132,18 +144,18 @@ export default function RangeScreen() {
     <div className="min-h-screen bg-green-50 flex flex-col items-center py-4 px-2">
       {/* Header */}
       <div className="w-full max-w-xl flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-green-900">Practice Range</h1>
+        <h1 className="text-2xl font-bold text-green-900">練習場</h1>
         <button
           className="bg-green-200 hover:bg-green-300 text-green-900 rounded px-4 py-2 font-semibold shadow"
           onClick={() => window.history.back()}
         >
-          Back to Menu
+          メニューに戻る
         </button>
       </div>
 
       {/* ...existing code... */}
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
-        <label className="block font-semibold mb-2">Select Club</label>
+        <label className="block font-semibold mb-2">クラブ選択</label>
         <div className="mb-2 text-xs text-gray-500">クラブ本数: {clubs.length}</div>
         {clubs.length === 0 ? (
           <div className="text-red-600 font-bold py-2">クラブが登録されていません。<br/>クラブ管理画面でクラブを追加してください。</div>
@@ -154,7 +166,7 @@ export default function RangeScreen() {
               value={selectedClubId}
               onChange={(e) => setSelectedClubId(e.target.value)}
             >
-              <option value="">-- Choose a club --</option>
+              <option value="">-- クラブを選択 --</option>
               {clubs.map((club) => (
                 <option key={club.id} value={club.id}>
                   {club.name} ({club.number})
@@ -164,7 +176,7 @@ export default function RangeScreen() {
             {selectedClub && (
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
                 <span className="font-bold">{selectedClub.name}</span>
-                <span>Avg: {simClub?.avgDistance ?? '-'} yd</span>
+                <span>平均: {simClub?.avgDistance ?? '-'} ヤード</span>
                 <span>
                   有効成功率: {clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--'}%
                 </span>
@@ -177,7 +189,7 @@ export default function RangeScreen() {
       {/* Conditions Panel */}
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4 flex flex-col gap-3">
         <div>
-          <label className="block font-semibold mb-1">Lie</label>
+          <label className="block font-semibold mb-1">ライ</label>
           <select
             className="w-full border rounded p-2"
             value={lie}
@@ -189,7 +201,7 @@ export default function RangeScreen() {
           </select>
         </div>
         <div className="flex gap-2 items-center">
-          <label className="font-semibold">Wind</label>
+          <label className="font-semibold">風</label>
           <input
             type="range"
             min={0}
@@ -210,7 +222,7 @@ export default function RangeScreen() {
           </select>
         </div>
         <div>
-          <label className="block font-semibold mb-1">Number of Shots</label>
+          <label className="block font-semibold mb-1">試行回数</label>
           <div className="flex gap-2">
             {SHOT_COUNTS.map((n) => (
               <button
@@ -231,7 +243,7 @@ export default function RangeScreen() {
         disabled={!selectedClub || isSimulating}
         onClick={handleSimulate}
       >
-        {isSimulating ? 'Simulating...' : `Hit ${numShots} Shots`}
+        {isSimulating ? 'シミュレーション中...' : `ショット実行（${numShots}回）`}
       </button>
 
       {/* Results Section */}
@@ -249,8 +261,8 @@ export default function RangeScreen() {
                 <tr className="bg-green-100">
                   <th className="px-2 py-1">#</th>
                   <th className="px-2 py-1">飛距離</th>
+                  <th className="px-2 py-1">品質</th>
                   <th className="px-2 py-1">結果</th>
-                  <th className="px-2 py-1">備考</th>
                 </tr>
               </thead>
               <tbody>
@@ -258,8 +270,8 @@ export default function RangeScreen() {
                   <tr key={i} className="border-b last:border-0">
                     <td className="px-2 py-1 text-center">{i + 1}</td>
                     <td className="px-2 py-1 text-center">{r.distanceHit.toFixed(1)}</td>
+                    <td className="px-2 py-1 text-center">{qualityLabel(r.shotQuality)}</td>
                     <td className={`px-2 py-1 text-center font-bold ${outcomeColor(r.outcome)}`}>{r.outcome}</td>
-                    <td className="px-2 py-1">{r.note || ''}</td>
                   </tr>
                 ))}
               </tbody>
