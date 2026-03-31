@@ -9,6 +9,19 @@ import type {
 } from "../types/game";
 import type { ClubPersonalData } from "../types/golf";
 import { calculateEffectiveSuccessRate } from "./calculateSuccessRate";
+import { ClubService } from "../db/clubService";
+/**
+ * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
+ * @returns Promise<number> 0.0〜1.0（なければ0.5）
+ */
+export async function fetchPlayerSkillLevelFromPersonalData(): Promise<number> {
+  try {
+    const level = await ClubService.getPlayerSkillLevel();
+    return typeof level === "number" ? level : 0.5;
+  } catch {
+    return 0.5;
+  }
+}
 
 interface SimulationOptions {
   confidenceBoost?: number;

@@ -1,7 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+// ShotQualityのラベルを返す関数
+function shotQualityLabel(q: any) {
+  switch (q) {
+    case 'excellent': return '会心';
+    case 'good': return 'ナイス';
+    case 'average': return '普通';
+    case 'poor': return 'ミス気味';
+    case 'mishit': return 'ミス';
+    default: return '-';
+  }
+}
 import { useClubStore } from '../store/clubStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
-import { simulateShot } from '../utils/shotSimulation';
+import { simulateShot, fetchPlayerSkillLevelFromPersonalData } from '../utils/shotSimulation';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
 
 const LIE_OPTIONS = [
@@ -28,6 +40,7 @@ const outcomeColor = (outcome: string) => {
 export default function RangeScreen() {
   const { clubs, personalData } = useClubStore();
   // const { playerSkillLevel } = useGameStore();
+  const [playerSkillLevel, setPlayerSkillLevel] = useState<number>(0.5);
   const [selectedClubId, setSelectedClubId] = useState<string>('');
   const [lie, setLie] = useState<string>('Fairway');
   const [windSpeed, setWindSpeed] = useState<number>(0);
@@ -56,8 +69,10 @@ export default function RangeScreen() {
   };
   const simClub = toSimClub(selectedClub);
   const clubPersonal = simClub && simClub.id !== undefined ? personalData[simClub.id] : null;
-  // スキルレベルを個人データから取得（なければ0.5）
-  const playerSkillLevel = 0.5;
+  // 初回ロード時に個人データからスキルレベルを取得
+  useEffect(() => {
+    fetchPlayerSkillLevelFromPersonalData().then(setPlayerSkillLevel);
+  }, []);
   const effectiveSuccess = simClub && clubPersonal
     ? calculateEffectiveSuccessRate({ ...simClub, id: Number(simClub.id) }, clubPersonal, playerSkillLevel)
     : null;
@@ -66,8 +81,7 @@ export default function RangeScreen() {
     if (!simClub) return;
     setIsSimulating(true);
     const shotResults = [];
-    // デバッグ用: 各ショットの途中計算値を格納
-    const debugShots = [];
+    //
     for (let i = 0; i < numShots; i++) {
       const club = simClub;
       // lieをLieTypeに変換
@@ -91,19 +105,11 @@ export default function RangeScreen() {
       const riskLevel = "normal";
       const options = { personalData: clubPersonal ?? undefined, playerSkillLevel };
       const shotResult = simulateShot(club, context, riskLevel, options);
-      debugShots.push({
-        i,
-        actualDistance: shotResult.distanceHit,
-        shotQuality: shotResult.shotQuality,
-        effectiveRate: shotResult.effectiveSuccessRate,
-        isGoodShot: shotResult.wasSuccessful,
-        penalty: shotResult.penalty,
-      });
+
       shotResults.push(shotResult);
     }
     setResults(shotResults);
-    // デバッグ用: 計算途中値をstateに保存
-    setDebugShots(debugShots);
+    //
     // Summary
     const distances = shotResults.map((r) => r.distanceHit);
     const avg = distances.reduce((a, b) => a + b, 0) / distances.length;
@@ -122,63 +128,24 @@ export default function RangeScreen() {
     setCalibrated(true);
   };
 
-  // デバッグ用: 計算途中値state
-  const [debugShots, setDebugShots] = useState<any[]>([]);
+
 
   return (
     <div className="min-h-screen bg-green-50 flex flex-col items-center py-4 px-2">
       {/* Header */}
       <div className="w-full max-w-xl flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-green-900">Practice Range</h1>
+        <h1 className="text-2xl font-bold text-green-900">練習場</h1>
         <button
           className="bg-green-200 hover:bg-green-300 text-green-900 rounded px-4 py-2 font-semibold shadow"
           onClick={() => window.history.back()}
         >
-          Back to Menu
+          メニューに戻る
         </button>
       </div>
 
-      {/* Debug Parameters */}
-      {debugShots.length > 0 && (
-        <div className="w-full max-w-xl bg-yellow-100 border border-yellow-400 rounded shadow p-2 mb-4 text-xs text-yellow-900">
-          <div className="font-bold mb-1">[DEBUG] 飛距離計算 途中値</div>
-          <table className="text-[10px]">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>actual</th>
-                <th>shotQ</th>
-                <th>effRate</th>
-                <th>isGood</th>
-                <th>penalty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {debugShots.map((d) => (
-                <tr key={d.i}>
-                  <td>{d.i+1}</td>
-                  <td>{d.actualDistance}</td>
-                  <td>{d.shotQuality}</td>
-                  <td>{d.effectiveRate}</td>
-                  <td>{d.isGoodShot ? '○' : ''}</td>
-                  <td>{d.penalty ? 'P' : ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="w-full max-w-xl bg-yellow-50 border border-yellow-300 rounded shadow p-2 mb-4 text-xs text-yellow-900">
-        <div className="font-bold mb-1">[DEBUG] 飛距離計算パラメータ</div>
-        <div>lie: {String(lie)}</div>
-        <div>windDir: {String(windDir)}</div>
-        <div>windSpeed: {String(windSpeed)}</div>
-        <div>playerSkillLevel: {String(playerSkillLevel)}</div>
-        <div>selectedClub: {selectedClub ? JSON.stringify(selectedClub) : 'null'}</div>
-        <div>clubPersonal: {clubPersonal ? JSON.stringify(clubPersonal) : 'null'}</div>
-      </div>
+
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
-        <label className="block font-semibold mb-2">Select Club</label>
+        <label className="block font-semibold mb-2">クラブ選択</label>
         <div className="mb-2 text-xs text-gray-500">クラブ本数: {clubs.length}</div>
         {clubs.length === 0 ? (
           <div className="text-red-600 font-bold py-2">クラブが登録されていません。<br/>クラブ管理画面でクラブを追加してください。</div>
@@ -189,7 +156,7 @@ export default function RangeScreen() {
               value={selectedClubId}
               onChange={(e) => setSelectedClubId(e.target.value)}
             >
-              <option value="">-- Choose a club --</option>
+              <option value="">-- クラブを選択 --</option>
               {clubs.map((club) => (
                 <option key={club.id} value={club.id}>
                   {club.name} ({club.number})
@@ -199,8 +166,8 @@ export default function RangeScreen() {
             {selectedClub && (
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
                 <span className="font-bold">{selectedClub.name}</span>
-                <span>Avg: {simClub?.avgDistance ?? '-'} yd</span>
-                <span>Success: {effectiveSuccess ? (effectiveSuccess * 100).toFixed(1) : '--'}%</span>
+                <span>平均: {simClub?.avgDistance ?? '-'} yd</span>
+                <span>成功率: {effectiveSuccess ? (effectiveSuccess * 100).toFixed(1) : '--'}%</span>
               </div>
             )}
           </>
@@ -210,19 +177,19 @@ export default function RangeScreen() {
       {/* Conditions Panel */}
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4 flex flex-col gap-3">
         <div>
-          <label className="block font-semibold mb-1">Lie</label>
+          <label className="block font-semibold mb-1">ライ</label>
           <select
             className="w-full border rounded p-2"
             value={lie}
             onChange={(e) => setLie(e.target.value)}
           >
             {LIE_OPTIONS.map((l) => (
-              <option key={l} value={l}>{l}</option>
+              <option key={l} value={l}>{l === 'Fairway' ? 'フェアウェイ' : l === 'Rough' ? 'ラフ' : l === 'Light Rough' ? 'セミラフ' : l === 'Bunker' ? 'バンカー' : l === 'Green' ? 'グリーン' : l}</option>
             ))}
           </select>
         </div>
         <div className="flex gap-2 items-center">
-          <label className="font-semibold">Wind</label>
+          <label className="font-semibold">風</label>
           <input
             type="range"
             min={0}
@@ -238,12 +205,12 @@ export default function RangeScreen() {
             onChange={(e) => setWindDir(e.target.value)}
           >
             {WIND_DIRECTIONS.map((d) => (
-              <option key={d.value} value={d.value}>{d.label}</option>
+              <option key={d.value} value={d.value}>{d.label === 'Tailwind' ? '追い風' : d.label === 'Headwind' ? '向かい風' : d.label === 'Crosswind' ? '横風' : d.label}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block font-semibold mb-1">Number of Shots</label>
+          <label className="block font-semibold mb-1">ショット回数</label>
           <div className="flex gap-2">
             {SHOT_COUNTS.map((n) => (
               <button
@@ -264,26 +231,26 @@ export default function RangeScreen() {
         disabled={!selectedClub || isSimulating}
         onClick={handleSimulate}
       >
-        {isSimulating ? 'Simulating...' : `Hit ${numShots} Shots`}
+        {isSimulating ? 'シミュレーション中...' : `${numShots}回打つ`}
       </button>
 
       {/* Results Section */}
       {results.length > 0 && (
         <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
           <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="font-bold text-green-900">Session Summary:</span>
-            <span>Avg: {summary.avg.toFixed(1)} yd</span>
-            <span>Success: {(summary.success * 100).toFixed(1)}%</span>
-            <span>Dispersion: {summary.std.toFixed(1)} yd</span>
+            <span className="font-bold text-green-900">セッション結果:</span>
+            <span>平均: {summary.avg.toFixed(1)} yd</span>
+            <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
+            <span>ばらつき: {summary.std.toFixed(1)} yd</span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="bg-green-100">
                   <th className="px-2 py-1">#</th>
-                  <th className="px-2 py-1">Distance</th>
-                  <th className="px-2 py-1">Outcome</th>
-                  <th className="px-2 py-1">Note</th>
+                  <th className="px-2 py-1">飛距離</th>
+                  <th className="px-2 py-1">結果 (ShotQ)</th>
+                  <th className="px-2 py-1">メモ</th>
                 </tr>
               </thead>
               <tbody>
@@ -291,9 +258,16 @@ export default function RangeScreen() {
                   <tr key={i} className="border-b last:border-0">
                     <td className="px-2 py-1 text-center">{i + 1}</td>
                     <td className="px-2 py-1 text-center">{r.distanceHit.toFixed(1)}</td>
-                    <td className={`px-2 py-1 text-center font-bold ${outcomeColor(r.outcome)}`}>{r.outcome}</td>
+                    <td className={`px-2 py-1 text-center font-bold ${outcomeColor(r.outcome)}`}>{r.outcome} <span className="font-normal text-xs">{
+                      typeof r.shotQuality === 'number'
+                        ? `(${r.shotQuality.toFixed(2)})`
+                        : r.shotQuality
+                          ? `(${shotQualityLabel(r.shotQuality)})`
+                          : ''
+                    }</span></td>
                     <td className="px-2 py-1">{r.note || ''}</td>
                   </tr>
+
                 ))}
               </tbody>
             </table>
@@ -309,11 +283,11 @@ export default function RangeScreen() {
             disabled={calibrated}
             onClick={handleCalibrate}
           >
-            Update my personal data with this session
+            このセッションでパーソナルデータを更新
           </button>
           {calibrated && (
             <span className="mt-2 text-green-800 font-semibold text-sm text-center">
-              Personal data updated. Your {selectedClub?.name} miss rate is now more realistic.
+              パーソナルデータを更新しました。{selectedClub?.name}のミス率がより現実的になりました。
             </span>
           )}
         </div>
