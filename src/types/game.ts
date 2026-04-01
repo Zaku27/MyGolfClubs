@@ -7,6 +7,7 @@ export interface SimClub {
   name: string;        // e.g. "Ping G430"
   type: ClubType;
   number: string;      // "1", "3W", "7", "PW", etc.
+  loftAngle?: number;
   avgDistance: number; // yards (carry)
   successRate: number; // 0–100
   isWeakClub?: boolean;

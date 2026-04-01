@@ -28,6 +28,8 @@ interface SimulationOptions {
   confidenceBoost?: number;
   personalData?: ClubPersonalData;
   playerSkillLevel?: number;
+  headSpeed?: number;
+  useTheoretical?: boolean;
 }
 
 const WEAK_CLUB_EFFECT_SCALE = 0.5;
@@ -73,7 +75,8 @@ function simClubToGolfClub(club: SimClub): import("../types/golf").GolfClub {
     weight: 0,
     swingWeight: '',
     lieAngle: 0,
-    loftAngle: 0,
+    // SimClub 側のロフト角を理論飛距離計算へ引き継ぐ
+    loftAngle: club.loftAngle ?? 0,
     shaftType: '',
     torque: 0,
     flex: 'S',
@@ -93,7 +96,7 @@ function simClubToGolfClub(club: SimClub): import("../types/golf").GolfClub {
 export function estimateShotDistance(
   club: SimClub,
   context: Pick<ShotContext, "lie" | "wind" | "windStrength">,
-  riskLevel: RiskLevel,
+  _riskLevel: RiskLevel,
   options?: {
     personalData?: ClubPersonalData;
     headSpeed?: number;
@@ -111,15 +114,20 @@ export function estimateShotDistance(
 
   // --- ヘッドスピード・理論値を加味したベース飛距離 ---
   let baseDistance = club.avgDistance;
+  const headSpeed = options?.headSpeed;
   // ロボット（successRate=100, personalData未指定, useTheoretical=true, headSpeed指定）なら理論値のみ
-  const isRobot = club.successRate === 100 && !options?.personalData && options?.useTheoretical && options?.headSpeed;
+  const isRobot =
+    club.successRate === 100 &&
+    !options?.personalData &&
+    options?.useTheoretical &&
+    typeof headSpeed === "number";
   if (isRobot) {
     const golfClub = simClubToGolfClub(club);
-    baseDistance = getEstimatedDistance(golfClub, options.headSpeed);
-  } else if (options?.useTheoretical && options?.headSpeed) {
+    baseDistance = getEstimatedDistance(golfClub, headSpeed);
+  } else if (options?.useTheoretical && typeof headSpeed === "number") {
     // 実測値と理論値の中間値を取る（重みは要調整）
     const golfClub = simClubToGolfClub(club);
-    const theoretical = getEstimatedDistance(golfClub, options.headSpeed);
+    const theoretical = getEstimatedDistance(golfClub, headSpeed);
     baseDistance = (baseDistance * 0.7 + theoretical * 0.3);
   }
 
@@ -147,7 +155,7 @@ export function estimateShotDistanceRange(
 
   const weakClub = isWeakClub(club);
   const varianceFactor = getVarianceFactor(club.successRate, riskLevel, weakClub);
-  const spreadMultiplier = riskLevel === "safe" ? 0.75 : riskLevel === "aggressive" ? 1.25 : 1.0;
+  const spreadMultiplier = 1.0;
   let spreadRatio = Math.min(0.3, Math.max(0.08, varianceFactor * 1.8 * spreadMultiplier));
 
   // excellent時のドライバー上振れをsimulateShotと同じく強化

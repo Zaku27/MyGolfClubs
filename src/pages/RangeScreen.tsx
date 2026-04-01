@@ -294,7 +294,7 @@ export default function RangeScreen() {
                         ? (() => {
                             // ロボット用: successRate=100, personalDataなし, スキルレベルはrobotSkillLevel
                             const robotEffective = calculateEffectiveSuccessRate(
-                              { ...simClub, successRate: 100 },
+                              simClub as any,
                               undefined,
                               robotSkillLevel
                             );
