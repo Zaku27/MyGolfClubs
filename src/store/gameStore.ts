@@ -187,7 +187,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   takeShot: () => {
     const {
       selectedClubId,
-      shotPowerPercent,
       bag,
       shotContext,
       riskLevel,
@@ -209,7 +208,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const personalData = useClubStore.getState().personalData;
     const result = simulateShot(club, shotContext, riskLevel, {
       confidenceBoost,
-      shotPowerPercent,
       personalData: resolvePersonalDataForSimClub(club, personalData),
       playerSkillLevel: useClubStore.getState().playerSkillLevel,
     });

@@ -47,9 +47,9 @@ export function RiskSelectionSheet({ club, onClose, onSelectRisk }: Props) {
     ? Math.round((clubSuccessesToday / clubShotsToday.length) * 100)
     : null;
   const distancePreview = {
-    safe: estimateShotDistanceRange(club, shotContext, "safe"),
-    normal: estimateShotDistanceRange(club, shotContext, "normal"),
-    aggressive: estimateShotDistanceRange(club, shotContext, "aggressive"),
+    safe: estimateShotDistanceRange(club, shotContext),
+    normal: estimateShotDistanceRange(club, shotContext),
+    aggressive: estimateShotDistanceRange(club, shotContext),
   };
   const effectiveRatePreview = {
     safe: estimateEffectiveSuccessRate(club, shotContext, "safe", {

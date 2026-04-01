@@ -5,7 +5,7 @@ import type { GolfClub, ClubPersonalData } from '../types/golf';
  * Moves values slightly toward observed outcomes.
  */
 export function rangeAutoCalibrate(
-  club: GolfClub,
+  _club: GolfClub,
   personal: ClubPersonalData,
   results: Array<{ outcome: string; distance: number }>
 ): ClubPersonalData {

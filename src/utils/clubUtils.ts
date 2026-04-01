@@ -78,7 +78,7 @@ export const getAnalysisClubKey = (
  * 例: missRate=0.2, weakness=0.9, skill=0.7 → 1 - (0.2 * 0.9 * (1-skill))
  */
 export function calculateEffectiveSuccessRate(
-  club: GolfClub,
+  _club: GolfClub,
   personal: { missRate?: number; weaknessFactor?: number } = {},
   playerSkillLevel: number = 0.5
 ): number {

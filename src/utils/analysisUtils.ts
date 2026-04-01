@@ -1,20 +1,42 @@
 import type { GolfClub } from '../types/golf';
 import {
   lieStatusFromDeviation,
-  resolveStandardLieAngle,
-  type UserLieAngleStandards,
 } from '../types/lieStandards';
-import { sortClubsForDisplay } from './clubSort';
 import { getAnalysisClubKey, getClubTypeDisplay } from './clubUtils';
+import {
+  CATEGORY_VISUAL_CONFIG,
+  CLUB_TYPE_CATEGORY_MAP,
+  DISTANCE_MODELS,
+  SWING_STATUS_COLOR_MAP,
+  WEIGHT_NORMAL_BAND_TOLERANCE,
+  type ClubCategory,
+  type SwingStatus,
+} from './analysisConstants';
+import {
+  classifySwingDeviation,
+  classifyWeightDeviation,
+} from './analysisRules';
+import {
+  normalizeSwingWeightText,
+  numericToSwingWeightLabel,
+  parseSwingWeightInput,
+  swingWeightToNumeric,
+} from './swingWeight';
+import {
+  clamp,
+  createLieChartMappers,
+  createLoftChartMappers,
+  createSwingChartMappers,
+  createWeightChartMappers,
+  getTooltipPosition,
+} from './analysisGeometry';
 
-export type ClubCategory = 'driver' | 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
+export type { ClubCategory, SwingStatus };
 
 export type WeightRegression = {
   slope: number;
   intercept: number;
 };
-
-type ClubVisibilityPredicate = (club: GolfClub) => boolean;
 
 export type LoftDistancePoint = GolfClub & {
   estimatedDistance: number;
@@ -42,7 +64,7 @@ export type SwingWeightPoint = GolfClub & {
   category: ClubCategory;
   swingWeightNumeric: number;
   swingDeviation: number;
-  swingStatus: '良好' | 'やや重い' | 'やや軽い' | '調整推奨';
+  swingStatus: SwingStatus;
 };
 
 export type LieAnglePoint = GolfClub & {
@@ -52,54 +74,35 @@ export type LieAnglePoint = GolfClub & {
   lieStatus: ReturnType<typeof lieStatusFromDeviation>;
 };
 
-type ChartSize = {
-  width: number;
-  height: number;
+export {
+  clamp,
+  createLieChartMappers,
+  createLoftChartMappers,
+  createSwingChartMappers,
+  createWeightChartMappers,
+  getTooltipPosition,
+  normalizeSwingWeightText,
+  numericToSwingWeightLabel,
+  parseSwingWeightInput,
+  swingWeightToNumeric,
 };
 
-type ChartPadding = {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
+const inferCategoryFromClubTypeCode = (normalizedClubType: string): ClubCategory => {
+  if (normalizedClubType.endsWith('W')) return 'wood';
+  if (normalizedClubType.endsWith('H')) return 'hybrid';
+  if (normalizedClubType.endsWith('I')) return 'iron';
+  return 'wedge';
 };
-
-const WEIGHT_NORMAL_BAND_TOLERANCE = 12;
-const WEIGHT_HEAVY_OUTLIER_THRESHOLD = 15;
-const WEIGHT_LIGHT_OUTLIER_THRESHOLD = 15;
 
 export const getLieBarColor = (category: ClubCategory): string => {
-  switch (category) {
-    case 'driver':
-      return '#1976d2';
-    case 'wood':
-      return '#0d47a1';
-    case 'hybrid':
-      return '#26c6da';
-    case 'iron':
-      return '#2e7d32';
-    case 'wedge':
-      return '#9acd32';
-    case 'putter':
-      return '#424242';
-  }
+  return CATEGORY_VISUAL_CONFIG[category].lieBarColor;
 };
 
 export const getClubCategoryByType = (clubType: string): ClubCategory => {
-  if (clubType === 'Driver' || clubType === 'Putter') {
-    return clubType.toLowerCase() as ClubCategory;
-  }
-  if (clubType === 'Wood') return 'wood';
-  if (clubType === 'Hybrid') return 'hybrid';
-  if (clubType === 'Iron') return 'iron';
-  if (clubType === 'Wedge') return 'wedge';
-
-  if (clubType === 'P') return 'putter';
-  if (clubType === 'PW') return 'iron';
-  if (clubType.endsWith('W') || clubType === 'D') return 'wood';
-  if (clubType.endsWith('H')) return 'hybrid';
-  if (clubType.endsWith('I')) return 'iron';
-  return 'wedge';
+  const normalizedClubType = (clubType ?? '').trim().toUpperCase();
+  const mappedCategory = CLUB_TYPE_CATEGORY_MAP[normalizedClubType];
+  if (mappedCategory) return mappedCategory;
+  return inferCategoryFromClubTypeCode(normalizedClubType);
 };
 
 export const getClubCategory = (club: GolfClub): ClubCategory =>
@@ -110,91 +113,23 @@ export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   const loftAngle = club.loftAngle ?? 0;
   const category = getClubCategoryByType(club.clubType ?? '');
 
-  let base = 0;
-  let speedCoeff = 1.0;
-  let loftCoeff = 1.0;
-  let min = 0, max = 400;
-
-  switch (category) {
-    case 'driver':
-      base = 255;
-      speedCoeff = 4.8;
-      loftCoeff = -4.25;
-      min = 170; max = 350;
-      break;
-    case 'wood':
-      base = 235;
-      speedCoeff = 4.3;
-      loftCoeff = -4.25;
-      min = 130; max = 290;
-      break;
-    case 'hybrid':
-      base = 195;
-      speedCoeff = 3.8;
-      loftCoeff = -3.25;
-      min = 110; max = 250;
-      break;
-    case 'iron':
-      // 実測値: 27°=170, 34°=155, 38°=145, 42°=133 (HS44.5)
-      base = 165; // 27°基準
-      speedCoeff = 3.0;
-      loftCoeff = -2.75; // 1°増えるごとに約-2.75y
-      min = 70; max = 220;
-      break;
-    case 'wedge':
-      // 実測値: 46°=122, 50°=105, 54°=95, 58°=80 (HS44.5)
-      base = 115; // 46°基準
-      speedCoeff = 2.1;
-      loftCoeff = -2.75; // 1°増えるごとに約-2.75y
-      min = 40; max = 150;
-      break;
-    case 'putter':
-      base = 10;
-      speedCoeff = 0.0;
-      loftCoeff = 0.0;
-      min = 1; max = 20;
-      break;
-  }
+  const model = DISTANCE_MODELS[category];
 
   // 標準式: base + (headSpeed - 44.5) * speedCoeff + (loftAngle - 標準値) * loftCoeff
-  const standardLoft = category === 'driver' ? 10.5 : category === 'wood' ? 15 : category === 'hybrid' ? 22 : category === 'iron' ? 30 : category === 'wedge' ? 46 : 0;
-  let estimated = base + (headSpeed - 44.5) * speedCoeff + (loftAngle - standardLoft) * loftCoeff;
-  estimated = Math.max(min, Math.min(max, estimated));
+  let estimated =
+    model.base +
+    (headSpeed - 44.5) * model.speedCoeff +
+    (loftAngle - model.standardLoft) * model.loftCoeff;
+  estimated = Math.max(model.min, Math.min(model.max, estimated));
   return Math.round(estimated);
 };
 
 export const getCategoryColor = (category: ClubCategory) => {
-  switch (category) {
-    case 'driver':
-      return '#1976d2';
-    case 'wood':
-      return '#0d47a1';
-    case 'hybrid':
-      return '#00acc1';
-    case 'iron':
-      return '#0b8f5b';
-    case 'wedge':
-      return '#9acd32';
-    case 'putter':
-      return '#616161';
-  }
+  return CATEGORY_VISUAL_CONFIG[category].color;
 };
 
 export const getCategoryLabel = (category: ClubCategory) => {
-  switch (category) {
-    case 'driver':
-      return 'ドライバー';
-    case 'wood':
-      return 'ウッド';
-    case 'hybrid':
-      return 'ハイブリッド';
-    case 'iron':
-      return 'アイアン';
-    case 'wedge':
-      return 'ウェッジ';
-    case 'putter':
-      return 'パター';
-  }
+  return CATEGORY_VISUAL_CONFIG[category].label;
 };
 
 export const getWeightLengthDotRadius = (club: Pick<GolfClub, 'clubType'>) => {
@@ -263,22 +198,19 @@ export const formatSignedGrams = (value: number) =>
   `${value > 0 ? '+' : ''}${value.toFixed(1)} g`;
 
 export const getWeightTrendMessage = (deviation: number) => {
-  if (deviation > WEIGHT_HEAVY_OUTLIER_THRESHOLD) {
-    return 'バランス確認推奨';
-  }
-  if (deviation < -WEIGHT_LIGHT_OUTLIER_THRESHOLD) {
-    return '軽量側の確認推奨';
-  }
-  if (Math.abs(deviation) <= WEIGHT_NORMAL_BAND_TOLERANCE) {
-    return 'トレンド内';
-  }
+  const deviationClass = classifyWeightDeviation(deviation);
+  if (deviationClass === 'heavyOutlier') return 'バランス確認推奨';
+  if (deviationClass === 'lightOutlier') return '軽量側の確認推奨';
+  if (deviationClass === 'inBand') return 'トレンド内';
   return 'ややトレンド外';
 };
 
 export const getWeightDeviationLabel = (deviation: number) => {
-  if (Math.abs(deviation) <= WEIGHT_NORMAL_BAND_TOLERANCE) {
+  const deviationClass = classifyWeightDeviation(deviation);
+  if (deviationClass === 'inBand') {
     return `${formatSignedGrams(deviation)} / トレンド内`;
   }
+
   return deviation > 0
     ? `${formatSignedGrams(deviation)} トレンドより重い`
     : `${formatSignedGrams(deviation)} トレンドより軽い`;
@@ -288,7 +220,9 @@ export const getWeightPointStyle = (
   club: Pick<GolfClub, 'clubType'> & { category: ClubCategory },
   deviation: number,
 ) => {
-  if (deviation > WEIGHT_HEAVY_OUTLIER_THRESHOLD) {
+  const deviationClass = classifyWeightDeviation(deviation);
+
+  if (deviationClass === 'heavyOutlier') {
     return {
       fill: '#e53935',
       stroke: '#000000',
@@ -297,7 +231,7 @@ export const getWeightPointStyle = (
     };
   }
 
-  if (deviation < -WEIGHT_LIGHT_OUTLIER_THRESHOLD) {
+  if (deviationClass === 'lightOutlier') {
     return {
       fill: '#ec407a',
       stroke: '#ad1457',
@@ -362,73 +296,23 @@ export const makeTickValues = (min: number, max: number, interval: number) => {
   return ticks;
 };
 
-export const normalizeSwingWeightText = (value: string): string => {
-  return (value ?? '')
-    .trim()
-    .replace(/[Ａ-Ｚａ-ｚ０-９．]/g, (char) =>
-      String.fromCharCode(char.charCodeAt(0) - 0xfee0),
-    )
-    .toUpperCase()
-    .replace(/\s+/g, '');
-};
-
-export const swingWeightToNumeric = (swingWeightRaw: string): number => {
-  const normalized = normalizeSwingWeightText(swingWeightRaw);
-  const fullMatch = normalized.match(/^([A-F])([0-9](?:\.[0-9])?)$/);
-  const legacyMatch = normalized.match(/^([0-9](?:\.[0-9])?)$/);
-  if (!fullMatch && !legacyMatch) return 0;
-
-  const letter = fullMatch ? fullMatch[1] : 'D';
-  const letterIndex = letter.charCodeAt(0) - 'D'.charCodeAt(0);
-  const point = Number(fullMatch ? fullMatch[2] : legacyMatch?.[1]);
-  if (!Number.isFinite(point) || point < 0 || point > 9.9) return 0;
-
-  return letterIndex * 10 + point;
-};
-
-export const numericToSwingWeightLabel = (value: number): string => {
-  const rounded = Math.round(value * 10) / 10;
-  const letterIndex = Math.floor(rounded / 10);
-  const point = rounded - letterIndex * 10;
-  const letterCode = 'D'.charCodeAt(0) + letterIndex;
-
-  if (letterCode < 'A'.charCodeAt(0) || letterCode > 'Z'.charCodeAt(0)) {
-    return rounded.toFixed(1);
-  }
-
-  const pointLabel = Number.isInteger(point) ? point.toFixed(0) : point.toFixed(1);
-  return `${String.fromCharCode(letterCode)}${pointLabel}`;
-};
-
-export const parseSwingWeightInput = (value: string): number | null => {
-  const normalized = normalizeSwingWeightText(value);
-  if (!normalized) return null;
-
-  const fullMatch = normalized.match(/^([A-F])([0-9](?:\.[0-9])?)$/);
-  const legacyMatch = normalized.match(/^([0-9](?:\.[0-9])?)$/);
-  if (!fullMatch && !legacyMatch) return null;
-
-  return swingWeightToNumeric(normalized);
-};
-
 export const getSwingStatus = (
   deviation: number,
   goodTolerance: number,
   adjustThreshold: number,
-): '良好' | 'やや重い' | 'やや軽い' | '調整推奨' => {
-  const abs = Math.abs(deviation);
-  if (abs <= goodTolerance) return '良好';
-  if (abs > adjustThreshold) return '調整推奨';
-  return deviation > 0 ? 'やや重い' : 'やや軽い';
+): SwingStatus => {
+  const deviationClass = classifySwingDeviation(
+    deviation,
+    goodTolerance,
+    adjustThreshold,
+  );
+
+  if (deviationClass === 'adjust') return '調整推奨';
+  if (deviationClass === 'good') return '良好';
+  return deviationClass === 'heavy' ? 'やや重い' : 'やや軽い';
 };
 
-export const getSwingStatusColor = (
-  status: '良好' | 'やや重い' | 'やや軽い' | '調整推奨',
-) => {
-  if (status === '良好') return '#2e7d32';
-  if (status === '調整推奨') return '#c62828';
-  return '#ef6c00';
-};
+export const getSwingStatusColor = (status: SwingStatus) => SWING_STATUS_COLOR_MAP[status];
 
 export const getSwingClubLabel = (
   club: Pick<GolfClub, 'clubType' | 'number' | 'name'>,
@@ -444,76 +328,27 @@ export const getSwingBarColor = (
   goodTolerance: number,
   adjustThreshold: number,
 ): { fill: string; stroke: string; strokeWidth: number } => {
-  const abs = Math.abs(deviation);
-  if (abs > adjustThreshold) {
+  const deviationClass = classifySwingDeviation(
+    deviation,
+    goodTolerance,
+    adjustThreshold,
+  );
+
+  if (deviationClass === 'adjust') {
     return { fill: '#e53935', stroke: '#b71c1c', strokeWidth: 2 };
   }
-  if (deviation < -goodTolerance && abs <= adjustThreshold) {
+
+  if (deviationClass === 'light') {
     return { fill: getCategoryColor(category), stroke: '#ef6c00', strokeWidth: 2 };
   }
-  if (abs > goodTolerance) {
+
+  if (deviationClass === 'heavy') {
     return { fill: '#fb8c00', stroke: '#e65100', strokeWidth: 1.8 };
   }
+
   return { fill: getCategoryColor(category), stroke: 'none', strokeWidth: 0 };
 };
 
-export const clamp = (value: number, min: number, max: number) =>
-  Math.max(min, Math.min(max, value));
-
-export const getTooltipPosition = (
-  pointX: number,
-  pointY: number,
-  chartSize: { width: number; height: number },
-  boxSize: { width: number; height: number },
-) => {
-  const margin = 10;
-  const gap = 12;
-  const usableWidth = Math.max(boxSize.width, 1);
-  const usableHeight = Math.max(boxSize.height, 1);
-
-  const preferAbove = pointY - usableHeight - gap >= margin;
-  const preferredTop = preferAbove ? pointY - usableHeight - gap : pointY + gap;
-
-  const top = clamp(
-    preferredTop,
-    margin,
-    Math.max(margin, chartSize.height - usableHeight - margin),
-  );
-  const left = clamp(
-    pointX - usableWidth / 2,
-    margin,
-    Math.max(margin, chartSize.width - usableWidth - margin),
-  );
-
-  return { left, top };
-};
-
-export const createLoftChartMappers = (
-  chartSize: ChartSize,
-  padding: ChartPadding,
-  axis: {
-    minLoft: number;
-    maxLoft: number;
-    minDistance: number;
-    maxDistance: number;
-  },
-) => {
-  const mapX = (loftAngle: number) => {
-    const plotWidth = chartSize.width - padding.left - padding.right;
-    return padding.left + ((loftAngle - axis.minLoft) / (axis.maxLoft - axis.minLoft)) * plotWidth;
-  };
-
-  const mapY = (distance: number) => {
-    const plotHeight = chartSize.height - padding.top - padding.bottom;
-    return (
-      chartSize.height -
-      padding.bottom -
-      ((distance - axis.minDistance) / (axis.maxDistance - axis.minDistance)) * plotHeight
-    );
-  };
-
-  return { mapX, mapY };
-};
 
 export const buildActualDistanceLinePoints = (
   clubs: Array<Pick<LoftDistancePoint, 'loftAngle' | 'actualDistance'>>,
@@ -526,32 +361,6 @@ export const buildActualDistanceLinePoints = (
     .join(' ');
 };
 
-export const createWeightChartMappers = (
-  chartSize: ChartSize,
-  padding: ChartPadding,
-  bounds: {
-    minLength: number;
-    maxLength: number;
-    minWeight: number;
-    maxWeight: number;
-  },
-) => {
-  const mapX = (length: number) => {
-    const plotWidth = chartSize.width - padding.left - padding.right;
-    return padding.left + ((length - bounds.minLength) / (bounds.maxLength - bounds.minLength || 1)) * plotWidth;
-  };
-
-  const mapY = (weight: number) => {
-    const plotHeight = chartSize.height - padding.top - padding.bottom;
-    return (
-      chartSize.height -
-      padding.bottom -
-      ((weight - bounds.minWeight) / (bounds.maxWeight - bounds.minWeight || 1)) * plotHeight
-    );
-  };
-
-  return { mapX, mapY };
-};
 
 export const buildWeightTrendPoints = (
   hasData: boolean,
@@ -585,65 +394,6 @@ export const buildWeightTrendPoints = (
   };
 };
 
-export const createSwingChartMappers = (
-  chartSize: ChartSize,
-  padding: ChartPadding,
-  chartMin: number,
-  chartMax: number,
-  clubCount: number,
-) => {
-  const mapY = (value: number) => {
-    const plotHeight = chartSize.height - padding.top - padding.bottom;
-    return (
-      chartSize.height -
-      padding.bottom -
-      ((value - chartMin) / (chartMax - chartMin || 1)) * plotHeight
-    );
-  };
-
-  const mapX = (index: number) => {
-    const plotWidth = chartSize.width - padding.left - padding.right;
-    return padding.left + (plotWidth / Math.max(1, clubCount)) * (index + 0.5);
-  };
-
-  const barWidth = Math.min(
-    30,
-    Math.max(
-      12,
-      ((chartSize.width - padding.left - padding.right) / Math.max(1, clubCount)) * 0.52,
-    ),
-  );
-
-  return { mapX, mapY, barWidth };
-};
-
-export const createLieChartMappers = (
-  chartSize: ChartSize,
-  padding: ChartPadding,
-  minLie: number,
-  maxLie: number,
-  clubCount: number,
-) => {
-  const mapY = (deg: number) => {
-    const plotHeight = chartSize.height - padding.top - padding.bottom;
-    return chartSize.height - padding.bottom - ((deg - minLie) / (maxLie - minLie)) * plotHeight;
-  };
-
-  const mapX = (index: number) => {
-    const plotWidth = chartSize.width - padding.left - padding.right;
-    return padding.left + (plotWidth / Math.max(1, clubCount)) * (index + 0.5);
-  };
-
-  const barWidth = Math.min(
-    32,
-    Math.max(
-      12,
-      ((chartSize.width - padding.left - padding.right) / Math.max(1, clubCount)) * 0.55,
-    ),
-  );
-
-  return { mapX, mapY, barWidth };
-};
 
 export const buildLieReferencePoints = (
   clubs: Array<Pick<LieAnglePoint, 'standardLieAngle'>>,
@@ -683,165 +433,3 @@ export const isAnalysisClubVisible = (
   club: GolfClub,
   hiddenClubKeys: Set<string>,
 ): boolean => !hiddenClubKeys.has(getAnalysisClubKey(club));
-
-export const buildLoftDistanceAnalysis = (
-  clubs: GolfClub[],
-  headSpeed: number,
-  isVisible: ClubVisibilityPredicate,
-) => {
-  const tableClubs = sortClubsForDisplay(
-    clubs.filter((club) => club.loftAngle >= 5 && club.loftAngle <= 60),
-  ).map((club) => ({
-    ...club,
-    estimatedDistance: getEstimatedDistance(club, headSpeed),
-    actualDistance: club.distance ?? 0,
-    category: getClubCategory(club),
-  }));
-
-  const chartClubs = tableClubs.filter(isVisible);
-
-  return {
-    tableClubs,
-    chartClubs,
-    hasAnyData: tableClubs.length > 0,
-    hasVisibleData: chartClubs.length > 0,
-  };
-};
-
-export const buildWeightLengthAnalysis = (
-  clubs: GolfClub[],
-  isVisible: ClubVisibilityPredicate,
-) => {
-  const baseClubs = clubs
-    .filter(
-      (club) =>
-        Number.isFinite(club.length) &&
-        Number.isFinite(club.weight) &&
-        club.length > 0 &&
-        club.weight > 0 &&
-        getClubCategory(club) !== 'putter',
-    )
-    .map((club) => ({
-      ...club,
-      category: getClubCategory(club),
-    }));
-
-  const visibleBaseClubs = baseClubs.filter(isVisible);
-  const regression = getWeightRegression(
-    visibleBaseClubs.length > 0 ? visibleBaseClubs : baseClubs,
-  );
-
-  const tableClubs = baseClubs.map((club) => {
-    const expectedWeight = getExpectedWeight(club.length, regression);
-    const deviation = club.weight - expectedWeight;
-    return {
-      ...club,
-      expectedWeight,
-      deviation,
-      weightTrendMessage: getWeightTrendMessage(deviation),
-    };
-  });
-
-  const chartClubs = tableClubs.filter(isVisible);
-  const hasVisibleData = chartClubs.length > 0;
-  const bounds = hasVisibleData
-    ? getWeightChartBounds(chartClubs, regression)
-    : {
-        minLength: 30,
-        maxLength: 48,
-        minWeight: 250,
-        maxWeight: 550,
-        xInterval: 2,
-        yInterval: 50,
-      };
-
-  return {
-    tableClubs,
-    chartClubs,
-    regression,
-    bounds,
-    lengthTicks: makeTickValues(bounds.minLength, bounds.maxLength, bounds.xInterval),
-    weightTicks: makeTickValues(bounds.minWeight, bounds.maxWeight, bounds.yInterval),
-    hasAnyData: tableClubs.length > 0,
-    hasVisibleData,
-  };
-};
-
-export const buildSwingWeightAnalysis = (
-  clubs: GolfClub[],
-  swingWeightTarget: number,
-  swingGoodTolerance: number,
-  swingAdjustThreshold: number,
-  isVisible: ClubVisibilityPredicate,
-) => {
-  const tableClubs = sortClubsForDisplay(clubs.filter((club) => getClubCategory(club) !== 'putter'))
-    .map((club) => {
-      const category = getClubCategory(club);
-      const swingWeightNumeric = swingWeightToNumeric(club.swingWeight ?? '');
-      const swingDeviation = swingWeightNumeric - swingWeightTarget;
-      const swingStatus = getSwingStatus(
-        swingDeviation,
-        swingGoodTolerance,
-        swingAdjustThreshold,
-      );
-
-      return {
-        ...club,
-        category,
-        swingWeightNumeric,
-        swingDeviation,
-        swingStatus,
-      };
-    });
-
-  const chartClubs = tableClubs.filter(isVisible);
-  const hasVisibleData = chartClubs.length > 0;
-  const swingMinValue = hasVisibleData
-    ? Math.min(...chartClubs.map((club) => club.swingWeightNumeric), swingWeightTarget)
-    : -2;
-  const swingMaxValue = hasVisibleData
-    ? Math.max(...chartClubs.map((club) => club.swingWeightNumeric), swingWeightTarget)
-    : 4;
-  const chartMin = Math.floor(swingMinValue - 2);
-  const chartMax = Math.ceil(swingMaxValue + 2);
-
-  return {
-    tableClubs,
-    chartClubs,
-    chartMin,
-    chartMax,
-    ticks: Array.from(
-      { length: Math.max(2, chartMax - chartMin + 1) },
-      (_, index) => chartMin + index,
-    ).filter((tick) => tick % 2 === 0),
-    hasAnyData: tableClubs.length > 0,
-    hasVisibleData,
-  };
-};
-
-export const buildLieAngleAnalysis = (
-  clubs: GolfClub[],
-  userLieAngleStandards: UserLieAngleStandards,
-  isVisible: ClubVisibilityPredicate,
-) => {
-  const tableClubs = sortClubsForDisplay(clubs).map((club) => {
-    const category = getClubCategory(club);
-    const standardLieAngle = resolveStandardLieAngle(club, userLieAngleStandards);
-    const deviationFromStandard = club.lieAngle - standardLieAngle;
-    const lieStatus = lieStatusFromDeviation(deviationFromStandard);
-
-    return {
-      ...club,
-      category,
-      standardLieAngle,
-      deviationFromStandard,
-      lieStatus,
-    };
-  });
-
-  return {
-    tableClubs,
-    chartClubs: tableClubs.filter(isVisible),
-    hasAnyData: tableClubs.length > 0,
-  };
-};

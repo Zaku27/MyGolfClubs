@@ -42,13 +42,9 @@ import {
   WEIGHT_NORMAL_BAND_TOLERANCE,
 } from './analysisConfig';
 import {
-  buildLieAngleAnalysis,
-  buildLoftDistanceAnalysis,
-  buildSwingWeightAnalysis,
   buildActualDistanceLinePoints,
   buildLieReferencePoints,
   buildWeightTrendPoints,
-  buildWeightLengthAnalysis,
   createLieChartMappers,
   createLoftChartMappers,
   createSwingChartMappers,
@@ -61,6 +57,12 @@ import {
   getWeightPointStyle,
   isAnalysisClubVisible,
 } from '../utils/analysisUtils';
+import {
+  buildLieAngleAnalysis,
+  buildLoftDistanceAnalysis,
+  buildSwingWeightAnalysis,
+  buildWeightLengthAnalysis,
+} from '../utils/analysisBuilders';
 import {
   type UserLieAngleStandards,
 } from '../types/lieStandards';

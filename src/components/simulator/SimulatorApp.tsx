@@ -1,5 +1,4 @@
 import type { Hole } from "../../types/game";
-import type { SimClub } from "../../types/game";
 import type { GolfClub } from "../../types/golf";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -10,7 +9,6 @@ import { HoleView } from "./HoleView";
 import { PostRoundAnalysis } from "./PostRoundAnalysis";
 
 import { Scorecard } from "./Scorecard";
-import { ShotResultModal } from "./ShotResultModal";
 
 interface Props {
   onBack: () => void;
@@ -108,11 +106,6 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
     startRound,
     resetGame,
     showResultModal,
-    selectClub,
-    setRiskLevel,
-    takeShot,
-    dismissResult,
-    advanceHole,
   } = useGameStore();
   const [showDetailedScorecard, setShowDetailedScorecard] = useState(false);
   const bagSource = selectedClubs;
@@ -121,13 +114,6 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
     const bag = bagSource.map(toSimClub);
     setShowDetailedScorecard(false);
     startRound(holes, bag);
-  };
-
-  // クラブ選択後すぐショット実行（リスクは常にnormal）
-  const handleClubSelect = (club: SimClub) => {
-    selectClub(club.id);
-    setRiskLevel("normal");
-    takeShot();
   };
 
   if (phase === "setup") {
@@ -175,7 +161,6 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
     <>
       <HoleView
         onBack={() => { resetGame(); onBack(); }}
-        handleClubSelect={handleClubSelect}
       />
 
       {/* ショット結果モーダルの表示を廃止 */}
