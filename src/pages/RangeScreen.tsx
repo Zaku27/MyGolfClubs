@@ -41,6 +41,11 @@ export default function RangeScreen() {
   const { clubs, personalData } = useClubStore();
   // const { playerSkillLevel } = useGameStore();
   const [selectedClubId, setSelectedClubId] = useState<string>('');
+  // 打席タイプ: "robot" or "personal"
+  const [seatType, setSeatType] = useState<'robot' | 'personal'>('personal');
+  // ロボット用: ヘッドスピードとスキルレベル
+  const [robotHeadSpeed, setRobotHeadSpeed] = useState<number>(40); // 初期値40m/s
+  const [robotSkillLevel, setRobotSkillLevel] = useState<number>(0.5); // 0.0〜1.0
   const [lie, setLie] = useState<string>('Fairway');
   const [windSpeed, setWindSpeed] = useState<number>(0);
   const [windDir, setWindDir] = useState<string>('tail');
@@ -55,9 +60,34 @@ export default function RangeScreen() {
   // SimClub型に変換（最低限必要なプロパティを補完）
   const toSimClub = (club: import('../types/golf').GolfClub | undefined) => {
     if (!club) return undefined;
+    // type/clubType補完
+    let type = (club as any).type ?? club.clubType ?? "Unknown";
+    // numberやnameからdriver/wood/iron/wedge/putterを推定
+    if (!type || type === "Unknown") {
+      const n = (club.number ?? "").toString().toLowerCase();
+      if (n.includes("d") || n.includes("dr") || club.name?.toLowerCase().includes("driver")) type = "Driver";
+      else if (n.includes("w") || club.name?.toLowerCase().includes("wood")) type = "Wood";
+      else if (n.includes("h")) type = "Hybrid";
+      else if (n.includes("p") && club.name?.toLowerCase().includes("putter")) type = "Putter";
+      else if (n.match(/^[0-9]+$/)) type = "Iron";
+      else type = "Iron";
+    }
+    // loftAngle補完（未設定や0なら推定値）
+    let loftAngle = club.loftAngle;
+    if (!loftAngle || loftAngle === 0) {
+      if (type === "Driver") loftAngle = 10.5;
+      else if (type === "Wood") loftAngle = 15;
+      else if (type === "Hybrid") loftAngle = 22;
+      else if (type === "Iron") loftAngle = 30;
+      else if (type === "Wedge") loftAngle = 46;
+      else if (type === "Putter") loftAngle = 3;
+      else loftAngle = 30;
+    }
     return {
       ...club,
-      type: (club as any).type ?? "Unknown",
+      type,
+      clubType: type,
+      loftAngle,
       avgDistance: (club as any).avgDistance ?? club.distance ?? 0,
       successRate: (club as any).successRate ?? 70,
       isWeakClub: (club as any).isWeakClub ?? false,
@@ -86,7 +116,6 @@ export default function RangeScreen() {
     setIsSimulating(true);
     const shotResults = [];
     for (let i = 0; i < numShots; i++) {
-      const club = simClub;
       // lieをLieTypeに変換
       let lieType: import('../types/game').LieType = 'fairway';
       switch (lie) {
@@ -106,8 +135,24 @@ export default function RangeScreen() {
         shotPowerPercent: 100,
       };
       const riskLevel = "normal";
-      const options = { personalData: clubPersonal ?? undefined, playerSkillLevel };
-      const shotResult = simulateShot(club, context, riskLevel, options);
+
+      // ロボット打席の場合はクラブ成功率100%、スキル・ヘッドスピードをロボット値で渡す
+      let clubForSim = simClub;
+      let options;
+      if (seatType === 'robot') {
+        clubForSim = { ...simClub, successRate: 100 };
+        options = {
+          personalData: undefined, // 個人データは使わない
+          playerSkillLevel: robotSkillLevel,
+          headSpeed: robotHeadSpeed,
+        };
+      } else {
+        options = {
+          personalData: clubPersonal ?? undefined,
+          playerSkillLevel,
+        };
+      }
+      const shotResult = simulateShot(clubForSim, context, riskLevel, options);
       // outcomeを追加
       let outcome = "";
       if (shotResult.penalty) {
@@ -154,7 +199,52 @@ export default function RangeScreen() {
         </button>
       </div>
 
-      {/* ...existing code... */}
+
+      {/* 打席リスト（ロボット／個人データ）＋ロボット設定 */}
+      <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
+        <label className="block font-semibold mb-2">打席タイプ選択</label>
+        <select
+          className="w-full border rounded p-2 mb-2"
+          value={seatType}
+          onChange={e => setSeatType(e.target.value as 'robot' | 'personal')}
+        >
+          <option value="personal">個人データ</option>
+          <option value="robot">ロボット</option>
+        </select>
+
+        {/* ロボット選択時のみ設定UIを表示 */}
+        {seatType === 'robot' && (
+          <div className="flex flex-col gap-2 mt-2 bg-green-50 rounded p-3 border border-green-200">
+            <div>
+              <label className="block font-semibold mb-1">ヘッドスピード (m/s)</label>
+              <input
+                type="number"
+                min={20}
+                max={60}
+                step={0.1}
+                value={robotHeadSpeed}
+                onChange={e => setRobotHeadSpeed(Number(e.target.value))}
+                className="w-32 border rounded p-1 mr-2"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">スキルレベル</label>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={robotSkillLevel}
+                onChange={e => setRobotSkillLevel(Number(e.target.value))}
+                className="w-40 accent-green-700"
+              />
+              <span className="ml-2">{(robotSkillLevel * 100).toFixed(0)}%</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ...既存のクラブ選択UI... */}
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
         <label className="block font-semibold mb-2">クラブ選択</label>
         <div className="mb-2 text-xs text-gray-500">クラブ本数: {clubs.length}</div>
@@ -181,18 +271,42 @@ export default function RangeScreen() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
                 <span className="font-bold">{selectedClub.name}</span>
                 <span>
-                  目安: {simClub ? estimateShotDistance(
-                    simClub,
-                    { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
-                    "normal",
-                    { personalData: clubPersonal, headSpeed: undefined, useTheoretical: true }
+                  目安: {simClub ? (
+                    seatType === 'robot'
+                      ? estimateShotDistance(
+                          { ...simClub, successRate: 100 },
+                          { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+                          "normal",
+                          { personalData: undefined, headSpeed: robotHeadSpeed, useTheoretical: true }
+                        )
+                      : estimateShotDistance(
+                          simClub,
+                          { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+                          "normal",
+                          { personalData: clubPersonal, headSpeed: undefined, useTheoretical: true }
+                        )
                   ) : '-'} ヤード
                 </span>
                 <span>
-                  有効成功率: {clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--'}%
+                  有効成功率: {
+                    simClub ? (
+                      seatType === 'robot'
+                        ? (() => {
+                            // ロボット用: successRate=100, personalDataなし, スキルレベルはrobotSkillLevel
+                            const robotEffective = calculateEffectiveSuccessRate(
+                              { ...simClub, successRate: 100 },
+                              undefined,
+                              robotSkillLevel
+                            );
+                            return (robotEffective * 100).toFixed(1);
+                          })()
+                        : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--')
+                    ) : '--'
+                  }%
                 </span>
               </div>
             )}
+
           </>
         )}
       </div>

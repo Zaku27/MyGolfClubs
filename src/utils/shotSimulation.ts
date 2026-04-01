@@ -56,9 +56,6 @@ function getWindYards(wind: WindDirection | undefined, strength: number): number
   }
 }
 
-function getRiskMultiplier(risk: RiskLevel): number {
-  return risk === "safe" ? 0.87 : risk === "aggressive" ? 1.10 : 1.00;
-}
 
 function isWeakClub(club: SimClub): boolean {
   return club.isWeakClub === true || club.successRate < 65;
@@ -114,12 +111,15 @@ export function estimateShotDistance(
 
   // --- ヘッドスピード・理論値を加味したベース飛距離 ---
   let baseDistance = club.avgDistance;
-  // ヘッドスピード・ロフト角から理論値を加味（useTheoretical=true時）
-  if (options?.useTheoretical && options?.headSpeed) {
-    // SimClubにはloftAngle等が無いので0で埋める
+  // ロボット（successRate=100, personalData未指定, useTheoretical=true, headSpeed指定）なら理論値のみ
+  const isRobot = club.successRate === 100 && !options?.personalData && options?.useTheoretical && options?.headSpeed;
+  if (isRobot) {
+    const golfClub = simClubToGolfClub(club);
+    baseDistance = getEstimatedDistance(golfClub, options.headSpeed);
+  } else if (options?.useTheoretical && options?.headSpeed) {
+    // 実測値と理論値の中間値を取る（重みは要調整）
     const golfClub = simClubToGolfClub(club);
     const theoretical = getEstimatedDistance(golfClub, options.headSpeed);
-    // 実測値と理論値の中間値を取る（重みは要調整）
     baseDistance = (baseDistance * 0.7 + theoretical * 0.3);
   }
 
@@ -134,8 +134,9 @@ export function estimateShotDistance(
 export function estimateShotDistanceRange(
   club: SimClub,
   context: Pick<ShotContext, "lie" | "wind" | "windStrength">,
-  riskLevel: RiskLevel,
 ): { min: number; max: number } {
+  // デフォルトリスクレベルを "normal" として扱う
+  const riskLevel: RiskLevel = "normal";
   const center = estimateShotDistance(club, context, riskLevel);
 
   if (club.type === "Putter") {

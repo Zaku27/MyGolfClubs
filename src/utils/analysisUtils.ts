@@ -106,56 +106,61 @@ export const getClubCategory = (club: GolfClub): ClubCategory =>
   getClubCategoryByType(club.clubType ?? '');
 
 export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
+  // 44.5m/sで調整した値を基準に、他ヘッドスピードでも自然に追従させる
   const loftAngle = club.loftAngle ?? 0;
   const category = getClubCategoryByType(club.clubType ?? '');
 
-  let baseline = 0;
-  let speedPower = 1.0;
+  let base = 0;
+  let speedCoeff = 1.0;
+  let loftCoeff = 1.0;
+  let min = 0, max = 400;
 
   switch (category) {
     case 'driver':
-      baseline = 270.0 - 5.0 * loftAngle;
-      speedPower = 1.15;
+      base = 255;
+      speedCoeff = 4.8;
+      loftCoeff = -4.25;
+      min = 170; max = 350;
       break;
     case 'wood':
-      baseline = 300.0 - 8.2222 * loftAngle + 0.1481 * loftAngle * loftAngle;
-      speedPower = 1.14;
-      break;
-    case 'iron':
-      baseline = 177.88 + 1.2559 * loftAngle - 0.0581 * loftAngle * loftAngle;
-      speedPower = 1.08;
+      base = 235;
+      speedCoeff = 4.3;
+      loftCoeff = -4.25;
+      min = 130; max = 290;
       break;
     case 'hybrid':
-      baseline = 263.3333 - 3.3333 * loftAngle;
-      speedPower = 1.12;
+      base = 195;
+      speedCoeff = 3.8;
+      loftCoeff = -3.25;
+      min = 110; max = 250;
+      break;
+    case 'iron':
+      // 実測値: 27°=170, 34°=155, 38°=145, 42°=133 (HS44.5)
+      base = 165; // 27°基準
+      speedCoeff = 3.0;
+      loftCoeff = -2.75; // 1°増えるごとに約-2.75y
+      min = 70; max = 220;
       break;
     case 'wedge':
-      baseline = 235.0 - 2.5 * loftAngle;
-      speedPower = 1.03;
+      // 実測値: 46°=122, 50°=105, 54°=95, 58°=80 (HS44.5)
+      base = 115; // 46°基準
+      speedCoeff = 2.1;
+      loftCoeff = -2.75; // 1°増えるごとに約-2.75y
+      min = 40; max = 150;
       break;
     case 'putter':
-      baseline = 10.0;
-      speedPower = 1.0;
+      base = 10;
+      speedCoeff = 0.0;
+      loftCoeff = 0.0;
+      min = 1; max = 20;
       break;
   }
 
-  const speedRatio = Math.max(0.7, Math.min(1.35, headSpeed / 42));
-  const speedFactor = Math.pow(speedRatio, speedPower);
-  const estimated = baseline * speedFactor;
-  const categoryAdjustment =
-    category === 'driver'
-      ? 1.05
-      : category === 'wood'
-        ? 1.02
-        : category === 'wedge'
-          ? 0.9
-          : category === 'iron'
-            ? 0.95
-            : category === 'hybrid'
-              ? 0.96
-              : 1.0;
-
-  return Math.max(0, Math.min(290, estimated * categoryAdjustment));
+  // 標準式: base + (headSpeed - 44.5) * speedCoeff + (loftAngle - 標準値) * loftCoeff
+  const standardLoft = category === 'driver' ? 10.5 : category === 'wood' ? 15 : category === 'hybrid' ? 22 : category === 'iron' ? 30 : category === 'wedge' ? 46 : 0;
+  let estimated = base + (headSpeed - 44.5) * speedCoeff + (loftAngle - standardLoft) * loftCoeff;
+  estimated = Math.max(min, Math.min(max, estimated));
+  return Math.round(estimated);
 };
 
 export const getCategoryColor = (category: ClubCategory) => {
