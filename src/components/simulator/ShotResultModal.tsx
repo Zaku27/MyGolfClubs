@@ -25,11 +25,11 @@ export function ShotResultModal({ onDismiss, onAdvance }: Props) {
   const {
     outcomeMessage,
     shotQuality,
-    distanceHit,
     newRemainingDistance,
     penalty,
     effectiveSuccessRate,
     confidenceBoostApplied,
+    landing,
   } = lastShotResult;
   const holeComplete = phase === "hole_complete" || phase === "round_complete";
   const lastScore    = holeComplete ? scores[scores.length - 1] : null;
@@ -60,7 +60,7 @@ export function ShotResultModal({ onDismiss, onAdvance }: Props) {
           <span className="text-4xl leading-none">{QUALITY_ICON[shotQuality]}</span>
           <div>
             <p className="text-lg font-bold text-emerald-900">{mainLabel}</p>
-            <p className="text-sm text-emerald-700">飛距離: {distanceHit}ヤード</p>
+            <p className="text-sm text-emerald-700">飛距離: {(landing?.totalDistance ?? lastShotResult.distanceHit).toFixed(1)}ヤード</p>
           </div>
           {penalty && (
             <div className="ml-auto rounded-md border border-red-300/70 bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
@@ -77,6 +77,19 @@ export function ShotResultModal({ onDismiss, onAdvance }: Props) {
           <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
             実効成功率 {effectiveSuccessRate}%
           </span>
+          {landing && (
+            <>
+              <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                キャリー {landing.carry.toFixed(1)}y
+              </span>
+              <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                ラン {landing.roll.toFixed(1)}y
+              </span>
+              <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                着地 X:{landing.finalX.toFixed(1)} / Y:{landing.finalY.toFixed(1)}
+              </span>
+            </>
+          )}
           {confidenceBoostApplied && (
             <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
               勢いボーナス適用

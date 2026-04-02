@@ -167,7 +167,7 @@ export default function RangeScreen() {
     setResults(shotResults);
     // ...existing code...
     // Summary
-    const distances = shotResults.map((r) => r.distanceHit);
+    const distances = shotResults.map((r) => r.landing?.totalDistance ?? r.distanceHit);
     const avg = distances.reduce((a, b) => a + b, 0) / distances.length;
     const std = Math.sqrt(
       distances.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / distances.length
@@ -386,6 +386,11 @@ export default function RangeScreen() {
                 <tr className="bg-green-100">
                   <th className="px-2 py-1">#</th>
                   <th className="px-2 py-1">飛距離</th>
+                  <th className="px-2 py-1">キャリー</th>
+                  <th className="px-2 py-1">ラン</th>
+                  <th className="px-2 py-1">横ブレ</th>
+                  <th className="px-2 py-1">着地X</th>
+                  <th className="px-2 py-1">着地Y</th>
                   <th className="px-2 py-1">ショット品質</th>
                   <th className="px-2 py-1">結果</th>
                 </tr>
@@ -394,7 +399,12 @@ export default function RangeScreen() {
                 {results.map((r, i) => (
                   <tr key={i} className="border-b last:border-0">
                     <td className="px-2 py-1 text-center">{i + 1}</td>
-                    <td className="px-2 py-1 text-center">{r.distanceHit.toFixed(1)}</td>
+                    <td className="px-2 py-1 text-center">{(r.landing?.totalDistance ?? r.distanceHit).toFixed(1)}</td>
+                    <td className="px-2 py-1 text-center">{r.landing?.carry?.toFixed(1) ?? '-'}</td>
+                    <td className="px-2 py-1 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
+                    <td className="px-2 py-1 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
+                    <td className="px-2 py-1 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
+                    <td className="px-2 py-1 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
                     <td className="px-2 py-1 text-center">{qualityLabel(r.shotQuality)}</td>
                     <td className={`px-2 py-1 text-center font-bold ${outcomeColor(r.outcome)}`}>{r.outcome}</td>
                   </tr>

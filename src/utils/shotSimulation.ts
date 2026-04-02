@@ -11,6 +11,7 @@ import type { ClubPersonalData } from "../types/golf";
 import { calculateEffectiveSuccessRate } from "./calculateSuccessRate";
 import { ClubService } from "../db/clubService";
 import { getEstimatedDistance } from "./analysisUtils";
+import { calculateLandingPosition } from "./landingPosition";
 /**
  * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
  * @returns Promise<number> 0.0〜1.0（なければ0.5）
@@ -253,6 +254,20 @@ function getNearCupLeaveDistance(shotQuality: ShotQuality): number {
   return 3 + Math.floor(Math.random() * 6); // 3-8y
 }
 
+function mapWindToLanding(wind: WindDirection | undefined, windStrength: number): number {
+  if (wind === "headwind") return -windStrength;
+  if (wind === "tailwind") return windStrength;
+  return 0;
+}
+
+function mapGroundHardnessByLie(lie: LieType): number {
+  if (lie === "bunker") return 20;
+  if (lie === "rough") return 45;
+  if (lie === "fairway") return 75;
+  if (lie === "green") return 85;
+  return 60;
+}
+
 export const LIE_LABELS: Record<LieType, string> = {
   tee: "ティー", fairway: "フェアウェイ", rough: "ラフ",
   bunker: "バンカー", green: "グリーン", penalty: "ペナルティ",
@@ -337,17 +352,31 @@ export function simulateShot(
   // ── Putter path ────────────────────────────────────────────────────────────
   if (club.type === "Putter") {
     const putt = simulatePutt(remainingDistance, confidenceBoost, playerSkillLevel);
+    const puttDistance = Math.max(0, remainingDistance - putt.newRemaining);
     return {
       newRemainingDistance: putt.newRemaining,
       outcomeMessage: putt.message,
       strokesAdded: 1,
       lie: "green",
       penalty: false,
-      distanceHit: Math.max(0, remainingDistance - putt.newRemaining),
+      distanceHit: puttDistance,
       shotQuality: putt.made ? "good" : "poor",
       wasSuccessful: putt.made || putt.newRemaining <= 3,
       effectiveSuccessRate: putt.effectiveSuccessRate,
       confidenceBoostApplied,
+      landing: {
+        carry: puttDistance,
+        roll: 0,
+        totalDistance: puttDistance,
+        lateralDeviation: 0,
+        finalX: 0,
+        finalY: puttDistance,
+        apexHeight: 0,
+        trajectoryPoints: [
+          { x: 0, y: 0, z: 0 },
+          { x: 0, y: puttDistance, z: 0 },
+        ],
+      },
     };
   }
 
@@ -470,6 +499,44 @@ export function simulateShot(
 
   const newLie = resolveNewLie(newRemaining, isGoodShot, penalty, riskLevel);
 
+  const landing = calculateLandingPosition({
+    club: {
+      clubType: club.type,
+      name: club.name,
+      number: club.number,
+      length: 0,
+      weight: 0,
+      swingWeight: "D0",
+      lieAngle: 0,
+      loftAngle: club.loftAngle ?? 30,
+      shaftType: "",
+      torque: 0,
+      flex: "S",
+      distance: actualDistance,
+      notes: "",
+    },
+    skillLevel: {
+      dispersion: 1 - playerSkillLevel,
+      mishitRate: 1 - playerSkillLevel,
+      sideSpinDispersion: 1 - playerSkillLevel,
+    },
+    executionQuality: shotQuality,
+    aimXOffset: 0,
+    conditions: {
+      wind: mapWindToLanding(wind, windStrength),
+      groundHardness: mapGroundHardnessByLie(lie),
+      seed: [
+        club.id,
+        remainingDistance,
+        actualDistance,
+        shotQuality,
+        wind ?? "none",
+        windStrength,
+        playerSkillLevel,
+      ].join("|"),
+    },
+  });
+
   // ── Message ────────────────────────────────────────────────────────────────
   const clubLabel = `${club.name}${club.number ? " " + club.number : ""}`;
   let message: string;
@@ -493,6 +560,7 @@ export function simulateShot(
     wasSuccessful: isGoodShot && !penalty,
     effectiveSuccessRate: effectiveRate,
     confidenceBoostApplied,
+    landing,
   };
 }
 

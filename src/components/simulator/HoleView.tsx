@@ -247,7 +247,7 @@ export function HoleView({ onBack }: Props) {
                     ? "ミス気味"
                     : "苦しい結果"}
                 </p>
-                <p className="text-sm text-emerald-700">飛距離: {lastShotResult.distanceHit}ヤード</p>
+                <p className="text-sm text-emerald-700">飛距離: {(lastShotResult.landing?.totalDistance ?? lastShotResult.distanceHit).toFixed(1)}ヤード</p>
             </div>
               {lastShotResult.penalty && (
                 <div className="ml-auto rounded-md border border-red-300/70 bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
@@ -259,6 +259,19 @@ export function HoleView({ onBack }: Props) {
               <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
                 実効成功率 {lastShotResult.effectiveSuccessRate}%
               </span>
+              {lastShotResult.landing && (
+                <>
+                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                    キャリー {lastShotResult.landing.carry.toFixed(1)}y
+                  </span>
+                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                    ラン {lastShotResult.landing.roll.toFixed(1)}y
+                  </span>
+                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                    着地 X:{lastShotResult.landing.finalX.toFixed(1)} / Y:{lastShotResult.landing.finalY.toFixed(1)}
+                  </span>
+                </>
+              )}
               {lastShotResult.confidenceBoostApplied && (
                 <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
                   勢いボーナス適用

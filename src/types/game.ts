@@ -37,6 +37,17 @@ export interface ShotContext {
 // ─── Shot result ──────────────────────────────────────────────────────────────
 export type ShotQuality = "excellent" | "good" | "average" | "poor" | "mishit";
 
+export interface ShotLanding {
+  carry: number;
+  roll: number;
+  totalDistance: number;
+  lateralDeviation: number;
+  finalX: number;
+  finalY: number;
+  apexHeight?: number;
+  trajectoryPoints?: Array<{ x: number; y: number; z?: number }>;
+}
+
 export interface ShotResult {
   newRemainingDistance: number;
   outcomeMessage: string;
@@ -48,6 +59,7 @@ export interface ShotResult {
   wasSuccessful: boolean;
   effectiveSuccessRate: number;
   confidenceBoostApplied?: boolean;
+  landing?: ShotLanding;
 }
 
 export interface ShotLog {
