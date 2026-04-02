@@ -4,6 +4,7 @@ import type { UserProfile } from '../types/golf';
 interface UserProfileState {
   profile: UserProfile;
   setHeadSpeed: (headSpeed: number | null) => void;
+  setSkillWeights: (baseSkillWeight: number, effectiveRateWeight: number) => void;
   loadProfile: () => void;
 }
 
@@ -32,6 +33,19 @@ export const useUserProfileStore = create<UserProfileState>((set) => ({
   setHeadSpeed: (headSpeed) => {
     set((state) => {
       const next = { ...state.profile, headSpeed };
+      saveProfileToStorage(next);
+      return { profile: next };
+    });
+  },
+  setSkillWeights: (baseSkillWeight, effectiveRateWeight) => {
+    set((state) => {
+      const next = {
+        ...state.profile,
+        skillWeights: {
+          baseSkillWeight: Math.max(0, Math.min(1, baseSkillWeight)),
+          effectiveRateWeight: Math.max(0, Math.min(1, effectiveRateWeight)),
+        },
+      };
       saveProfileToStorage(next);
       return { profile: next };
     });

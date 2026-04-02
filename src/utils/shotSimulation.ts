@@ -11,7 +11,7 @@ import type { ClubPersonalData } from "../types/golf";
 import { calculateEffectiveSuccessRate } from "./calculateSuccessRate";
 import { ClubService } from "../db/clubService";
 import { getEstimatedDistance } from "./analysisUtils";
-import { calculateLandingPosition } from "./landingPosition";
+import { calculateLandingOutcome } from "./landingPosition";
 /**
  * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
  * @returns Promise<number> 0.0〜1.0（なければ0.5）
@@ -31,6 +31,11 @@ interface SimulationOptions {
   playerSkillLevel?: number;
   headSpeed?: number;
   useTheoretical?: boolean;
+  shotIndex?: number;
+  skillWeights?: {
+    baseSkillWeight: number;
+    effectiveRateWeight: number;
+  };
 }
 
 const WEAK_CLUB_EFFECT_SCALE = 0.5;
@@ -133,9 +138,6 @@ export function estimateShotDistance(
   }
 
   let expected = baseDistance * lieMultiplier * weakDistanceMultiplier + windYards;
-  if (club.type === "Driver") {
-    expected *= 1.06; // simulateShotと同じく6%アップ
-  }
 
   return Math.max(5, Math.round(expected));
 }
@@ -268,6 +270,38 @@ function mapGroundHardnessByLie(lie: LieType): number {
   return 60;
 }
 
+/**
+ * 有効成功率(15〜95)を 0〜1 のスキル寄与へ正規化する。
+ * 分布モデルへ直接渡して、表示成功率と体感を近づける。
+ */
+function normalizeEffectiveRateToSkill(rate: number): number {
+  const normalized = (rate - 15) / 80;
+  return Math.max(0, Math.min(1, normalized));
+}
+
+/**
+ * 基本スキルと有効成功率を合成し、分布モデル用の実効スキルを作る。
+ * lie/risk/個人データ補正を体感へ反映しやすいよう、有効成功率の重みを高く設定する。
+ * @param playerSkillLevel 0-1の基本スキル
+ * @param effectiveRate 15-95の有効成功率
+ * @param baseWeight 基本スキルの重み（デフォルト: 0.35）
+ * @param rateWeight 有効成功率の重み（デフォルト: 0.65）
+ */
+export function composeEffectiveSkill(
+  playerSkillLevel: number,
+  effectiveRate: number,
+  baseWeight: number = 0.35,
+  rateWeight: number = 0.65
+): number {
+  const baseSkill = Math.max(0, Math.min(1, playerSkillLevel));
+  const rateSkill = normalizeEffectiveRateToSkill(effectiveRate);
+  // 重みが0に近い場合も対応
+  const totalWeight = baseWeight + rateWeight;
+  if (totalWeight === 0) return 0.5;
+  const normalized = (baseSkill * baseWeight + rateSkill * rateWeight) / totalWeight;
+  return Math.max(0, Math.min(1, normalized));
+}
+
 export const LIE_LABELS: Record<LieType, string> = {
   tee: "ティー", fairway: "フェアウェイ", rough: "ラフ",
   bunker: "バンカー", green: "グリーン", penalty: "ペナルティ",
@@ -346,7 +380,6 @@ export function simulateShot(
   const confidenceBoost = options.confidenceBoost ?? 0;
   const playerSkillLevel = options.playerSkillLevel ?? 0.5;
   const { personalData } = options;
-  const weakClub = isWeakClub(club);
   const confidenceBoostApplied = confidenceBoost > 0;
 
   // ── Putter path ────────────────────────────────────────────────────────────
@@ -389,77 +422,65 @@ export function simulateShot(
     playerSkillLevel,
     personalData,
   );
-  const roll = Math.random() * 100;
-  const isGoodShot = roll < effectiveRate;
-
-  let shotQuality: ShotQuality;
-  if (isGoodShot) {
-    if      (roll < effectiveRate * 0.12) shotQuality = "excellent";
-    else if (roll < effectiveRate * 0.55) shotQuality = "good";
-    else                                  shotQuality = "average";
-  } else {
-    shotQuality = roll < effectiveRate + (100 - effectiveRate) * 0.45 ? "poor" : "mishit";
-  }
-
-  // ── Distance calculation ───────────────────────────────────────────────────
-  // 共通ロジックで推定飛距離を算出
-  let expected = estimateShotDistance(
-    club,
-    { lie, wind, windStrength },
-    riskLevel,
-    {
-      personalData,
-      // ヘッドスピードや理論値加味したい場合はここで渡す（現状は未使用）
-    }
+  const { baseSkillWeight = 0.35, effectiveRateWeight = 0.65 } = options.skillWeights ?? {};
+  const effectiveSkill = composeEffectiveSkill(
+    playerSkillLevel,
+    effectiveRate,
+    baseSkillWeight,
+    effectiveRateWeight
   );
 
-  const varianceFactor = getVarianceFactor(club.successRate, riskLevel, weakClub);
-  const varRoll        = Math.random() * 2 - 1; // −1 … +1
+  const landingOutcome = calculateLandingOutcome({
+    club: {
+      clubType: club.type,
+      name: club.name,
+      number: club.number,
+      length: 0,
+      weight: 0,
+      swingWeight: "D0",
+      lieAngle: 0,
+      loftAngle: club.loftAngle ?? 30,
+      shaftType: "",
+      torque: 0,
+      flex: "S",
+      distance: club.avgDistance,
+      notes: "",
+    },
+    skillLevel: {
+      dispersion: 1 - effectiveSkill,
+      mishitRate: 1 - effectiveSkill,
+      sideSpinDispersion: 1 - effectiveSkill,
+    },
+    aimXOffset: 0,
+    conditions: {
+      wind: mapWindToLanding(wind, windStrength),
+      groundHardness: mapGroundHardnessByLie(lie),
+      seed: [
+        club.id,
+        remainingDistance,
+        effectiveRate,
+        wind ?? "none",
+        windStrength,
+        playerSkillLevel,
+        effectiveSkill,
+        options.shotIndex ?? 0,
+      ].join("|"),
+    },
+  });
 
-  let actualDistance: number;
-  if (shotQuality === "excellent") {
-    if (club.type === "Driver") {
-      // ドライバーはさらに上振れ強化（倍率を大きく）
-      actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 1.7 + 0.12); // 上振れ倍率をさらに強化
-    } else if (club.type === "Wood" || club.type === "Hybrid") {
-      // ウッド・ハイブリッドは0.7
-      actualDistance = expected * (1 + Math.abs(varRoll) * varianceFactor * 0.7 + 0.04);
-    } else {
-      // アイアン・ウェッジ・パターは理論値±2%の微小ブレのみ
-      const microVar = (Math.random() * 0.04) - 0.02; // -0.02〜+0.02
-      actualDistance = expected * (1 + microVar);
-    }
-  } else if (isGoodShot) {
-    if (shotQuality === "average") {
-      // averageは下振れ補正（ばらつき幅を0.7倍、さらに-0.05オフセット）上振れはしない
-      actualDistance = expected * (1 + Math.min(varRoll, 0) * varianceFactor * 0.7 - 0.05);
-    } else if (shotQuality === "good") {
-      // goodはばらつき幅を0.8倍に抑制
-      actualDistance = expected * (1 + varRoll * varianceFactor * 0.8);
-    } else {
-      actualDistance = expected * (1 + varRoll * varianceFactor);
-    }
-  } else if (shotQuality === "poor") {
-    actualDistance = expected * (weakClub ? 0.48 + Math.random() * 0.18 : 0.60 + Math.random() * 0.22);
+  const shotQuality = landingOutcome.shotQuality;
+  const landing = landingOutcome.landing;
+  const actualDistance = Math.round(Math.max(5, landing.totalDistance));
 
-  } else { /* mishit */
-    // スキルレベルに応じて減少幅を線形に調整
-    // skillLevel: 0.0（初心者）→0.30〜0.80, 0.5（中級）→0.60〜0.80, 1.0（上級）→0.70〜0.80
-    const skill = typeof playerSkillLevel === "number" ? playerSkillLevel : 0.5;
-    const minRate = 0.30 + 0.40 * skill; // 0.30〜0.70
-    const maxRate = 0.80;
-    const mishitRate = minRate + Math.random() * (maxRate - minRate);
-    actualDistance = expected * mishitRate;
-  }
-
-  actualDistance = Math.round(Math.max(5, actualDistance));
+  // 結果先行モデルでは品質から成功判定を導く。
+  const isGoodShot = shotQuality === "excellent" || shotQuality === "good" || shotQuality === "average";
 
   // ── Penalty check ──────────────────────────────────────────────────────────
   const penaltyBase =
     shotQuality === "mishit"
-      ? (hazards.length > 0 ? 0.42 : 0.10) + (weakClub ? 0.12 * WEAK_CLUB_EFFECT_SCALE : 0)
+      ? (hazards.length > 0 ? 0.42 : 0.10)
       : shotQuality === "poor"
-        ? (hazards.length > 0 ? 0.18 : 0.04) + (weakClub ? 0.08 * WEAK_CLUB_EFFECT_SCALE : 0)
+        ? (hazards.length > 0 ? 0.18 : 0.04)
         : 0;
   const penalty = penaltyBase > 0 && Math.random() < penaltyBase;
 
@@ -498,44 +519,6 @@ export function simulateShot(
   }
 
   const newLie = resolveNewLie(newRemaining, isGoodShot, penalty, riskLevel);
-
-  const landing = calculateLandingPosition({
-    club: {
-      clubType: club.type,
-      name: club.name,
-      number: club.number,
-      length: 0,
-      weight: 0,
-      swingWeight: "D0",
-      lieAngle: 0,
-      loftAngle: club.loftAngle ?? 30,
-      shaftType: "",
-      torque: 0,
-      flex: "S",
-      distance: actualDistance,
-      notes: "",
-    },
-    skillLevel: {
-      dispersion: 1 - playerSkillLevel,
-      mishitRate: 1 - playerSkillLevel,
-      sideSpinDispersion: 1 - playerSkillLevel,
-    },
-    executionQuality: shotQuality,
-    aimXOffset: 0,
-    conditions: {
-      wind: mapWindToLanding(wind, windStrength),
-      groundHardness: mapGroundHardnessByLie(lie),
-      seed: [
-        club.id,
-        remainingDistance,
-        actualDistance,
-        shotQuality,
-        wind ?? "none",
-        windStrength,
-        playerSkillLevel,
-      ].join("|"),
-    },
-  });
 
   // ── Message ────────────────────────────────────────────────────────────────
   const clubLabel = `${club.name}${club.number ? " " + club.number : ""}`;

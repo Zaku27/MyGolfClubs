@@ -1,7 +1,7 @@
 import seedrandom from "seedrandom";
 import { getEstimatedDistance } from "./analysisUtils";
 import type { GolfClub } from "../types/golf";
-import type { ShotQuality } from "../types/game";
+import type { ShotQuality, ShotQualityMetrics } from "../types/game";
 
 export type ClubData = Pick<
   GolfClub,
@@ -34,17 +34,31 @@ export type LandingResult = {
   lateralDeviation: number;
   finalX: number;
   finalY: number;
+  qualityMetrics?: ShotQualityMetrics;
   apexHeight?: number;
   trajectoryPoints?: Array<{ x: number; y: number; z?: number }>;
 };
 
+export type LandingOutcome = {
+  landing: LandingResult;
+  shotQuality: ShotQuality;
+};
+
 type ExecutionProfile = {
   quality: ShotQuality;
-  distanceMultiplier: number;
-  sideSpinRPM: number;
+  carrySigmaMultiplier: number;
+  lateralSigmaMultiplier: number;
+  carryBiasRatio: number;
+};
+
+type DispersionProfile = {
+  carrySigma: number;
+  lateralSigma: number;
+  mishitProbability: number;
 };
 
 const DEFAULT_HEAD_SPEED = 44.5;
+const GLOBAL_CARRY_TUNING = 0.9;
 
 /**
  * 値を最小〜最大の範囲へ丸めるための共通関数。
@@ -117,99 +131,124 @@ function toGolfClubForDistanceModel(club: ClubData): GolfClub {
 }
 
 /**
- * 実行品質をスキル依存で決定する。
- * mishitRate が高いほど mishit へ寄り、dispersion が小さいほど excellent/good が増える。
+ * Box-Muller 法で平均0・標準偏差1の正規乱数を作る。
  */
-function resolveExecutionQuality(rng: () => number, skillLevel: SkillLevel): ShotQuality {
-  const dispersion01 = normalizeSkillValue(skillLevel.dispersion);
-  const mishit01 = normalizeSkillValue(skillLevel.mishitRate);
-  const consistency = 1 - dispersion01;
-
-  const excellentChance = 0.08 + consistency * 0.16;
-  const goodChance = 0.30 + consistency * 0.18;
-  const averageChance = 0.28;
-  const poorChance = 0.18 + mishit01 * 0.12;
-  const mishitChance = 0.06 + mishit01 * 0.26;
-
-  const total = excellentChance + goodChance + averageChance + poorChance + mishitChance;
-  const roll = rng() * total;
-
-  if (roll < excellentChance) return "excellent";
-  if (roll < excellentChance + goodChance) return "good";
-  if (roll < excellentChance + goodChance + averageChance) return "average";
-  if (roll < excellentChance + goodChance + averageChance + poorChance) return "poor";
-  return "mishit";
+function sampleStandardNormal(rng: () => number): number {
+  const u1 = Math.max(1e-9, rng());
+  const u2 = rng();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
 /**
- * 品質ごとの距離倍率とサイドスピンの基準幅を返す。
- * sideSpinRPM の係数はチューニング前提の簡易モデル。
+ * 品質ラベルが外部から与えられたときに、分散を条件付きで制御する。
  */
-function buildExecutionProfile(
-  quality: ShotQuality,
-  skillLevel: SkillLevel,
-  rng: () => number,
-): ExecutionProfile {
-  const sideSpinDispersion01 = normalizeSkillValue(skillLevel.sideSpinDispersion);
-  const sideSpinScale = 1 + sideSpinDispersion01 * 1.6;
-
+function buildForcedExecutionProfile(quality: ShotQuality): ExecutionProfile {
   if (quality === "excellent") {
-    return {
-      quality,
-      distanceMultiplier: randomInRange(rng, 1.02, 1.1),
-      sideSpinRPM: randomInRange(rng, -300, 300) * sideSpinScale,
-    };
+    return { quality, carrySigmaMultiplier: 0.45, lateralSigmaMultiplier: 0.45, carryBiasRatio: 0.02 };
   }
-
   if (quality === "good") {
-    return {
-      quality,
-      distanceMultiplier: randomInRange(rng, 0.96, 1.03),
-      sideSpinRPM: randomInRange(rng, -700, 700) * sideSpinScale,
-    };
+    return { quality, carrySigmaMultiplier: 0.75, lateralSigmaMultiplier: 0.75, carryBiasRatio: 0 };
   }
-
   if (quality === "average") {
-    return {
-      quality,
-      distanceMultiplier: randomInRange(rng, 0.88, 0.98),
-      sideSpinRPM: randomInRange(rng, -1200, 1200) * sideSpinScale,
-    };
+    return { quality, carrySigmaMultiplier: 1, lateralSigmaMultiplier: 1, carryBiasRatio: -0.01 };
   }
-
   if (quality === "poor") {
-    return {
-      quality,
-      distanceMultiplier: randomInRange(rng, 0.72, 0.88),
-      sideSpinRPM: randomInRange(rng, -2200, 2200) * sideSpinScale,
-    };
+    return { quality, carrySigmaMultiplier: 1.35, lateralSigmaMultiplier: 1.45, carryBiasRatio: -0.08 };
   }
+  return { quality, carrySigmaMultiplier: 1.85, lateralSigmaMultiplier: 2.1, carryBiasRatio: -0.2 };
+}
+
+/**
+ * クラブ種別ごとの「通常ショット時のばらつき基準」を返す。
+ * 数値は実測レンジに寄せた目安で、低スキルほど大きい分散になる。
+ */
+function getBaseDispersionByClubType(clubType: GolfClub["clubType"]): {
+  carrySigmaLow: number;
+  carrySigmaHigh: number;
+  lateralSigmaLow: number;
+  lateralSigmaHigh: number;
+  mishitLow: number;
+  mishitHigh: number;
+} {
+  if (clubType === "Driver") {
+    return { carrySigmaLow: 6, carrySigmaHigh: 20, lateralSigmaLow: 10, lateralSigmaHigh: 35, mishitLow: 0.04, mishitHigh: 0.24 };
+  }
+  if (clubType === "Wood") {
+    return { carrySigmaLow: 6, carrySigmaHigh: 16, lateralSigmaLow: 9, lateralSigmaHigh: 30, mishitLow: 0.04, mishitHigh: 0.21 };
+  }
+  if (clubType === "Hybrid") {
+    return { carrySigmaLow: 5, carrySigmaHigh: 14, lateralSigmaLow: 8, lateralSigmaHigh: 26, mishitLow: 0.04, mishitHigh: 0.2 };
+  }
+  if (clubType === "Iron") {
+    return { carrySigmaLow: 4, carrySigmaHigh: 12, lateralSigmaLow: 6, lateralSigmaHigh: 20, mishitLow: 0.03, mishitHigh: 0.16 };
+  }
+  if (clubType === "Wedge") {
+    return { carrySigmaLow: 3, carrySigmaHigh: 9, lateralSigmaLow: 4, lateralSigmaHigh: 12, mishitLow: 0.02, mishitHigh: 0.12 };
+  }
+  return { carrySigmaLow: 1, carrySigmaHigh: 4, lateralSigmaLow: 1, lateralSigmaHigh: 4, mishitLow: 0.01, mishitHigh: 0.08 };
+}
+
+/**
+ * スキル値を、キャリー/横ブレ/大ミス確率に変換する。
+ */
+function buildDispersionProfile(club: ClubData, skillLevel: SkillLevel): DispersionProfile {
+  const skill01 = 1 - normalizeSkillValue(skillLevel.dispersion);
+  const mishitSkill01 = 1 - normalizeSkillValue(skillLevel.mishitRate);
+  const sideSkill01 = 1 - normalizeSkillValue(skillLevel.sideSpinDispersion);
+
+  const base = getBaseDispersionByClubType(club.clubType);
+  const carrySigma = base.carrySigmaHigh - (base.carrySigmaHigh - base.carrySigmaLow) * skill01;
+  const lateralSigma = base.lateralSigmaHigh - (base.lateralSigmaHigh - base.lateralSigmaLow) * sideSkill01;
+  const mishitProbability = base.mishitHigh - (base.mishitHigh - base.mishitLow) * mishitSkill01;
 
   return {
-    quality,
-    distanceMultiplier: randomInRange(rng, 0.45, 0.78),
-    sideSpinRPM: randomInRange(rng, -3500, 3500) * sideSpinScale,
+    carrySigma: Math.max(1, carrySigma),
+    lateralSigma: Math.max(1, lateralSigma),
+    mishitProbability: clamp(mishitProbability, 0.01, 0.35),
   };
 }
 
 /**
- * 飛距離方向（Y軸）に対して前後のばらつきを与える。
+ * 生成したキャリー誤差と横ブレ量から品質ラベルを後判定する。
  */
-function applyDispersion(baseCarry: number, skillLevel: SkillLevel, rng: () => number): number {
-  const dispersion01 = normalizeSkillValue(skillLevel.dispersion);
-  const maxCarryVariationRate = 0.03 + dispersion01 * 0.12;
-  const variation = randomInRange(rng, -maxCarryVariationRate, maxCarryVariationRate);
-  return baseCarry * (1 + variation);
-}
+function classifyQualityByOutcome(
+  carry: number,
+  expectedCarry: number,
+  lateralDeviation: number,
+  profile: DispersionProfile,
+  wasMishitSampled: boolean,
+): { quality: ShotQuality; metrics: ShotQualityMetrics } {
+  const carryZ = Math.abs(carry - expectedCarry) / Math.max(1e-6, profile.carrySigma);
+  const lateralZ = Math.abs(lateralDeviation) / Math.max(1e-6, profile.lateralSigma);
+  // 横ブレだけで poor へ落ちすぎると「Missなのに距離はGood相当」が増えるため、
+  // 距離誤差をやや重く、横ブレをやや軽く評価する。
+  const weightedCarry = carryZ * 1.1;
+  const weightedLateral = lateralZ * 0.75;
+  const score = Math.max(weightedCarry, weightedLateral);
+  const poorThreshold = 1.6;
 
-/**
- * サイドスピンから左右ズレを算出する。
- * 簡易式: lateralDeviation = (sideSpinRPM / 1000) * carry * 係数
- * 係数 0.035 は調整ポイント（実測に合わせて将来チューニング可能）。
- */
-function calculateSideDeviation(sideSpinRPM: number, carry: number): number {
-  const SIDE_DEVIATION_COEFFICIENT = 0.035;
-  return (sideSpinRPM / 1000) * carry * SIDE_DEVIATION_COEFFICIENT;
+  const decisiveAxis: ShotQualityMetrics["decisiveAxis"] =
+    Math.abs(weightedCarry - weightedLateral) < 0.05
+      ? "mixed"
+      : weightedCarry > weightedLateral
+        ? "carry"
+        : "lateral";
+
+  const metrics: ShotQualityMetrics = {
+    carryZ,
+    lateralZ,
+    weightedCarry,
+    weightedLateral,
+    score,
+    poorThreshold,
+    decisiveAxis,
+  };
+
+  if (wasMishitSampled) return { quality: "mishit", metrics };
+  if (score < 0.65) return { quality: "excellent", metrics };
+  if (score < 1.0) return { quality: "good", metrics };
+  if (score < poorThreshold) return { quality: "average", metrics };
+  return { quality: "poor", metrics };
 }
 
 /**
@@ -323,6 +362,24 @@ function calculateRollDistance(
 }
 
 /**
+ * 推定距離を「トータル距離」とみなし、クラブ別ロール率からキャリー基準へ変換する。
+ */
+function estimateCarryFromTotalDistance(
+  estimatedTotalDistance: number,
+  club: Pick<GolfClub, "clubType" | "number" | "loftAngle">,
+  groundHardness: number,
+): number {
+  const baseRollRate = getRollRateByClub(club);
+  const groundHardness01 = clamp(groundHardness, 0, 100) / 100;
+  const groundFactor = 0.8 + groundHardness01 * 0.4;
+  const typicalQualityFactor = 0.98; // average品質寄り
+
+  const effectiveRollRate = Math.max(0, baseRollRate * groundFactor * typicalQualityFactor);
+  const carry = estimatedTotalDistance / (1 + effectiveRollRate);
+  return Math.max(1, carry * GLOBAL_CARRY_TUNING);
+}
+
+/**
  * 簡易放物線の頂点高さを返す。
  */
 function calculateApexHeight(loftAngle: number, carry: number): number {
@@ -351,9 +408,9 @@ function buildTrajectoryPoints(finalX: number, finalY: number, apexHeight: numbe
 }
 
 /**
- * 着地地点を再現可能（seed指定）に計算する純粋関数。
+ * 着地地点と品質を再現可能（seed指定）に計算する純粋関数。
  */
-export function calculateLandingPosition(input: ShotInput): LandingResult {
+export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
   // シード付き乱数を使うことで、同一入力なら常に同一結果になる。
   const rng = seedrandom(buildDeterministicSeed(input));
   const headSpeed = input.conditions?.headSpeed ?? DEFAULT_HEAD_SPEED;
@@ -362,26 +419,64 @@ export function calculateLandingPosition(input: ShotInput): LandingResult {
 
   // 既存の標準飛距離関数を使って、クラブごとの基準値を作る。
   const clubForDistance = toGolfClubForDistanceModel(input.club);
-  const standardDistance = getEstimatedDistance(clubForDistance, headSpeed);
+  const estimatedTotalDistance = getEstimatedDistance(clubForDistance, headSpeed);
+  const expectedCarry = estimateCarryFromTotalDistance(estimatedTotalDistance, input.club, groundHardness);
 
-  // 品質を決めて、距離倍率とサイドスピン量を生成する。
-  // executionQuality が指定された場合はその品質を優先し、未指定時のみ内部抽選する。
-  const quality = input.executionQuality ?? resolveExecutionQuality(rng, input.skillLevel);
-  const execution = buildExecutionProfile(quality, input.skillLevel, rng);
+  // スキルレベルに応じた分散パラメータを作る。
+  const profile = buildDispersionProfile(input.club, input.skillLevel);
 
-  // まず品質倍率を適用し、その後にスキル由来の前後分散を入れる。
-  const carryBeforeDispersion = standardDistance * execution.distanceMultiplier;
-  let carry = applyDispersion(carryBeforeDispersion, input.skillLevel, rng);
+  const forcedQuality = input.executionQuality;
+  const isForced = typeof forcedQuality === "string";
+
+  let carry: number;
+  let lateralDeviation: number;
+  let resolvedQuality: ShotQuality;
+  let qualityMetrics: ShotQualityMetrics;
+
+  if (isForced && forcedQuality) {
+    // 既存の shotQuality と同期させる場合は、品質に応じた条件付き分布で生成する。
+    const forced = buildForcedExecutionProfile(forcedQuality);
+    const carryNoise = sampleStandardNormal(rng) * profile.carrySigma * forced.carrySigmaMultiplier;
+    carry = expectedCarry * (1 + forced.carryBiasRatio) + carryNoise;
+
+    const startLine = sampleStandardNormal(rng) * profile.lateralSigma * 0.7 * forced.lateralSigmaMultiplier;
+    const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.45 * forced.lateralSigmaMultiplier;
+    lateralDeviation = startLine + curve;
+    const forcedResult = classifyQualityByOutcome(carry, expectedCarry, lateralDeviation, profile, forcedQuality === "mishit");
+    resolvedQuality = forcedQuality;
+    qualityMetrics = forcedResult.metrics;
+  } else {
+    // 通常ショット分布 + 大ミス分布の混合モデルで carry と横ブレを生成する。
+    const wasMishit = rng() < profile.mishitProbability;
+
+    if (wasMishit) {
+      const minCarryRate = 0.55;
+      const maxCarryRate = 0.9;
+      carry = expectedCarry * randomInRange(rng, minCarryRate, maxCarryRate);
+      const lateralScale = randomInRange(rng, 1.5, 2.3);
+      const startLine = sampleStandardNormal(rng) * profile.lateralSigma * lateralScale;
+      const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.8 * lateralScale;
+      lateralDeviation = startLine + curve;
+      const classified = classifyQualityByOutcome(carry, expectedCarry, lateralDeviation, profile, true);
+      resolvedQuality = classified.quality;
+      qualityMetrics = classified.metrics;
+    } else {
+      carry = expectedCarry + sampleStandardNormal(rng) * profile.carrySigma;
+      const startLine = sampleStandardNormal(rng) * profile.lateralSigma * 0.75;
+      const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.4;
+      lateralDeviation = startLine + curve;
+      const classified = classifyQualityByOutcome(carry, expectedCarry, lateralDeviation, profile, false);
+      resolvedQuality = classified.quality;
+      qualityMetrics = classified.metrics;
+    }
+  }
 
   // 風は簡易的にY方向へ線形反映する（単位と係数は調整余地あり）。
   carry += wind * 0.8;
   carry = Math.max(1, carry);
 
   // ランはクラブ種別・地面硬さ・品質で決める。
-  const roll = calculateRollDistance(carry, input.club, groundHardness, execution.quality);
-
-  // 横ズレは sideSpinRPM に比例する簡易式で計算する。
-  const lateralDeviation = calculateSideDeviation(execution.sideSpinRPM, carry);
+  const roll = calculateRollDistance(carry, input.club, groundHardness, resolvedQuality);
 
   // ユーザーの狙いオフセットと横ズレを合成して最終X座標を得る。
   const finalX = input.aimXOffset + lateralDeviation;
@@ -393,17 +488,36 @@ export function calculateLandingPosition(input: ShotInput): LandingResult {
   const trajectoryPoints = buildTrajectoryPoints(finalX, finalY, apexHeight);
 
   return {
-    carry: Math.round(carry * 10) / 10,
-    roll: Math.round(roll * 10) / 10,
-    totalDistance: Math.round(totalDistance * 10) / 10,
-    lateralDeviation: Math.round(lateralDeviation * 10) / 10,
-    finalX: Math.round(finalX * 10) / 10,
-    finalY: Math.round(finalY * 10) / 10,
-    apexHeight: Math.round(apexHeight * 10) / 10,
-    trajectoryPoints: trajectoryPoints.map((p) => ({
-      x: Math.round(p.x * 10) / 10,
-      y: Math.round(p.y * 10) / 10,
-      z: Math.round(p.z * 10) / 10,
-    })),
+    shotQuality: resolvedQuality,
+    landing: {
+      carry: Math.round(carry * 10) / 10,
+      roll: Math.round(roll * 10) / 10,
+      totalDistance: Math.round(totalDistance * 10) / 10,
+      lateralDeviation: Math.round(lateralDeviation * 10) / 10,
+      finalX: Math.round(finalX * 10) / 10,
+      finalY: Math.round(finalY * 10) / 10,
+      qualityMetrics: {
+        carryZ: Math.round(qualityMetrics.carryZ * 100) / 100,
+        lateralZ: Math.round(qualityMetrics.lateralZ * 100) / 100,
+        weightedCarry: Math.round(qualityMetrics.weightedCarry * 100) / 100,
+        weightedLateral: Math.round(qualityMetrics.weightedLateral * 100) / 100,
+        score: Math.round(qualityMetrics.score * 100) / 100,
+        poorThreshold: qualityMetrics.poorThreshold,
+        decisiveAxis: qualityMetrics.decisiveAxis,
+      },
+      apexHeight: Math.round(apexHeight * 10) / 10,
+      trajectoryPoints: trajectoryPoints.map((p) => ({
+        x: Math.round(p.x * 10) / 10,
+        y: Math.round(p.y * 10) / 10,
+        z: Math.round(p.z * 10) / 10,
+      })),
+    },
   };
+}
+
+/**
+ * 既存呼び出しとの互換性維持用: 着地地点のみ返すラッパー。
+ */
+export function calculateLandingPosition(input: ShotInput): LandingResult {
+  return calculateLandingOutcome(input).landing;
 }

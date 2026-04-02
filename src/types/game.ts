@@ -37,6 +37,16 @@ export interface ShotContext {
 // ─── Shot result ──────────────────────────────────────────────────────────────
 export type ShotQuality = "excellent" | "good" | "average" | "poor" | "mishit";
 
+export interface ShotQualityMetrics {
+  carryZ: number;
+  lateralZ: number;
+  weightedCarry: number;
+  weightedLateral: number;
+  score: number;
+  poorThreshold: number;
+  decisiveAxis: "carry" | "lateral" | "mixed";
+}
+
 export interface ShotLanding {
   carry: number;
   roll: number;
@@ -44,6 +54,7 @@ export interface ShotLanding {
   lateralDeviation: number;
   finalX: number;
   finalY: number;
+  qualityMetrics?: ShotQualityMetrics;
   apexHeight?: number;
   trajectoryPoints?: Array<{ x: number; y: number; z?: number }>;
 }

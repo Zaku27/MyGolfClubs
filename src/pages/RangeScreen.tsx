@@ -1,17 +1,18 @@
 import { useState } from 'react';
 
-// ショット品質の日本語ラベル関数（ファイル先頭に定義）
+// ショット品質の英語ラベル関数
 function qualityLabel(q: string) {
   switch (q) {
-    case "excellent": return "会心の一打！";
-    case "good": return "ナイスショット！";
-    case "average": return "まずまず";
-    case "poor": return "ミス気味...";
-    case "mishit": return "ミスショット";
+    case "excellent": return "Excellent";
+    case "good": return "Good";
+    case "average": return "Average";
+    case "poor": return "Poor";
+    case "mishit": return "Mishit";
     default: return q;
   }
 }
 import { useClubStore } from '../store/clubStore';
+import { useUserProfileStore } from '../store/userProfileStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
 import { simulateShot, estimateShotDistance } from '../utils/shotSimulation';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
@@ -30,15 +31,18 @@ const WIND_DIRECTIONS = [
 ];
 const SHOT_COUNTS = [5, 10, 20];
 
-const outcomeColor = (outcome: string) => {
-  if (outcome === 'Penalty') return 'text-red-600';
-  if (outcome === 'Miss') return 'text-yellow-600';
-  if (outcome === 'Good') return 'text-green-700';
-  return 'text-green-900';
+const qualityStatusColor = (shotQuality: string) => {
+  if (shotQuality === 'excellent') return 'text-blue-700';
+  if (shotQuality === 'good') return 'text-green-700';
+  if (shotQuality === 'average') return 'text-amber-600';
+  if (shotQuality === 'poor') return 'text-pink-600';
+  if (shotQuality === 'mishit') return 'text-red-600';
+  return 'text-gray-700';
 };
 
 export default function RangeScreen() {
   const { clubs, personalData } = useClubStore();
+  const { profile } = useUserProfileStore();
   // const { playerSkillLevel } = useGameStore();
   const [selectedClubId, setSelectedClubId] = useState<string>('');
   // 打席タイプ: "robot" or "personal"
@@ -145,24 +149,19 @@ export default function RangeScreen() {
           personalData: undefined, // 個人データは使わない
           playerSkillLevel: robotSkillLevel,
           headSpeed: robotHeadSpeed,
+          shotIndex: i,
+          skillWeights: profile.skillWeights,
         };
       } else {
         options = {
           personalData: clubPersonal ?? undefined,
           playerSkillLevel,
+          shotIndex: i,
+          skillWeights: profile.skillWeights,
         };
       }
       const shotResult = simulateShot(clubForSim, context, riskLevel, options);
-      // outcomeを追加
-      let outcome = "";
-      if (shotResult.penalty) {
-        outcome = "Penalty";
-      } else if (!shotResult.wasSuccessful) {
-        outcome = "Miss";
-      } else {
-        outcome = "Good";
-      }
-      shotResults.push({ ...shotResult, outcome });
+      shotResults.push(shotResult);
     }
     setResults(shotResults);
     // ...existing code...
@@ -173,7 +172,26 @@ export default function RangeScreen() {
       distances.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / distances.length
     );
     const success = shotResults.filter((r) => r.wasSuccessful).length / numShots;
-    setSummary({ avg, std, success });
+
+    // 目安値との差分を計算
+    const estimatedDist = simClub
+      ? seatType === 'robot'
+        ? estimateShotDistance(
+            { ...simClub, successRate: 100 },
+            { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+            "normal",
+            { personalData: undefined, headSpeed: robotHeadSpeed, useTheoretical: true }
+          )
+        : estimateShotDistance(
+            simClub,
+            { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+            "normal",
+            { personalData: clubPersonal, headSpeed: undefined, useTheoretical: false }
+          )
+      : 0;
+    const diff = Math.round(avg - estimatedDist);
+
+    setSummary({ avg, std, success, estimatedDist, diff });
     setCalibrated(false);
     setIsSimulating(false);
   };
@@ -214,7 +232,10 @@ export default function RangeScreen() {
 
         {/* ロボット選択時のみ設定UIを表示 */}
         {seatType === 'robot' && (
-          <div className="flex flex-col gap-2 mt-2 bg-green-50 rounded p-3 border border-green-200">
+          <div className="flex flex-col gap-2 mt-2 bg-blue-50 rounded p-3 border border-blue-300">
+            <div className="text-xs text-blue-700 font-semibold bg-blue-100 px-2 py-1 rounded">
+              💡 ロボット打席: クラブの影響を受けないため、成功率は常に100%です
+            </div>
             <div>
               <label className="block font-semibold mb-1">ヘッドスピード (m/s)</label>
               <input
@@ -242,6 +263,55 @@ export default function RangeScreen() {
             </div>
           </div>
         )}
+
+        {/* skillWeights チューニング（全時間共通） */}
+        <div className="mt-4 pt-4 border-t border-green-200">
+          <label className="block font-semibold mb-2">スキル合成の重み</label>
+          <div className="flex flex-col gap-3 bg-blue-50 rounded p-3 border border-blue-200">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                基本スキル重み: {(profile.skillWeights?.baseSkillWeight ?? 0.35).toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={profile.skillWeights?.baseSkillWeight ?? 0.35}
+                onChange={e => {
+                  const { setSkillWeights } = useUserProfileStore.getState();
+                  setSkillWeights(
+                    Number(e.target.value),
+                    profile.skillWeights?.effectiveRateWeight ?? 0.65
+                  );
+                }}
+                className="w-full accent-blue-600"
+              />
+              <span className="text-xs text-gray-600">← 低 | 高 →</span>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                成功率重み: {(profile.skillWeights?.effectiveRateWeight ?? 0.65).toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={profile.skillWeights?.effectiveRateWeight ?? 0.65}
+                onChange={e => {
+                  const { setSkillWeights } = useUserProfileStore.getState();
+                  setSkillWeights(
+                    profile.skillWeights?.baseSkillWeight ?? 0.35,
+                    Number(e.target.value)
+                  );
+                }}
+                className="w-full accent-blue-600"
+              />
+              <span className="text-xs text-gray-600">← 低 | 高 →</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ...既存のクラブ選択UI... */}
@@ -283,7 +353,7 @@ export default function RangeScreen() {
                           simClub,
                           { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
                           "normal",
-                          { personalData: clubPersonal, headSpeed: undefined, useTheoretical: true }
+                           { personalData: clubPersonal, headSpeed: undefined, useTheoretical: false }
                         )
                   ) : '-'} ヤード
                 </span>
@@ -291,18 +361,10 @@ export default function RangeScreen() {
                   有効成功率: {
                     simClub ? (
                       seatType === 'robot'
-                        ? (() => {
-                            // ロボット用: successRate=100, personalDataなし, スキルレベルはrobotSkillLevel
-                            const robotEffective = calculateEffectiveSuccessRate(
-                              simClub as any,
-                              undefined,
-                              robotSkillLevel
-                            );
-                            return (robotEffective * 100).toFixed(1);
-                          })()
-                        : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--')
+                        ? '100 (ロボット固定)'
+                        : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--') + '%'
                     ) : '--'
-                  }%
+                  }
                 </span>
               </div>
             )}
@@ -380,33 +442,58 @@ export default function RangeScreen() {
             <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
             <span>ばらつき: {summary.std.toFixed(1)} ヤード</span>
           </div>
+          {summary.estimatedDist && (
+            <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+              <span className="font-semibold">目安との比較：</span>
+              <span>目安: {summary.estimatedDist} ヤード / 実績平均: {summary.avg.toFixed(1)} ヤード</span>
+              <span className={summary.diff > 0 ? 'text-red-600 font-bold' : summary.diff < 0 ? 'text-blue-600 font-bold' : ''}>
+                {summary.diff > 0 ? ` (+${summary.diff}y)` : summary.diff < 0 ? ` (${summary.diff}y)` : ' (一致)'}
+              </span>
+            </div>
+          )}
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-xs">
               <thead>
                 <tr className="bg-green-100">
-                  <th className="px-2 py-1">#</th>
-                  <th className="px-2 py-1">飛距離</th>
-                  <th className="px-2 py-1">キャリー</th>
-                  <th className="px-2 py-1">ラン</th>
-                  <th className="px-2 py-1">横ブレ</th>
-                  <th className="px-2 py-1">着地X</th>
-                  <th className="px-2 py-1">着地Y</th>
-                  <th className="px-2 py-1">ショット品質</th>
-                  <th className="px-2 py-1">結果</th>
+                  <th className="px-1 py-0.5">#</th>
+                  <th className="px-1 py-0.5">飛距離</th>
+                  <th className="px-1 py-0.5">キャリー</th>
+                  <th className="px-1 py-0.5">ラン</th>
+                  <th className="px-1 py-0.5">横ブレ</th>
+                  <th className="px-1 py-0.5">判定値</th>
+                  <th className="px-1 py-0.5">判定内訳(C/L)</th>
+                  <th className="px-1 py-0.5">着地X</th>
+                  <th className="px-1 py-0.5">着地Y</th>
+                  <th className="px-1 py-0.5">ショット品質</th>
                 </tr>
               </thead>
               <tbody>
                 {results.map((r, i) => (
                   <tr key={i} className="border-b last:border-0">
-                    <td className="px-2 py-1 text-center">{i + 1}</td>
-                    <td className="px-2 py-1 text-center">{(r.landing?.totalDistance ?? r.distanceHit).toFixed(1)}</td>
-                    <td className="px-2 py-1 text-center">{r.landing?.carry?.toFixed(1) ?? '-'}</td>
-                    <td className="px-2 py-1 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
-                    <td className="px-2 py-1 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
-                    <td className="px-2 py-1 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
-                    <td className="px-2 py-1 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
-                    <td className="px-2 py-1 text-center">{qualityLabel(r.shotQuality)}</td>
-                    <td className={`px-2 py-1 text-center font-bold ${outcomeColor(r.outcome)}`}>{r.outcome}</td>
+                    <td className="px-1 py-0.5 text-center">{i + 1}</td>
+                    <td className="px-1 py-0.5 text-center">{(r.landing?.totalDistance ?? r.distanceHit).toFixed(1)}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.carry?.toFixed(1) ?? '-'}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
+                    <td className={`px-1 py-0.5 text-center ${r.landing?.qualityMetrics && r.landing.qualityMetrics.score >= r.landing.qualityMetrics.poorThreshold ? 'text-red-600 font-bold' : ''}`}>
+                      {r.landing?.qualityMetrics ? `${r.landing.qualityMetrics.score.toFixed(2)} / ${r.landing.qualityMetrics.poorThreshold.toFixed(2)}` : '-'}
+                    </td>
+                    <td className="px-1 py-0.5 text-center">
+                      {r.landing?.qualityMetrics ? (
+                        <>
+                          <span className={r.landing.qualityMetrics.decisiveAxis === 'carry' ? 'text-red-600 font-bold' : ''}>
+                            {r.landing.qualityMetrics.weightedCarry.toFixed(2)}
+                          </span>
+                          {' / '}
+                          <span className={r.landing.qualityMetrics.decisiveAxis === 'lateral' ? 'text-red-600 font-bold' : ''}>
+                            {r.landing.qualityMetrics.weightedLateral.toFixed(2)}
+                          </span>
+                        </>
+                      ) : '-'}
+                    </td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
+                    <td className={`px-1 py-0.5 text-center font-bold ${qualityStatusColor(r.shotQuality)}`}>{qualityLabel(r.shotQuality)}</td>
                   </tr>
                 ))}
               </tbody>
