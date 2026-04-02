@@ -39,6 +39,18 @@ export type LandingResult = {
   trajectoryPoints?: Array<{ x: number; y: number; z?: number }>;
 };
 
+export type MonteCarloResult = {
+  shots: LandingResult[];
+  stats: {
+    meanX: number;
+    meanY: number;
+    stdDevX: number;
+    stdDevY: number;
+    correlation?: number;
+    hazardRate?: number;
+  };
+};
+
 export type LandingOutcome = {
   landing: LandingResult;
   shotQuality: ShotQuality;
@@ -214,11 +226,16 @@ function buildDispersionProfile(club: ClubData, skillLevel: SkillLevel): Dispers
 function classifyQualityByOutcome(
   carry: number,
   expectedCarry: number,
+  clubType: GolfClub["clubType"],
   lateralDeviation: number,
   profile: DispersionProfile,
   wasMishitSampled: boolean,
 ): { quality: ShotQuality; metrics: ShotQualityMetrics } {
-  const carryZ = Math.abs(carry - expectedCarry) / Math.max(1e-6, profile.carrySigma);
+  const carryDelta = carry - expectedCarry;
+  const rawCarryZ = Math.abs(carryDelta) / Math.max(1e-6, profile.carrySigma);
+  // Driverは「飛びすぎ」を原則ネガティブ評価しない。
+  // 方向性ミスは lateral 側で評価し、距離上振れ単体では品質を落としにくくする。
+  const carryZ = clubType === "Driver" && carryDelta > 0 ? 0 : rawCarryZ;
   const lateralZ = Math.abs(lateralDeviation) / Math.max(1e-6, profile.lateralSigma);
   // 横ブレだけで poor へ落ちすぎると「Missなのに距離はGood相当」が増えるため、
   // 距離誤差をやや重く、横ブレをやや軽く評価する。
@@ -442,7 +459,14 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
     const startLine = sampleStandardNormal(rng) * profile.lateralSigma * 0.7 * forced.lateralSigmaMultiplier;
     const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.45 * forced.lateralSigmaMultiplier;
     lateralDeviation = startLine + curve;
-    const forcedResult = classifyQualityByOutcome(carry, expectedCarry, lateralDeviation, profile, forcedQuality === "mishit");
+    const forcedResult = classifyQualityByOutcome(
+      carry,
+      expectedCarry,
+      input.club.clubType,
+      lateralDeviation,
+      profile,
+      forcedQuality === "mishit"
+    );
     resolvedQuality = forcedQuality;
     qualityMetrics = forcedResult.metrics;
   } else {
@@ -457,7 +481,14 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
       const startLine = sampleStandardNormal(rng) * profile.lateralSigma * lateralScale;
       const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.8 * lateralScale;
       lateralDeviation = startLine + curve;
-      const classified = classifyQualityByOutcome(carry, expectedCarry, lateralDeviation, profile, true);
+      const classified = classifyQualityByOutcome(
+        carry,
+        expectedCarry,
+        input.club.clubType,
+        lateralDeviation,
+        profile,
+        true
+      );
       resolvedQuality = classified.quality;
       qualityMetrics = classified.metrics;
     } else {
@@ -465,7 +496,14 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
       const startLine = sampleStandardNormal(rng) * profile.lateralSigma * 0.75;
       const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.4;
       lateralDeviation = startLine + curve;
-      const classified = classifyQualityByOutcome(carry, expectedCarry, lateralDeviation, profile, false);
+      const classified = classifyQualityByOutcome(
+        carry,
+        expectedCarry,
+        input.club.clubType,
+        lateralDeviation,
+        profile,
+        false
+      );
       resolvedQuality = classified.quality;
       qualityMetrics = classified.metrics;
     }

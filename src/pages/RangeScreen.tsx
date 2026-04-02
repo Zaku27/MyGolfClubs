@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // ショット品質の英語ラベル関数
 function qualityLabel(q: string) {
@@ -16,6 +16,9 @@ import { useUserProfileStore } from '../store/userProfileStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
 import { simulateShot, estimateShotDistance } from '../utils/shotSimulation';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
+import ShotDispersionChart from '../components/ShotDispersionChart';
+import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
+import type { LieType, RiskLevel, ShotResult, WindDirection } from '../types/game';
 
 const LIE_OPTIONS = [
   'フェアウェイ',
@@ -40,6 +43,102 @@ const qualityStatusColor = (shotQuality: string) => {
   return 'text-gray-700';
 };
 
+type RangeSummary = {
+  avg: number;
+  std: number;
+  success: number;
+  estimatedDist: number;
+  diff: number;
+};
+
+function mapLieUiToGameLie(lie: string): LieType {
+  switch (lie) {
+    case 'フェアウェイ': return 'fairway';
+    case 'ラフ':
+    case '薄いラフ': return 'rough';
+    case 'バンカー': return 'bunker';
+    case 'グリーン': return 'green';
+    default: return 'fairway';
+  }
+}
+
+function mapWindDirToGameWind(windDir: string): WindDirection {
+  switch (windDir) {
+    case 'head': return 'headwind';
+    case 'tail': return 'tailwind';
+    case 'cross': return 'crosswind';
+    default: return 'none';
+  }
+}
+
+function toLandingResult(raw: ShotResult): LandingResult | null {
+  const landing = raw?.landing;
+  if (!landing) return null;
+
+  const finalX = Number(landing.finalX);
+  const finalY = Number(landing.finalY);
+  if (!Number.isFinite(finalX) || !Number.isFinite(finalY)) return null;
+
+  const carry = Number(landing.carry);
+  const roll = Number(landing.roll);
+  const totalDistance = Number(landing.totalDistance);
+  const lateralDeviation = Number(landing.lateralDeviation);
+
+  return {
+    carry: Number.isFinite(carry) ? carry : finalY,
+    roll: Number.isFinite(roll) ? roll : 0,
+    totalDistance: Number.isFinite(totalDistance) ? totalDistance : finalY,
+    lateralDeviation: Number.isFinite(lateralDeviation) ? lateralDeviation : finalX,
+    finalX,
+    finalY,
+    qualityMetrics: landing.qualityMetrics,
+    apexHeight: landing.apexHeight,
+    trajectoryPoints: landing.trajectoryPoints,
+  };
+}
+
+function buildMonteCarloResult(rawResults: ShotResult[]): MonteCarloResult {
+  const shots = rawResults
+    .map((r) => toLandingResult(r))
+    .filter((shot): shot is LandingResult => shot !== null);
+
+  if (shots.length === 0) {
+    return {
+      shots: [],
+      stats: {
+        meanX: 0,
+        meanY: 0,
+        stdDevX: 0,
+        stdDevY: 0,
+        correlation: 0,
+      },
+    };
+  }
+
+  const meanX = shots.reduce((sum, shot) => sum + shot.finalX, 0) / shots.length;
+  const meanY = shots.reduce((sum, shot) => sum + shot.finalY, 0) / shots.length;
+  const varianceX = shots.reduce((sum, shot) => sum + (shot.finalX - meanX) ** 2, 0) / shots.length;
+  const varianceY = shots.reduce((sum, shot) => sum + (shot.finalY - meanY) ** 2, 0) / shots.length;
+  const covariance = shots.reduce((sum, shot) => sum + (shot.finalX - meanX) * (shot.finalY - meanY), 0) / shots.length;
+  const stdDevX = Math.sqrt(varianceX);
+  const stdDevY = Math.sqrt(varianceY);
+
+  // X/Y のばらつきの連動を相関係数として保持しておくと、
+  // 可視化側で軸平行ではない回転楕円を描ける。
+  const correlation = stdDevX > 0 && stdDevY > 0 ? covariance / (stdDevX * stdDevY) : 0;
+
+  return {
+    shots,
+    stats: {
+      meanX,
+      meanY,
+      stdDevX,
+      stdDevY,
+      correlation,
+    },
+  };
+}
+
 export default function RangeScreen() {
   const { clubs, personalData } = useClubStore();
   const { profile } = useUserProfileStore();
@@ -54,10 +153,37 @@ export default function RangeScreen() {
   const [windSpeed, setWindSpeed] = useState<number>(0);
   const [windDir, setWindDir] = useState<string>('tail');
   const [numShots, setNumShots] = useState<number>(10);
-  const [results, setResults] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>(null);
+  const [results, setResults] = useState<ShotResult[]>([]);
+  const [summary, setSummary] = useState<RangeSummary | null>(null);
   const [calibrated, setCalibrated] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [showRobotHint, setShowRobotHint] = useState(false);
+  const robotHintRef = useRef<HTMLDivElement | null>(null);
+  const monteCarloResult = buildMonteCarloResult(results);
+  const chartTarget = { x: 0, y: summary?.estimatedDist ?? 0 };
+  const skillLevelName =
+    seatType === 'robot' ? `Robot Skill ${(robotSkillLevel * 100).toFixed(0)}%` : 'Personal Skill';
+  const gameLie = mapLieUiToGameLie(lie);
+  const gameWind = mapWindDirToGameWind(windDir);
+
+  useEffect(() => {
+    if (!showRobotHint) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) return;
+      if (robotHintRef.current && !robotHintRef.current.contains(targetNode)) {
+        setShowRobotHint(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, [showRobotHint]);
 
   // avgDistanceが無い場合はdistanceをavgDistanceとして使う
   let selectedClub = clubs.find((c) => String(c.id) === String(selectedClubId));
@@ -118,27 +244,17 @@ export default function RangeScreen() {
   const handleSimulate = async () => {
     if (!simClub) return;
     setIsSimulating(true);
-    const shotResults = [];
+    const shotResults: ShotResult[] = [];
     for (let i = 0; i < numShots; i++) {
-      // lieをLieTypeに変換
-      let lieType: import('../types/game').LieType = 'fairway';
-      switch (lie) {
-        case 'フェアウェイ': lieType = 'fairway'; break;
-        case 'ラフ':
-        case '薄いラフ': lieType = 'rough'; break;
-        case 'バンカー': lieType = 'bunker'; break;
-        case 'グリーン': lieType = 'green'; break;
-        default: lieType = 'fairway';
-      }
       const context = {
-        lie: lieType,
-        wind: windDir as any,
+        lie: gameLie,
+        wind: gameWind,
         windStrength: windSpeed,
         remainingDistance: simClub.avgDistance,
         hazards: [],
         shotPowerPercent: 100,
       };
-      const riskLevel = "normal";
+      const riskLevel: RiskLevel = 'normal';
 
       // ロボット打席の場合はクラブ成功率100%、スキル・ヘッドスピードをロボット値で渡す
       let clubForSim = simClub;
@@ -178,13 +294,13 @@ export default function RangeScreen() {
       ? seatType === 'robot'
         ? estimateShotDistance(
             { ...simClub, successRate: 100 },
-            { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+            { lie: gameLie, wind: gameWind, windStrength: windSpeed },
             "normal",
             { personalData: undefined, headSpeed: robotHeadSpeed, useTheoretical: true }
           )
         : estimateShotDistance(
             simClub,
-            { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+            { lie: gameLie, wind: gameWind, windStrength: windSpeed },
             "normal",
             { personalData: clubPersonal, headSpeed: undefined, useTheoretical: false }
           )
@@ -198,7 +314,11 @@ export default function RangeScreen() {
 
   const handleCalibrate = () => {
     if (!simClub || !results.length || !clubPersonal) return;
-    rangeAutoCalibrate({ ...simClub, id: Number(simClub.id) }, clubPersonal, results);
+    const calibrationResults = results.map((result) => ({
+      outcome: result.penalty ? 'Penalty' : result.wasSuccessful ? 'Success' : 'Miss',
+      distance: result.distanceHit,
+    }));
+    rangeAutoCalibrate({ ...simClub, id: Number(simClub.id) }, clubPersonal, calibrationResults);
     setCalibrated(true);
   };
 
@@ -233,9 +353,6 @@ export default function RangeScreen() {
         {/* ロボット選択時のみ設定UIを表示 */}
         {seatType === 'robot' && (
           <div className="flex flex-col gap-2 mt-2 bg-blue-50 rounded p-3 border border-blue-300">
-            <div className="text-xs text-blue-700 font-semibold bg-blue-100 px-2 py-1 rounded">
-              💡 ロボット打席: クラブの影響を受けないため、成功率は常に100%です
-            </div>
             <div>
               <label className="block font-semibold mb-1">ヘッドスピード (m/s)</label>
               <input
@@ -264,54 +381,56 @@ export default function RangeScreen() {
           </div>
         )}
 
-        {/* skillWeights チューニング（全時間共通） */}
-        <div className="mt-4 pt-4 border-t border-green-200">
-          <label className="block font-semibold mb-2">スキル合成の重み</label>
-          <div className="flex flex-col gap-3 bg-blue-50 rounded p-3 border border-blue-200">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                基本スキル重み: {(profile.skillWeights?.baseSkillWeight ?? 0.35).toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={profile.skillWeights?.baseSkillWeight ?? 0.35}
-                onChange={e => {
-                  const { setSkillWeights } = useUserProfileStore.getState();
-                  setSkillWeights(
-                    Number(e.target.value),
-                    profile.skillWeights?.effectiveRateWeight ?? 0.65
-                  );
-                }}
-                className="w-full accent-blue-600"
-              />
-              <span className="text-xs text-gray-600">← 低 | 高 →</span>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                成功率重み: {(profile.skillWeights?.effectiveRateWeight ?? 0.65).toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={profile.skillWeights?.effectiveRateWeight ?? 0.65}
-                onChange={e => {
-                  const { setSkillWeights } = useUserProfileStore.getState();
-                  setSkillWeights(
-                    profile.skillWeights?.baseSkillWeight ?? 0.35,
-                    Number(e.target.value)
-                  );
-                }}
-                className="w-full accent-blue-600"
-              />
-              <span className="text-xs text-gray-600">← 低 | 高 →</span>
+        {/* 個人データ打席のみ、スキル合成の重み調整を表示する */}
+        {seatType !== 'robot' && (
+          <div className="mt-4 pt-4 border-t border-green-200">
+            <label className="block font-semibold mb-2">スキル合成の重み</label>
+            <div className="flex flex-col gap-3 bg-blue-50 rounded p-3 border border-blue-200">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  基本スキル重み: {(profile.skillWeights?.baseSkillWeight ?? 0.35).toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={profile.skillWeights?.baseSkillWeight ?? 0.35}
+                  onChange={e => {
+                    const { setSkillWeights } = useUserProfileStore.getState();
+                    setSkillWeights(
+                      Number(e.target.value),
+                      profile.skillWeights?.effectiveRateWeight ?? 0.65
+                    );
+                  }}
+                  className="w-full accent-blue-600"
+                />
+                <span className="text-xs text-gray-600">← 低 | 高 →</span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  成功率重み: {(profile.skillWeights?.effectiveRateWeight ?? 0.65).toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={profile.skillWeights?.effectiveRateWeight ?? 0.65}
+                  onChange={e => {
+                    const { setSkillWeights } = useUserProfileStore.getState();
+                    setSkillWeights(
+                      profile.skillWeights?.baseSkillWeight ?? 0.35,
+                      Number(e.target.value)
+                    );
+                  }}
+                  className="w-full accent-blue-600"
+                />
+                <span className="text-xs text-gray-600">← 低 | 高 →</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ...既存のクラブ選択UI... */}
@@ -345,27 +464,47 @@ export default function RangeScreen() {
                     seatType === 'robot'
                       ? estimateShotDistance(
                           { ...simClub, successRate: 100 },
-                          { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+                          { lie: gameLie, wind: gameWind, windStrength: windSpeed },
                           "normal",
                           { personalData: undefined, headSpeed: robotHeadSpeed, useTheoretical: true }
                         )
                       : estimateShotDistance(
                           simClub,
-                          { lie: lie as any, wind: windDir as any, windStrength: windSpeed },
+                          { lie: gameLie, wind: gameWind, windStrength: windSpeed },
                           "normal",
                            { personalData: clubPersonal, headSpeed: undefined, useTheoretical: false }
                         )
                   ) : '-'} ヤード
                 </span>
-                <span>
-                  有効成功率: {
-                    simClub ? (
-                      seatType === 'robot'
-                        ? '100 (ロボット固定)'
-                        : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--') + '%'
-                    ) : '--'
-                  }
-                </span>
+                <div ref={robotHintRef} className="relative">
+                  <span className="inline-flex items-center gap-2">
+                    <span>
+                      有効成功率: {
+                        simClub ? (
+                          seatType === 'robot'
+                            ? '100 (ロボット固定)'
+                            : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--') + '%'
+                        ) : '--'
+                      }
+                    </span>
+                    {seatType === 'robot' && (
+                      <button
+                        type="button"
+                        aria-label="ロボット打席の有効成功率ヒント"
+                        aria-expanded={showRobotHint}
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-300 bg-blue-100 text-xs font-bold text-blue-700"
+                        onClick={() => setShowRobotHint((prev) => !prev)}
+                      >
+                        ?
+                      </button>
+                    )}
+                  </span>
+                  {seatType === 'robot' && showRobotHint && (
+                    <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-md border border-blue-300 bg-white p-2 text-xs leading-relaxed text-blue-900 shadow-lg">
+                      ロボット打席はクラブの個体差や個人データの影響を受けないため、有効成功率は常に100%で固定されます。
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -441,6 +580,15 @@ export default function RangeScreen() {
             <span>平均: {summary.avg.toFixed(1)} ヤード</span>
             <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
             <span>ばらつき: {summary.std.toFixed(1)} ヤード</span>
+          </div>
+          <div className="mb-4 rounded border border-green-200 bg-green-50/40 p-2">
+            <ShotDispersionChart
+              monteCarloResult={monteCarloResult}
+              target={chartTarget}
+              clubName={selectedClub?.name ?? 'Club'}
+              skillLevelName={skillLevelName}
+              numShots={numShots}
+            />
           </div>
           {summary.estimatedDist && (
             <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
