@@ -43,6 +43,8 @@ type ConfidenceLevelOption = {
 
 const DEFAULT_CHART_HEIGHT = 360;
 const DEFAULT_CONFIDENCE_LEVEL: ConfidenceLevelOption['value'] = 0.95;
+const TARGET_GREEN_RADIUS_YARDS = 15;
+const STANDARD_MAX_CARRY_MULTIPLIER = 1.15;
 const CONFIDENCE_LEVEL_OPTIONS: ConfidenceLevelOption[] = [
   { value: 0.68, label: '68%' },
   { value: 0.95, label: '95%' },
@@ -128,9 +130,21 @@ export function ShotDispersionChart({
       .filter((v) => Number.isFinite(v))
       .concat(target.y, Number(meanPoint.y), confidenceEllipse.y - ellipseHalfHeight, confidenceEllipse.y + ellipseHalfHeight);
 
+    const yRange = calculateAxisRange(yValues, -20, 240);
+
+    // 長く飛びすぎる側の表示が過度に広がらないよう、標準飛距離ベースで上限をかける。
+    // 要件: yMax = Math.min(計算値, meanY + standardMaxCarry)
+    // standardMaxCarry は標準飛距離 * 1.15 とする。
+    const baseStandardDistance = target.y > 0 ? target.y : Number(meanPoint.y);
+    const standardMaxCarry = Math.max(0, baseStandardDistance * STANDARD_MAX_CARRY_MULTIPLIER);
+    const cappedYMax = Math.min(yRange.max, Number(meanPoint.y) + standardMaxCarry);
+
     return {
       x: calculateAxisRange(xValues, -20, 20),
-      y: calculateAxisRange(yValues, -20, 240),
+      y: {
+        min: yRange.min,
+        max: Math.max(yRange.min + 1, Math.ceil(cappedYMax)),
+      },
     };
   }, [confidenceEllipse.height, confidenceEllipse.width, confidenceEllipse.x, confidenceEllipse.y, meanPoint.x, meanPoint.y, shotPoints, target.x, target.y]);
 
@@ -144,9 +158,27 @@ export function ShotDispersionChart({
       yMin: confidenceEllipse.y - confidenceEllipse.height / 2,
       yMax: confidenceEllipse.y + confidenceEllipse.height / 2,
       rotation: confidenceEllipse.rotation ?? 0,
-      backgroundColor: 'rgba(75, 192, 192, 0.15)',
-      borderColor: 'rgba(75, 192, 192, 0.8)',
-      borderWidth: 2,
+      backgroundColor: (context: any) => {
+        const chart = context?.chart;
+        const xScale = chart?.scales?.x;
+        const yScale = chart?.scales?.y;
+        if (!chart?.ctx || !xScale || !yScale) {
+          return 'rgba(75, 192, 192, 0.18)';
+        }
+
+        const cx = xScale.getPixelForValue(confidenceEllipse.x);
+        const cy = yScale.getPixelForValue(confidenceEllipse.y);
+        const xHalf = Math.abs(xScale.getPixelForValue(confidenceEllipse.x + confidenceEllipse.width / 2) - cx);
+        const yHalf = Math.abs(yScale.getPixelForValue(confidenceEllipse.y + confidenceEllipse.height / 2) - cy);
+        const radius = Math.max(8, Math.max(xHalf, yHalf));
+
+        const gradient = chart.ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        gradient.addColorStop(0, 'rgba(75, 192, 192, 0.34)');
+        gradient.addColorStop(0.55, 'rgba(75, 192, 192, 0.20)');
+        gradient.addColorStop(1, 'rgba(75, 192, 192, 0.05)');
+        return gradient;
+      },
+      borderWidth: 0,
       label: {
         display: true,
         content: confidenceLabel,
@@ -161,6 +193,29 @@ export function ShotDispersionChart({
       },
     };
   }, [confidenceEllipse.height, confidenceEllipse.rotation, confidenceEllipse.width, confidenceEllipse.x, confidenceEllipse.y, confidenceLabel]);
+
+  const targetGreenAnnotation = useMemo(() => {
+    return {
+      type: 'ellipse' as const,
+      xMin: target.x - TARGET_GREEN_RADIUS_YARDS,
+      xMax: target.x + TARGET_GREEN_RADIUS_YARDS,
+      yMin: target.y - TARGET_GREEN_RADIUS_YARDS,
+      yMax: target.y + TARGET_GREEN_RADIUS_YARDS,
+      drawTime: 'beforeDatasetsDraw' as const,
+      backgroundColor: 'rgba(34, 197, 94, 0.14)',
+      borderColor: 'rgba(22, 163, 74, 0.85)',
+      borderWidth: 2,
+      label: {
+        display: true,
+        content: '目標 (半径15y)',
+        position: { x: 'center', y: 'end' } as const,
+        yAdjust: -8,
+        color: 'rgba(20, 83, 45, 0.95)',
+        backgroundColor: 'rgba(255, 255, 255, 0.75)',
+        padding: 5,
+      },
+    };
+  }, [target.x, target.y]);
 
   const data = useMemo<ChartData<'scatter', DispersionPoint[]>>(
     () => ({
@@ -191,7 +246,7 @@ export function ShotDispersionChart({
               {
                 label: '平均位置',
                 data: [meanPoint],
-                backgroundColor: 'rgba(46, 125, 50, 0.95)',
+                backgroundColor: 'rgba(249, 115, 22, 0.95)',
                 pointRadius: 7,
                 pointHoverRadius: 9,
                 pointStyle: 'rectRot' as const,
@@ -211,6 +266,7 @@ export function ShotDispersionChart({
         // annotation に楕円や将来のハザード矩形を集約すると、可視オーバーレイの責務が明確になる。
         annotation: {
           annotations: {
+            targetGreen: targetGreenAnnotation,
             confidenceEllipse: confidenceEllipseAnnotation,
           },
         },
@@ -302,6 +358,7 @@ export function ShotDispersionChart({
       axisRange.y.min,
       clubName,
       confidenceEllipseAnnotation,
+      targetGreenAnnotation,
       numShots,
       skillLevelName,
     ],
