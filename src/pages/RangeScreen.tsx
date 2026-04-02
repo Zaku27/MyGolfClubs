@@ -49,6 +49,7 @@ type RangeSummary = {
   success: number;
   estimatedDist: number;
   diff: number;
+  avgToTargetDistance: number;
 };
 
 function mapLieUiToGameLie(lie: string): LieType {
@@ -157,6 +158,8 @@ export default function RangeScreen() {
   const [summary, setSummary] = useState<RangeSummary | null>(null);
   const [calibrated, setCalibrated] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [reuseLastSeed, setReuseLastSeed] = useState(false);
+  const [lastSimulationSeedNonce, setLastSimulationSeedNonce] = useState<string | null>(null);
   const [showRobotHint, setShowRobotHint] = useState(false);
   const robotHintRef = useRef<HTMLDivElement | null>(null);
   const monteCarloResult = buildMonteCarloResult(results);
@@ -245,6 +248,10 @@ export default function RangeScreen() {
     if (!simClub) return;
     setIsSimulating(true);
     const shotResults: ShotResult[] = [];
+    const simulationSeedNonce = reuseLastSeed && lastSimulationSeedNonce
+      ? lastSimulationSeedNonce
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    setLastSimulationSeedNonce(simulationSeedNonce);
     for (let i = 0; i < numShots; i++) {
       const context = {
         lie: gameLie,
@@ -266,6 +273,7 @@ export default function RangeScreen() {
           playerSkillLevel: robotSkillLevel,
           headSpeed: robotHeadSpeed,
           shotIndex: i,
+          seedNonce: simulationSeedNonce,
           skillWeights: profile.skillWeights,
         };
       } else {
@@ -273,6 +281,7 @@ export default function RangeScreen() {
           personalData: clubPersonal ?? undefined,
           playerSkillLevel,
           shotIndex: i,
+          seedNonce: simulationSeedNonce,
           skillWeights: profile.skillWeights,
         };
       }
@@ -306,8 +315,16 @@ export default function RangeScreen() {
           )
       : 0;
     const diff = Math.round(avg - estimatedDist);
+    const avgToTargetDistance =
+      shotResults.reduce((sum, result) => {
+        const finalX = result.landing?.finalX ?? 0;
+        const finalY = result.landing?.finalY ?? (result.landing?.totalDistance ?? result.distanceHit ?? 0);
+        const dx = finalX;
+        const dy = finalY - estimatedDist;
+        return sum + Math.sqrt(dx * dx + dy * dy);
+      }, 0) / Math.max(1, shotResults.length);
 
-    setSummary({ avg, std, success, estimatedDist, diff });
+    setSummary({ avg, std, success, estimatedDist, diff, avgToTargetDistance });
     setCalibrated(false);
     setIsSimulating(false);
   };
@@ -561,6 +578,39 @@ export default function RangeScreen() {
             ))}
           </div>
         </div>
+        <div className="rounded border border-green-200 bg-green-50 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <label htmlFor="reuse-last-seed" className="block font-semibold text-green-900">
+                再実行時の乱数
+              </label>
+              <p className="text-xs text-gray-600">
+                {reuseLastSeed
+                  ? '前回と同じ乱数で再実行します。条件が同じなら結果も再現されます。'
+                  : '毎回新しい乱数で再実行します。'}
+              </p>
+            </div>
+            <label htmlFor="reuse-last-seed" className="inline-flex cursor-pointer items-center gap-2">
+              <span className={`text-sm font-medium ${reuseLastSeed ? 'text-green-900' : 'text-gray-500'}`}>
+                同じ乱数
+              </span>
+              <span className="relative inline-flex items-center">
+                <input
+                  id="reuse-last-seed"
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={reuseLastSeed}
+                  onChange={(e) => setReuseLastSeed(e.target.checked)}
+                />
+                <span className="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-green-600" />
+                <span className="pointer-events-none absolute left-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+              </span>
+              <span className={`text-sm font-medium ${reuseLastSeed ? 'text-gray-500' : 'text-green-900'}`}>
+                新しい乱数
+              </span>
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* Hit Shots Button */}
@@ -577,9 +627,9 @@ export default function RangeScreen() {
         <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
           <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="font-bold text-green-900">セッション結果：</span>
-            <span>平均: {summary.avg.toFixed(1)} ヤード</span>
+            <span>平均: {summary.avg.toFixed(1)} y</span>
             <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
-            <span>ばらつき: {summary.std.toFixed(1)} ヤード</span>
+            <span>目標まで平均距離: {(summary.avgToTargetDistance ?? 0).toFixed(1)} y</span>
           </div>
           <div className="mb-4 rounded border border-green-200 bg-green-50/40 p-2">
             <ShotDispersionChart
@@ -593,7 +643,7 @@ export default function RangeScreen() {
           {summary.estimatedDist && (
             <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
               <span className="font-semibold">目安との比較：</span>
-              <span>目安: {summary.estimatedDist} ヤード / 実績平均: {summary.avg.toFixed(1)} ヤード</span>
+              <span>目安: {summary.estimatedDist} y / 実績平均: {summary.avg.toFixed(1)} y</span>
               <span className={summary.diff > 0 ? 'text-red-600 font-bold' : summary.diff < 0 ? 'text-blue-600 font-bold' : ''}>
                 {summary.diff > 0 ? ` (+${summary.diff}y)` : summary.diff < 0 ? ` (${summary.diff}y)` : ' (一致)'}
               </span>

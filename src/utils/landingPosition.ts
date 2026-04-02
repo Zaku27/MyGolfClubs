@@ -67,6 +67,7 @@ type DispersionProfile = {
   carrySigma: number;
   lateralSigma: number;
   mishitProbability: number;
+  effectiveSkill: number;
 };
 
 const DEFAULT_HEAD_SPEED = 44.5;
@@ -211,12 +212,16 @@ function buildDispersionProfile(club: ClubData, skillLevel: SkillLevel): Dispers
   const base = getBaseDispersionByClubType(club.clubType);
   const carrySigma = base.carrySigmaHigh - (base.carrySigmaHigh - base.carrySigmaLow) * skill01;
   const lateralSigma = base.lateralSigmaHigh - (base.lateralSigmaHigh - base.lateralSigmaLow) * sideSkill01;
-  const mishitProbability = base.mishitHigh - (base.mishitHigh - base.mishitLow) * mishitSkill01;
+  // 上級者では大ミス発生率を急減、初心者では発生率を高める非線形カーブ。
+  const mishitSkillCurve = Math.pow(clamp(mishitSkill01, 0, 1), 1.7);
+  const mishitProbability = base.mishitHigh - (base.mishitHigh - base.mishitLow) * mishitSkillCurve;
+  const effectiveSkill = clamp((skill01 + mishitSkill01 + sideSkill01) / 3, 0, 1);
 
   return {
     carrySigma: Math.max(1, carrySigma),
     lateralSigma: Math.max(1, lateralSigma),
-    mishitProbability: clamp(mishitProbability, 0.01, 0.35),
+    mishitProbability: clamp(mishitProbability, 0.003, 0.40),
+    effectiveSkill,
   };
 }
 
@@ -474,10 +479,14 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
     const wasMishit = rng() < profile.mishitProbability;
 
     if (wasMishit) {
-      const minCarryRate = 0.55;
-      const maxCarryRate = 0.9;
+      // 初心者ほど極端ミスが大きく、上級者ほど「軽いミス」で収まりやすくする。
+      const noviceFactor = 1 - profile.effectiveSkill;
+      const minCarryRate = 0.78 - noviceFactor * 0.42; // 上級: ~0.78 / 初心者: ~0.36
+      const maxCarryRate = 0.95 - noviceFactor * 0.14; // 上級: ~0.95 / 初心者: ~0.81
       carry = expectedCarry * randomInRange(rng, minCarryRate, maxCarryRate);
-      const lateralScale = randomInRange(rng, 1.5, 2.3);
+      const lateralMin = 1.15 + noviceFactor * 0.65; // 上級: ~1.15 / 初心者: ~1.80
+      const lateralMax = 1.65 + noviceFactor * 1.45; // 上級: ~1.65 / 初心者: ~3.10
+      const lateralScale = randomInRange(rng, lateralMin, lateralMax);
       const startLine = sampleStandardNormal(rng) * profile.lateralSigma * lateralScale;
       const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.8 * lateralScale;
       lateralDeviation = startLine + curve;

@@ -32,6 +32,7 @@ interface SimulationOptions {
   headSpeed?: number;
   useTheoretical?: boolean;
   shotIndex?: number;
+  seedNonce?: string;
   skillWeights?: {
     baseSkillWeight: number;
     effectiveRateWeight: number;
@@ -39,6 +40,27 @@ interface SimulationOptions {
 }
 
 const WEAK_CLUB_EFFECT_SCALE = 0.5;
+
+function hashSeed(seed: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createSeededRandom(seed: string): () => number {
+  let state = hashSeed(seed) || 0x6d2b79f5;
+
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -213,15 +235,16 @@ function resolveNewLie(
   isGoodShot: boolean,
   penalty: boolean,
   risk: RiskLevel,
+  random: () => number,
 ): LieType {
   if (penalty)         return "penalty";
   if (remaining === 0) return "green";
   if (remaining <= 30) return "green";
   if (!isGoodShot) {
-    return Math.random() < 0.28 ? "bunker" : "rough";
+    return random() < 0.28 ? "bunker" : "rough";
   }
   const roughChance = risk === "aggressive" ? 0.20 : risk === "safe" ? 0.05 : 0.12;
-  return Math.random() < roughChance ? "rough" : "fairway";
+  return random() < roughChance ? "rough" : "fairway";
 }
 
 function getNonPutterHoleOutChance(remainingDistance: number, shotQuality: ShotQuality): number {
@@ -249,11 +272,11 @@ function getNonPutterHoleOutChance(remainingDistance: number, shotQuality: ShotQ
   return shotQuality === "excellent" ? 0.001 : 0;
 }
 
-function getNearCupLeaveDistance(shotQuality: ShotQuality): number {
-  if (shotQuality === "excellent") return 1 + Math.floor(Math.random() * 2); // 1-2y
-  if (shotQuality === "good") return 1 + Math.floor(Math.random() * 4); // 1-4y
-  if (shotQuality === "average") return 2 + Math.floor(Math.random() * 5); // 2-6y
-  return 3 + Math.floor(Math.random() * 6); // 3-8y
+function getNearCupLeaveDistance(shotQuality: ShotQuality, random: () => number): number {
+  if (shotQuality === "excellent") return 1 + Math.floor(random() * 2); // 1-2y
+  if (shotQuality === "good") return 1 + Math.floor(random() * 4); // 1-4y
+  if (shotQuality === "average") return 2 + Math.floor(random() * 5); // 2-6y
+  return 3 + Math.floor(random() * 6); // 3-8y
 }
 
 function mapWindToLanding(wind: WindDirection | undefined, windStrength: number): number {
@@ -317,7 +340,12 @@ const QUALITY_LABELS: Record<ShotQuality, string> = {
 
 // ─── Putting ──────────────────────────────────────────────────────────────────
 
-function simulatePutt(remaining: number, confidenceBoost: number, playerSkillLevel: number = 0.5): {
+function simulatePutt(
+  remaining: number,
+  confidenceBoost: number,
+  playerSkillLevel: number = 0.5,
+  random: () => number = Math.random,
+): {
   made: boolean;
   newRemaining: number;
   message: string;
@@ -340,7 +368,7 @@ function simulatePutt(remaining: number, confidenceBoost: number, playerSkillLev
   // 信頼度ブーストも加味
   makeChance = Math.min(0.98, makeChance + confidenceBoost / 100);
 
-  if (Math.random() < makeChance) {
+  if (random() < makeChance) {
     return {
       made: true,
       newRemaining: 0,
@@ -353,10 +381,10 @@ function simulatePutt(remaining: number, confidenceBoost: number, playerSkillLev
   let leftOver: number;
   if (remaining <= 30) {
     // Normal putt: leave a short tap-in
-    leftOver = Math.max(1, Math.round(remaining * (0.05 + Math.random() * 0.12)));
+    leftOver = Math.max(1, Math.round(remaining * (0.05 + random() * 0.12)));
   } else {
     // Very long putt from off-green: ball advances somewhat
-    const advanced = Math.round(20 + Math.random() * 15);
+    const advanced = Math.round(20 + random() * 15);
     leftOver = Math.max(1, remaining - advanced);
   }
 
@@ -381,10 +409,23 @@ export function simulateShot(
   const playerSkillLevel = options.playerSkillLevel ?? 0.5;
   const { personalData } = options;
   const confidenceBoostApplied = confidenceBoost > 0;
+  const simulationSeedBase = [
+    club.id,
+    club.avgDistance,
+    remainingDistance,
+    lie,
+    wind ?? "none",
+    windStrength,
+    riskLevel,
+    playerSkillLevel,
+    options.shotIndex ?? 0,
+    options.seedNonce ?? "default",
+  ].join("|");
+  const random = createSeededRandom(simulationSeedBase);
 
   // ── Putter path ────────────────────────────────────────────────────────────
   if (club.type === "Putter") {
-    const putt = simulatePutt(remainingDistance, confidenceBoost, playerSkillLevel);
+    const putt = simulatePutt(remainingDistance, confidenceBoost, playerSkillLevel, random);
     const puttDistance = Math.max(0, remainingDistance - putt.newRemaining);
     return {
       newRemainingDistance: putt.newRemaining,
@@ -429,6 +470,17 @@ export function simulateShot(
     baseSkillWeight,
     effectiveRateWeight
   );
+  const landingSeed = [
+    club.id,
+    remainingDistance,
+    effectiveRate,
+    wind ?? "none",
+    windStrength,
+    playerSkillLevel,
+    effectiveSkill,
+    options.shotIndex ?? 0,
+    options.seedNonce ?? "default",
+  ].join("|");
 
   const landingOutcome = calculateLandingOutcome({
     club: {
@@ -455,16 +507,7 @@ export function simulateShot(
     conditions: {
       wind: mapWindToLanding(wind, windStrength),
       groundHardness: mapGroundHardnessByLie(lie),
-      seed: [
-        club.id,
-        remainingDistance,
-        effectiveRate,
-        wind ?? "none",
-        windStrength,
-        playerSkillLevel,
-        effectiveSkill,
-        options.shotIndex ?? 0,
-      ].join("|"),
+      seed: landingSeed,
     },
   });
 
@@ -482,7 +525,7 @@ export function simulateShot(
       : shotQuality === "poor"
         ? (hazards.length > 0 ? 0.18 : 0.04)
         : 0;
-  const penalty = penaltyBase > 0 && Math.random() < penaltyBase;
+  const penalty = penaltyBase > 0 && random() < penaltyBase;
 
   // ── New remaining ──────────────────────────────────────────────────────────
   let newRemaining: number;
@@ -512,13 +555,13 @@ export function simulateShot(
   // Non-putter hole-outs are intentionally rare.
   if (!penalty && newRemaining === 0) {
     const holeOutChance = getNonPutterHoleOutChance(remainingDistance, shotQuality);
-    const holedOut = Math.random() < holeOutChance;
+    const holedOut = random() < holeOutChance;
     if (!holedOut) {
-      newRemaining = getNearCupLeaveDistance(shotQuality);
+      newRemaining = getNearCupLeaveDistance(shotQuality, random);
     }
   }
 
-  const newLie = resolveNewLie(newRemaining, isGoodShot, penalty, riskLevel);
+  const newLie = resolveNewLie(newRemaining, isGoodShot, penalty, riskLevel, random);
 
   // ── Message ────────────────────────────────────────────────────────────────
   const clubLabel = `${club.name}${club.number ? " " + club.number : ""}`;
