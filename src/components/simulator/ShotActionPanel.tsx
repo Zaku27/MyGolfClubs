@@ -1,5 +1,5 @@
 import React from "react";
-import { formatSimClubLabel } from "../../utils/simClubLabel";
+import { formatSimClubDisplayName } from "../../utils/simClubLabel";
 
 interface ShotActionPanelProps {
   selectedClub: any;
@@ -50,7 +50,7 @@ export const ShotActionPanel: React.FC<ShotActionPanelProps> = ({
         )}
         {selectedClub && selectedClubIsUnstable && (
           <>
-            {formatSimClubLabel(selectedClub)} は安定度が低めです。
+            {formatSimClubDisplayName(selectedClub)} は安定度が低めです。
             {selectedEffectiveRate !== null ? ` 有効成功率 ${selectedEffectiveRate}%` : ""}
             {selectedTodayRate !== null && selectedTodayStats
               ? ` / 今日 ${selectedTodayStats.successes}/${selectedTodayStats.attempts}本 (${selectedTodayRate}%)`
@@ -61,7 +61,7 @@ export const ShotActionPanel: React.FC<ShotActionPanelProps> = ({
     </div>
 
     <p className="text-center text-xs font-medium text-emerald-700">
-      {selectedClub ? `${formatSimClubLabel(selectedClub)} で打つ` : "先にクラブを選択してください"}
+      {selectedClub ? `${formatSimClubDisplayName(selectedClub)} で打つ` : "先にクラブを選択してください"}
     </p>
 
     <div className="rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-3 py-3">

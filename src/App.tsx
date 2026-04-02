@@ -328,7 +328,7 @@ function App() {
     return (
       <SimulatorApp
         onBack={() => setShowSimulator(false)}
-        selectedClubs={visibleAnalysisClubs}
+        selectedClubs={sortedClubs}
       />
     );
   }

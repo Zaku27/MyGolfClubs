@@ -29,6 +29,8 @@ interface SimulationOptions {
   confidenceBoost?: number;
   personalData?: ClubPersonalData;
   playerSkillLevel?: number;
+  forceEffectiveSuccessRate?: number;
+  shotPowerPercent?: number;
   headSpeed?: number;
   useTheoretical?: boolean;
   shotIndex?: number;
@@ -128,6 +130,7 @@ export function estimateShotDistance(
   options?: {
     personalData?: ClubPersonalData;
     headSpeed?: number;
+    playerSkillLevel?: number;
     useTheoretical?: boolean;
   }
 ): number {
@@ -143,6 +146,7 @@ export function estimateShotDistance(
   // --- ヘッドスピード・理論値を加味したベース飛距離 ---
   let baseDistance = club.avgDistance;
   const headSpeed = options?.headSpeed;
+  const playerSkillLevel = Math.max(0, Math.min(1, options?.playerSkillLevel ?? 0.5));
   // ロボット（successRate=100, personalData未指定, useTheoretical=true, headSpeed指定）なら理論値のみ
   const isRobot =
     club.successRate === 100 &&
@@ -159,7 +163,9 @@ export function estimateShotDistance(
     baseDistance = (baseDistance * 0.7 + theoretical * 0.3);
   }
 
-  let expected = baseDistance * lieMultiplier * weakDistanceMultiplier + windYards;
+  // Skill level also affects expected distance slightly so UI estimates follow robot/person skill settings.
+  const skillDistanceMultiplier = 0.92 + playerSkillLevel * 0.16;
+  let expected = baseDistance * lieMultiplier * weakDistanceMultiplier * skillDistanceMultiplier + windYards;
 
   return Math.max(5, Math.round(expected));
 }
@@ -293,6 +299,16 @@ function mapGroundHardnessByLie(lie: LieType): number {
   return 60;
 }
 
+function distanceToPinFromLanding(
+  remainingDistance: number,
+  finalX: number,
+  finalY: number,
+): number {
+  const dx = finalX;
+  const dy = remainingDistance - finalY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 /**
  * 有効成功率(15〜95)を 0〜1 のスキル寄与へ正規化する。
  * 分布モデルへ直接渡して、表示成功率と体感を近づける。
@@ -404,9 +420,11 @@ export function simulateShot(
   riskLevel: RiskLevel,
   options: SimulationOptions & { isPractice?: boolean } = {},
 ): ShotResult {
-  const { remainingDistance, lie, wind, windStrength = 7, hazards = [] } = context;
+  const { remainingDistance, lie, wind, windStrength = 7 } = context;
   const confidenceBoost = options.confidenceBoost ?? 0;
   const playerSkillLevel = options.playerSkillLevel ?? 0.5;
+  const shotPowerPercent = Math.max(0, Math.min(110, options.shotPowerPercent ?? 100));
+  const powerMultiplier = shotPowerPercent / 100;
   const { personalData } = options;
   const confidenceBoostApplied = confidenceBoost > 0;
   const simulationSeedBase = [
@@ -455,14 +473,17 @@ export function simulateShot(
   }
 
   // ── Success/quality roll ────────────────────────────────────────────────────
-  const effectiveRate = getEffectiveSuccessRate(
-    club,
-    lie,
-    riskLevel,
-    confidenceBoost,
-    playerSkillLevel,
-    personalData,
-  );
+  const forcedEffectiveRate = options.forceEffectiveSuccessRate;
+  const effectiveRate = typeof forcedEffectiveRate === "number"
+    ? Math.max(0, Math.min(100, Math.round(forcedEffectiveRate)))
+    : getEffectiveSuccessRate(
+        club,
+        lie,
+        riskLevel,
+        confidenceBoost,
+        playerSkillLevel,
+        personalData,
+      );
   const { baseSkillWeight = 0.35, effectiveRateWeight = 0.65 } = options.skillWeights ?? {};
   const effectiveSkill = composeEffectiveSkill(
     playerSkillLevel,
@@ -513,48 +534,45 @@ export function simulateShot(
   });
 
   const shotQuality = landingOutcome.shotQuality;
-  const landing = landingOutcome.landing;
+  const rawLanding = landingOutcome.landing;
+  const scaledCarry = Math.max(0.1, rawLanding.carry * powerMultiplier);
+  const scaledRoll = Math.max(0, rawLanding.roll * powerMultiplier);
+  const scaledTotalDistance = Math.max(0.1, scaledCarry + scaledRoll);
+  const scaledFinalX = rawLanding.finalX * powerMultiplier;
+  const scaledFinalY = scaledTotalDistance;
+  const landing = {
+    ...rawLanding,
+    carry: Math.round(scaledCarry * 10) / 10,
+    roll: Math.round(scaledRoll * 10) / 10,
+    totalDistance: Math.round(scaledTotalDistance * 10) / 10,
+    lateralDeviation: Math.round(rawLanding.lateralDeviation * powerMultiplier * 10) / 10,
+    finalX: Math.round(scaledFinalX * 10) / 10,
+    finalY: Math.round(scaledFinalY * 10) / 10,
+    trajectoryPoints: rawLanding.trajectoryPoints?.map((point) => ({
+      x: Math.round(point.x * powerMultiplier * 10) / 10,
+      y: Math.round(point.y * powerMultiplier * 10) / 10,
+      z: Math.round((point.z ?? 0) * powerMultiplier * 10) / 10,
+    })),
+  };
   const actualDistance = Math.round(Math.max(5, landing.totalDistance));
 
   // 結果先行モデルでは品質から成功判定を導く。
   const isGoodShot = shotQuality === "excellent" || shotQuality === "good" || shotQuality === "average";
 
   // ── Penalty check ──────────────────────────────────────────────────────────
-  const penaltyBase =
-    shotQuality === "mishit"
-      ? (hazards.length > 0 ? 0.42 : 0.10)
-      : shotQuality === "poor"
-        ? (hazards.length > 0 ? 0.18 : 0.04)
-        : 0;
-  const penalty = penaltyBase > 0 && random() < penaltyBase;
+  // New model: penalty outcome is disabled.
+  const penalty = false;
 
   // ── New remaining ──────────────────────────────────────────────────────────
+  // New model: use landing X/Y to compute the geometric distance to the pin.
+  // Pin is at (0, remainingDistance) in the shot coordinate system.
   let newRemaining: number;
-
-  // 池ポチャ判定: hazardsに"water"が含まれていて、練習場でない場合のみ特別処理
-  const isPractice = options.isPractice === true;
-  const isWaterHazard = !isPractice && hazards.some(h => typeof h === "string" && h.toLowerCase().includes("water"));
-  if (penalty && isWaterHazard) {
-    // 池ポチャ: 距離は進めてワンペナ
-    if (actualDistance > remainingDistance + 15) {
-      newRemaining = actualDistance - remainingDistance;
-    } else {
-      newRemaining = Math.max(0, remainingDistance - actualDistance);
-    }
-    newRemaining = Math.round(newRemaining);
-  } else if (penalty) {
-    // OB等: その場に留まる
-    newRemaining = remainingDistance;
-  } else if (actualDistance > remainingDistance + 15) {
-    // Overshoot: ended up past the pin
-    newRemaining = actualDistance - remainingDistance;
-  } else {
-    newRemaining = Math.max(0, remainingDistance - actualDistance);
-  }
-  newRemaining = Math.round(newRemaining);
+  newRemaining = Math.round(
+    distanceToPinFromLanding(remainingDistance, landing.finalX, landing.finalY),
+  );
 
   // Non-putter hole-outs are intentionally rare.
-  if (!penalty && newRemaining === 0) {
+  if (newRemaining === 0) {
     const holeOutChance = getNonPutterHoleOutChance(remainingDistance, shotQuality);
     const holedOut = random() < holeOutChance;
     if (!holedOut) {
@@ -567,10 +585,7 @@ export function simulateShot(
   // ── Message ────────────────────────────────────────────────────────────────
   const clubLabel = `${club.name}${club.number ? " " + club.number : ""}`;
   let message: string;
-  if (penalty) {
-    const hazardName = hazards[0] ?? "ハザード";
-    message = `${QUALITY_LABELS["mishit"]} ${clubLabel} — ${hazardName}に入りました。ペナルティ +1。(${actualDistance}y方向)`;
-  } else if (newRemaining === 0) {
+  if (newRemaining === 0) {
     message = `${QUALITY_LABELS[shotQuality]} ${clubLabel} — ${actualDistance}yのショットがカップイン！🎉`;
   } else {
     message = `${QUALITY_LABELS[shotQuality]} ${clubLabel} — ${actualDistance}y、残り${newRemaining}y（${LIE_LABELS[newLie]}）`;
@@ -579,12 +594,12 @@ export function simulateShot(
   return {
     newRemainingDistance: newRemaining,
     outcomeMessage: message,
-    strokesAdded: penalty ? 2 : 1,
+    strokesAdded: 1,
     lie: newLie,
     penalty,
     distanceHit: actualDistance,
     shotQuality,
-    wasSuccessful: isGoodShot && !penalty,
+    wasSuccessful: isGoodShot,
     effectiveSuccessRate: effectiveRate,
     confidenceBoostApplied,
     landing,

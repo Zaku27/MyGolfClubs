@@ -15,7 +15,7 @@ import type {
 import { simulateShot } from "../utils/shotSimulation";
 import { buildClubUsageStats } from "../utils/roundAnalysis";
 import { useClubStore } from "./clubStore";
-import { formatSimClubLabel } from "../utils/simClubLabel";
+import { formatSimClubDisplayName } from "../utils/simClubLabel";
 import { resolvePersonalDataForSimClub } from "../utils/personalData";
 
 // ─── Wind generation ──────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ function buildInitialContext(hole: Hole): ShotContext {
 }
 
 function getClubLabel(club: SimClub): string {
-  return formatSimClubLabel(club);
+  return formatSimClubDisplayName(club);
 }
 
 function buildHoleInsight(hole: Hole, holeShots: ShotLog[], roundShots: ShotLog[]): string {
@@ -189,6 +189,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedClubId,
       bag,
       shotContext,
+      shotPowerPercent,
       riskLevel,
       holeStrokes,
       course,
@@ -205,11 +206,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const club = bag.find((c) => c.id === selectedClubId);
     if (!club) return;
 
-    const personalData = useClubStore.getState().personalData;
-    const result = simulateShot(club, shotContext, riskLevel, {
+    const clubForRobot = { ...club, successRate: 100, isWeakClub: false };
+    const result = simulateShot(clubForRobot, shotContext, riskLevel, {
       confidenceBoost,
-      personalData: resolvePersonalDataForSimClub(club, personalData),
-      playerSkillLevel: useClubStore.getState().playerSkillLevel,
+      personalData: undefined,
+      playerSkillLevel: 1,
+      forceEffectiveSuccessRate: 100,
+      shotPowerPercent,
     });
     const newHoleStrokes = holeStrokes + result.strokesAdded;
     const confidenceBoostApplied = result.confidenceBoostApplied === true;

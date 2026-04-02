@@ -2,7 +2,7 @@ import type { RiskLevel, SimClub } from "../../types/game";
 import { useGameStore } from "../../store/gameStore";
 import { useClubStore } from "../../store/clubStore";
 import { estimateEffectiveSuccessRate, estimateShotDistanceRange } from "../../utils/shotSimulation";
-import { formatSimClubLabel } from "../../utils/simClubLabel";
+import { formatSimClubDisplayName } from "../../utils/simClubLabel";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 
 interface Props {
@@ -78,7 +78,7 @@ export function RiskSelectionSheet({ club, onClose, onSelectRisk }: Props) {
         <div className="mb-4">
           <h3 className="text-lg font-bold text-emerald-900 sm:text-xl">ショット方針を選択</h3>
           <p className="mt-1 text-sm text-emerald-700">
-            {formatSimClubLabel(club)} を選択中
+            {formatSimClubDisplayName(club)} を選択中
           </p>
         </div>
 

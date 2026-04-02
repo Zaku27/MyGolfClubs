@@ -34,6 +34,58 @@ const WIND_DIRECTIONS = [
 ];
 const SHOT_COUNTS = [5, 10, 20];
 
+const RANGE_PLAYER_SETTINGS_KEY = 'rangePlayerSettings';
+
+type RangePlayerSettings = {
+  seatType: 'robot' | 'personal';
+  robotHeadSpeed: number;
+  robotSkillLevel: number;
+};
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function loadRangePlayerSettings(): RangePlayerSettings {
+  if (typeof window === 'undefined') {
+    return {
+      seatType: 'personal',
+      robotHeadSpeed: 40,
+      robotSkillLevel: 0.5,
+    };
+  }
+
+  try {
+    const raw = localStorage.getItem(RANGE_PLAYER_SETTINGS_KEY);
+    if (!raw) {
+      return {
+        seatType: 'personal',
+        robotHeadSpeed: 40,
+        robotSkillLevel: 0.5,
+      };
+    }
+
+    const parsed = JSON.parse(raw) as Partial<RangePlayerSettings>;
+    return {
+      seatType: parsed.seatType === 'robot' ? 'robot' : 'personal',
+      robotHeadSpeed: clampNumber(Number(parsed.robotHeadSpeed), 20, 60),
+      robotSkillLevel: clampNumber(Number(parsed.robotSkillLevel), 0, 1),
+    };
+  } catch {
+    return {
+      seatType: 'personal',
+      robotHeadSpeed: 40,
+      robotSkillLevel: 0.5,
+    };
+  }
+}
+
+function saveRangePlayerSettings(settings: RangePlayerSettings) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(RANGE_PLAYER_SETTINGS_KEY, JSON.stringify(settings));
+}
+
 const qualityStatusColor = (shotQuality: string) => {
   if (shotQuality === 'excellent') return 'text-blue-700';
   if (shotQuality === 'good') return 'text-green-700';
@@ -142,14 +194,17 @@ function buildMonteCarloResult(rawResults: ShotResult[]): MonteCarloResult {
 
 export default function RangeScreen() {
   const { clubs, personalData } = useClubStore();
+  const loadPlayerSkillLevel = useClubStore((state) => state.loadPlayerSkillLevel);
+  const storedPlayerSkillLevel = useClubStore((state) => state.playerSkillLevel);
   const { profile } = useUserProfileStore();
+  const initialRangePlayerSettings = loadRangePlayerSettings();
   // const { playerSkillLevel } = useGameStore();
   const [selectedClubId, setSelectedClubId] = useState<string>('');
-  // 打席タイプ: "robot" or "personal"
-  const [seatType, setSeatType] = useState<'robot' | 'personal'>('personal');
+  // プレイヤー: "robot" or "personal"
+  const [seatType, setSeatType] = useState<'robot' | 'personal'>(initialRangePlayerSettings.seatType);
   // ロボット用: ヘッドスピードとスキルレベル
-  const [robotHeadSpeed, setRobotHeadSpeed] = useState<number>(40); // 初期値40m/s
-  const [robotSkillLevel, setRobotSkillLevel] = useState<number>(0.5); // 0.0〜1.0
+  const [robotHeadSpeed, setRobotHeadSpeed] = useState<number>(initialRangePlayerSettings.robotHeadSpeed);
+  const [robotSkillLevel, setRobotSkillLevel] = useState<number>(initialRangePlayerSettings.robotSkillLevel);
   const [lie, setLie] = useState<string>('Fairway');
   const [windSpeed, setWindSpeed] = useState<number>(0);
   const [windDir, setWindDir] = useState<string>('tail');
@@ -166,8 +221,22 @@ export default function RangeScreen() {
   const chartTarget = { x: 0, y: summary?.estimatedDist ?? 0 };
   const skillLevelName =
     seatType === 'robot' ? `Robot Skill ${(robotSkillLevel * 100).toFixed(0)}%` : 'Personal Skill';
+  const personalHeadSpeed = profile.headSpeed;
+  const personalSkillLevel = storedPlayerSkillLevel;
   const gameLie = mapLieUiToGameLie(lie);
   const gameWind = mapWindDirToGameWind(windDir);
+
+  useEffect(() => {
+    void loadPlayerSkillLevel();
+  }, [loadPlayerSkillLevel]);
+
+  useEffect(() => {
+    saveRangePlayerSettings({
+      seatType,
+      robotHeadSpeed,
+      robotSkillLevel,
+    });
+  }, [seatType, robotHeadSpeed, robotSkillLevel]);
 
   useEffect(() => {
     if (!showRobotHint) return;
@@ -232,15 +301,13 @@ export default function RangeScreen() {
   const simClub = toSimClub(selectedClub);
   const clubPersonal: import('../types/golf').ClubPersonalData | undefined =
     simClub && simClub.id !== undefined ? personalData[simClub.id] ?? undefined : undefined;
-  // スキルレベルを個人データから取得（なければ0.5）
-  const playerSkillLevel = 0.5;
   // DB保存値があればそれを優先、なければ従来通り計算値を使う
   let effectiveSuccess: number | null = null;
   if (simClub && clubPersonal) {
     if (typeof clubPersonal.effectiveSuccessRate === 'number') {
       effectiveSuccess = clubPersonal.effectiveSuccessRate / 100;
     } else {
-      effectiveSuccess = calculateEffectiveSuccessRate({ ...simClub, id: Number(simClub.id) }, clubPersonal, playerSkillLevel);
+      effectiveSuccess = calculateEffectiveSuccessRate({ ...simClub, id: Number(simClub.id) }, clubPersonal, personalSkillLevel);
     }
   }
 
@@ -279,7 +346,8 @@ export default function RangeScreen() {
       } else {
         options = {
           personalData: clubPersonal ?? undefined,
-          playerSkillLevel,
+          playerSkillLevel: personalSkillLevel,
+          headSpeed: personalHeadSpeed ?? undefined,
           shotIndex: i,
           seedNonce: simulationSeedNonce,
           skillWeights: profile.skillWeights,
@@ -311,7 +379,7 @@ export default function RangeScreen() {
             simClub,
             { lie: gameLie, wind: gameWind, windStrength: windSpeed },
             "normal",
-            { personalData: clubPersonal, headSpeed: undefined, useTheoretical: false }
+            { personalData: clubPersonal, headSpeed: personalHeadSpeed ?? undefined, useTheoretical: false }
           )
       : 0;
     const diff = Math.round(avg - estimatedDist);
@@ -357,7 +425,7 @@ export default function RangeScreen() {
 
       {/* 打席リスト（ロボット／個人データ）＋ロボット設定 */}
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
-        <label className="block font-semibold mb-2">打席タイプ選択</label>
+        <label className="block font-semibold mb-2">プレイヤー選択</label>
         <select
           className="w-full border rounded p-2 mb-2"
           value={seatType}
@@ -395,6 +463,22 @@ export default function RangeScreen() {
               />
               <span className="ml-2">{(robotSkillLevel * 100).toFixed(0)}%</span>
             </div>
+          </div>
+        )}
+
+        {seatType === 'personal' && (
+          <div className="flex flex-col gap-2 mt-2 bg-green-50 rounded p-3 border border-green-200 text-sm text-green-900">
+            <div>
+              <span className="font-semibold">ヘッドスピード:</span>{' '}
+              {personalHeadSpeed !== null && personalHeadSpeed !== undefined ? `${personalHeadSpeed.toFixed(1)} m/s` : '未設定'}
+            </div>
+            <div>
+              <span className="font-semibold">スキルレベル:</span>{' '}
+              {(personalSkillLevel * 100).toFixed(0)}%
+            </div>
+            <span className="text-xs text-green-700">
+              個人データの値は個人データ入力画面で保存された設定を使用します。
+            </span>
           </div>
         )}
 
@@ -489,7 +573,7 @@ export default function RangeScreen() {
                           simClub,
                           { lie: gameLie, wind: gameWind, windStrength: windSpeed },
                           "normal",
-                           { personalData: clubPersonal, headSpeed: undefined, useTheoretical: false }
+                           { personalData: clubPersonal, headSpeed: personalHeadSpeed ?? undefined, useTheoretical: false }
                         )
                   ) : '-'} ヤード
                 </span>

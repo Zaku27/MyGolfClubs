@@ -1,14 +1,14 @@
 import { useGameStore } from "../../store/gameStore";
-import { useMemo, useState, useEffect } from "react";
-import type { LieType, SimClub } from "../../types/game";
+import { useMemo, useState, useEffect, useRef } from "react";
+import type { LieType, SimClub, WindDirection } from "../../types/game";
 import { useClubStore } from "../../store/clubStore";
-import { estimateEffectiveSuccessRate } from "../../utils/shotSimulation";
+import { estimateShotDistance } from "../../utils/shotSimulation";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
-import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 import { CompactScorecard } from "./Scorecard";
 
 interface Props {
   onBack: () => void;
+  onViewFinalScorecard?: () => void;
 }
 
 const LIE_LABEL: Record<LieType, string> = {
@@ -20,7 +20,68 @@ const LIE_LABEL: Record<LieType, string> = {
   penalty: "ペナルティ",
 };
 
-export function HoleView({ onBack }: Props) {
+const RANGE_PLAYER_SETTINGS_KEY = "rangePlayerSettings";
+const DEFAULT_ROBOT_HEAD_SPEED = 40;
+const DEFAULT_ROBOT_SKILL_LEVEL = 0.5;
+
+function loadRobotSettingsFromStorage(): { robotHeadSpeed: number; robotSkillLevel: number } {
+  if (typeof window === "undefined") {
+    return {
+      robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
+      robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
+    };
+  }
+
+  try {
+    const raw = localStorage.getItem(RANGE_PLAYER_SETTINGS_KEY);
+    if (!raw) {
+      return {
+        robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
+        robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
+      };
+    }
+    const parsed = JSON.parse(raw) as { robotHeadSpeed?: number; robotSkillLevel?: number };
+    const headSpeedValue = Number(parsed.robotHeadSpeed);
+    const skillLevelValue = Number(parsed.robotSkillLevel);
+
+    return {
+      robotHeadSpeed: Number.isFinite(headSpeedValue)
+        ? Math.max(20, Math.min(60, headSpeedValue))
+        : DEFAULT_ROBOT_HEAD_SPEED,
+      robotSkillLevel: Number.isFinite(skillLevelValue)
+        ? Math.max(0, Math.min(1, skillLevelValue))
+        : DEFAULT_ROBOT_SKILL_LEVEL,
+    };
+  } catch {
+    return {
+      robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
+      robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
+    };
+  }
+}
+
+function estimateRobotDistance(
+  club: SimClub,
+  lie: LieType,
+  wind: WindDirection | undefined,
+  windStrength: number,
+  robotHeadSpeed: number,
+  robotSkillLevel: number,
+): number {
+  return estimateShotDistance(
+    { ...club, successRate: 100, isWeakClub: false },
+    { lie, wind: wind ?? "none", windStrength },
+    "normal",
+    {
+      personalData: undefined,
+      headSpeed: robotHeadSpeed,
+      playerSkillLevel: robotSkillLevel,
+      useTheoretical: true,
+    },
+  );
+}
+
+export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const {
     phase,
     course,
@@ -40,6 +101,7 @@ export function HoleView({ onBack }: Props) {
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [showMobileScorecard, setShowMobileScorecard] = useState(false);
   const [selectedClub, setSelectedClub] = useState<SimClub | null>(null);
+  const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ショット結果モーダルが閉じられたらクラブ選択をリセット
   const showResultModal = useGameStore((state) => state.showResultModal);
@@ -48,13 +110,41 @@ export function HoleView({ onBack }: Props) {
       setSelectedClub(null);
     }
   }, [showResultModal]);
+
+  useEffect(() => {
+    if (autoDismissTimerRef.current) {
+      clearTimeout(autoDismissTimerRef.current);
+      autoDismissTimerRef.current = null;
+    }
+
+    if (!showResultModal || !lastShotResult) {
+      return;
+    }
+
+    if (phase === "hole_complete" || phase === "round_complete") {
+      return;
+    }
+
+    autoDismissTimerRef.current = setTimeout(() => {
+      useGameStore.getState().dismissResult();
+      autoDismissTimerRef.current = null;
+    }, 800);
+
+    return () => {
+      if (autoDismissTimerRef.current) {
+        clearTimeout(autoDismissTimerRef.current);
+        autoDismissTimerRef.current = null;
+      }
+    };
+  }, [lastShotResult, phase, showResultModal]);
   const personalData = useClubStore((state) => state.personalData);
   const playerSkillLevel = useClubStore((state) => state.playerSkillLevel);
 
   const currentHole = course[currentHoleIndex];
   if (!currentHole) return null;
 
-  const { remainingDistance, lie, hazards = [] } = shotContext;
+  const { remainingDistance, lie, wind, windStrength = 0, hazards = [] } = shotContext;
+  const { robotHeadSpeed, robotSkillLevel } = loadRobotSettingsFromStorage();
   const completedRelativeToPar = scores.reduce((sum, s) => sum + (s.strokes - s.par), 0);
   const currentHoleRelativeToPar =
     phase === "playing" && holeStrokes > 0 ? holeStrokes - currentHole.par : 0;
@@ -69,16 +159,8 @@ export function HoleView({ onBack }: Props) {
     const preview = new Map<string, { effectiveRate: number }>();
 
     for (const club of bag) {
-      const effectiveRate = estimateEffectiveSuccessRate(
-        club,
-        { lie },
-        "normal",
-        {
-          confidenceBoost,
-          personalData: resolvePersonalDataForSimClub(club, personalData),
-          playerSkillLevel,
-        },
-      );
+      // Robot mode: all clubs have 100% effective success rate
+      const effectiveRate = 100; // Robot mode always 100%
 
       preview.set(club.id, { effectiveRate });
     }
@@ -88,28 +170,73 @@ export function HoleView({ onBack }: Props) {
 
   const recommendedClubs = useMemo(
     () => {
+      // Robot-only test mode: all clubs have 100% effective success rate
+      const isRobotMode = true;
+
+      // Use estimateShotDistance for distance-based club recommendation
       const scoredClubs = [...bag].sort((a, b) => {
-        const gapA = Math.abs(a.avgDistance - remainingDistance);
-        const gapB = Math.abs(b.avgDistance - remainingDistance);
+        // Calculate estimated distances using estimateShotDistance (same as range screen)
+        const distanceA = estimateRobotDistance(
+          a,
+          lie,
+          wind,
+          windStrength,
+          robotHeadSpeed,
+          robotSkillLevel,
+        );
+        const distanceB = estimateRobotDistance(
+          b,
+          lie,
+          wind,
+          windStrength,
+          robotHeadSpeed,
+          robotSkillLevel,
+        );
+        const gapA = Math.abs(distanceA - remainingDistance);
+        const gapB = Math.abs(distanceB - remainingDistance);
         if (gapA !== gapB) return gapA - gapB;
-        return b.avgDistance - a.avgDistance;
+        return distanceB - distanceA;
       });
 
       if (lie === "green") {
         return scoredClubs.filter((club) => club.type === "Putter");
       }
+
+      // Robot mode: show top 5 non-putter clubs as recommended
+      if (isRobotMode) {
+        return scoredClubs.filter((club) => club.type !== "Putter").slice(0, 5);
+      }
+
       // グリーン以外の時はPutterを除外
       return scoredClubs.filter((club) => club.type !== "Putter").slice(0, 5);
     },
-    [bag, lie, remainingDistance],
+    [bag, lie, remainingDistance, wind, windStrength, robotHeadSpeed, robotSkillLevel],
   );
   const allClubsSorted = useMemo(
-    () =>
-      [...bag].sort((a, b) => {
-        if (b.avgDistance !== a.avgDistance) return b.avgDistance - a.avgDistance;
+    () => {
+      // Sort clubs by estimated distance (using same function as range screen)
+      return [...bag].sort((a, b) => {
+        const distanceA = estimateRobotDistance(
+          a,
+          lie,
+          wind,
+          windStrength,
+          robotHeadSpeed,
+          robotSkillLevel,
+        );
+        const distanceB = estimateRobotDistance(
+          b,
+          lie,
+          wind,
+          windStrength,
+          robotHeadSpeed,
+          robotSkillLevel,
+        );
+        if (distanceB !== distanceA) return distanceB - distanceA;
         return a.number.localeCompare(b.number, "ja");
-      }),
-    [bag],
+      });
+    },
+    [bag, lie, wind, windStrength, robotHeadSpeed, robotSkillLevel],
   );
   const clubsToRender = showAllClubs ? allClubsSorted : recommendedClubs;
   const recommendedClubIds = new Set(recommendedClubs.map((club) => club.id));
@@ -132,10 +259,7 @@ export function HoleView({ onBack }: Props) {
   };
 
   // ショット注意案内の内容生成
-  const selectedClubIsUnstable = selectedClub ? (selectedClub.isWeakClub === true || (clubPreview.get(selectedClub.id)?.effectiveRate ?? selectedClub.successRate) < 60) : false;
-  const selectedEffectiveRate = selectedClub ? (clubPreview.get(selectedClub.id)?.effectiveRate ?? selectedClub.successRate) : null;
-  const selectedTodayStats = selectedClub ? clubStatsToday.get(selectedClub.id) : undefined;
-  const selectedTodayRate = selectedTodayStats && selectedTodayStats.attempts > 0 ? Math.round((selectedTodayStats.successes / selectedTodayStats.attempts) * 100) : null;
+  const selectedEffectiveRate = selectedClub ? 100 : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 text-emerald-900">
@@ -195,6 +319,12 @@ export function HoleView({ onBack }: Props) {
 
         <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-10 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-14">
           <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
+          <span className="mt-3 inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-bold tracking-[0.08em] text-sky-800 sm:text-sm">
+            ロボットプレイ中
+          </span>
+          <div className="mt-2 text-xs font-semibold text-sky-800 sm:text-sm">
+            ヘッドスピード: {robotHeadSpeed.toFixed(1)} m/s / スキルレベル: {(robotSkillLevel * 100).toFixed(0)}%
+          </div>
           <h1 className="mt-4 text-4xl font-extrabold leading-tight text-emerald-900 sm:text-6xl">
             ピンまで {remainingDistance}ヤード
           </h1>
@@ -233,9 +363,7 @@ export function HoleView({ onBack }: Props) {
               </span>
               <div>
                 <p className="text-lg font-bold text-emerald-900">
-                  {lastShotResult.penalty
-                    ? "ペナルティ"
-                    : lastShotResult.newRemainingDistance === 0
+                  {lastShotResult.newRemainingDistance === 0
                     ? "カップイン"
                     : lastShotResult.shotQuality === "excellent"
                     ? "会心のショット"
@@ -249,15 +377,10 @@ export function HoleView({ onBack }: Props) {
                 </p>
                 <p className="text-sm text-emerald-700">飛距離: {(lastShotResult.landing?.totalDistance ?? lastShotResult.distanceHit).toFixed(1)}ヤード</p>
             </div>
-              {lastShotResult.penalty && (
-                <div className="ml-auto rounded-md border border-red-300/70 bg-red-50 px-2 py-1 text-xs font-bold text-red-700">
-                  +1
-                </div>
-              )}
             </div>
             <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
               <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                実効成功率 {lastShotResult.effectiveSuccessRate}%
+                実効成功率 100% (ロボット)
               </span>
               {lastShotResult.landing && (
                 <>
@@ -295,16 +418,12 @@ export function HoleView({ onBack }: Props) {
                 </button>
               ) : phase === "round_complete" ? (
                 <button
-                  onClick={useGameStore.getState().dismissResult}
+                  onClick={onViewFinalScorecard ?? useGameStore.getState().dismissResult}
                   className="w-full rounded-xl bg-amber-400 py-3 text-sm font-bold text-emerald-950 transition hover:bg-amber-300"
                 >
                   スコアカードを見る
                 </button>
               ) : null}
-              {/* 通常時は自動でdismissResultを呼ぶ */}
-              {lastShotResult && phase !== "hole_complete" && phase !== "round_complete" && (
-                (() => { setTimeout(() => useGameStore.getState().dismissResult(), 800); return null; })()
-              )}
             </div>
           </div>
         )}
@@ -317,26 +436,17 @@ export function HoleView({ onBack }: Props) {
           {/* ショット方針の注意案内 */}
           <div className={[
             "rounded-xl px-4 py-3 text-left",
-            selectedClub && selectedClubIsUnstable ? "border border-amber-300/70 bg-amber-50 text-amber-900" : "border border-emerald-300/70 bg-emerald-100/70 text-emerald-900"
+            "border border-emerald-300/70 bg-emerald-100/70 text-emerald-900"
           ].join(" ")}>
             <p className={["text-[11px] font-bold tracking-[0.16em]",
-              selectedClub && selectedClubIsUnstable ? "text-amber-700" : "text-emerald-700"
+              "text-emerald-700"
             ].join(" ")}>ショット方針の注意</p>
             <p className="mt-1 text-xs sm:text-sm">
               {!selectedClub && "クラブを選ぶと、この位置にショット前の注意が表示されます。"}
-              {selectedClub && !selectedClubIsUnstable && (
+              {selectedClub && (
                 selectedEffectiveRate !== null
                   ? `ショットは有効成功率:${selectedEffectiveRate}%で実行されます。`
                   : "ショットは有効成功率:--%で実行されます。"
-              )}
-              {selectedClub && selectedClubIsUnstable && (
-                <>
-                  {formatSimClubLabel(selectedClub)} は安定度が低めです。
-                  {selectedEffectiveRate !== null ? ` 有効成功率 ${selectedEffectiveRate}%` : ""}
-                  {selectedTodayRate !== null && selectedTodayStats
-                    ? ` / 今日 ${selectedTodayStats.successes}/${selectedTodayStats.attempts}本 (${selectedTodayRate}%)`
-                    : ""}
-                </>
               )}
             </p>
           </div>
@@ -407,7 +517,6 @@ export function HoleView({ onBack }: Props) {
             {clubsToRender.map((club) => {
               const isRecommended = !showAllClubs && recommendedClubIds.has(club.id);
               const effectiveRate = clubPreview.get(club.id)?.effectiveRate ?? club.successRate;
-              const weakClub = club.isWeakClub === true || effectiveRate < 60;
               const todayStats = clubStatsToday.get(club.id);
               const todayRate = todayStats && todayStats.attempts > 0
                 ? Math.round((todayStats.successes / todayStats.attempts) * 100)
@@ -428,24 +537,31 @@ export function HoleView({ onBack }: Props) {
                   ].join(" ")}
                 >
                   <div className="flex items-center gap-2">
-                    <p className="text-base font-bold text-emerald-900">{formatSimClubLabel(club)}</p>
+                    <p className="flex items-center gap-2 text-base font-bold text-emerald-900">
+                      <span className="rounded-md bg-emerald-700 px-2 py-0.5 text-xs font-semibold text-white">
+                        {formatSimClubLabel(club)}
+                      </span>
+                      <span>{club.name}</span>
+                    </p>
                     {showAllClubs && recommendedClubIds.has(club.id) && (
                       <span className="rounded-full border border-lime-300/70 bg-lime-100 px-2 py-0.5 text-[11px] font-bold tracking-[0.12em] text-lime-800">
                         おすすめ5本
                       </span>
                     )}
-                    {weakClub && (
-                      <span className="rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.18em] text-amber-800">
-                        不安定
-                      </span>
-                    )}
                   </div>
-                  <p className="mt-2 text-sm text-emerald-700">平均飛距離: {club.avgDistance}ヤード</p>
-                  <p className={`mt-1 text-sm ${weakClub ? "text-amber-700" : "text-emerald-700"}`}>
+                  <p className="mt-2 text-sm text-emerald-700">推定飛距離: {estimateRobotDistance(
+                    club,
+                    lie,
+                    wind,
+                    windStrength,
+                    robotHeadSpeed,
+                    robotSkillLevel,
+                  )}ヤード</p>
+                  <p className="mt-1 text-sm text-emerald-700">
                     有効成功率(通常): {effectiveRate}%
                   </p>
                   {todayRate !== null && (
-                    <p className={`mt-1 text-xs ${todayRate < 50 ? "text-amber-700" : "text-emerald-700"}`}>
+                    <p className="mt-1 text-xs text-emerald-700">
                       今日の成功: {todayStats?.successes}/{todayStats?.attempts}本 ({todayRate}%)
                     </p>
                   )}

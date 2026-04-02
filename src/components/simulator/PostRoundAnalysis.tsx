@@ -57,6 +57,55 @@ function ClubStatList({
   );
 }
 
+function RoundClubSummaryTable({
+  items,
+}: {
+  items: Array<{
+    clubId: string;
+    clubName: string;
+    timesUsed: number;
+    successes: number;
+    successRate: number;
+    avgDistanceAchieved: number;
+  }>;
+}) {
+  return (
+    <section className="mt-4 rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
+      <h2 className="text-sm font-bold tracking-[0.08em] text-emerald-100">ラウンドサマリー（クラブ別）</h2>
+      {items.length === 0 ? (
+        <p className="mt-3 rounded-xl border border-emerald-700/35 bg-emerald-900/30 px-3 py-3 text-sm text-emerald-300">
+          クラブ使用データがありません。
+        </p>
+      ) : (
+        <div className="mt-3">
+          <table className="w-full table-fixed border-separate border-spacing-y-1 text-left text-[10px] sm:text-xs">
+            <thead>
+              <tr className="text-emerald-300">
+                <th className="w-[38%] px-2 py-1 font-semibold">クラブ</th>
+                <th className="w-[16%] px-1.5 py-1 font-semibold">使用回数</th>
+                <th className="w-[16%] px-1.5 py-1 font-semibold">成功回数</th>
+                <th className="w-[14%] px-1.5 py-1 font-semibold">成功率</th>
+                <th className="w-[16%] px-1.5 py-1 font-semibold">平均飛距離</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.clubId} className="rounded-xl border border-emerald-700/35 bg-emerald-900/35 text-emerald-50">
+                  <td className="rounded-l-xl break-words px-2 py-2 font-semibold leading-tight">{item.clubName}</td>
+                  <td className="px-1.5 py-2">{item.timesUsed}回</td>
+                  <td className="px-1.5 py-2">{item.successes}回</td>
+                  <td className="px-1.5 py-2">{item.successRate}%</td>
+                  <td className="rounded-r-xl px-1.5 py-2">{item.avgDistanceAchieved}y</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function PostRoundAnalysis({
   onPlayAnotherRound,
   onViewDetailedScorecard,
@@ -87,6 +136,10 @@ export function PostRoundAnalysis({
       .slice(0, 3);
 
     const insights = buildInsights(keyStats, clubUsageStats, perHoleResults);
+    const clubRoundSummary = [...ranked].sort((a, b) => {
+      if (b.timesUsed !== a.timesUsed) return b.timesUsed - a.timesUsed;
+      return b.successRate - a.successRate;
+    });
 
     return {
       totalPar,
@@ -97,6 +150,7 @@ export function PostRoundAnalysis({
       bestClubs,
       strugglingClubs,
       insights,
+      clubRoundSummary,
     };
   }, [clubUsageStats, course, finalScore, perHoleResults, roundShots]);
 
@@ -124,6 +178,8 @@ export function PostRoundAnalysis({
               </p>
             </div>
           </div>
+
+          <RoundClubSummaryTable items={analysis.clubRoundSummary} />
         </header>
 
         <section className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 p-5 sm:p-6">

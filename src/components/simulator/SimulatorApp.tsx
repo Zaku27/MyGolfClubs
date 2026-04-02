@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useGameStore } from "../../store/gameStore";
 import { toSimClub } from "../../utils/clubSimAdapter";
-import { COURSE_3HOLES, COURSE_9HOLES, COURSE_18HOLES } from "../../data/defaultCourses";
+import { COURSE_1HOLE, COURSE_3HOLES, COURSE_9HOLES, COURSE_18HOLES } from "../../data/defaultCourses";
 import { HoleView } from "./HoleView";
 import { PostRoundAnalysis } from "./PostRoundAnalysis";
 
@@ -39,8 +39,8 @@ function SetupScreen({ onStart, onBack, clubCount }: {
 
         {clubCount === 0 && (
           <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <p>分析画面で表示チェックが入っているクラブがありません。</p>
-            <p className="mt-1">クラブを表示状態にしてから開始してください。</p>
+            <p>プレー対象のクラブがありません。</p>
+            <p className="mt-1">クラブ管理でクラブを登録してから開始してください。</p>
           </div>
         )}
 
@@ -60,6 +60,13 @@ function SetupScreen({ onStart, onBack, clubCount }: {
           </div>
         </div>
 
+        <button
+          onClick={() => onStart(COURSE_1HOLE)}
+          disabled={clubCount === 0}
+          className="w-full py-3 bg-emerald-400 hover:bg-emerald-300 disabled:bg-emerald-700/60 disabled:text-emerald-100/70 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors"
+        >
+          1ホールでプレー
+        </button>
         <button
           onClick={() => onStart(COURSE_3HOLES)}
           disabled={clubCount === 0}
@@ -161,6 +168,10 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
     <>
       <HoleView
         onBack={() => { resetGame(); onBack(); }}
+        onViewFinalScorecard={() => {
+          setShowDetailedScorecard(true);
+          useGameStore.getState().dismissResult();
+        }}
       />
 
       {/* ショット結果モーダルの表示を廃止 */}

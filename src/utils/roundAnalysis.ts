@@ -1,4 +1,5 @@
 import type { ClubUsageStat, Hole, HoleScore, ShotLog, SimClub } from "../types/game";
+import { formatSimClubDisplayName } from "./simClubLabel";
 
 export interface KeyRoundStats {
   totalStrokes: number;
@@ -24,14 +25,17 @@ export function buildClubUsageStats(roundShots: ShotLog[], bag: SimClub[]): Club
   for (const shot of roundShots) {
     const club = bagById.get(shot.clubId);
     const base = statsMap.get(shot.clubId) ?? {
-      clubName: club ? `${club.number} ${club.type}` : shot.clubLabel,
+      clubName: club ? formatSimClubDisplayName(club) : shot.clubLabel,
       uses: 0,
       successes: 0,
       distanceSum: 0,
     };
 
+    const isPutter = club?.type === "Putter";
+    const isSuccessfulShot = isPutter ? shot.distanceAfterShot === 0 : shot.success;
+
     base.uses += 1;
-    if (shot.success) base.successes += 1;
+    if (isSuccessfulShot) base.successes += 1;
     base.distanceSum += shot.distanceHit;
     statsMap.set(shot.clubId, base);
   }

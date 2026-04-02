@@ -1,6 +1,6 @@
 import React from 'react';
 import type { GolfClub } from '../types/golf';
-import { getClubTypeDisplay } from '../utils/clubUtils';
+import { formatGolfClubLabel } from '../utils/simClubLabel';
 import './ClubCard.css';
 
 interface ClubCardProps {
@@ -11,7 +11,7 @@ interface ClubCardProps {
 }
 
 export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, viewMode = 'full' }) => {
-  const clubTypeDisplay = getClubTypeDisplay(club.clubType, club.number);
+  const clubTypeDisplay = formatGolfClubLabel(club);
   const compactLoft = club.loftAngle != null ? `${club.loftAngle}°` : '-';
 
   return (

@@ -56,11 +56,29 @@ function getDefaultSuccessRate(club: GolfClub): number {
 export function toSimClub(club: GolfClub): SimClub {
   const successRate = getDefaultSuccessRate(club);
 
+  // Keep loft angle for estimateShotDistance/getEstimatedDistance.
+  // Missing loft was treated as 0, which caused large distance overestimation in simulator UI.
+  const loftAngle =
+    typeof club.loftAngle === "number" && club.loftAngle > 0
+      ? club.loftAngle
+      : club.clubType === "Driver"
+        ? 10.5
+        : club.clubType === "Wood"
+          ? 15
+          : club.clubType === "Hybrid"
+            ? 22
+            : club.clubType === "Iron"
+              ? 30
+              : club.clubType === "Wedge"
+                ? 46
+                : 3;
+
   return {
     id: String(club.id ?? `${club.clubType}-${club.number}`),
     name: club.name,
     type: club.clubType as SimClub["type"],
     number: club.number,
+    loftAngle,
     avgDistance: club.distance,
     successRate,
     isWeakClub: successRate < 65,
