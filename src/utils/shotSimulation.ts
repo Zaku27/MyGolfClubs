@@ -507,6 +507,7 @@ export function simulateShot(
     conditions: {
       wind: mapWindToLanding(wind, windStrength),
       groundHardness: mapGroundHardnessByLie(lie),
+      headSpeed: options.headSpeed,
       seed: landingSeed,
     },
   });

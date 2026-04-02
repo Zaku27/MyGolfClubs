@@ -303,7 +303,7 @@ export function ShotDispersionChart({
               const parsedY = Number(context.parsed.y ?? 0);
               const lines: string[] = [
                 `左右偏差: ${parsedX.toFixed(1)} y`,
-                `ピン方向距離: ${parsedY.toFixed(1)} y`,
+                `目標方向距離: ${parsedY.toFixed(1)} y`,
               ];
 
               if (typeof raw.carry === 'number') {
@@ -338,7 +338,7 @@ export function ShotDispersionChart({
           type: 'linear',
           title: {
             display: true,
-            text: 'ピン方向距離 (yards)',
+            text: '目標方向距離 (yards)',
           },
           // Y軸は通常の向きのまま扱う。
           // 「ティー側を上にする」などの見せ方を変える場合は、ここだけで調整できる。

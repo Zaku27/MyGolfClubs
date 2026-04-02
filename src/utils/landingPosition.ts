@@ -71,7 +71,11 @@ type DispersionProfile = {
 };
 
 const DEFAULT_HEAD_SPEED = 44.5;
-const GLOBAL_CARRY_TUNING = 0.9;
+const GLOBAL_CARRY_TUNING = 1;
+const DISPERSION_SKILL_CURVE_POWER = 1.8;
+const LOW_SKILL_NEAR_TARGET_RADIUS = 15;
+const LOW_SKILL_AVOID_START_SKILL = 0.45;
+const LOW_SKILL_AVOID_FULL_SKILL = 0.15;
 
 /**
  * 値を最小〜最大の範囲へ丸めるための共通関数。
@@ -210,8 +214,11 @@ function buildDispersionProfile(club: ClubData, skillLevel: SkillLevel): Dispers
   const sideSkill01 = 1 - normalizeSkillValue(skillLevel.sideSpinDispersion);
 
   const base = getBaseDispersionByClubType(club.clubType);
-  const carrySigma = base.carrySigmaHigh - (base.carrySigmaHigh - base.carrySigmaLow) * skill01;
-  const lateralSigma = base.lateralSigmaHigh - (base.lateralSigmaHigh - base.lateralSigmaLow) * sideSkill01;
+  // 中級から初心者にかけて分散の増加が加速するよう、スキルを非線形カーブへ変換する。
+  const carrySkillCurve = Math.pow(clamp(skill01, 0, 1), DISPERSION_SKILL_CURVE_POWER);
+  const lateralSkillCurve = Math.pow(clamp(sideSkill01, 0, 1), DISPERSION_SKILL_CURVE_POWER);
+  const carrySigma = base.carrySigmaHigh - (base.carrySigmaHigh - base.carrySigmaLow) * carrySkillCurve;
+  const lateralSigma = base.lateralSigmaHigh - (base.lateralSigmaHigh - base.lateralSigmaLow) * lateralSkillCurve;
   // 上級者では大ミス発生率を急減、初心者では発生率を高める非線形カーブ。
   const mishitSkillCurve = Math.pow(clamp(mishitSkill01, 0, 1), 1.7);
   const mishitProbability = base.mishitHigh - (base.mishitHigh - base.mishitLow) * mishitSkillCurve;
@@ -271,6 +278,54 @@ function classifyQualityByOutcome(
   if (score < 1.0) return { quality: "good", metrics };
   if (score < poorThreshold) return { quality: "average", metrics };
   return { quality: "poor", metrics };
+}
+
+/**
+ * 低スキル時、目標15y圏内に入るショットを減らすための補正。
+ * 目標近傍に着弾した場合のみ、外側リングへ確率的に押し出す。
+ */
+function applyLowSkillTargetAvoidance(
+  carry: number,
+  lateralDeviation: number,
+  expectedCarry: number,
+  effectiveSkill: number,
+  rng: () => number,
+): { carry: number; lateralDeviation: number } {
+  const avoidanceStrength = clamp(
+    (LOW_SKILL_AVOID_START_SKILL - effectiveSkill) / (LOW_SKILL_AVOID_START_SKILL - LOW_SKILL_AVOID_FULL_SKILL),
+    0,
+    1,
+  );
+  if (avoidanceStrength <= 0) {
+    return { carry, lateralDeviation };
+  }
+
+  const carryDelta = carry - expectedCarry;
+  const distanceFromTarget = Math.hypot(lateralDeviation, carryDelta);
+  if (distanceFromTarget > LOW_SKILL_NEAR_TARGET_RADIUS) {
+    return { carry, lateralDeviation };
+  }
+
+  // 低スキルほど発動率を高め、15y以内の着弾を起こしにくくする。
+  const avoidChance = 0.65 + avoidanceStrength * 0.35;
+  if (rng() > avoidChance) {
+    return { carry, lateralDeviation };
+  }
+
+  const angle =
+    distanceFromTarget > 1e-6
+      ? Math.atan2(carryDelta, lateralDeviation)
+      : randomInRange(rng, -Math.PI, Math.PI);
+  const pushedDistance = randomInRange(
+    rng,
+    LOW_SKILL_NEAR_TARGET_RADIUS + 1,
+    LOW_SKILL_NEAR_TARGET_RADIUS + 8 + 14 * avoidanceStrength,
+  );
+
+  return {
+    carry: expectedCarry + Math.sin(angle) * pushedDistance,
+    lateralDeviation: Math.cos(angle) * pushedDistance,
+  };
 }
 
 /**
@@ -490,6 +545,9 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
       const startLine = sampleStandardNormal(rng) * profile.lateralSigma * lateralScale;
       const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.8 * lateralScale;
       lateralDeviation = startLine + curve;
+      const adjusted = applyLowSkillTargetAvoidance(carry, lateralDeviation, expectedCarry, profile.effectiveSkill, rng);
+      carry = adjusted.carry;
+      lateralDeviation = adjusted.lateralDeviation;
       const classified = classifyQualityByOutcome(
         carry,
         expectedCarry,
@@ -505,6 +563,9 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
       const startLine = sampleStandardNormal(rng) * profile.lateralSigma * 0.75;
       const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.4;
       lateralDeviation = startLine + curve;
+      const adjusted = applyLowSkillTargetAvoidance(carry, lateralDeviation, expectedCarry, profile.effectiveSkill, rng);
+      carry = adjusted.carry;
+      lateralDeviation = adjusted.lateralDeviation;
       const classified = classifyQualityByOutcome(
         carry,
         expectedCarry,
