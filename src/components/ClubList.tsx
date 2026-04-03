@@ -18,6 +18,8 @@ import type { GolfClub } from '../types/golf';
 import './ClubList.css';
 import { sortClubsForDisplay } from '../utils/clubSort';
 
+const SHOW_HOME_RELEASE_LIMITED_ACTIONS = false;
+
 interface ClubListProps {
   clubs: GolfClub[];
   onEdit: (club: GolfClub) => void;
@@ -79,15 +81,19 @@ export const ClubList: React.FC<ClubListProps> = ({
         <button className="btn-icon btn-analysis" onClick={onShowAnalysis} disabled={loading} title="分析画面" aria-label="分析画面">
           <AnalysisIcon size={20} />
         </button>
-        <button className="btn-icon btn-simulator" onClick={onShowSimulator} disabled={loading} title="コースシミュレーター" aria-label="コースシミュレーター">
-          <SimulatorIcon size={20} />
-        </button>
-        <Link className="btn-icon btn-range" to="/range" title="練習場" aria-label="練習場">
-          <RangeIcon size={20} />
-        </Link>
-        <Link className="btn-icon btn-personal-data" to="/personal-data" title="パーソナルデータ" aria-label="パーソナルデータ">
-          <PersonalDataIcon size={20} />
-        </Link>
+        {SHOW_HOME_RELEASE_LIMITED_ACTIONS && (
+          <>
+            <button className="btn-icon btn-simulator" onClick={onShowSimulator} disabled={loading} title="コースシミュレーター" aria-label="コースシミュレーター">
+              <SimulatorIcon size={20} />
+            </button>
+            <Link className="btn-icon btn-range" to="/range" title="練習場" aria-label="練習場">
+              <RangeIcon size={20} />
+            </Link>
+            <Link className="btn-icon btn-personal-data" to="/personal-data" title="パーソナルデータ" aria-label="パーソナルデータ">
+              <PersonalDataIcon size={20} />
+            </Link>
+          </>
+        )}
       </div>
 
       {loading ? (
