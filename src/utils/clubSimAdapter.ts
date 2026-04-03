@@ -4,15 +4,15 @@ import type { SimClub } from "../types/game";
 function getDefaultSuccessRate(club: GolfClub): number {
   switch (club.clubType) {
     case "Driver":
-      return 80;
+      return 65;
     case "Wood":
-      return 84;
+      return 70;
     case "Hybrid":
-      return 88;
+      return 75;
     case "Iron":
-      return 92;
+      return 80;
     case "Wedge":
-      return 96;
+      return 85;
     case "Putter":
       return 100;
     default:

@@ -36,7 +36,7 @@ export class GolfBagDatabase extends Dexie {
         if (club.notes == null)       club.notes       = '';
       });
     });
-    // v3: add personalData table for storing player miss rates and weakness factors
+    // v3: add personalData table for storing player club personal factors
     this.version(3).stores({
       clubs: '++id, name',
       personalData: 'clubId',

@@ -38,6 +38,7 @@ const SWING_GOOD_TOLERANCE_STORAGE_KEY = 'golfbag-swing-good-tolerance';
 const SWING_ADJUST_THRESHOLD_STORAGE_KEY = 'golfbag-swing-adjust-threshold';
 const ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY = 'golfbag-analysis-hidden-clubs';
 const CLUB_LIST_SCOPE_STORAGE_KEY = 'golfbag-club-list-scope';
+const VIEW_MODE_STORAGE_KEY = 'golfbag-view-mode';
 const DEFAULT_SWING_TARGET = 2.0;
 const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
 const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
@@ -64,6 +65,10 @@ const parseHiddenAnalysisClubKeys = (value: unknown): string[] => {
 
 const parseClubListScope = (value: unknown): 'bag' | 'all' => {
   return value === 'all' ? 'all' : 'bag';
+};
+
+const parseViewMode = (value: unknown): 'full' | 'compact' => {
+  return value === 'compact' ? 'compact' : 'full';
 };
 
 function App() {
@@ -106,7 +111,9 @@ function App() {
     );
   });
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
-  const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
+  const [viewMode, setViewMode] = useState<'full' | 'compact'>(() => {
+    return readStoredJson(VIEW_MODE_STORAGE_KEY, 'full', parseViewMode);
+  });
   const [clubListScope, setClubListScope] = useState<'bag' | 'all'>(() => {
     return readStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, 'bag', parseClubListScope);
   });
@@ -224,6 +231,10 @@ function App() {
   useEffect(() => {
     writeStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, clubListScope);
   }, [clubListScope]);
+
+  useEffect(() => {
+    writeStoredJson(VIEW_MODE_STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
   useEffect(() => {
     if (clubListScope === 'bag' && activeBagClubCount === 0 && sortedClubs.length > 0 && bags.length === 1) {

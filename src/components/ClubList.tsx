@@ -109,7 +109,7 @@ export const ClubList: React.FC<ClubListProps> = ({
             <button className="btn-icon btn-simulator" onClick={onShowSimulator} disabled={loading} title="コースシミュレーター" aria-label="コースシミュレーター">
               <SimulatorIcon size={20} />
             </button>
-            <Link className="btn-icon btn-range" to={`/range${bagQuery}`} title="練習場" aria-label="練習場">
+            <Link className="btn-icon btn-range" to={`/range${bagQuery}`} title="レンジシミュレーター" aria-label="レンジシミュレーター">
               <RangeIcon size={20} />
             </Link>
             <Link className="btn-icon btn-personal-data" to={`/personal-data${bagQuery}`} title="パーソナルデータ" aria-label="パーソナルデータ">

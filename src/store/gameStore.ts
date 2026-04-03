@@ -19,6 +19,11 @@ import { ClubService } from "../db/clubService";
 import { useClubStore } from "./clubStore";
 import { resolvePersonalDataForSimClub } from "../utils/personalData";
 import { useUserProfileStore } from "./userProfileStore";
+import {
+  buildAnalysisPenaltyByClubId,
+  getAnalysisAdjustedBaseSuccessRate,
+  isWeakClubByAnalysisAdjustedRate,
+} from "../utils/clubSuccessDisplay";
 
 // ─── Wind generation ──────────────────────────────────────────────────────────
 
@@ -222,10 +227,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const isRobotMode = playMode === "robot";
     const profile = useUserProfileStore.getState().profile;
+    const allClubs = useClubStore.getState().clubs;
+    const analysisPenaltyByClubId = buildAnalysisPenaltyByClubId(allClubs);
+    const analysisPenaltyPoints = analysisPenaltyByClubId[club.id] ?? 0;
+    const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(
+      club,
+      analysisPenaltyPoints,
+    );
+    const treatedAsWeakClub = isWeakClubByAnalysisAdjustedRate(club, analysisPenaltyPoints);
     const clubPersonalData = resolvePersonalDataForSimClub(club, useClubStore.getState().personalData);
     const clubForSimulation = isRobotMode
       ? { ...club, successRate: 100, isWeakClub: false }
-      : club;
+      : {
+          ...club,
+          successRate: adjustedBaseSuccessRate,
+          isWeakClub: treatedAsWeakClub,
+        };
 
     // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
     const isPutter = club.type === "Putter";
@@ -258,7 +275,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lieAfter: result.lie,
       shotQuality: result.shotQuality,
       riskLevel,
-      wasWeakClub: club.isWeakClub === true || club.successRate < 65,
+      wasWeakClub: isRobotMode ? false : treatedAsWeakClub,
       confidenceBoostApplied: result.confidenceBoostApplied === true,
     };
     const nextHoleShots = [...currentHoleShots, shotLog];

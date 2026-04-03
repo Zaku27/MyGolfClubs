@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 type BagRef = { id?: number };
@@ -16,8 +16,15 @@ export const useBagIdUrlSync = ({
 }: UseBagIdUrlSyncParams): void => {
   const [searchParams, setSearchParams] = useSearchParams();
   const bagIdParam = searchParams.get('bagId');
+  // undefined = 初回実行前（まだ見たことがない）を表すセンチネル値
+  const prevBagIdParamRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
+    // URL の bagId パラメータが実際に変化したか（初回は必ず true）
+    const bagIdParamChanged =
+      prevBagIdParamRef.current === undefined || bagIdParam !== prevBagIdParamRef.current;
+    prevBagIdParamRef.current = bagIdParam;
+
     if (bags.length === 0) {
       return;
     }
@@ -28,7 +35,8 @@ export const useBagIdUrlSync = ({
       Number.isInteger(normalizedBagId) &&
       bags.some((bag) => bag.id === normalizedBagId);
 
-    if (isValidBagId && normalizedBagId !== activeBagId) {
+    // URL が変わった場合のみ store へ反映する（UI 操作で store が変わった場合は URL を追随させる）
+    if (bagIdParamChanged && isValidBagId && normalizedBagId !== activeBagId) {
       void setActiveBag(normalizedBagId);
       return;
     }

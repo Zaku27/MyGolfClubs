@@ -27,7 +27,11 @@ import {
   estimateBaseDistance,
   getLieDistanceMultiplierValue,
 } from '../utils/shotSimulation';
-import { calculateBaseClubSuccessRate } from '../utils/calculateSuccessRate';
+import {
+  calculateDisplayClubSuccessRate,
+  getAnalysisAdjustedBaseSuccessRate,
+  isWeakClubByAnalysisAdjustedRate,
+} from '../utils/clubSuccessDisplay';
 import {
   buildLieAngleAnalysis,
   buildSwingWeightAnalysis,
@@ -499,15 +503,12 @@ export default function RangeScreen() {
     simClub ? resolvePersonalDataForSimClub(simClub, personalData) : undefined;
   const effectiveSuccess =
     simClub && seatType === 'personal'
-      ? calculateBaseClubSuccessRate({
-          baseSuccessRate: Math.max(
-            5,
-            simClub.successRate - (analysisPenaltyByClubId[simClub.id]?.points ?? 0),
-          ),
-          personalData: clubPersonal,
-          isWeakClub: simClub.isWeakClub === true || simClub.successRate < 65,
-          playerSkillLevel: personalSkillLevel,
-        })
+      ? calculateDisplayClubSuccessRate(
+          simClub,
+          clubPersonal,
+          personalSkillLevel,
+          analysisPenaltyByClubId[simClub.id]?.points ?? 0,
+        )
       : null;
 
   const handleSimulate = async () => {
@@ -544,6 +545,20 @@ export default function RangeScreen() {
           seedNonce: simulationSeedNonce,
         };
       } else {
+        const analysisPenaltyPoints = analysisPenaltyByClubId[simClub.id]?.points ?? 0;
+        const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(
+          simClub,
+          analysisPenaltyPoints,
+        );
+        const treatedAsWeakClub = isWeakClubByAnalysisAdjustedRate(
+          simClub,
+          analysisPenaltyPoints,
+        );
+        clubForSim = {
+          ...simClub,
+          successRate: adjustedBaseSuccessRate,
+          isWeakClub: treatedAsWeakClub,
+        };
         options = {
           personalData: clubPersonal ?? undefined,
           playerSkillLevel: personalSkillLevel,
@@ -598,7 +613,7 @@ export default function RangeScreen() {
     <div className="min-h-screen bg-green-50 flex flex-col items-center py-4 px-2">
       {/* Header */}
       <div className="w-full max-w-xl flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-green-900">練習場</h1>
+        <h1 className="text-2xl font-bold text-green-900">レンジシミュレーター</h1>
         <div className="flex items-center gap-2">
           <Link
             to="/personal-data"
@@ -976,7 +991,7 @@ export default function RangeScreen() {
           </button>
           {calibrated && (
             <span className="mt-2 text-green-800 font-semibold text-sm text-center">
-              個人データを更新しました。{selectedClub?.name}のミス率がより現実的になりました。
+              個人データを更新しました。{selectedClub?.name}の弱点係数を反映しました。
             </span>
           )}
         </div>

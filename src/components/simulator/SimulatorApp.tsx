@@ -145,7 +145,7 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
         to={`/range${bagQuery}`}
         className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
       >
-        練習場に戻る
+        レンジシミュレーターに戻る
       </Link>
       <Link
         to={`/personal-data${bagQuery}`}

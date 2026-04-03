@@ -8,11 +8,11 @@ export interface BaseClubSuccessRateOptions {
 }
 
 /**
- * Adjusts a club's base success rate using personal tendencies, weak-club status,
+ * Adjusts a club's base success rate using weakness tendencies, weak-club status,
  * and an overall player skill level.
  *
  * @param baseSuccessRate - Raw successRate from SimClub (0-100)
- * @param personalData - Player-reported miss/weakness data for this club
+ * @param personalData - Player-reported weakness data for this club
  * @param isWeakClub - Whether the club is flagged as weak
  * @param playerSkillLevel - 0.0 (beginner) to 1.0 (advanced)
  * @returns Clamped adjusted rate in [5, 95]
@@ -50,12 +50,6 @@ export function calculateBaseClubSuccessRate({
   const normalizedSkill = Math.pow(skill, 0.78);
   let rate = lowSkillRate * (1 - normalizedSkill) + highSkillTarget * normalizedSkill;
 
-  // Miss-rate penalty is still applied, but high skill significantly dampens it.
-  const missPenaltyWeight = 1 - skill * 0.93;
-  const missMultiplier = personalData
-    ? 1 - (personalData.missRate / 100) * missPenaltyWeight
-    : 1.0;
-
   // Weak-club weakness is stricter at low skill and mostly relaxed at high skill.
   let weakness = personalData ? personalData.weaknessFactor : 0;
   if (isWeakClub) {
@@ -65,7 +59,7 @@ export function calculateBaseClubSuccessRate({
   const weaknessMultiplier =
     1 - weakness * (isWeakClub ? 1.28 : 0.82) * (1 - skill * 0.92);
 
-  rate = rate * missMultiplier * weaknessMultiplier;
+  rate = rate * weaknessMultiplier;
 
   // Allow near-100 outcomes for high-skill players.
   return Math.max(5, Math.min(99, Math.round(rate * 10) / 10));

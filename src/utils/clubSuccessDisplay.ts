@@ -21,6 +21,7 @@ const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
 const DEFAULT_SWING_TARGET = 2.0;
 const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
 const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
+const WEAK_CLUB_THRESHOLD = 65;
 
 function parseUserLieAngleStandards(value: unknown): UserLieAngleStandards {
   if (!value || typeof value !== 'object') {
@@ -114,10 +115,33 @@ export function calculateDisplayClubSuccessRate(
   playerSkillLevel: number,
   analysisPenaltyPoints: number,
 ): number {
+  const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(
+    simClub,
+    analysisPenaltyPoints,
+  );
+
   return calculateBaseClubSuccessRate({
-    baseSuccessRate: Math.max(5, simClub.successRate - analysisPenaltyPoints),
+    baseSuccessRate: adjustedBaseSuccessRate,
     personalData,
-    isWeakClub: simClub.isWeakClub === true || simClub.successRate < 65,
+    isWeakClub: isWeakClubByAnalysisAdjustedRate(simClub, analysisPenaltyPoints),
     playerSkillLevel,
   });
+}
+
+export function getAnalysisAdjustedBaseSuccessRate(
+  simClub: SimClub,
+  analysisPenaltyPoints: number,
+): number {
+  return Math.max(5, simClub.successRate - analysisPenaltyPoints);
+}
+
+export function isWeakClubByAnalysisAdjustedRate(
+  simClub: SimClub,
+  analysisPenaltyPoints: number,
+): boolean {
+  const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(
+    simClub,
+    analysisPenaltyPoints,
+  );
+  return simClub.isWeakClub === true || adjustedBaseSuccessRate < WEAK_CLUB_THRESHOLD;
 }

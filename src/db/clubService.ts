@@ -270,7 +270,7 @@ export class ClubService {
     await db.golfBags.update(bagId, createUpdatedBagRecord({ clubIds }));
   }
 
-  // ─── Personal Data (Miss Rate & Weakness Factor) ─────────────────────────────
+  // ─── Personal Data (Weakness Factor) ──────────────────────────────────────────
 
   static async getAllPersonalData(): Promise<Record<string, ClubPersonalData>> {
     const records = await db.personalData.toArray();

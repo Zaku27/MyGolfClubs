@@ -1,9 +1,15 @@
 import type { RiskLevel, SimClub } from "../../types/game";
+import { useMemo } from "react";
 import { useGameStore } from "../../store/gameStore";
 import { useClubStore } from "../../store/clubStore";
 import { estimateEffectiveSuccessRate } from "../../utils/shotSimulation";
 import { formatSimClubDisplayName } from "../../utils/simClubLabel";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
+import {
+  buildAnalysisPenaltyByClubId,
+  getAnalysisAdjustedBaseSuccessRate,
+  isWeakClubByAnalysisAdjustedRate,
+} from "../../utils/clubSuccessDisplay";
 
 interface Props {
   club: SimClub | null;
@@ -35,12 +41,19 @@ const RISK_OPTIONS: Array<{
 
 export function RiskSelectionSheet({ club, onClose, onSelectRisk }: Props) {
   const { roundShots, confidenceBoost, shotContext } = useGameStore();
+  const allClubs = useClubStore((state) => state.clubs);
   const personalData = useClubStore((state) => state.personalData);
   const playerSkillLevel = useClubStore((state) => state.playerSkillLevel);
+  const analysisPenaltyByClubId = useMemo(
+    () => buildAnalysisPenaltyByClubId(allClubs),
+    [allClubs],
+  );
 
   if (!club) return null;
 
-  const weakClub = club.isWeakClub === true || club.successRate < 65;
+  const analysisPenalty = analysisPenaltyByClubId[club.id] ?? 0;
+  const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(club, analysisPenalty);
+  const weakClub = isWeakClubByAnalysisAdjustedRate(club, analysisPenalty);
   const clubShotsToday = roundShots.filter((shot) => shot.clubId === club.id);
   const clubSuccessesToday = clubShotsToday.filter((shot) => shot.success).length;
   const todayRate = clubShotsToday.length > 0
@@ -82,7 +95,7 @@ export function RiskSelectionSheet({ club, onClose, onSelectRisk }: Props) {
             <p className="text-sm font-bold tracking-[0.18em] text-amber-700">注意</p>
             <p className="mt-2 text-base font-semibold">このクラブは最近安定していません</p>
             <p className="mt-2 text-sm text-amber-800">
-              基本成功率 {club.successRate}%
+              基本成功率 {adjustedBaseSuccessRate}%
               {` ・クラブ成功率(通常) ${effectiveRatePreview.normal}%`}
               {todayRate !== null ? ` ・今日の成功 ${clubSuccessesToday}/${clubShotsToday.length}本 (${todayRate}%)` : ""}
             </p>
