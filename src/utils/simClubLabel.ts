@@ -6,19 +6,32 @@ function normalizeToken(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function formatBaseClubLabel(clubType: string, clubNumber?: string): string {
+  return getClubTypeDisplay(clubType, clubNumber ?? "");
+}
+
+function composeDisplayName(base: string, name?: string): string {
+  const normalizedName = name?.trim() ?? "";
+
+  if (!normalizedName) return base;
+  if (normalizeToken(base) === normalizeToken(normalizedName)) return base;
+  return `${base} ${normalizedName}`;
+}
+
 /**
  * Returns a simulator label aligned with list/card display style.
  * Examples: Driver, 3Wood, 4Hybrid, 7Iron, PW, Putter
  */
 export function formatSimClubLabel(club: Pick<SimClub, "number" | "type">): string {
-  return getClubTypeDisplay(club.type, club.number);
+  return formatBaseClubLabel(club.type, club.number);
 }
 
 /**
- * Top page (GolfClub) label formatter with the same rules as simulator labels.
+ * Top-page style full club name for GolfClub.
+ * Example: 3Wood Callaway Rogue Max LS
  */
-export function formatGolfClubLabel(club: Pick<GolfClub, "clubType" | "number">): string {
-  return getClubTypeDisplay(club.clubType, club.number);
+export function formatGolfClubDisplayName(club: Pick<GolfClub, "clubType" | "number" | "name">): string {
+  return composeDisplayName(formatBaseClubLabel(club.clubType, club.number), club.name);
 }
 
 /**
@@ -26,10 +39,5 @@ export function formatGolfClubLabel(club: Pick<GolfClub, "clubType" | "number">)
  * Example: 3Wood Callaway Rogue Max LS
  */
 export function formatSimClubDisplayName(club: Pick<SimClub, "number" | "type" | "name">): string {
-  const base = formatSimClubLabel(club);
-  const name = club.name?.trim() ?? "";
-
-  if (!name) return base;
-  if (normalizeToken(base) === normalizeToken(name)) return base;
-  return `${base} ${name}`;
+  return composeDisplayName(formatSimClubLabel(club), club.name);
 }

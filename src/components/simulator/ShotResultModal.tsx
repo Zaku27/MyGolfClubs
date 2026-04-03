@@ -60,7 +60,7 @@ export function ShotResultModal({ onDismiss, onAdvance }: Props) {
           <span className="text-4xl leading-none">{QUALITY_ICON[shotQuality]}</span>
           <div>
             <p className="text-lg font-bold text-emerald-900">{mainLabel}</p>
-            <p className="text-sm text-emerald-700">飛距離: {(landing?.totalDistance ?? lastShotResult.distanceHit).toFixed(1)}ヤード</p>
+            <p className="text-sm text-emerald-700">飛距離: {(landing?.totalDistance ?? lastShotResult.distanceHit).toFixed(1)}y</p>
           </div>
           {penalty && (
             <div className="ml-auto rounded-md border border-red-300/70 bg-red-50 px-2 py-1 text-xs font-bold text-red-700">

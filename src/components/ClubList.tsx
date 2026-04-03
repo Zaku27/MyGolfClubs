@@ -18,7 +18,7 @@ import type { GolfClub } from '../types/golf';
 import './ClubList.css';
 import { sortClubsForDisplay } from '../utils/clubSort';
 
-const SHOW_HOME_RELEASE_LIMITED_ACTIONS = false;
+const SHOW_HOME_RELEASE_LIMITED_ACTIONS = true;
 
 interface ClubListProps {
   clubs: GolfClub[];

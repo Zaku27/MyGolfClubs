@@ -440,7 +440,7 @@ export function PersonalDataInput() {
                   <th className="px-4 py-3 text-right font-semibold">基本成功率(補正後)</th>
                   <th className="px-4 py-3 text-right font-semibold">ミス率 (%)</th>
                   <th className="px-4 py-3 text-left font-semibold">弱点係数</th>
-                  <th className="px-4 py-3 text-right font-semibold">有効成功率</th>
+                  <th className="px-4 py-3 text-right font-semibold">クラブ成功率</th>
                 </tr>
               </thead>
               <tbody>

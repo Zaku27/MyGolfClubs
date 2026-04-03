@@ -73,7 +73,7 @@ export const getAnalysisClubKey = (
 };
 
 /**
- * クラブ・個人データ・スキルレベルから有効成功率を計算
+ * クラブ・個人データ・スキルレベルからクラブ成功率を計算
  * missRate: 0-1, weaknessFactor: 0.0-1.0, skill: 0.0-1.0
  * 例: missRate=0.2, weakness=0.9, skill=0.7 → 1 - (0.2 * 0.9 * (1-skill))
  */
@@ -88,7 +88,7 @@ export function calculateEffectiveSuccessRate(
   const skill = Math.max(0, Math.min(1, playerSkillLevel));
   // missRateは0-1で扱う（100なら1.0）
   const miss = missRate > 1 ? missRate / 100 : missRate;
-  // 有効成功率 = 1 - (miss * weakness * (1-skill))
+  // クラブ成功率 = 1 - (miss * weakness * (1-skill))
   const effective = 1 - (miss * weakness * (1 - skill));
   return Math.max(0, Math.min(1, effective));
 }

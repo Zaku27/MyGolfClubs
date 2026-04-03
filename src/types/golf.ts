@@ -23,7 +23,7 @@ export interface ClubPersonalData {
   clubId: string;
   missRate: number;        // 0-100 (user input, e.g. 35 = 35% miss)
   weaknessFactor: number;  // 0.0-1.0 (0 = no weakness, 0.3 = moderate weakness)
-  effectiveSuccessRate?: number; // 0-100 クラブごとの有効成功率（任意）
+  effectiveSuccessRate?: number; // 0-100 クラブごとのクラブ成功率（任意）
 }
 
 export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
@@ -52,7 +52,7 @@ export interface UserProfile {
   headSpeed: number | null; // ユーザーのヘッドスピード（m/s、nullなら未設定）
   skillWeights?: {
     baseSkillWeight: number; // 基本スキルの重み（デフォルト: 0.35）
-    effectiveRateWeight: number; // 有効成功率の重み（デフォルト: 0.65）
+    effectiveRateWeight: number; // クラブ成功率の重み（デフォルト: 0.65）
   };
   // 今後、年齢・性別・身長・体重なども追加可能
 }

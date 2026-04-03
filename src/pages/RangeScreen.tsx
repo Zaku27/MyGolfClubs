@@ -14,7 +14,8 @@ function qualityLabel(q: string) {
 import { useClubStore } from '../store/clubStore';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
-import { simulateShot, estimateShotDistance } from '../utils/shotSimulation';
+import { formatGolfClubDisplayName } from '../utils/simClubLabel';
+import { simulateShot, estimateBaseDistance } from '../utils/shotSimulation';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
 import ShotDispersionChart from '../components/ShotDispersionChart';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
@@ -366,22 +367,15 @@ export default function RangeScreen() {
     );
     const success = shotResults.filter((r) => r.wasSuccessful).length / numShots;
 
-    // 目安値との差分を計算
-    const estimatedDist = simClub
-      ? seatType === 'robot'
-        ? estimateShotDistance(
-            { ...simClub, successRate: 100 },
-            { lie: gameLie, wind: gameWind, windStrength: windSpeed },
-            "normal",
-            { personalData: undefined, headSpeed: robotHeadSpeed, useTheoretical: true }
-          )
-        : estimateShotDistance(
-            simClub,
-            { lie: gameLie, wind: gameWind, windStrength: windSpeed },
-            "normal",
-            { personalData: clubPersonal, headSpeed: personalHeadSpeed ?? undefined, useTheoretical: false }
-          )
-      : 0;
+    // 推定飛距離はヘッドスピード + ライ角のみで決定
+    let estimatedDist = 0;
+    if (simClub) {
+      const clubForEst = seatType === 'robot' 
+        ? { ...simClub, successRate: 100 }
+        : simClub;
+      const headSpeed = seatType === 'robot' ? robotHeadSpeed : personalHeadSpeed ?? undefined;
+      estimatedDist = estimateBaseDistance(clubForEst, headSpeed);
+    }
     const diff = Math.round(avg - estimatedDist);
     const avgToTargetDistance =
       shotResults.reduce((sum, result) => {
@@ -553,7 +547,7 @@ export default function RangeScreen() {
                 .sort((a, b) => (a.loftAngle ?? 999) - (b.loftAngle ?? 999))
                 .map((club) => (
                   <option key={club.id} value={club.id}>
-                    {club.name} ({club.number})
+                    {formatGolfClubDisplayName(club)}
                   </option>
                 ))}
             </select>
@@ -561,29 +555,25 @@ export default function RangeScreen() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
                 <span className="font-bold">{selectedClub.name}</span>
                 <span>
-                  目安: {simClub ? (
+                  推定飛距離: {simClub ? (
                     seatType === 'robot'
-                      ? estimateShotDistance(
+                      ? estimateBaseDistance(
                           { ...simClub, successRate: 100 },
-                          { lie: gameLie, wind: gameWind, windStrength: windSpeed },
-                          "normal",
-                          { personalData: undefined, headSpeed: robotHeadSpeed, useTheoretical: true }
+                          robotHeadSpeed
                         )
-                      : estimateShotDistance(
+                      : estimateBaseDistance(
                           simClub,
-                          { lie: gameLie, wind: gameWind, windStrength: windSpeed },
-                          "normal",
-                           { personalData: clubPersonal, headSpeed: personalHeadSpeed ?? undefined, useTheoretical: false }
+                          personalHeadSpeed ?? undefined
                         )
-                  ) : '-'} ヤード
+                  ) : '-'} y
                 </span>
                 <div ref={robotHintRef} className="relative">
                   <span className="inline-flex items-center gap-2">
                     <span>
-                      有効成功率: {
+                      クラブ成功率: {
                         simClub ? (
                           seatType === 'robot'
-                            ? '100 (ロボット固定)'
+                            ? '100% (ロボット固定)'
                             : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--') + '%'
                         ) : '--'
                       }
@@ -591,7 +581,7 @@ export default function RangeScreen() {
                     {seatType === 'robot' && (
                       <button
                         type="button"
-                        aria-label="ロボット打席の有効成功率ヒント"
+                        aria-label="ロボット打席のクラブ成功率ヒント"
                         aria-expanded={showRobotHint}
                         className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-300 bg-blue-100 text-xs font-bold text-blue-700"
                         onClick={() => setShowRobotHint((prev) => !prev)}
@@ -602,7 +592,7 @@ export default function RangeScreen() {
                   </span>
                   {seatType === 'robot' && showRobotHint && (
                     <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-md border border-blue-300 bg-white p-2 text-xs leading-relaxed text-blue-900 shadow-lg">
-                      ロボット打席はクラブの個体差や個人データの影響を受けないため、有効成功率は常に100%で固定されます。
+                      ロボット打席はクラブの個体差や個人データの影響を受けないため、クラブ成功率は常に100%で固定されます。
                     </div>
                   )}
                 </div>

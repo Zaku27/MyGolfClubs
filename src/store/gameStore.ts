@@ -17,6 +17,7 @@ import { buildClubUsageStats } from "../utils/roundAnalysis";
 import { useClubStore } from "./clubStore";
 import { formatSimClubDisplayName } from "../utils/simClubLabel";
 import { resolvePersonalDataForSimClub } from "../utils/personalData";
+import { ClubService } from "../db/clubService";
 
 // ─── Wind generation ──────────────────────────────────────────────────────────
 
@@ -53,6 +54,8 @@ interface GameStoreState {
   holeSummaries: HoleSummary[];
   goodShotStreak: number;
   confidenceBoost: number;
+  /** DBから取得したプレイヤースキルレベル (0-1)。パット確率に使用。 */
+  playerSkillLevel: number;
 }
 
 interface GameStoreActions {
@@ -92,6 +95,7 @@ const INITIAL_STATE: GameStoreState = {
   holeSummaries: [],
   goodShotStreak: 0,
   confidenceBoost: 0,
+  playerSkillLevel: 0.5,
 };
 
 function buildInitialContext(hole: Hole): ShotContext {
@@ -174,6 +178,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentHoleIndex: 0,
       shotContext: buildInitialContext(course[0]),
     });
+    // パット確率用にプレイヤースキルレベルを非同期取得
+    ClubService.getPlayerSkillLevel()
+      .then((level) => set({ playerSkillLevel: level }))
+      .catch(() => {/* デフォルト 0.5 を維持 */});
   },
 
   selectClub: (clubId) => set({ selectedClubId: clubId }),
@@ -200,6 +208,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       goodShotStreak,
       confidenceBoost,
       holeSummaries,
+      playerSkillLevel,
     } = get();
 
     if (!selectedClubId) return;
@@ -207,11 +216,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!club) return;
 
     const clubForRobot = { ...club, successRate: 100, isWeakClub: false };
+    // パターはDBのスキルレベルを反映、非パターはロボット設定（forceEffectiveSuccessRate:100）を維持
+    const isPutter = club.type === "Putter";
     const result = simulateShot(clubForRobot, shotContext, riskLevel, {
       confidenceBoost,
       personalData: undefined,
-      playerSkillLevel: 1,
-      forceEffectiveSuccessRate: 100,
+      playerSkillLevel: isPutter ? playerSkillLevel : 1,
+      forceEffectiveSuccessRate: isPutter ? undefined : 100,
       shotPowerPercent,
     });
     const newHoleStrokes = holeStrokes + result.strokesAdded;

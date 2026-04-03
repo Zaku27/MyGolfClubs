@@ -1,10 +1,11 @@
 import { useGameStore } from "../../store/gameStore";
 import { useMemo, useState, useEffect, useRef } from "react";
-import type { LieType, SimClub, WindDirection } from "../../types/game";
+import type { LieType, SimClub } from "../../types/game";
 import { useClubStore } from "../../store/clubStore";
-import { estimateShotDistance } from "../../utils/shotSimulation";
+import { estimateBaseDistance } from "../../utils/shotSimulation";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
 import { CompactScorecard } from "./Scorecard";
+import { useUserProfileStore } from "../../store/userProfileStore";
 
 interface Props {
   onBack: () => void;
@@ -24,9 +25,21 @@ const RANGE_PLAYER_SETTINGS_KEY = "rangePlayerSettings";
 const DEFAULT_ROBOT_HEAD_SPEED = 40;
 const DEFAULT_ROBOT_SKILL_LEVEL = 0.5;
 
-function loadRobotSettingsFromStorage(): { robotHeadSpeed: number; robotSkillLevel: number } {
+type RangePlayerSettings = {
+  seatType: "robot" | "personal";
+  robotHeadSpeed: number;
+  robotSkillLevel: number;
+};
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function loadRangePlayerSettingsFromStorage(): RangePlayerSettings {
   if (typeof window === "undefined") {
     return {
+      seatType: "personal",
       robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
       robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
     };
@@ -36,48 +49,43 @@ function loadRobotSettingsFromStorage(): { robotHeadSpeed: number; robotSkillLev
     const raw = localStorage.getItem(RANGE_PLAYER_SETTINGS_KEY);
     if (!raw) {
       return {
+        seatType: "personal",
         robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
         robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
       };
     }
-    const parsed = JSON.parse(raw) as { robotHeadSpeed?: number; robotSkillLevel?: number };
-    const headSpeedValue = Number(parsed.robotHeadSpeed);
-    const skillLevelValue = Number(parsed.robotSkillLevel);
+    const parsed = JSON.parse(raw) as Partial<RangePlayerSettings>;
 
     return {
-      robotHeadSpeed: Number.isFinite(headSpeedValue)
-        ? Math.max(20, Math.min(60, headSpeedValue))
-        : DEFAULT_ROBOT_HEAD_SPEED,
-      robotSkillLevel: Number.isFinite(skillLevelValue)
-        ? Math.max(0, Math.min(1, skillLevelValue))
-        : DEFAULT_ROBOT_SKILL_LEVEL,
+      seatType: parsed.seatType === "robot" ? "robot" : "personal",
+      robotHeadSpeed: clampNumber(Number(parsed.robotHeadSpeed), 20, 60),
+      robotSkillLevel: clampNumber(Number(parsed.robotSkillLevel), 0, 1),
     };
   } catch {
     return {
+      seatType: "personal",
       robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
       robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
     };
   }
 }
 
-function estimateRobotDistance(
+function estimateBaseDistanceByMode(
   club: SimClub,
-  lie: LieType,
-  wind: WindDirection | undefined,
-  windStrength: number,
+  seatType: "robot" | "personal",
   robotHeadSpeed: number,
-  robotSkillLevel: number,
+  personalHeadSpeed: number | null,
 ): number {
-  return estimateShotDistance(
-    { ...club, successRate: 100, isWeakClub: false },
-    { lie, wind: wind ?? "none", windStrength },
-    "normal",
-    {
-      personalData: undefined,
-      headSpeed: robotHeadSpeed,
-      playerSkillLevel: robotSkillLevel,
-      useTheoretical: true,
-    },
+  if (seatType === "robot") {
+    return estimateBaseDistance(
+      { ...club, successRate: 100, isWeakClub: false },
+      robotHeadSpeed,
+    );
+  }
+
+  return estimateBaseDistance(
+    club,
+    personalHeadSpeed ?? undefined,
   );
 }
 
@@ -138,13 +146,14 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     };
   }, [lastShotResult, phase, showResultModal]);
   const personalData = useClubStore((state) => state.personalData);
-  const playerSkillLevel = useClubStore((state) => state.playerSkillLevel);
+  const personalHeadSpeed = useUserProfileStore((state) => state.profile.headSpeed);
 
   const currentHole = course[currentHoleIndex];
   if (!currentHole) return null;
 
   const { remainingDistance, lie, wind, windStrength = 0, hazards = [] } = shotContext;
-  const { robotHeadSpeed, robotSkillLevel } = loadRobotSettingsFromStorage();
+  const { seatType, robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettingsFromStorage();
+  const displayedHeadSpeed = seatType === "robot" ? robotHeadSpeed : (personalHeadSpeed ?? 0);
   const completedRelativeToPar = scores.reduce((sum, s) => sum + (s.strokes - s.par), 0);
   const currentHoleRelativeToPar =
     phase === "playing" && holeStrokes > 0 ? holeStrokes - currentHole.par : 0;
@@ -166,32 +175,26 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     }
 
     return preview;
-  }, [bag, confidenceBoost, lie, personalData, playerSkillLevel]);
+  }, [bag, confidenceBoost, lie, personalData]);
 
   const recommendedClubs = useMemo(
     () => {
-      // Robot-only test mode: all clubs have 100% effective success rate
-      const isRobotMode = true;
+      const estimatedDistances = new Map<string, number>();
+      for (const club of bag) {
+        estimatedDistances.set(
+          club.id,
+          estimateBaseDistanceByMode(
+            club,
+            seatType,
+            robotHeadSpeed,
+            personalHeadSpeed,
+          ),
+        );
+      }
 
-      // Use estimateShotDistance for distance-based club recommendation
       const scoredClubs = [...bag].sort((a, b) => {
-        // Calculate estimated distances using estimateShotDistance (same as range screen)
-        const distanceA = estimateRobotDistance(
-          a,
-          lie,
-          wind,
-          windStrength,
-          robotHeadSpeed,
-          robotSkillLevel,
-        );
-        const distanceB = estimateRobotDistance(
-          b,
-          lie,
-          wind,
-          windStrength,
-          robotHeadSpeed,
-          robotSkillLevel,
-        );
+        const distanceA = estimatedDistances.get(a.id) ?? 0;
+        const distanceB = estimatedDistances.get(b.id) ?? 0;
         const gapA = Math.abs(distanceA - remainingDistance);
         const gapB = Math.abs(distanceB - remainingDistance);
         if (gapA !== gapB) return gapA - gapB;
@@ -202,41 +205,54 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         return scoredClubs.filter((club) => club.type === "Putter");
       }
 
-      // Robot mode: show top 5 non-putter clubs as recommended
-      if (isRobotMode) {
-        return scoredClubs.filter((club) => club.type !== "Putter").slice(0, 5);
-      }
-
-      // グリーン以外の時はPutterを除外
       return scoredClubs.filter((club) => club.type !== "Putter").slice(0, 5);
     },
-    [bag, lie, remainingDistance, wind, windStrength, robotHeadSpeed, robotSkillLevel],
+    [
+      bag,
+      lie,
+      remainingDistance,
+      wind,
+      windStrength,
+      seatType,
+      robotHeadSpeed,
+      personalHeadSpeed,
+    ],
   );
+
+  const estimatedDistanceByClub = useMemo(() => {
+    const distances = new Map<string, number>();
+    for (const club of bag) {
+      distances.set(
+        club.id,
+        estimateBaseDistanceByMode(
+          club,
+          seatType,
+          robotHeadSpeed,
+          personalHeadSpeed,
+        ),
+      );
+    }
+    return distances;
+  }, [
+    bag,
+    lie,
+    wind,
+    windStrength,
+    seatType,
+    robotHeadSpeed,
+    personalHeadSpeed,
+  ]);
+
   const allClubsSorted = useMemo(
     () => {
-      // Sort clubs by estimated distance (using same function as range screen)
       return [...bag].sort((a, b) => {
-        const distanceA = estimateRobotDistance(
-          a,
-          lie,
-          wind,
-          windStrength,
-          robotHeadSpeed,
-          robotSkillLevel,
-        );
-        const distanceB = estimateRobotDistance(
-          b,
-          lie,
-          wind,
-          windStrength,
-          robotHeadSpeed,
-          robotSkillLevel,
-        );
+        const distanceA = estimatedDistanceByClub.get(a.id) ?? 0;
+        const distanceB = estimatedDistanceByClub.get(b.id) ?? 0;
         if (distanceB !== distanceA) return distanceB - distanceA;
         return a.number.localeCompare(b.number, "ja");
       });
     },
-    [bag, lie, wind, windStrength, robotHeadSpeed, robotSkillLevel],
+    [bag, estimatedDistanceByClub],
   );
   const clubsToRender = showAllClubs ? allClubsSorted : recommendedClubs;
   const recommendedClubIds = new Set(recommendedClubs.map((club) => club.id));
@@ -323,7 +339,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             ロボットプレイ中
           </span>
           <div className="mt-2 text-xs font-semibold text-sky-800 sm:text-sm">
-            ヘッドスピード: {robotHeadSpeed.toFixed(1)} m/s / スキルレベル: {(robotSkillLevel * 100).toFixed(0)}%
+            ヘッドスピード: {displayedHeadSpeed.toFixed(1)} m/s / スキルレベル: {(robotSkillLevel * 100).toFixed(0)}%
           </div>
           <h1 className="mt-4 text-4xl font-extrabold leading-tight text-emerald-900 sm:text-6xl">
             ピンまで {remainingDistance}ヤード
@@ -380,7 +396,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             </div>
             <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
               <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                実効成功率 100% (ロボット)
+                クラブ成功率 100% (ロボット)
               </span>
               {lastShotResult.landing && (
                 <>
@@ -445,8 +461,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               {!selectedClub && "クラブを選ぶと、この位置にショット前の注意が表示されます。"}
               {selectedClub && (
                 selectedEffectiveRate !== null
-                  ? `ショットは有効成功率:${selectedEffectiveRate}%で実行されます。`
-                  : "ショットは有効成功率:--%で実行されます。"
+                  ? `ショットはクラブ成功率:${selectedEffectiveRate}%で実行されます。`
+                  : "ショットはクラブ成功率:--%で実行されます。"
               )}
             </p>
           </div>
@@ -549,16 +565,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                       </span>
                     )}
                   </div>
-                  <p className="mt-2 text-sm text-emerald-700">推定飛距離: {estimateRobotDistance(
-                    club,
-                    lie,
-                    wind,
-                    windStrength,
-                    robotHeadSpeed,
-                    robotSkillLevel,
-                  )}ヤード</p>
+                  <p className="mt-2 text-sm text-emerald-700">推定飛距離: {estimatedDistanceByClub.get(club.id) ?? 0}ヤード</p>
                   <p className="mt-1 text-sm text-emerald-700">
-                    有効成功率(通常): {effectiveRate}%
+                    クラブ成功率: {effectiveRate}%
                   </p>
                   {todayRate !== null && (
                     <p className="mt-1 text-xs text-emerald-700">

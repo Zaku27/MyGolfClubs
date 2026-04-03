@@ -45,13 +45,13 @@ export const ShotActionPanel: React.FC<ShotActionPanelProps> = ({
         {!selectedClub && "クラブを選ぶと、この位置にショット前の注意が表示されます。"}
         {selectedClub && !selectedClubIsUnstable && (
           selectedEffectiveRate !== null
-            ? `ショットは有効成功率:${selectedEffectiveRate}%で実行されます。`
-            : "ショットは有効成功率:--%で実行されます。"
+            ? `ショットはクラブ成功率:${selectedEffectiveRate}%で実行されます。`
+            : "ショットはクラブ成功率:--%で実行されます。"
         )}
         {selectedClub && selectedClubIsUnstable && (
           <>
             {formatSimClubDisplayName(selectedClub)} は安定度が低めです。
-            {selectedEffectiveRate !== null ? ` 有効成功率 ${selectedEffectiveRate}%` : ""}
+            {selectedEffectiveRate !== null ? ` クラブ成功率 ${selectedEffectiveRate}%` : ""}
             {selectedTodayRate !== null && selectedTodayStats
               ? ` / 今日 ${selectedTodayStats.successes}/${selectedTodayStats.attempts}本 (${selectedTodayRate}%)`
               : ""}

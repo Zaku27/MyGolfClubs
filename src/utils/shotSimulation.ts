@@ -117,6 +117,35 @@ function simClubToGolfClub(club: SimClub): import("../types/golf").GolfClub {
 }
 
 /**
+ * 基本推定飛距離：ヘッドスピード・ライ角のみで決定
+ * UI表示用の安定した推定値（ライ・風の影響を除外）
+ * @param club SimClub
+ * @param headSpeed ヘッドスピード（m/s）。未指定なら実測値avgDistanceを使用
+ * @returns 推定飛距離（ヤード）
+ */
+export function estimateBaseDistance(
+  club: SimClub,
+  headSpeed?: number,
+): number {
+  if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance));
+
+  let baseDistance = club.avgDistance;
+  if (typeof headSpeed === "number") {
+    const golfClub = simClubToGolfClub(club);
+    const theoretical = getEstimatedDistance(golfClub, headSpeed);
+    // ロボット判定（successRate=100）なら理論値のみ
+    if (club.successRate === 100) {
+      baseDistance = theoretical;
+    } else {
+      // 個人の場合は実測値と理論値の中間
+      baseDistance = baseDistance * 0.7 + theoretical * 0.3;
+    }
+  }
+
+  return Math.max(5, Math.round(baseDistance));
+}
+
+/**
  * 高精度な飛距離推定（個人データ・ヘッドスピード・理論値も加味可能）
  * @param club SimClub
  * @param context lie, wind, windStrength
@@ -170,42 +199,7 @@ export function estimateShotDistance(
   return Math.max(5, Math.round(expected));
 }
 
-export function estimateShotDistanceRange(
-  club: SimClub,
-  context: Pick<ShotContext, "lie" | "wind" | "windStrength">,
-): { min: number; max: number } {
-  // デフォルトリスクレベルを "normal" として扱う
-  const riskLevel: RiskLevel = "normal";
-  const center = estimateShotDistance(club, context, riskLevel);
 
-  if (club.type === "Putter") {
-    const min = Math.max(1, Math.round(center * 0.8));
-    const max = Math.max(min, Math.round(center * 1.15));
-    return { min, max };
-  }
-
-  const weakClub = isWeakClub(club);
-  const varianceFactor = getVarianceFactor(club.successRate, riskLevel, weakClub);
-  const spreadMultiplier = 1.0;
-  let spreadRatio = Math.min(0.3, Math.max(0.08, varianceFactor * 1.8 * spreadMultiplier));
-
-  // excellent時のドライバー上振れをsimulateShotと同じく強化
-  let max = Math.max(center, Math.round(center * (1 + spreadRatio)));
-  if (club.type === "Driver") {
-    // excellent時の最大上振れをsimulateShotのロジックに合わせてさらに強化
-    // 1.7倍+0.12分の上振れ幅を考慮
-    max = Math.max(max, Math.round(center * (1 + Math.abs(1) * varianceFactor * 1.7 + 0.12)));
-  }
-  const min = Math.max(5, Math.round(center * (1 - spreadRatio)));
-  return { min, max };
-}
-
-/** Lower success rate + aggressive risk → more variance. */
-function getVarianceFactor(successRate: number, risk: RiskLevel, weakClub: boolean): number {
-  const base = (100 - successRate) / 250; // 0.0 – 0.34
-  const riskMult = risk === "aggressive" ? 2.0 : risk === "safe" ? 0.4 : 1.0;
-  return base * riskMult + (weakClub ? 0.06 * WEAK_CLUB_EFFECT_SCALE : 0);
-}
 
 /** Effective success rate after personal data, lie, and risk adjustments. */
 function getEffectiveSuccessRate(
@@ -310,7 +304,7 @@ function distanceToPinFromLanding(
 }
 
 /**
- * 有効成功率(15〜95)を 0〜1 のスキル寄与へ正規化する。
+ * クラブ成功率(15〜95)を 0〜1 のスキル寄与へ正規化する。
  * 分布モデルへ直接渡して、表示成功率と体感を近づける。
  */
 function normalizeEffectiveRateToSkill(rate: number): number {
@@ -319,12 +313,12 @@ function normalizeEffectiveRateToSkill(rate: number): number {
 }
 
 /**
- * 基本スキルと有効成功率を合成し、分布モデル用の実効スキルを作る。
- * lie/risk/個人データ補正を体感へ反映しやすいよう、有効成功率の重みを高く設定する。
+ * 基本スキルとクラブ成功率を合成し、分布モデル用の実効スキルを作る。
+ * lie/risk/個人データ補正を体感へ反映しやすいよう、クラブ成功率の重みを高く設定する。
  * @param playerSkillLevel 0-1の基本スキル
- * @param effectiveRate 15-95の有効成功率
+ * @param effectiveRate 15-95のクラブ成功率
  * @param baseWeight 基本スキルの重み（デフォルト: 0.35）
- * @param rateWeight 有効成功率の重み（デフォルト: 0.65）
+ * @param rateWeight クラブ成功率の重み（デフォルト: 0.65）
  */
 export function composeEffectiveSkill(
   playerSkillLevel: number,

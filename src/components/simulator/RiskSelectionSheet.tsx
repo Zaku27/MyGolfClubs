@@ -1,7 +1,7 @@
 import type { RiskLevel, SimClub } from "../../types/game";
 import { useGameStore } from "../../store/gameStore";
 import { useClubStore } from "../../store/clubStore";
-import { estimateEffectiveSuccessRate, estimateShotDistanceRange } from "../../utils/shotSimulation";
+import { estimateEffectiveSuccessRate } from "../../utils/shotSimulation";
 import { formatSimClubDisplayName } from "../../utils/simClubLabel";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 
@@ -46,11 +46,6 @@ export function RiskSelectionSheet({ club, onClose, onSelectRisk }: Props) {
   const todayRate = clubShotsToday.length > 0
     ? Math.round((clubSuccessesToday / clubShotsToday.length) * 100)
     : null;
-  const distancePreview = {
-    safe: estimateShotDistanceRange(club, shotContext),
-    normal: estimateShotDistanceRange(club, shotContext),
-    aggressive: estimateShotDistanceRange(club, shotContext),
-  };
   const effectiveRatePreview = {
     safe: estimateEffectiveSuccessRate(club, shotContext, "safe", {
       confidenceBoost,
@@ -88,7 +83,7 @@ export function RiskSelectionSheet({ club, onClose, onSelectRisk }: Props) {
             <p className="mt-2 text-base font-semibold">このクラブは最近安定していません</p>
             <p className="mt-2 text-sm text-amber-800">
               基本成功率 {club.successRate}%
-              {` ・有効成功率(通常) ${effectiveRatePreview.normal}%`}
+              {` ・クラブ成功率(通常) ${effectiveRatePreview.normal}%`}
               {todayRate !== null ? ` ・今日の成功 ${clubSuccessesToday}/${clubShotsToday.length}本 (${todayRate}%)` : ""}
             </p>
           </div>
@@ -115,13 +110,17 @@ export function RiskSelectionSheet({ club, onClose, onSelectRisk }: Props) {
               ].join(" ")}
             >
               <p className="text-base font-semibold text-emerald-900">{option.title}</p>
-              <p className="mt-1 text-sm text-emerald-700">
-                想定レンジ {distancePreview[option.risk].min}-{distancePreview[option.risk].max}ヤード
-                {option.risk === "safe" ? " / リスク低め" : ""}
-                {option.risk === "aggressive" ? " / ミスの振れ幅大" : ""}
-              </p>
+              {option.risk === "safe" && (
+                <p className="mt-1 text-sm text-emerald-700">リスク低め、ミスに強い</p>
+              )}
+              {option.risk === "normal" && (
+                <p className="mt-1 text-sm text-emerald-700">標準的なショット方針</p>
+              )}
+              {option.risk === "aggressive" && (
+                <p className="mt-1 text-sm text-emerald-700">ミスの振れ幅大、フェアウェイ抜ける可能性あり</p>
+              )}
               <p className="mt-1 text-sm text-emerald-800">
-                有効成功率: {effectiveRatePreview[option.risk]}%
+                クラブ成功率: {effectiveRatePreview[option.risk]}%
               </p>
             </button>
           ))}
