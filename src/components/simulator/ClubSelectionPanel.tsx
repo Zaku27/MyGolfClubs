@@ -1,8 +1,15 @@
 import type { SimClub } from "../../types/game";
+import { useMemo } from "react";
 import { useGameStore } from "../../store/gameStore";
 import { useClubStore } from "../../store/clubStore";
-import { estimateEffectiveSuccessRate, estimateShotDistance } from "../../utils/shotSimulation";
+import { estimateShotDistance } from "../../utils/shotSimulation";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
+import { useUserProfileStore } from "../../store/userProfileStore";
+import { loadRangePlayerSettings } from "../../utils/rangePlayerSettings";
+import {
+  buildAnalysisPenaltyByClubId,
+  calculateDisplayClubSuccessRate,
+} from "../../utils/clubSuccessDisplay";
 
 interface Props {
   remainingDistance: number;
@@ -25,13 +32,8 @@ function sortBag(bag: SimClub[]): SimClub[] {
 
 type DistanceTag = "best" | "good" | "ok" | "far";
 
-function getDistanceTag(club: SimClub, remaining: number, lie: string = "fairway"): DistanceTag {
+function getDistanceTag(estimatedDist: number, club: SimClub, remaining: number): DistanceTag {
   if (club.type === "Putter") return "ok"; // putter uses its own badge
-  const estimatedDist = estimateShotDistance(
-    club,
-    { lie: lie as any, wind: "none", windStrength: 0 },
-    "normal"
-  );
   const ratio = estimatedDist / remaining;
   if (ratio >= 0.88 && ratio <= 1.04) return "best";
   if (ratio >= 0.72 && ratio <= 1.14) return "good";
@@ -39,38 +41,49 @@ function getDistanceTag(club: SimClub, remaining: number, lie: string = "fairway
   return "ok";
 }
 
-function isRobotOnlyMode(): boolean {
-  // Robot-only test mode: only show clubs with 100% effective success rate as recommended
-  return true;
-}
-
 export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairway" }: Props) {
-  const { bag, selectedClubId, selectClub, confidenceBoost } = useGameStore();
+  const { bag, selectedClubId, selectClub, playMode } = useGameStore();
+  const allClubs = useClubStore((state) => state.clubs);
   const personalData = useClubStore((state) => state.personalData);
   const playerSkillLevel = useClubStore((state) => state.playerSkillLevel);
+  const personalHeadSpeed = useUserProfileStore((state) => state.profile.headSpeed);
   const sorted = sortBag(bag);
+  const { robotHeadSpeed } = loadRangePlayerSettings();
+  const analysisPenaltyByClubId = useMemo(
+    () => buildAnalysisPenaltyByClubId(allClubs),
+    [allClubs],
+  );
 
-  // Compute effective success rates for robot-only mode
-  const isRobot = isRobotOnlyMode();
+  const isRobot = playMode === "robot";
   const effectiveSuccessRates = new Map<string, number>();
+  const estimatedDistances = new Map<string, number>();
   for (const club of sorted) {
-    // Robot mode: all clubs have 100% effective success rate
     if (isRobot) {
       effectiveSuccessRates.set(club.id, 100);
     } else {
-      const lieType = lie as any; // lie is passed as string from HoleView
-      const effectiveRate = estimateEffectiveSuccessRate(
+      const effectiveRate = calculateDisplayClubSuccessRate(
         club,
-        { lie: lieType },
-        "normal",
-        {
-          confidenceBoost,
-          personalData: resolvePersonalDataForSimClub(club, personalData),
-          playerSkillLevel,
-        }
+        resolvePersonalDataForSimClub(club, personalData),
+        playerSkillLevel,
+        analysisPenaltyByClubId[club.id] ?? 0,
       );
       effectiveSuccessRates.set(club.id, effectiveRate);
     }
+
+    estimatedDistances.set(
+      club.id,
+      estimateShotDistance(
+        club,
+        { lie: lie as any, wind: "none", windStrength: 0 },
+        "normal",
+        {
+          personalData: isRobot ? undefined : resolvePersonalDataForSimClub(club, personalData),
+          playerSkillLevel: isRobot ? 1 : playerSkillLevel,
+          headSpeed: isRobot ? robotHeadSpeed : personalHeadSpeed ?? undefined,
+          useTheoretical: true,
+        }
+      )
+    );
   }
 
   return (
@@ -78,11 +91,11 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
       {sorted.map((club) => {
         const isSelected = selectedClubId === club.id;
         const isPutter   = club.type === "Putter";
-        const tag        = getDistanceTag(club, remainingDistance, lie);
+        const estimatedDistance = estimatedDistances.get(club.id) ?? 0;
+        const tag        = getDistanceTag(estimatedDistance, club, remainingDistance);
         const effectiveRate = effectiveSuccessRates.get(club.id) ?? 50;
 
-        // Robot-only mode: all clubs are recommended with 100% effective success rate
-        const isRecommendedRobot = isRobot; // All clubs recommended in robot mode
+        const isRecommendedRobot = isRobot;
 
         return (
           <button
@@ -136,14 +149,10 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
             {/* Stats */}
             <div className="text-right flex-shrink-0">
               <div className="text-sm font-mono font-bold">
-                {estimateShotDistance(
-                  club,
-                  { lie: lie as any, wind: "none", windStrength: 0 },
-                  "normal"
-                )}
+                {estimatedDistance}
                 <span className="text-xs text-green-500 font-normal">y</span>
               </div>
-              <div className="text-xs text-green-500">{isRobot && effectiveRate ? `${Math.round(effectiveRate)}%` : `${club.successRate}%`}</div>
+              <div className="text-xs text-green-500">{effectiveRate.toFixed(1)}%</div>
             </div>
           </button>
         );

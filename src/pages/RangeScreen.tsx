@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { GolfBagPanel } from '../components/GolfBagPanel';
 
 // ショット品質の英語ラベル関数
@@ -20,10 +21,32 @@ import {
 } from '../store/clubStore';
 import { useBagIdUrlSync } from '../hooks/useBagIdUrlSync';
 import { useUserProfileStore } from '../store/userProfileStore';
-import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
 import { formatGolfClubDisplayName } from '../utils/simClubLabel';
-import { simulateShot, estimateBaseDistance, getLieDistanceMultiplierValue } from '../utils/shotSimulation';
+import {
+  simulateShot,
+  estimateBaseDistance,
+  getLieDistanceMultiplierValue,
+} from '../utils/shotSimulation';
+import { calculateBaseClubSuccessRate } from '../utils/calculateSuccessRate';
+import {
+  buildLieAngleAnalysis,
+  buildSwingWeightAnalysis,
+  buildWeightLengthAnalysis,
+} from '../utils/analysisBuilders';
+import { classifyWeightDeviation } from '../utils/analysisRules';
+import {
+  DEFAULT_USER_LIE_ANGLE_STANDARDS,
+  type UserLieAngleStandards,
+} from '../types/lieStandards';
+import { readStoredJson, readStoredNumber } from '../utils/storage';
+import { resolvePersonalDataForSimClub } from '../utils/personalData';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
+import { toSimClub } from '../utils/clubSimAdapter';
+import {
+  loadRangePlayerSettings,
+  saveRangePlayerSettings,
+  type RangeSeatType,
+} from '../utils/rangePlayerSettings';
 import ShotDispersionChart from '../components/ShotDispersionChart';
 import WindDirectionDial from '../components/WindDirectionDial';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
@@ -48,14 +71,14 @@ const LIE_OPTIONS = [
 ];
 const SHOT_COUNTS = [5, 10, 20];
 
-const RANGE_PLAYER_SETTINGS_KEY = 'rangePlayerSettings';
 const RANGE_CONDITION_SETTINGS_KEY = 'rangeConditionSettings';
-
-type RangePlayerSettings = {
-  seatType: 'robot' | 'personal';
-  robotHeadSpeed: number;
-  robotSkillLevel: number;
-};
+const SWING_TARGET_STORAGE_KEY = 'golfbag-swing-weight-target';
+const SWING_GOOD_TOLERANCE_STORAGE_KEY = 'golfbag-swing-good-tolerance';
+const SWING_ADJUST_THRESHOLD_STORAGE_KEY = 'golfbag-swing-adjust-threshold';
+const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
+const DEFAULT_SWING_TARGET = 2.0;
+const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
+const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
 
 type RangeConditionSettings = {
   lie: string;
@@ -63,49 +86,10 @@ type RangeConditionSettings = {
   windSpeed: number;
 };
 
-function clampNumber(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.max(min, Math.min(max, value));
-}
-
-function loadRangePlayerSettings(): RangePlayerSettings {
-  if (typeof window === 'undefined') {
-    return {
-      seatType: 'personal',
-      robotHeadSpeed: 40,
-      robotSkillLevel: 0.5,
-    };
-  }
-
-  try {
-    const raw = localStorage.getItem(RANGE_PLAYER_SETTINGS_KEY);
-    if (!raw) {
-      return {
-        seatType: 'personal',
-        robotHeadSpeed: 40,
-        robotSkillLevel: 0.5,
-      };
-    }
-
-    const parsed = JSON.parse(raw) as Partial<RangePlayerSettings>;
-    return {
-      seatType: parsed.seatType === 'robot' ? 'robot' : 'personal',
-      robotHeadSpeed: clampNumber(Number(parsed.robotHeadSpeed), 20, 60),
-      robotSkillLevel: clampNumber(Number(parsed.robotSkillLevel), 0, 1),
-    };
-  } catch {
-    return {
-      seatType: 'personal',
-      robotHeadSpeed: 40,
-      robotSkillLevel: 0.5,
-    };
-  }
-}
-
-function saveRangePlayerSettings(settings: RangePlayerSettings) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(RANGE_PLAYER_SETTINGS_KEY, JSON.stringify(settings));
-}
+type AnalysisPenalty = {
+  points: number;
+  reasons: string[];
+};
 
 function loadRangeConditionSettings(): RangeConditionSettings {
   if (typeof window === 'undefined') {
@@ -153,6 +137,18 @@ function saveRangeConditionSettings(settings: RangeConditionSettings) {
       windSpeed: normalizeWindSpeedMps(settings.windSpeed),
     }),
   );
+}
+
+function parseUserLieAngleStandards(value: unknown): UserLieAngleStandards {
+  if (!value || typeof value !== 'object') {
+    return DEFAULT_USER_LIE_ANGLE_STANDARDS;
+  }
+
+  const parsed = value as Partial<UserLieAngleStandards>;
+  return {
+    byClubType: parsed.byClubType ?? {},
+    byClubName: parsed.byClubName ?? {},
+  };
 }
 
 const qualityStatusColor = (shotQuality: string) => {
@@ -291,7 +287,7 @@ export default function RangeScreen() {
   // const { playerSkillLevel } = useGameStore();
   const [selectedClubId, setSelectedClubId] = useState<string>('');
   // プレイヤー: "robot" or "personal"
-  const [seatType, setSeatType] = useState<'robot' | 'personal'>(initialRangePlayerSettings.seatType);
+  const [seatType, setSeatType] = useState<RangeSeatType>(initialRangePlayerSettings.seatType);
   // ロボット用: ヘッドスピードとスキルレベル
   const [robotHeadSpeed, setRobotHeadSpeed] = useState<number>(initialRangePlayerSettings.robotHeadSpeed);
   const [robotSkillLevel, setRobotSkillLevel] = useState<number>(initialRangePlayerSettings.robotSkillLevel);
@@ -317,8 +313,30 @@ export default function RangeScreen() {
     seatType === 'robot' ? `Robot Skill ${(robotSkillLevel * 100).toFixed(0)}%` : 'Personal Skill';
   const personalHeadSpeed = profile.headSpeed;
   const personalSkillLevel = storedPlayerSkillLevel;
+  const personalSkillLevelLabel =
+    personalSkillLevel < 0.35 ? '初心者' : personalSkillLevel < 0.7 ? '中級者' : '上級者';
   const clubs = seatType === 'personal' ? activeBagClubs : allClubs;
   const selectableClubs = getSelectableRangeClubs(clubs, seatType);
+  const swingWeightTarget = readStoredNumber(
+    SWING_TARGET_STORAGE_KEY,
+    DEFAULT_SWING_TARGET,
+    { decimals: 1 },
+  );
+  const swingGoodTolerance = readStoredNumber(
+    SWING_GOOD_TOLERANCE_STORAGE_KEY,
+    DEFAULT_SWING_GOOD_TOLERANCE,
+    { decimals: 1 },
+  );
+  const swingAdjustThreshold = readStoredNumber(
+    SWING_ADJUST_THRESHOLD_STORAGE_KEY,
+    DEFAULT_SWING_ADJUST_THRESHOLD,
+    { decimals: 1 },
+  );
+  const userLieAngleStandards = readStoredJson(
+    LIE_STANDARDS_STORAGE_KEY,
+    DEFAULT_USER_LIE_ANGLE_STANDARDS,
+    parseUserLieAngleStandards,
+  );
 
   useBagIdUrlSync({
     bags,
@@ -407,58 +425,90 @@ export default function RangeScreen() {
 
   // avgDistanceが無い場合はdistanceをavgDistanceとして使う
   let selectedClub = clubs.find((c) => String(c.id) === String(selectedClubId));
-  // SimClub型に変換（最低限必要なプロパティを補完）
-  const toSimClub = (club: import('../types/golf').GolfClub | undefined) => {
-    if (!club) return undefined;
-    // type/clubType補完
-    let type = (club as any).type ?? club.clubType ?? "Unknown";
-    // numberやnameからdriver/wood/iron/wedge/putterを推定
-    if (!type || type === "Unknown") {
-      const n = (club.number ?? "").toString().toLowerCase();
-      if (n.includes("d") || n.includes("dr") || club.name?.toLowerCase().includes("driver")) type = "Driver";
-      else if (n.includes("w") || club.name?.toLowerCase().includes("wood")) type = "Wood";
-      else if (n.includes("h")) type = "Hybrid";
-      else if (n.includes("p") && club.name?.toLowerCase().includes("putter")) type = "Putter";
-      else if (n.match(/^[0-9]+$/)) type = "Iron";
-      else type = "Iron";
-    }
-    // loftAngle補完（未設定や0なら推定値）
-    let loftAngle = club.loftAngle;
-    if (!loftAngle || loftAngle === 0) {
-      if (type === "Driver") loftAngle = 10.5;
-      else if (type === "Wood") loftAngle = 15;
-      else if (type === "Hybrid") loftAngle = 22;
-      else if (type === "Iron") loftAngle = 30;
-      else if (type === "Wedge") loftAngle = 46;
-      else if (type === "Putter") loftAngle = 3;
-      else loftAngle = 30;
-    }
-    return {
-      ...club,
-      type,
-      clubType: type,
-      loftAngle,
-      avgDistance: (club as any).avgDistance ?? club.distance ?? 0,
-      successRate: (club as any).successRate ?? 70,
-      isWeakClub: (club as any).isWeakClub ?? false,
-      number: club.number ?? "",
-      name: club.name ?? "",
-      id: String(club.id),
-    };
-  };
-  const simClub = toSimClub(selectedClub);
+  const simClub = selectedClub ? toSimClub(selectedClub) : undefined;
+  const estimatedClubDistance = simClub
+    ? estimateBaseDistance(
+        simClub,
+        seatType === 'robot' ? robotHeadSpeed : personalHeadSpeed ?? undefined,
+        undefined,
+        true,
+      )
+    : 0;
   const lieDistanceMultiplier = getLieDistanceMultiplierValue(gameLie, simClub?.type ?? 'Iron');
-  const clubPersonal: import('../types/golf').ClubPersonalData | undefined =
-    simClub && simClub.id !== undefined ? personalData[simClub.id] ?? undefined : undefined;
-  // DB保存値があればそれを優先、なければ従来通り計算値を使う
-  let effectiveSuccess: number | null = null;
-  if (simClub && clubPersonal) {
-    if (typeof clubPersonal.effectiveSuccessRate === 'number') {
-      effectiveSuccess = clubPersonal.effectiveSuccessRate / 100;
-    } else {
-      effectiveSuccess = calculateEffectiveSuccessRate({ ...simClub, id: Number(simClub.id) }, clubPersonal, personalSkillLevel);
+  const analysisPenaltyByClubId = (() => {
+    const penaltyMap: Record<string, AnalysisPenalty> = {};
+
+    const addPenalty = (clubId: string, points: number, reason: string) => {
+      const existing = penaltyMap[clubId] ?? { points: 0, reasons: [] };
+      const nextReasons = existing.reasons.includes(reason)
+        ? existing.reasons
+        : [...existing.reasons, reason];
+      penaltyMap[clubId] = {
+        points: Math.min(20, existing.points + points),
+        reasons: nextReasons,
+      };
+    };
+
+    const alwaysVisible = () => true;
+
+    const { tableClubs: swingTable } = buildSwingWeightAnalysis(
+      clubs,
+      swingWeightTarget,
+      swingGoodTolerance,
+      swingAdjustThreshold,
+      alwaysVisible,
+    );
+    for (const club of swingTable) {
+      const clubId = toSimClub(club).id;
+      if (club.swingStatus === '調整推奨') {
+        addPenalty(clubId, 8, 'スイングウェイト: 調整推奨');
+      } else if (club.swingStatus !== '良好') {
+        addPenalty(clubId, 4, `スイングウェイト: ${club.swingStatus}`);
+      }
     }
-  }
+
+    const { tableClubs: weightTable } = buildWeightLengthAnalysis(clubs, alwaysVisible);
+    for (const club of weightTable) {
+      const clubId = toSimClub(club).id;
+      const weightClass = classifyWeightDeviation(club.deviation);
+      if (weightClass === 'heavyOutlier' || weightClass === 'lightOutlier') {
+        addPenalty(clubId, 6, '重量偏差: 外れ値');
+      } else if (weightClass === 'outOfBand') {
+        addPenalty(clubId, 3, '重量偏差: トレンド外');
+      }
+    }
+
+    const { tableClubs: lieTable } = buildLieAngleAnalysis(
+      clubs,
+      userLieAngleStandards,
+      alwaysVisible,
+    );
+    for (const club of lieTable) {
+      const clubId = toSimClub(club).id;
+      if (club.lieStatus === 'Adjust Recommended') {
+        addPenalty(clubId, 6, 'ライ角: 調整推奨');
+      } else if (club.lieStatus === 'Slightly Off') {
+        addPenalty(clubId, 3, 'ライ角: ややズレ');
+      }
+    }
+
+    return penaltyMap;
+  })();
+
+  const clubPersonal: import('../types/golf').ClubPersonalData | undefined =
+    simClub ? resolvePersonalDataForSimClub(simClub, personalData) : undefined;
+  const effectiveSuccess =
+    simClub && seatType === 'personal'
+      ? calculateBaseClubSuccessRate({
+          baseSuccessRate: Math.max(
+            5,
+            simClub.successRate - (analysisPenaltyByClubId[simClub.id]?.points ?? 0),
+          ),
+          personalData: clubPersonal,
+          isWeakClub: simClub.isWeakClub === true || simClub.successRate < 65,
+          playerSkillLevel: personalSkillLevel,
+        })
+      : null;
 
   const handleSimulate = async () => {
     if (!simClub) return;
@@ -492,7 +542,6 @@ export default function RangeScreen() {
           headSpeed: robotHeadSpeed,
           shotIndex: i,
           seedNonce: simulationSeedNonce,
-          skillWeights: profile.skillWeights,
         };
       } else {
         options = {
@@ -501,7 +550,6 @@ export default function RangeScreen() {
           headSpeed: personalHeadSpeed ?? undefined,
           shotIndex: i,
           seedNonce: simulationSeedNonce,
-          skillWeights: profile.skillWeights,
         };
       }
       const shotResult = simulateShot(clubForSim, context, riskLevel, options);
@@ -518,21 +566,7 @@ export default function RangeScreen() {
     const success = shotResults.filter((r) => r.wasSuccessful).length / numShots;
 
     // 目安値との差分を計算
-    const estimatedDist = simClub
-      ? seatType === 'robot'
-        ? estimateBaseDistance(
-            { ...simClub, successRate: 100 },
-            robotHeadSpeed,
-            undefined,
-            true
-          )
-        : estimateBaseDistance(
-            simClub,
-            personalHeadSpeed ?? undefined,
-            undefined,
-            false
-          )
-      : 0;
+    const estimatedDist = estimatedClubDistance;
     const diff = Math.round(avg - estimatedDist);
     const avgToTargetDistance =
       shotResults.reduce((sum, result) => {
@@ -549,12 +583,12 @@ export default function RangeScreen() {
   };
 
   const handleCalibrate = () => {
-    if (!simClub || !results.length || !clubPersonal) return;
+    if (!simClub || !selectedClub || !results.length || !clubPersonal) return;
     const calibrationResults = results.map((result) => ({
       outcome: result.penalty ? 'Penalty' : result.wasSuccessful ? 'Success' : 'Miss',
       distance: result.distanceHit,
     }));
-    rangeAutoCalibrate({ ...simClub, id: Number(simClub.id) }, clubPersonal, calibrationResults);
+    rangeAutoCalibrate(selectedClub, clubPersonal, calibrationResults);
     setCalibrated(true);
   };
 
@@ -565,12 +599,20 @@ export default function RangeScreen() {
       {/* Header */}
       <div className="w-full max-w-xl flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-green-900">練習場</h1>
-        <button
-          className="bg-green-200 hover:bg-green-300 text-green-900 rounded px-4 py-2 font-semibold shadow"
-          onClick={() => window.history.back()}
-        >
-          メニューに戻る
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/personal-data"
+            className="inline-flex items-center justify-center rounded bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-900 shadow hover:bg-emerald-200"
+          >
+            個人データ入力へ
+          </Link>
+          <button
+            className="bg-green-200 hover:bg-green-300 text-green-900 rounded px-4 py-2 font-semibold shadow"
+            onClick={() => window.history.back()}
+          >
+            メニューに戻る
+          </button>
+        </div>
       </div>
 
 
@@ -580,7 +622,7 @@ export default function RangeScreen() {
         <select
           className="w-full border rounded p-2 mb-2"
           value={seatType}
-          onChange={e => setSeatType(e.target.value as 'robot' | 'personal')}
+          onChange={e => setSeatType(e.target.value as RangeSeatType)}
         >
           <option value="personal">ユーザー</option>
           <option value="robot">ロボット</option>
@@ -622,59 +664,21 @@ export default function RangeScreen() {
             <span className="text-xs text-green-700">
               ユーザーの値は個人データ入力画面で保存された設定を使用します。
             </span>
-          </div>
-        )}
-
-        {/* 個人データ打席のみ、スキル合成の重み調整を表示する */}
-        {seatType !== 'robot' && (
-          <div className="mt-4 pt-4 border-t border-green-200">
-            <label className="block font-semibold mb-2">スキル合成の重み</label>
-            <div className="flex flex-col gap-3 bg-blue-50 rounded p-3 border border-blue-200">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  基本スキル重み: {(profile.skillWeights?.baseSkillWeight ?? 0.35).toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={profile.skillWeights?.baseSkillWeight ?? 0.35}
-                  onChange={e => {
-                    const { setSkillWeights } = useUserProfileStore.getState();
-                    setSkillWeights(
-                      Number(e.target.value),
-                      profile.skillWeights?.effectiveRateWeight ?? 0.65
-                    );
-                  }}
-                  className="w-full accent-blue-600"
-                />
-                <span className="text-xs text-gray-600">← 低 | 高 →</span>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  成功率重み: {(profile.skillWeights?.effectiveRateWeight ?? 0.65).toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={profile.skillWeights?.effectiveRateWeight ?? 0.65}
-                  onChange={e => {
-                    const { setSkillWeights } = useUserProfileStore.getState();
-                    setSkillWeights(
-                      profile.skillWeights?.baseSkillWeight ?? 0.35,
-                      Number(e.target.value)
-                    );
-                  }}
-                  className="w-full accent-blue-600"
-                />
-                <span className="text-xs text-gray-600">← 低 | 高 →</span>
+            <div className="rounded border border-green-200 bg-white/80 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span>
+                  <span className="font-semibold">適用ヘッドスピード:</span>{' '}
+                  {personalHeadSpeed != null ? `${personalHeadSpeed.toFixed(1)} m/s` : '未設定（クラブ基準）'}
+                </span>
+                <span>
+                  <span className="font-semibold">適用スキルレベル:</span>{' '}
+                  {(personalSkillLevel * 100).toFixed(0)}% ({personalSkillLevelLabel})
+                </span>
               </div>
             </div>
           </div>
         )}
+
       </div>
 
       {seatType === 'personal' && (
@@ -720,21 +724,7 @@ export default function RangeScreen() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
                 <span className="font-bold">{selectedClub.name}</span>
                 <span>
-                  推定飛距離: {simClub ? (
-                    seatType === 'robot'
-                      ? estimateBaseDistance(
-                          { ...simClub, successRate: 100 },
-                          robotHeadSpeed,
-                          undefined,
-                          true
-                        )
-                      : estimateBaseDistance(
-                          simClub,
-                          personalHeadSpeed ?? undefined,
-                          undefined,
-                          false
-                        )
-                  ) : '-'} y
+                  推定飛距離: {simClub ? estimatedClubDistance : '-'} y
                 </span>
                 <div ref={robotHintRef} className="relative">
                   <span className="inline-flex items-center gap-2">
@@ -743,7 +733,7 @@ export default function RangeScreen() {
                         simClub ? (
                           seatType === 'robot'
                             ? '100% (ロボット固定)'
-                            : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? (effectiveSuccess * 100).toFixed(1) : '--') + '%'
+                            : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
                         ) : '--'
                       }
                     </span>

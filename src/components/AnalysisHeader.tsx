@@ -72,7 +72,7 @@ export const AnalysisHeader = ({
     <div className="analysis-controls">
       {activeTab === 'loftDistance' && (
         <label className="headspeed-control">
-          <span>ヘッドスピード</span>
+          <span>推定ヘッドスピード</span>
           <div className="headspeed-input-wrap">
             <input
               type="number"

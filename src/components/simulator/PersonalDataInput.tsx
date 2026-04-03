@@ -10,12 +10,28 @@ import {
 } from "../../store/clubStore";
 import { useBagIdUrlSync } from "../../hooks/useBagIdUrlSync";
 import { toSimClub } from "../../utils/clubSimAdapter";
-import { calculateEffectiveSuccessRate } from "../../utils/calculateSuccessRate";
+import { calculateBaseClubSuccessRate } from "../../utils/calculateSuccessRate";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
+import {
+  buildLieAngleAnalysis,
+  buildSwingWeightAnalysis,
+  buildWeightLengthAnalysis,
+} from "../../utils/analysisBuilders";
+import { classifyWeightDeviation } from "../../utils/analysisRules";
+import {
+  DEFAULT_USER_LIE_ANGLE_STANDARDS,
+  type UserLieAngleStandards,
+} from "../../types/lieStandards";
+import { readStoredJson, readStoredNumber } from "../../utils/storage";
 
 type DraftRow = {
   missRate: number;
   weaknessFactor: number;
+};
+
+type AnalysisPenalty = {
+  points: number;
+  reasons: string[];
 };
 
 const SKILL_PRESETS = [
@@ -23,6 +39,14 @@ const SKILL_PRESETS = [
   { label: "中級者", value: 0.5 },
   { label: "上級者", value: 0.85 },
 ] as const;
+
+const SWING_TARGET_STORAGE_KEY = "golfbag-swing-weight-target";
+const SWING_GOOD_TOLERANCE_STORAGE_KEY = "golfbag-swing-good-tolerance";
+const SWING_ADJUST_THRESHOLD_STORAGE_KEY = "golfbag-swing-adjust-threshold";
+const LIE_STANDARDS_STORAGE_KEY = "golfbag-user-lie-angle-standards";
+const DEFAULT_SWING_TARGET = 2.0;
+const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
+const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
 
 const clamp = (value: number, min: number, max: number): number => {
   if (Number.isNaN(value)) {
@@ -47,6 +71,18 @@ const getSkillLabel = (level: number): string => {
   if (level < 0.35) return "初心者";
   if (level < 0.7) return "中級者";
   return "上級者";
+};
+
+const parseUserLieAngleStandards = (value: unknown): UserLieAngleStandards => {
+  if (!value || typeof value !== "object") {
+    return DEFAULT_USER_LIE_ANGLE_STANDARDS;
+  }
+
+  const parsed = value as Partial<UserLieAngleStandards>;
+  return {
+    byClubType: parsed.byClubType ?? {},
+    byClubName: parsed.byClubName ?? {},
+  };
 };
 
 const CLUB_CATEGORIES: readonly { category: ClubCategory; label: string }[] = [
@@ -77,6 +113,26 @@ export function PersonalDataInput() {
   const setPersonalData = useClubStore((state) => state.setPersonalData);
   const setPlayerSkillLevel = useClubStore((state) => state.setPlayerSkillLevel);
   const setActiveBag = useClubStore((state) => state.setActiveBag);
+  const swingWeightTarget = readStoredNumber(
+    SWING_TARGET_STORAGE_KEY,
+    DEFAULT_SWING_TARGET,
+    { decimals: 1 },
+  );
+  const swingGoodTolerance = readStoredNumber(
+    SWING_GOOD_TOLERANCE_STORAGE_KEY,
+    DEFAULT_SWING_GOOD_TOLERANCE,
+    { decimals: 1 },
+  );
+  const swingAdjustThreshold = readStoredNumber(
+    SWING_ADJUST_THRESHOLD_STORAGE_KEY,
+    DEFAULT_SWING_ADJUST_THRESHOLD,
+    { decimals: 1 },
+  );
+  const userLieAngleStandards = readStoredJson(
+    LIE_STANDARDS_STORAGE_KEY,
+    DEFAULT_USER_LIE_ANGLE_STANDARDS,
+    parseUserLieAngleStandards,
+  );
 
   const [draftByClubId, setDraftByClubId] = useState<Record<string, DraftRow>>({});
   const [saveMessage, setSaveMessage] = useState<string>("");
@@ -117,33 +173,109 @@ export function PersonalDataInput() {
     setDraftByClubId(nextDraft);
   }, [clubs, personalData, isSaving]);
 
+  const analysisPenaltyByClubId = useMemo(() => {
+    const penaltyMap: Record<string, AnalysisPenalty> = {};
+
+    const addPenalty = (clubId: string, points: number, reason: string) => {
+      const existing = penaltyMap[clubId] ?? { points: 0, reasons: [] };
+      const nextReasons = existing.reasons.includes(reason)
+        ? existing.reasons
+        : [...existing.reasons, reason];
+      penaltyMap[clubId] = {
+        points: Math.min(20, existing.points + points),
+        reasons: nextReasons,
+      };
+    };
+
+    const alwaysVisible = () => true;
+
+    const { tableClubs: swingTable } = buildSwingWeightAnalysis(
+      clubs,
+      swingWeightTarget,
+      swingGoodTolerance,
+      swingAdjustThreshold,
+      alwaysVisible,
+    );
+    for (const club of swingTable) {
+      const clubId = toSimClub(club).id;
+      if (club.swingStatus === "調整推奨") {
+        addPenalty(clubId, 8, "スイングウェイト: 調整推奨");
+      } else if (club.swingStatus !== "良好") {
+        addPenalty(clubId, 4, `スイングウェイト: ${club.swingStatus}`);
+      }
+    }
+
+    const { tableClubs: weightTable } = buildWeightLengthAnalysis(clubs, alwaysVisible);
+    for (const club of weightTable) {
+      const clubId = toSimClub(club).id;
+      const weightClass = classifyWeightDeviation(club.deviation);
+      if (weightClass === "heavyOutlier" || weightClass === "lightOutlier") {
+        addPenalty(clubId, 6, "重量偏差: 外れ値");
+      } else if (weightClass === "outOfBand") {
+        addPenalty(clubId, 3, "重量偏差: トレンド外");
+      }
+    }
+
+    const { tableClubs: lieTable } = buildLieAngleAnalysis(
+      clubs,
+      userLieAngleStandards,
+      alwaysVisible,
+    );
+    for (const club of lieTable) {
+      const clubId = toSimClub(club).id;
+      if (club.lieStatus === "Adjust Recommended") {
+        addPenalty(clubId, 6, "ライ角: 調整推奨");
+      } else if (club.lieStatus === "Slightly Off") {
+        addPenalty(clubId, 3, "ライ角: ややズレ");
+      }
+    }
+
+    return penaltyMap;
+  }, [
+    clubs,
+    swingWeightTarget,
+    swingGoodTolerance,
+    swingAdjustThreshold,
+    userLieAngleStandards,
+  ]);
+
   const rows = useMemo(() => {
     return clubs.map((club) => {
       const simClub = toSimClub(club);
       const draft = draftByClubId[simClub.id] ?? { missRate: 0, weaknessFactor: 0 };
       const treatedAsWeakClub = simClub.isWeakClub === true || simClub.successRate < 65;
-      const effectiveSuccessRate = calculateEffectiveSuccessRate(
-        simClub.successRate,
-        {
+      const analysisPenalty = analysisPenaltyByClubId[simClub.id]?.points ?? 0;
+      const analysisPenaltyReasons = analysisPenaltyByClubId[simClub.id]?.reasons ?? [];
+      const adjustedBaseSuccessRate = Math.max(5, simClub.successRate - analysisPenalty);
+      const effectiveSuccessRate = calculateBaseClubSuccessRate({
+        baseSuccessRate: adjustedBaseSuccessRate,
+        personalData: {
           clubId: simClub.id,
           missRate: draft.missRate,
           weaknessFactor: draft.weaknessFactor,
         },
-        treatedAsWeakClub,
+        isWeakClub: treatedAsWeakClub,
         playerSkillLevel,
-      );
+      });
 
       return {
         clubId: simClub.id,
         clubLabel: `${club.name} ${club.number}`,
         treatedAsWeakClub,
         baseSuccessRate: simClub.successRate,
+        adjustedBaseSuccessRate,
+        analysisPenalty,
+        analysisPenaltyReasons,
         missRate: draft.missRate,
         weaknessFactor: draft.weaknessFactor,
         effectiveSuccessRate,
       };
     });
-  }, [clubs, draftByClubId, playerSkillLevel]);
+  }, [clubs, draftByClubId, playerSkillLevel, analysisPenaltyByClubId]);
+
+  const analysisAdjustedRows = useMemo(() => {
+    return rows.filter((row) => row.analysisPenalty > 0);
+  }, [rows]);
 
   const updateDraft = (clubId: string, patch: Partial<DraftRow>) => {
     setDraftByClubId((prev) => ({
@@ -219,7 +351,6 @@ export function PersonalDataInput() {
         clubId: row.clubId,
         missRate: row.missRate,
         weaknessFactor: row.weaknessFactor,
-        effectiveSuccessRate: row.effectiveSuccessRate,
       };
       await setPersonalData(payload);
     }
@@ -276,6 +407,12 @@ export function PersonalDataInput() {
           </div>
           <div className="flex flex-col items-stretch gap-2 sm:items-end">
             <Link
+              to="/range"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+            >
+              練習場へ
+            </Link>
+            <Link
               to={appLink}
               className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
@@ -308,6 +445,19 @@ export function PersonalDataInput() {
         {error && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {error}
+          </div>
+        )}
+
+        {analysisAdjustedRows.length > 0 && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+            <p className="font-semibold">分析結果により基本成功率を下げたクラブがあります。</p>
+            <ul className="mt-2 list-disc pl-5 space-y-1">
+              {analysisAdjustedRows.map((row) => (
+                <li key={`analysis-${row.clubId}`}>
+                  {row.clubLabel}: -{row.analysisPenalty}%（{row.analysisPenaltyReasons.join(" / ")}）
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -480,7 +630,12 @@ export function PersonalDataInput() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-slate-800">
-                      {row.baseSuccessRate}%
+                      {row.adjustedBaseSuccessRate}%
+                      {row.analysisPenalty > 0 && (
+                        <span className="ml-1 text-xs font-normal text-amber-700">
+                          (元 {row.baseSuccessRate}% / -{row.analysisPenalty}%)
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <input
@@ -529,7 +684,7 @@ export function PersonalDataInput() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-emerald-700">
-                      {row.effectiveSuccessRate}%
+                      {row.effectiveSuccessRate.toFixed(1)}%
                     </td>
                   </tr>
                 ))}

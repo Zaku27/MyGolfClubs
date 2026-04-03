@@ -2,11 +2,16 @@ import { useGameStore } from "../../store/gameStore";
 import { useMemo, useState, useEffect, useRef } from "react";
 import type { LieType, SimClub } from "../../types/game";
 import { useClubStore } from "../../store/clubStore";
-import { estimateBaseDistance, estimateEffectiveSuccessRate } from "../../utils/shotSimulation";
+import { estimateBaseDistance } from "../../utils/shotSimulation";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
 import { CompactScorecard } from "./Scorecard";
 import { useUserProfileStore } from "../../store/userProfileStore";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
+import { loadRangePlayerSettings } from "../../utils/rangePlayerSettings";
+import {
+  buildAnalysisPenaltyByClubId,
+  calculateDisplayClubSuccessRate,
+} from "../../utils/clubSuccessDisplay";
 
 interface Props {
   onBack: () => void;
@@ -23,54 +28,13 @@ const LIE_LABEL: Record<LieType, string> = {
   green: "グリーン",
 };
 
-const RANGE_PLAYER_SETTINGS_KEY = "rangePlayerSettings";
-const DEFAULT_ROBOT_HEAD_SPEED = 40;
-const DEFAULT_ROBOT_SKILL_LEVEL = 0.5;
-
-type RangePlayerSettings = {
-  seatType: "robot" | "personal";
-  robotHeadSpeed: number;
-  robotSkillLevel: number;
+const SHOT_QUALITY_LABEL: Record<string, string> = {
+  excellent: "会心のショット",
+  good: "ナイスショット",
+  average: "まずまず",
+  poor: "ミス気味",
+  mishit: "ミスショット",
 };
-
-function clampNumber(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.max(min, Math.min(max, value));
-}
-
-function loadRangePlayerSettingsFromStorage(): RangePlayerSettings {
-  if (typeof window === "undefined") {
-    return {
-      seatType: "personal",
-      robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
-      robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
-    };
-  }
-
-  try {
-    const raw = localStorage.getItem(RANGE_PLAYER_SETTINGS_KEY);
-    if (!raw) {
-      return {
-        seatType: "personal",
-        robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
-        robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
-      };
-    }
-    const parsed = JSON.parse(raw) as Partial<RangePlayerSettings>;
-
-    return {
-      seatType: parsed.seatType === "robot" ? "robot" : "personal",
-      robotHeadSpeed: clampNumber(Number(parsed.robotHeadSpeed), 20, 60),
-      robotSkillLevel: clampNumber(Number(parsed.robotSkillLevel), 0, 1),
-    };
-  } catch {
-    return {
-      seatType: "personal",
-      robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
-      robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
-    };
-  }
-}
 
 function estimateBaseDistanceWithMode(
   club: SimClub,
@@ -81,7 +45,7 @@ function estimateBaseDistanceWithMode(
   if (seatType === "robot") {
     return estimateBaseDistance(club, robotHeadSpeed, undefined, true);
   }
-  return estimateBaseDistance(club, personalHeadSpeed ?? undefined, undefined, false);
+  return estimateBaseDistance(club, personalHeadSpeed ?? undefined, undefined, true);
 }
 
 
@@ -144,13 +108,14 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     };
   }, [lastShotResult, phase, showResultModal]);
   const personalData = useClubStore((state) => state.personalData);
+  const allClubs = useClubStore((state) => state.clubs);
   const personalHeadSpeed = useUserProfileStore((state) => state.profile.headSpeed);
 
   const currentHole = course[currentHoleIndex];
   if (!currentHole) return null;
 
   const { remainingDistance, lie, wind, windStrength = 0, hazards = [] } = shotContext;
-  const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettingsFromStorage();
+  const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettings();
   const seatType = playMode === "robot" ? "robot" : "personal";
   const displayedHeadSpeed = seatType === "robot" ? robotHeadSpeed : (personalHeadSpeed ?? 0);
   const completedRelativeToPar = scores.reduce((sum, s) => sum + (s.strokes - s.par), 0);
@@ -163,6 +128,10 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       : cumulativeRelativeToPar < 0
         ? `${cumulativeRelativeToPar}`
         : "E";
+  const analysisPenaltyByClubId = useMemo(
+    () => buildAnalysisPenaltyByClubId(allClubs),
+    [allClubs],
+  );
   const clubPreview = useMemo(() => {
     const preview = new Map<string, { effectiveRate: number }>();
     const isRobotMode = playMode === "robot";
@@ -170,22 +139,18 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     for (const club of bag) {
       const effectiveRate = isRobotMode
         ? 100
-        : estimateEffectiveSuccessRate(
+        : calculateDisplayClubSuccessRate(
             club,
-            { lie },
-            "normal",
-            {
-              confidenceBoost,
-              personalData: resolvePersonalDataForSimClub(club, personalData),
-              playerSkillLevel,
-            },
+            resolvePersonalDataForSimClub(club, personalData),
+            playerSkillLevel,
+            analysisPenaltyByClubId[club.id] ?? 0,
           );
 
       preview.set(club.id, { effectiveRate });
     }
 
     return preview;
-  }, [bag, confidenceBoost, lie, personalData, playMode, playerSkillLevel]);
+  }, [analysisPenaltyByClubId, bag, personalData, playMode, playerSkillLevel]);
 
   const recommendedClubs = useMemo(
     () => {
@@ -268,7 +233,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
   // ショット注意案内の内容生成
   const selectedEffectiveRate = selectedClub
-    ? Math.round(clubPreview.get(selectedClub.id)?.effectiveRate ?? selectedClub.successRate)
+    ? Math.round((clubPreview.get(selectedClub.id)?.effectiveRate ?? selectedClub.successRate) * 10) / 10
     : null;
 
   return (
@@ -392,7 +357,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             </div>
             <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
               <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                {playMode === "robot" ? "クラブ成功率 100% (ロボット)" : `クラブ成功率 ${Math.round(lastShotResult.effectiveSuccessRate)}%`}
+                {SHOT_QUALITY_LABEL[lastShotResult.shotQuality] ?? lastShotResult.shotQuality}
               </span>
               {lastShotResult.landing && (
                 <>

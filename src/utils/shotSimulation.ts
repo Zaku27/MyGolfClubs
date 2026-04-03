@@ -8,9 +8,9 @@ import type {
   WindDirection,
 } from "../types/game";
 import type { ClubPersonalData } from "../types/golf";
-import { calculateEffectiveSuccessRate } from "./calculateSuccessRate";
+import { calculateBaseClubSuccessRate } from "./calculateSuccessRate";
 import { ClubService } from "../db/clubService";
-import { getEstimatedDistance } from "./analysisUtils";
+import { estimateTheoreticalDistance } from "./distanceEstimation";
 import { calculateLandingOutcome } from "./landingPosition";
 /**
  * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
@@ -35,10 +35,6 @@ interface SimulationOptions {
   useTheoretical?: boolean;
   shotIndex?: number;
   seedNonce?: string;
-  skillWeights?: {
-    baseSkillWeight: number;
-    effectiveRateWeight: number;
-  };
 }
 
 const WEAK_CLUB_EFFECT_SCALE = 0.5;
@@ -129,27 +125,40 @@ function isWeakClub(club: SimClub): boolean {
   return club.isWeakClub === true || club.successRate < 65;
 }
 
-/**
- * SimClub から GolfClub 相当の情報を生成（推定値は0や空文字で埋める）
- */
-function simClubToGolfClub(club: SimClub): import("../types/golf").GolfClub {
-  return {
-    clubType: club.type as any, // ClubCategory互換
-    name: club.name,
-    number: club.number,
-    length: 0,
-    weight: 0,
-    swingWeight: '',
-    lieAngle: 0,
-    // SimClub 側のロフト角を理論飛距離計算へ引き継ぐ
-    loftAngle: club.loftAngle ?? 0,
-    shaftType: '',
-    torque: 0,
-    flex: 'S',
-    distance: club.avgDistance,
-    notes: '',
-    id: Number(club.id),
-  };
+function clampSkillLevel(playerSkillLevel?: number): number {
+  return Math.max(0, Math.min(1, playerSkillLevel ?? 0.5));
+}
+
+function getSkillDistanceMultiplier(playerSkillLevel?: number): number {
+  const skillLevel = clampSkillLevel(playerSkillLevel);
+  return 0.92 + skillLevel * 0.16;
+}
+
+function resolveBaseDistanceWithTheoretical(
+  club: SimClub,
+  headSpeed: number | undefined,
+  mode: "none" | "blend" | "theoretical",
+): number {
+  if (typeof headSpeed !== "number" || mode === "none") {
+    return club.avgDistance;
+  }
+
+  const theoretical = estimateTheoreticalDistance(
+    {
+      clubType: club.type,
+      name: club.name,
+      number: club.number,
+      loftAngle: club.loftAngle,
+      distance: club.avgDistance,
+    },
+    headSpeed,
+  );
+
+  if (mode === "theoretical") {
+    return theoretical;
+  }
+
+  return club.avgDistance * 0.7 + theoretical * 0.3;
 }
 
 /**
@@ -168,23 +177,12 @@ export function estimateBaseDistance(
 ): number {
   if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance));
 
-  let baseDistance = club.avgDistance;
-  const skillLevel = Math.max(0, Math.min(1, playerSkillLevel ?? 0.5));
-
-  // ヘッドスピードと理論値の適用
-  if (typeof headSpeed === "number") {
-    const golfClub = simClubToGolfClub(club);
-    const theoretical = getEstimatedDistance(golfClub, headSpeed);
-    // useTheoretical=true なら理論値のみ、false なら実測値と理論値の中間
-    if (useTheoretical) {
-      baseDistance = theoretical;
-    } else {
-      baseDistance = baseDistance * 0.7 + theoretical * 0.3;
-    }
-  }
-
-  // スキルレベルによる軽微な距離調整
-  const skillDistanceMultiplier = 0.92 + skillLevel * 0.16;
+  const baseDistance = resolveBaseDistanceWithTheoretical(
+    club,
+    headSpeed,
+    useTheoretical ? "theoretical" : "blend",
+  );
+  const skillDistanceMultiplier = getSkillDistanceMultiplier(playerSkillLevel);
   const result = baseDistance * skillDistanceMultiplier;
 
   return Math.max(5, Math.round(result));
@@ -217,28 +215,23 @@ export function estimateShotDistance(
     : 0;
   const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
 
-  // --- ヘッドスピード・理論値を加味したベース飛距離 ---
-  let baseDistance = club.avgDistance;
   const headSpeed = options?.headSpeed;
-  const playerSkillLevel = Math.max(0, Math.min(1, options?.playerSkillLevel ?? 0.5));
+  const playerSkillLevel = clampSkillLevel(options?.playerSkillLevel);
   // ロボット（successRate=100, personalData未指定, useTheoretical=true, headSpeed指定）なら理論値のみ
   const isRobot =
     club.successRate === 100 &&
     !options?.personalData &&
     options?.useTheoretical &&
     typeof headSpeed === "number";
-  if (isRobot) {
-    const golfClub = simClubToGolfClub(club);
-    baseDistance = getEstimatedDistance(golfClub, headSpeed);
-  } else if (options?.useTheoretical && typeof headSpeed === "number") {
-    // 実測値と理論値の中間値を取る（重みは要調整）
-    const golfClub = simClubToGolfClub(club);
-    const theoretical = getEstimatedDistance(golfClub, headSpeed);
-    baseDistance = (baseDistance * 0.7 + theoretical * 0.3);
-  }
+  const baseDistanceMode: "none" | "blend" | "theoretical" = isRobot
+    ? "theoretical"
+    : options?.useTheoretical
+      ? "blend"
+      : "none";
+  const baseDistance = resolveBaseDistanceWithTheoretical(club, headSpeed, baseDistanceMode);
 
   // Skill level also affects expected distance slightly so UI estimates follow robot/person skill settings.
-  const skillDistanceMultiplier = 0.92 + playerSkillLevel * 0.16;
+  const skillDistanceMultiplier = getSkillDistanceMultiplier(playerSkillLevel);
   let expected = baseDistance * lieMultiplier * weakDistanceMultiplier * skillDistanceMultiplier + windYards;
 
   return Math.max(5, Math.round(expected));
@@ -254,12 +247,12 @@ function getEffectiveSuccessRate(
   personalData?: ClubPersonalData,
 ): number {
   const weakClub = isWeakClub(club);
-  let rate = calculateEffectiveSuccessRate(
-    club.successRate,
+  let rate = calculateBaseClubSuccessRate({
+    baseSuccessRate: club.successRate,
     personalData,
-    weakClub,
+    isWeakClub: weakClub,
     playerSkillLevel,
-  );
+  });
   if (lie === "rough")   rate -= 12;
   if (lie === "bunker")  rate -= 20;
   if (risk === "aggressive") rate -= 15;
@@ -374,16 +367,11 @@ function normalizeEffectiveRateToSkill(rate: number): number {
  */
 export function composeEffectiveSkill(
   playerSkillLevel: number,
-  effectiveRate: number,
-  baseWeight: number = 0.35,
-  rateWeight: number = 0.65
+  effectiveRate: number
 ): number {
   const baseSkill = Math.max(0, Math.min(1, playerSkillLevel));
   const rateSkill = normalizeEffectiveRateToSkill(effectiveRate);
-  // 重みが0に近い場合も対応
-  const totalWeight = baseWeight + rateWeight;
-  if (totalWeight === 0) return 0.5;
-  const normalized = (baseSkill * baseWeight + rateSkill * rateWeight) / totalWeight;
+  const normalized = (baseSkill + rateSkill) / 2;
   return Math.max(0, Math.min(1, normalized));
 }
 
@@ -531,12 +519,9 @@ export function simulateShot(
         playerSkillLevel,
         personalData,
       );
-  const { baseSkillWeight = 0.35, effectiveRateWeight = 0.65 } = options.skillWeights ?? {};
   const effectiveSkill = composeEffectiveSkill(
     playerSkillLevel,
-    effectiveRate,
-    baseSkillWeight,
-    effectiveRateWeight
+    effectiveRate
   );
   const landingSeed = [
     club.id,

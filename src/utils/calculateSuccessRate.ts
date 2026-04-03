@@ -1,5 +1,12 @@
 import type { ClubPersonalData } from "../types/golf";
 
+export interface BaseClubSuccessRateOptions {
+  baseSuccessRate: number;
+  personalData?: ClubPersonalData;
+  isWeakClub: boolean;
+  playerSkillLevel: number;
+}
+
 /**
  * Adjusts a club's base success rate using personal tendencies, weak-club status,
  * and an overall player skill level.
@@ -16,6 +23,20 @@ export function calculateEffectiveSuccessRate(
   isWeakClub: boolean,
   playerSkillLevel: number,
 ): number {
+  return calculateBaseClubSuccessRate({
+    baseSuccessRate,
+    personalData,
+    isWeakClub,
+    playerSkillLevel,
+  });
+}
+
+export function calculateBaseClubSuccessRate({
+  baseSuccessRate,
+  personalData,
+  isWeakClub,
+  playerSkillLevel,
+}: BaseClubSuccessRateOptions): number {
   const skill = Math.max(0, Math.min(1, playerSkillLevel));
   const difficulty = Math.max(0, Math.min(1, (100 - baseSuccessRate) / 100));
 
@@ -47,5 +68,5 @@ export function calculateEffectiveSuccessRate(
   rate = rate * missMultiplier * weaknessMultiplier;
 
   // Allow near-100 outcomes for high-skill players.
-  return Math.max(5, Math.min(99, Math.round(rate)));
+  return Math.max(5, Math.min(99, Math.round(rate * 10) / 10));
 }

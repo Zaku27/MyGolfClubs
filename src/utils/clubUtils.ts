@@ -71,24 +71,3 @@ export const getAnalysisClubKey = (
 
   return [club.clubType, club.name, club.number, club.createdAt ?? ''].join('|');
 };
-
-/**
- * クラブ・個人データ・スキルレベルからクラブ成功率を計算
- * missRate: 0-1, weaknessFactor: 0.0-1.0, skill: 0.0-1.0
- * 例: missRate=0.2, weakness=0.9, skill=0.7 → 1 - (0.2 * 0.9 * (1-skill))
- */
-export function calculateEffectiveSuccessRate(
-  _club: GolfClub,
-  personal: { missRate?: number; weaknessFactor?: number } = {},
-  playerSkillLevel: number = 0.5
-): number {
-  const missRate = typeof personal.missRate === 'number' ? personal.missRate : 0.15;
-  const weakness = typeof personal.weaknessFactor === 'number' ? personal.weaknessFactor : 1.0;
-  // skill: 0 (初心者)～1 (上級者)
-  const skill = Math.max(0, Math.min(1, playerSkillLevel));
-  // missRateは0-1で扱う（100なら1.0）
-  const miss = missRate > 1 ? missRate / 100 : missRate;
-  // クラブ成功率 = 1 - (miss * weakness * (1-skill))
-  const effective = 1 - (miss * weakness * (1 - skill));
-  return Math.max(0, Math.min(1, effective));
-}

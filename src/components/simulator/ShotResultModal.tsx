@@ -75,7 +75,7 @@ export function ShotResultModal({ onDismiss, onAdvance }: Props) {
 
         <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
           <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-            実効成功率 {effectiveSuccessRate}%
+            実効成功率 {effectiveSuccessRate.toFixed(1)}%
           </span>
           {landing && (
             <>

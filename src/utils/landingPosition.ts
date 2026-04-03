@@ -1,5 +1,5 @@
 import seedrandom from "seedrandom";
-import { getEstimatedDistance } from "./analysisUtils";
+import { estimateTheoreticalDistance } from "./distanceEstimation";
 import type { GolfClub } from "../types/golf";
 import type { ShotQuality, ShotQualityMetrics } from "../types/game";
 
@@ -123,28 +123,6 @@ function buildDeterministicSeed(input: ShotInput): string {
     conditions?.groundHardness ?? 50,
     conditions?.headSpeed ?? DEFAULT_HEAD_SPEED,
   ].join("|");
-}
-
-/**
- * getEstimatedDistance に渡せる最低限の GolfClub 形式へ整形する。
- */
-function toGolfClubForDistanceModel(club: ClubData): GolfClub {
-  return {
-    id: 0,
-    clubType: club.clubType,
-    name: club.name,
-    number: club.number,
-    length: club.length,
-    weight: club.weight,
-    swingWeight: club.swingWeight,
-    lieAngle: club.lieAngle,
-    loftAngle: club.loftAngle,
-    shaftType: club.shaftType,
-    torque: club.torque,
-    flex: club.flex,
-    distance: club.distance,
-    notes: club.notes,
-  };
 }
 
 /**
@@ -494,9 +472,8 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
   const wind = input.conditions?.wind ?? 0;
   const groundHardness = input.conditions?.groundHardness ?? 50;
 
-  // 既存の標準飛距離関数を使って、クラブごとの基準値を作る。
-  const clubForDistance = toGolfClubForDistanceModel(input.club);
-  const estimatedTotalDistance = getEstimatedDistance(clubForDistance, headSpeed);
+  // 共通インターフェース経由でクラブごとの基準値を作る。
+  const estimatedTotalDistance = estimateTheoreticalDistance(input.club, headSpeed);
   const expectedCarry = estimateCarryFromTotalDistance(estimatedTotalDistance, input.club, groundHardness);
 
   // スキルレベルに応じた分散パラメータを作る。
