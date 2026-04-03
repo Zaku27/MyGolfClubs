@@ -115,7 +115,7 @@ const LOW_LOFT_SPEED_RELIEF = 0.14;
 const DRIVER_BOOST_RAMP_START = 43;
 const DRIVER_BOOST_RAMP_END = 45;
 const DRIVER_BOOST_AT_45 = 10.5;
-const DRIVER_BOOST_ABOVE_45_PER_SPEED = 4.9;
+const DRIVER_BOOST_ABOVE_45_PER_SPEED = 4;
 
 export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   // 44.5m/sで調整した値を基準に、他ヘッドスピードでも自然に追従させる

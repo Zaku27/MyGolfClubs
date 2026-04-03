@@ -56,7 +56,7 @@ export const DISTANCE_MODELS: Record<ClubCategory, DistanceModel> = {
     standardLoft: 10.5,
   },
   wood: {
-    base: 232,
+    base: 225,
     speedCoeff: 4.3,
     loftCoeff: -4.25,
     min: 130,
