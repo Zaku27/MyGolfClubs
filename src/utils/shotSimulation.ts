@@ -68,17 +68,53 @@ function createSeededRandom(seed: string): () => number {
 
 function getLieDistanceMultiplier(lie: LieType, clubType: string): number {
   switch (lie) {
-    case "tee":     return 1.00;
-    case "fairway": return 0.98;
-    case "rough":   return 0.82;
-    case "bunker":  return clubType === "Wedge" ? 0.70 : 0.50;
-    case "green":   return 1.00; // putter path handles this separately
-    case "penalty": return 0.60;
-    default:        return 0.95;
+    case "tee":        return 1.00;
+    case "fairway":    return 0.98;
+    case "semirough":  return 0.90;
+    case "rough":      return 0.82;
+    case "bareground": return 0.60;
+    case "bunker":     return clubType === "Wedge" ? 0.70 : 0.50;
+    case "green":      return 1.00; // putter path handles this separately
+    default:           return 0.95;
   }
 }
 
-function getWindYards(wind: WindDirection | undefined, strength: number): number {
+export function getLieDistanceMultiplierValue(lie: LieType, clubType: string): number {
+  return getLieDistanceMultiplier(lie, clubType);
+}
+
+function normalizeDegrees(degrees: number): number {
+  const normalized = Math.round(degrees) % 360;
+  return (normalized + 360) % 360;
+}
+
+// 風向(0=北へ, 180=南へ)から「ショット進行方向成分」の mph を返す。
+// 本プロジェクトでは角度を「その方角へ吹く風」として扱う。
+function getHeadTailWindComponentMph(strength: number, windDirectionDegrees: number): number {
+  const normalized = normalizeDegrees(windDirectionDegrees);
+  const rad = (normalized * Math.PI) / 180;
+  return Math.cos(rad) * strength;
+}
+
+// 風向(0=北へ, 90=東へ)から横風成分 mph を返す。
+function getCrossWindComponentMph(strength: number, windDirectionDegrees: number): number {
+  const normalized = normalizeDegrees(windDirectionDegrees);
+  const rad = (normalized * Math.PI) / 180;
+  return Math.sin(rad) * strength;
+}
+
+function getWindYards(
+  wind: WindDirection | undefined,
+  strength: number,
+  windDirectionDegrees?: number,
+): number {
+  // 360度風向がある場合は、向かい/追いの連続成分を優先して距離へ反映する。
+  if (typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)) {
+    const componentMph = getHeadTailWindComponentMph(strength, windDirectionDegrees);
+    // 既存チューニングとの連続性を保つため、向かい風と追い風で係数を分ける。
+    return componentMph < 0 ? componentMph * 1.5 : componentMph * 0.8;
+  }
+
   if (!wind || wind === "none") return 0;
   switch (wind) {
     case "headwind":  return -(strength * 1.5);
@@ -163,7 +199,7 @@ export function estimateBaseDistance(
  */
 export function estimateShotDistance(
   club: SimClub,
-  context: Pick<ShotContext, "lie" | "wind" | "windStrength">,
+  context: Pick<ShotContext, "lie" | "wind" | "windStrength" | "windDirectionDegrees">,
   _riskLevel: RiskLevel,
   options?: {
     personalData?: ClubPersonalData;
@@ -175,7 +211,7 @@ export function estimateShotDistance(
   if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance));
 
   const lieMultiplier = getLieDistanceMultiplier(context.lie, club.type);
-  const windYards = getWindYards(context.wind, context.windStrength ?? 7);
+  const windYards = getWindYards(context.wind, context.windStrength ?? 7, context.windDirectionDegrees);
   const weakDistancePenaltyBase = isWeakClub(club)
     ? (club.successRate < 60 ? 0.14 : 0.10)
     : 0;
@@ -226,7 +262,6 @@ function getEffectiveSuccessRate(
   );
   if (lie === "rough")   rate -= 12;
   if (lie === "bunker")  rate -= 20;
-  if (lie === "penalty") rate -= 30;
   if (risk === "aggressive") rate -= 15;
   if (risk === "safe")       rate +=  8;
   if (weakClub) {
@@ -240,11 +275,9 @@ function getEffectiveSuccessRate(
 function resolveNewLie(
   remaining: number,
   isGoodShot: boolean,
-  penalty: boolean,
   risk: RiskLevel,
   random: () => number,
 ): LieType {
-  if (penalty)         return "penalty";
   if (remaining === 0) return "green";
   if (remaining <= 30) return "green";
   if (!isGoodShot) {
@@ -286,7 +319,16 @@ function getNearCupLeaveDistance(shotQuality: ShotQuality, random: () => number)
   return 3 + Math.floor(random() * 6); // 3-8y
 }
 
-function mapWindToLanding(wind: WindDirection | undefined, windStrength: number): number {
+function mapWindToLanding(
+  wind: WindDirection | undefined,
+  windStrength: number,
+  windDirectionDegrees?: number,
+): number {
+  // 360度風向がある場合は、ランディング計算にも連続成分を渡す。
+  if (typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)) {
+    return getHeadTailWindComponentMph(windStrength, windDirectionDegrees);
+  }
+
   if (wind === "headwind") return -windStrength;
   if (wind === "tailwind") return windStrength;
   return 0;
@@ -294,8 +336,11 @@ function mapWindToLanding(wind: WindDirection | undefined, windStrength: number)
 
 function mapGroundHardnessByLie(lie: LieType): number {
   if (lie === "bunker") return 20;
+  if (lie === "bareground") return 35;
+  if (lie === "semirough") return 60;
   if (lie === "rough") return 45;
   if (lie === "fairway") return 75;
+  if (lie === "tee") return 78;
   if (lie === "green") return 85;
   return 60;
 }
@@ -343,8 +388,8 @@ export function composeEffectiveSkill(
 }
 
 export const LIE_LABELS: Record<LieType, string> = {
-  tee: "ティー", fairway: "フェアウェイ", rough: "ラフ",
-  bunker: "バンカー", green: "グリーン", penalty: "ペナルティ",
+  tee: "ティー", fairway: "フェアウェイ", semirough: "セミラフ", rough: "ラフ",
+  bareground: "ベアグラウンド", bunker: "バンカー", green: "グリーン",
 };
 
 const QUALITY_LABELS: Record<ShotQuality, string> = {
@@ -421,7 +466,7 @@ export function simulateShot(
   riskLevel: RiskLevel,
   options: SimulationOptions & { isPractice?: boolean } = {},
 ): ShotResult {
-  const { remainingDistance, lie, wind, windStrength = 7 } = context;
+  const { remainingDistance, lie, wind, windStrength = 7, windDirectionDegrees } = context;
   const confidenceBoost = options.confidenceBoost ?? 0;
   const playerSkillLevel = options.playerSkillLevel ?? 0.5;
   const shotPowerPercent = Math.max(0, Math.min(110, options.shotPowerPercent ?? 100));
@@ -435,6 +480,7 @@ export function simulateShot(
     lie,
     wind ?? "none",
     windStrength,
+    typeof windDirectionDegrees === "number" ? normalizeDegrees(windDirectionDegrees) : "legacy",
     riskLevel,
     playerSkillLevel,
     options.shotIndex ?? 0,
@@ -498,6 +544,7 @@ export function simulateShot(
     effectiveRate,
     wind ?? "none",
     windStrength,
+    typeof windDirectionDegrees === "number" ? normalizeDegrees(windDirectionDegrees) : "legacy",
     playerSkillLevel,
     effectiveSkill,
     options.shotIndex ?? 0,
@@ -527,7 +574,7 @@ export function simulateShot(
     },
     aimXOffset: 0,
     conditions: {
-      wind: mapWindToLanding(wind, windStrength),
+      wind: mapWindToLanding(wind, windStrength, windDirectionDegrees),
       groundHardness: mapGroundHardnessByLie(lie),
       headSpeed: options.headSpeed,
       seed: landingSeed,
@@ -536,22 +583,41 @@ export function simulateShot(
 
   const shotQuality = landingOutcome.shotQuality;
   const rawLanding = landingOutcome.landing;
-  const scaledCarry = Math.max(0.1, rawLanding.carry * powerMultiplier);
-  const scaledRoll = Math.max(0, rawLanding.roll * powerMultiplier);
+  const lieDistanceMultiplier = getLieDistanceMultiplier(lie, club.type);
+  const weakDistancePenaltyBase = isWeakClub(club)
+    ? (club.successRate < 60 ? 0.14 : 0.10)
+    : 0;
+  const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
+  const distanceConditionMultiplier = lieDistanceMultiplier * weakDistanceMultiplier;
+
+  // 360度風向がある場合は横風成分を着弾Xへ加算する。
+  // 係数は現行モデルと同様に簡易線形として、調整しやすい形で定義する。
+  const crossWindComponentMph =
+    typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)
+      ? getCrossWindComponentMph(windStrength, windDirectionDegrees)
+      : wind === "crosswind"
+        ? windStrength
+        : 0;
+  const lateralWindYards = crossWindComponentMph * 0.9;
+
+  const scaledCarry = Math.max(0.1, rawLanding.carry * powerMultiplier * distanceConditionMultiplier);
+  const scaledRoll = Math.max(0, rawLanding.roll * powerMultiplier * distanceConditionMultiplier);
   const scaledTotalDistance = Math.max(0.1, scaledCarry + scaledRoll);
-  const scaledFinalX = rawLanding.finalX * powerMultiplier;
+  const scaledFinalX = rawLanding.finalX * powerMultiplier + lateralWindYards;
   const scaledFinalY = scaledTotalDistance;
+  const scaledLateralDeviation = rawLanding.lateralDeviation * powerMultiplier + lateralWindYards;
   const landing = {
     ...rawLanding,
     carry: Math.round(scaledCarry * 10) / 10,
     roll: Math.round(scaledRoll * 10) / 10,
     totalDistance: Math.round(scaledTotalDistance * 10) / 10,
-    lateralDeviation: Math.round(rawLanding.lateralDeviation * powerMultiplier * 10) / 10,
+    lateralDeviation: Math.round(scaledLateralDeviation * 10) / 10,
     finalX: Math.round(scaledFinalX * 10) / 10,
     finalY: Math.round(scaledFinalY * 10) / 10,
     trajectoryPoints: rawLanding.trajectoryPoints?.map((point) => ({
-      x: Math.round(point.x * powerMultiplier * 10) / 10,
-      y: Math.round(point.y * powerMultiplier * 10) / 10,
+      // 横風ドリフトは飛行進行に応じて徐々に効くよう、Y進捗比で配分する。
+      x: Math.round((point.x * powerMultiplier + lateralWindYards * (Math.max(0, point.y) / Math.max(1, rawLanding.finalY))) * 10) / 10,
+      y: Math.round(point.y * powerMultiplier * distanceConditionMultiplier * 10) / 10,
       z: Math.round((point.z ?? 0) * powerMultiplier * 10) / 10,
     })),
   };
@@ -559,10 +625,6 @@ export function simulateShot(
 
   // 結果先行モデルでは品質から成功判定を導く。
   const isGoodShot = shotQuality === "excellent" || shotQuality === "good" || shotQuality === "average";
-
-  // ── Penalty check ──────────────────────────────────────────────────────────
-  // New model: penalty outcome is disabled.
-  const penalty = false;
 
   // ── New remaining ──────────────────────────────────────────────────────────
   // New model: use landing X/Y to compute the geometric distance to the pin.
@@ -581,7 +643,7 @@ export function simulateShot(
     }
   }
 
-  const newLie = resolveNewLie(newRemaining, isGoodShot, penalty, riskLevel, random);
+  const newLie = resolveNewLie(newRemaining, isGoodShot, riskLevel, random);
 
   // ── Message ────────────────────────────────────────────────────────────────
   const clubLabel = `${club.name}${club.number ? " " + club.number : ""}`;
@@ -597,7 +659,7 @@ export function simulateShot(
     outcomeMessage: message,
     strokesAdded: 1,
     lie: newLie,
-    penalty,
+    penalty: false,
     distanceHit: actualDistance,
     shotQuality,
     wasSuccessful: isGoodShot,

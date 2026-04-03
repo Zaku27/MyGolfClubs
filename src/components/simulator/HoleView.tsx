@@ -15,10 +15,11 @@ interface Props {
 const LIE_LABEL: Record<LieType, string> = {
   tee: "ティー",
   fairway: "フェアウェイ",
+  semirough: "セミラフ",
   rough: "ラフ",
+  bareground: "ベアグラウンド",
   bunker: "バンカー",
   green: "グリーン",
-  penalty: "ペナルティ",
 };
 
 const RANGE_PLAYER_SETTINGS_KEY = "rangePlayerSettings";

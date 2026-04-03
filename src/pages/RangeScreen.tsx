@@ -15,32 +15,44 @@ import { useClubStore } from '../store/clubStore';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
 import { formatGolfClubDisplayName } from '../utils/simClubLabel';
-import { simulateShot, estimateBaseDistance } from '../utils/shotSimulation';
+import { simulateShot, estimateBaseDistance, getLieDistanceMultiplierValue } from '../utils/shotSimulation';
 import { rangeAutoCalibrate } from '../utils/rangeUtils';
 import ShotDispersionChart from '../components/ShotDispersionChart';
+import WindDirectionDial from '../components/WindDirectionDial';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
 import type { LieType, RiskLevel, ShotResult, WindDirection } from '../types/game';
+import {
+  convertMpsToMph,
+  formatWindDirectionLabel,
+  mapWindDirectionToLegacyType,
+  normalizeWindDirection,
+  normalizeWindSpeedMps,
+} from '../utils/windDirection';
 
 const LIE_OPTIONS = [
+  'ティー',
   'フェアウェイ',
+  'セミラフ',
   'ラフ',
-  '薄いラフ',
+  'ベアグラウンド',
   'バンカー',
   'グリーン',
-];
-const WIND_DIRECTIONS = [
-  { label: 'フォロー', value: 'tail' },
-  { label: 'アゲインスト', value: 'head' },
-  { label: '横風', value: 'cross' },
 ];
 const SHOT_COUNTS = [5, 10, 20];
 
 const RANGE_PLAYER_SETTINGS_KEY = 'rangePlayerSettings';
+const RANGE_CONDITION_SETTINGS_KEY = 'rangeConditionSettings';
 
 type RangePlayerSettings = {
   seatType: 'robot' | 'personal';
   robotHeadSpeed: number;
   robotSkillLevel: number;
+};
+
+type RangeConditionSettings = {
+  lie: string;
+  windDirection: number;
+  windSpeed: number;
 };
 
 function clampNumber(value: number, min: number, max: number): number {
@@ -87,6 +99,54 @@ function saveRangePlayerSettings(settings: RangePlayerSettings) {
   localStorage.setItem(RANGE_PLAYER_SETTINGS_KEY, JSON.stringify(settings));
 }
 
+function loadRangeConditionSettings(): RangeConditionSettings {
+  if (typeof window === 'undefined') {
+    return {
+      lie: 'ティー',
+      windDirection: 180,
+      windSpeed: 0,
+    };
+  }
+
+  try {
+    const raw = localStorage.getItem(RANGE_CONDITION_SETTINGS_KEY);
+    if (!raw) {
+      return {
+        lie: 'ティー',
+        windDirection: 180,
+        windSpeed: 0,
+      };
+    }
+
+    const parsed = JSON.parse(raw) as Partial<RangeConditionSettings>;
+    const safeLie = LIE_OPTIONS.includes(String(parsed.lie)) ? String(parsed.lie) : 'ティー';
+
+    return {
+      lie: safeLie,
+      windDirection: normalizeWindDirection(Number(parsed.windDirection)),
+      windSpeed: normalizeWindSpeedMps(Number(parsed.windSpeed)),
+    };
+  } catch {
+    return {
+      lie: 'ティー',
+      windDirection: 180,
+      windSpeed: 0,
+    };
+  }
+}
+
+function saveRangeConditionSettings(settings: RangeConditionSettings) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(
+    RANGE_CONDITION_SETTINGS_KEY,
+    JSON.stringify({
+      lie: settings.lie,
+      windDirection: normalizeWindDirection(settings.windDirection),
+      windSpeed: normalizeWindSpeedMps(settings.windSpeed),
+    }),
+  );
+}
+
 const qualityStatusColor = (shotQuality: string) => {
   if (shotQuality === 'excellent') return 'text-blue-700';
   if (shotQuality === 'good') return 'text-green-700';
@@ -107,21 +167,14 @@ type RangeSummary = {
 
 function mapLieUiToGameLie(lie: string): LieType {
   switch (lie) {
+    case 'ティー': return 'tee';
     case 'フェアウェイ': return 'fairway';
-    case 'ラフ':
-    case '薄いラフ': return 'rough';
+    case 'セミラフ': return 'semirough';
+    case 'ラフ': return 'rough';
+    case 'ベアグラウンド': return 'bareground';
     case 'バンカー': return 'bunker';
     case 'グリーン': return 'green';
-    default: return 'fairway';
-  }
-}
-
-function mapWindDirToGameWind(windDir: string): WindDirection {
-  switch (windDir) {
-    case 'head': return 'headwind';
-    case 'tail': return 'tailwind';
-    case 'cross': return 'crosswind';
-    default: return 'none';
+    default: return 'tee';
   }
 }
 
@@ -199,6 +252,7 @@ export default function RangeScreen() {
   const storedPlayerSkillLevel = useClubStore((state) => state.playerSkillLevel);
   const { profile } = useUserProfileStore();
   const initialRangePlayerSettings = loadRangePlayerSettings();
+  const initialRangeConditionSettings = loadRangeConditionSettings();
   // const { playerSkillLevel } = useGameStore();
   const [selectedClubId, setSelectedClubId] = useState<string>('');
   // プレイヤー: "robot" or "personal"
@@ -206,9 +260,13 @@ export default function RangeScreen() {
   // ロボット用: ヘッドスピードとスキルレベル
   const [robotHeadSpeed, setRobotHeadSpeed] = useState<number>(initialRangePlayerSettings.robotHeadSpeed);
   const [robotSkillLevel, setRobotSkillLevel] = useState<number>(initialRangePlayerSettings.robotSkillLevel);
-  const [lie, setLie] = useState<string>('Fairway');
-  const [windSpeed, setWindSpeed] = useState<number>(0);
-  const [windDir, setWindDir] = useState<string>('tail');
+  const [lie, setLie] = useState<string>(initialRangeConditionSettings.lie);
+  // 風向は 0〜359 度（0°=北、時計回り）で保持する。
+  const [windDirection, setWindDirection] = useState<number>(initialRangeConditionSettings.windDirection);
+  // 風速は UI 仕様どおり m/s で保持する。
+  const [windSpeed, setWindSpeed] = useState<number>(initialRangeConditionSettings.windSpeed);
+  // 風ダイアルは通常閉じ、必要な時だけ開いて調整できるようにする。
+  const [isWindControlOpen, setIsWindControlOpen] = useState<boolean>(false);
   const [numShots, setNumShots] = useState<number>(10);
   const [results, setResults] = useState<ShotResult[]>([]);
   const [summary, setSummary] = useState<RangeSummary | null>(null);
@@ -225,7 +283,18 @@ export default function RangeScreen() {
   const personalHeadSpeed = profile.headSpeed;
   const personalSkillLevel = storedPlayerSkillLevel;
   const gameLie = mapLieUiToGameLie(lie);
-  const gameWind = mapWindDirToGameWind(windDir);
+  // 既存シミュレーション API 互換のため、角度風向を旧3分類へ変換する。
+  const gameWind: WindDirection = mapWindDirectionToLegacyType(windDirection);
+  // 既存シミュレーションは mph 前提なので、UI(m/s)から変換して渡す。
+  const windSpeedMph = convertMpsToMph(windSpeed);
+  // 閉じた状態でも現在値が分かるよう、角度+方位ラベルを作って表示する。
+  const windDirectionSummary = formatWindDirectionLabel(windDirection);
+
+  // 風向・風速を初期状態へ戻す。
+  const handleResetWind = () => {
+    setWindDirection(0);
+    setWindSpeed(0);
+  };
 
   useEffect(() => {
     void loadPlayerSkillLevel();
@@ -238,6 +307,14 @@ export default function RangeScreen() {
       robotSkillLevel,
     });
   }, [seatType, robotHeadSpeed, robotSkillLevel]);
+
+  useEffect(() => {
+    saveRangeConditionSettings({
+      lie,
+      windDirection,
+      windSpeed,
+    });
+  }, [lie, windDirection, windSpeed]);
 
   useEffect(() => {
     if (!showRobotHint) return;
@@ -300,6 +377,7 @@ export default function RangeScreen() {
     };
   };
   const simClub = toSimClub(selectedClub);
+  const lieDistanceMultiplier = getLieDistanceMultiplierValue(gameLie, simClub?.type ?? 'Iron');
   const clubPersonal: import('../types/golf').ClubPersonalData | undefined =
     simClub && simClub.id !== undefined ? personalData[simClub.id] ?? undefined : undefined;
   // DB保存値があればそれを優先、なければ従来通り計算値を使う
@@ -324,7 +402,9 @@ export default function RangeScreen() {
       const context = {
         lie: gameLie,
         wind: gameWind,
-        windStrength: windSpeed,
+        windDirectionDegrees: windDirection,
+        // Range 画面の入力は m/s だが、内部計算は互換のため mph を利用する。
+        windStrength: windSpeedMph,
         remainingDistance: simClub.avgDistance,
         hazards: [],
         shotPowerPercent: 100,
@@ -627,27 +707,58 @@ export default function RangeScreen() {
               <option key={l} value={l}>{l}</option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-gray-600">
+            飛距離補正: ×{lieDistanceMultiplier.toFixed(2)}
+          </p>
         </div>
-        <div className="flex gap-2 items-center">
-          <label className="font-semibold">風</label>
-          <input
-            type="range"
-            min={0}
-            max={25}
-            value={windSpeed}
-            onChange={(e) => setWindSpeed(Number(e.target.value))}
-            className="w-24 accent-green-700"
-          />
-          <span className="w-8 text-center">{windSpeed} mph</span>
-          <select
-            className="border rounded p-1"
-            value={windDir}
-            onChange={(e) => setWindDir(e.target.value)}
-          >
-            {WIND_DIRECTIONS.map((d) => (
-              <option key={d.value} value={d.value}>{d.label}</option>
-            ))}
-          </select>
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label className="font-semibold">風向・風速</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+                onClick={handleResetWind}
+              >
+                風をリセット
+              </button>
+              <button
+                type="button"
+                className="rounded border border-green-300 bg-green-50 px-2 py-1 text-xs font-semibold text-green-800 hover:bg-green-100"
+                onClick={() => setIsWindControlOpen((prev) => !prev)}
+                aria-expanded={isWindControlOpen}
+                aria-controls="wind-direction-dial-panel"
+              >
+                {isWindControlOpen ? '設定を閉じる' : '設定を開く'}
+              </button>
+            </div>
+          </div>
+
+          {/*
+            通常時は数値サマリーのみ表示して画面をコンパクトに保つ。
+            設定が必要な時だけダイアルを展開する。
+          */}
+          <div className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
+            <span className="mr-3 font-semibold">風向: {windDirectionSummary}</span>
+            <span className="font-semibold">風速: {windSpeed.toFixed(1)} m/s</span>
+          </div>
+
+          {isWindControlOpen && (
+            <div id="wind-direction-dial-panel" className="mt-2">
+              <WindDirectionDial
+                windDirection={windDirection}
+                windSpeed={windSpeed}
+                onDirectionChange={(newDirection) => {
+                  // 子コンポーネントの入力値を安全に正規化して保持する。
+                  setWindDirection(normalizeWindDirection(newDirection));
+                }}
+                onSpeedChange={(newSpeed) => {
+                  // 速度値は 0〜15 m/s に収める。
+                  setWindSpeed(normalizeWindSpeedMps(newSpeed));
+                }}
+              />
+            </div>
+          )}
         </div>
         <div>
           <label className="block font-semibold mb-1">試行回数</label>

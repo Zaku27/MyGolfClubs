@@ -97,6 +97,12 @@ function SetupScreen({ onStart, onBack, clubCount }: {
         ← クラブ管理に戻る
       </button>
       <Link
+        to="/range"
+        className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
+      >
+        練習場に戻る
+      </Link>
+      <Link
         to="/personal-data"
         className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
       >

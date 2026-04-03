@@ -22,7 +22,7 @@ export interface Hole {
 }
 
 // ─── Shot context ─────────────────────────────────────────────────────────────
-export type LieType = "tee" | "fairway" | "rough" | "bunker" | "green" | "penalty";
+export type LieType = "tee" | "fairway" | "semirough" | "rough" | "bareground" | "bunker" | "green";
 export type RiskLevel = "safe" | "normal" | "aggressive";
 export type WindDirection = "headwind" | "tailwind" | "crosswind" | "none";
 
@@ -31,6 +31,7 @@ export interface ShotContext {
   lie: LieType;
   wind?: WindDirection;
   windStrength?: number; // mph
+  windDirectionDegrees?: number; // 0=北へ吹く, 時計回り
   hazards?: string[];
 }
 

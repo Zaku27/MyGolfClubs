@@ -1,0 +1,90 @@
+/*
+  風向ダイアル全体の見た目を定義する。
+  ゴルフアプリらしい爽やかさを意識して、グリーン/ブルー基調の配色にしている。
+*/
+.wind-dial-card {
+  border: 1px solid #bfe3d7;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(179, 231, 214, 0.4) 0%, rgba(179, 231, 214, 0) 48%),
+    radial-gradient(circle at 100% 80%, rgba(164, 214, 255, 0.32) 0%, rgba(164, 214, 255, 0) 48%),
+    linear-gradient(135deg, #f7fffc 0%, #eef9ff 100%);
+  box-shadow: 0 6px 16px rgba(23, 109, 93, 0.1);
+  padding: 8px;
+}
+
+/*
+  ダイアル本体を中央寄せし、モバイルでも詰まりすぎない余白を確保する。
+*/
+.wind-dial-svg-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+/*
+  タッチ端末でのドラッグ操作性を上げるため、
+  touch-action を none にしてブラウザ既定ジェスチャと競合しないようにする。
+*/
+.wind-dial-svg {
+  width: min(100%, 180px);
+  height: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+/*
+  現在角度と方位ラベルを強調表示する。
+*/
+.wind-dial-readout {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.wind-dial-angle {
+  font-size: 0.84rem;
+  color: #0d4f43;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.wind-dial-speed {
+  font-size: 0.78rem;
+  color: #165f93;
+  font-weight: 600;
+}
+
+/*
+  風速スライダーと補助テキストの領域。
+*/
+.wind-dial-speed-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.wind-dial-speed-control input[type='range'] {
+  width: 100%;
+  accent-color: #208b76;
+}
+
+.wind-dial-speed-mark {
+  font-size: 0.68rem;
+  color: #4f6f83;
+}
+
+@media (max-width: 480px) {
+  .wind-dial-card {
+    padding: 7px;
+    border-radius: 10px;
+  }
+
+  .wind-dial-angle {
+    font-size: 0.8rem;
+  }
+}
