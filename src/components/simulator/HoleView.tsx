@@ -70,24 +70,18 @@ function loadRangePlayerSettingsFromStorage(): RangePlayerSettings {
   }
 }
 
-function estimateBaseDistanceByMode(
+function estimateBaseDistanceWithMode(
   club: SimClub,
   seatType: "robot" | "personal",
   robotHeadSpeed: number,
   personalHeadSpeed: number | null,
 ): number {
   if (seatType === "robot") {
-    return estimateBaseDistance(
-      { ...club, successRate: 100, isWeakClub: false },
-      robotHeadSpeed,
-    );
+    return estimateBaseDistance(club, robotHeadSpeed, undefined, true);
   }
-
-  return estimateBaseDistance(
-    club,
-    personalHeadSpeed ?? undefined,
-  );
+  return estimateBaseDistance(club, personalHeadSpeed ?? undefined, undefined, false);
 }
+
 
 export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const {
@@ -183,12 +177,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       for (const club of bag) {
         estimatedDistances.set(
           club.id,
-          estimateBaseDistanceByMode(
-            club,
-            seatType,
-            robotHeadSpeed,
-            personalHeadSpeed,
-          ),
+          estimateBaseDistanceWithMode(club, seatType, robotHeadSpeed, personalHeadSpeed),
         );
       }
 
@@ -224,24 +213,11 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     for (const club of bag) {
       distances.set(
         club.id,
-        estimateBaseDistanceByMode(
-          club,
-          seatType,
-          robotHeadSpeed,
-          personalHeadSpeed,
-        ),
+        estimateBaseDistanceWithMode(club, seatType, robotHeadSpeed, personalHeadSpeed),
       );
     }
     return distances;
-  }, [
-    bag,
-    lie,
-    wind,
-    windStrength,
-    seatType,
-    robotHeadSpeed,
-    personalHeadSpeed,
-  ]);
+  }, [bag, seatType, robotHeadSpeed, personalHeadSpeed]);
 
   const allClubsSorted = useMemo(
     () => {

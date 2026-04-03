@@ -110,15 +110,6 @@ export function RiskSelectionSheet({ club, onClose, onSelectRisk }: Props) {
               ].join(" ")}
             >
               <p className="text-base font-semibold text-emerald-900">{option.title}</p>
-              {option.risk === "safe" && (
-                <p className="mt-1 text-sm text-emerald-700">リスク低め、ミスに強い</p>
-              )}
-              {option.risk === "normal" && (
-                <p className="mt-1 text-sm text-emerald-700">標準的なショット方針</p>
-              )}
-              {option.risk === "aggressive" && (
-                <p className="mt-1 text-sm text-emerald-700">ミスの振れ幅大、フェアウェイ抜ける可能性あり</p>
-              )}
               <p className="mt-1 text-sm text-emerald-800">
                 クラブ成功率: {effectiveRatePreview[option.risk]}%
               </p>

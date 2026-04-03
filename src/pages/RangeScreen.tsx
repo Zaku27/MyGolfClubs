@@ -367,15 +367,22 @@ export default function RangeScreen() {
     );
     const success = shotResults.filter((r) => r.wasSuccessful).length / numShots;
 
-    // 推定飛距離はヘッドスピード + ライ角のみで決定
-    let estimatedDist = 0;
-    if (simClub) {
-      const clubForEst = seatType === 'robot' 
-        ? { ...simClub, successRate: 100 }
-        : simClub;
-      const headSpeed = seatType === 'robot' ? robotHeadSpeed : personalHeadSpeed ?? undefined;
-      estimatedDist = estimateBaseDistance(clubForEst, headSpeed);
-    }
+    // 目安値との差分を計算
+    const estimatedDist = simClub
+      ? seatType === 'robot'
+        ? estimateBaseDistance(
+            { ...simClub, successRate: 100 },
+            robotHeadSpeed,
+            undefined,
+            true
+          )
+        : estimateBaseDistance(
+            simClub,
+            personalHeadSpeed ?? undefined,
+            undefined,
+            false
+          )
+      : 0;
     const diff = Math.round(avg - estimatedDist);
     const avgToTargetDistance =
       shotResults.reduce((sum, result) => {
@@ -559,11 +566,15 @@ export default function RangeScreen() {
                     seatType === 'robot'
                       ? estimateBaseDistance(
                           { ...simClub, successRate: 100 },
-                          robotHeadSpeed
+                          robotHeadSpeed,
+                          undefined,
+                          true
                         )
                       : estimateBaseDistance(
                           simClub,
-                          personalHeadSpeed ?? undefined
+                          personalHeadSpeed ?? undefined,
+                          undefined,
+                          false
                         )
                   ) : '-'} y
                 </span>

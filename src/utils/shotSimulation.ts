@@ -117,36 +117,45 @@ function simClubToGolfClub(club: SimClub): import("../types/golf").GolfClub {
 }
 
 /**
- * 基本推定飛距離：ヘッドスピード・ライ角のみで決定
- * UI表示用の安定した推定値（ライ・風の影響を除外）
+ * ヘッドスピードとロフト角のみで推定飛距離を計算（ライ・風は考慮しない）
  * @param club SimClub
- * @param headSpeed ヘッドスピード（m/s）。未指定なら実測値avgDistanceを使用
+ * @param headSpeed ヘッドスピード（m/s）
+ * @param playerSkillLevel スキルレベル 0-1（オプション、デフォルト 0.5）
+ * @param useTheoretical 理論値を使用するか（ロボット用、デフォルト false）
  * @returns 推定飛距離（ヤード）
  */
 export function estimateBaseDistance(
   club: SimClub,
   headSpeed?: number,
+  playerSkillLevel?: number,
+  useTheoretical?: boolean,
 ): number {
   if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance));
 
   let baseDistance = club.avgDistance;
+  const skillLevel = Math.max(0, Math.min(1, playerSkillLevel ?? 0.5));
+
+  // ヘッドスピードと理論値の適用
   if (typeof headSpeed === "number") {
     const golfClub = simClubToGolfClub(club);
     const theoretical = getEstimatedDistance(golfClub, headSpeed);
-    // ロボット判定（successRate=100）なら理論値のみ
-    if (club.successRate === 100) {
+    // useTheoretical=true なら理論値のみ、false なら実測値と理論値の中間
+    if (useTheoretical) {
       baseDistance = theoretical;
     } else {
-      // 個人の場合は実測値と理論値の中間
       baseDistance = baseDistance * 0.7 + theoretical * 0.3;
     }
   }
 
-  return Math.max(5, Math.round(baseDistance));
+  // スキルレベルによる軽微な距離調整
+  const skillDistanceMultiplier = 0.92 + skillLevel * 0.16;
+  const result = baseDistance * skillDistanceMultiplier;
+
+  return Math.max(5, Math.round(result));
 }
 
 /**
- * 高精度な飛距離推定（個人データ・ヘッドスピード・理論値も加味可能）
+ * ライ・風を考慮した飛距離推定（個人データ・ヘッドスピード・理論値も加味可能）
  * @param club SimClub
  * @param context lie, wind, windStrength
  * @param riskLevel RiskLevel
@@ -198,8 +207,6 @@ export function estimateShotDistance(
 
   return Math.max(5, Math.round(expected));
 }
-
-
 
 /** Effective success rate after personal data, lie, and risk adjustments. */
 function getEffectiveSuccessRate(
