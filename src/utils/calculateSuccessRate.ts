@@ -16,41 +16,36 @@ export function calculateEffectiveSuccessRate(
   isWeakClub: boolean,
   playerSkillLevel: number,
 ): number {
-  // Slight global uplift so overall outcomes feel less punishing.
-  const baseRateAdjustment = 1.3;
-  let rate = baseSuccessRate * baseRateAdjustment;
+  const skill = Math.max(0, Math.min(1, playerSkillLevel));
+  const difficulty = Math.max(0, Math.min(1, (100 - baseSuccessRate) / 100));
 
-  // 1) Skill boost logic (updated):
-  // Low/mid success clubs get a stronger boost from high skill.
-  // High success clubs (85%+) still get almost no boost.
-  const lowSuccessBoost = Math.max(0, (72 - baseSuccessRate) / 52);
-  const highSuccessMicroBoost =
-    baseSuccessRate >= 85 ? Math.max(0, (90 - baseSuccessRate) / 25) : 0;
-  const skillBoostFactor = 0.68;
-  const skillMultiplier =
-    1.0 +
-    lowSuccessBoost * playerSkillLevel * skillBoostFactor +
-    highSuccessMicroBoost * playerSkillLevel * 0.08;
-  // Examples (skill = 0.9):
-  // - base 40% -> lowSuccessBoost=0.615 -> skillMultiplier=1.377 -> about +37.7%
-  // - base 65% -> lowSuccessBoost=0.135 -> skillMultiplier=1.083 -> about +8.3%
-  // - base 85% -> microBoost=0.200 -> skillMultiplier=1.014 -> about +1.4%
+  // At low skill, difficult clubs are penalized more strongly to widen the
+  // putter-to-driver gap.
+  const lowSkillDifficultyPenalty = Math.pow(1 - skill, 1.15) * difficulty * 22;
+  const lowSkillRate = Math.max(5, baseSuccessRate - lowSkillDifficultyPenalty);
 
-  // 2) Personal miss-rate penalty.
-  const missMultiplier = personalData ? 1 - personalData.missRate / 100 : 1.0;
+  // At high skill, all clubs converge into a narrow high-success band near 100.
+  const highSkillTarget = 99 - difficulty * 2.2;
+  const normalizedSkill = Math.pow(skill, 0.78);
+  let rate = lowSkillRate * (1 - normalizedSkill) + highSkillTarget * normalizedSkill;
 
-  // 3) Weakness penalty:
-  // Weak clubs have a minimum penalty, but high skill relaxes that minimum.
+  // Miss-rate penalty is still applied, but high skill significantly dampens it.
+  const missPenaltyWeight = 1 - skill * 0.93;
+  const missMultiplier = personalData
+    ? 1 - (personalData.missRate / 100) * missPenaltyWeight
+    : 1.0;
+
+  // Weak-club weakness is stricter at low skill and mostly relaxed at high skill.
   let weakness = personalData ? personalData.weaknessFactor : 0;
   if (isWeakClub) {
-    const minWeaknessPenalty = 0.28 - playerSkillLevel * 0.16; // 0.28 -> 0.12
+    const minWeaknessPenalty = 0.35 - skill * 0.34; // 0.35 -> 0.01
     weakness = Math.max(weakness, minWeaknessPenalty);
   }
   const weaknessMultiplier =
-    1 - weakness * (isWeakClub ? 1.65 : 1.0) * (1 - playerSkillLevel * 0.65);
+    1 - weakness * (isWeakClub ? 1.28 : 0.82) * (1 - skill * 0.92);
 
-  rate = rate * skillMultiplier * missMultiplier * weaknessMultiplier;
+  rate = rate * missMultiplier * weaknessMultiplier;
 
-  // 4) Clamp final success rate to simulator bounds.
-  return Math.max(5, Math.min(95, Math.round(rate)));
+  // Allow near-100 outcomes for high-skill players.
+  return Math.max(5, Math.min(99, Math.round(rate)));
 }

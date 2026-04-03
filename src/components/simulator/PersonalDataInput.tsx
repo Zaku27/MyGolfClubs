@@ -23,7 +23,6 @@ const SKILL_PRESETS = [
   { label: "中級者", value: 0.5 },
   { label: "上級者", value: 0.85 },
 ] as const;
-const BASE_RATE_ADJUSTMENT = 1.1;
 
 const clamp = (value: number, min: number, max: number): number => {
   if (Number.isNaN(value)) {
@@ -123,10 +122,6 @@ export function PersonalDataInput() {
       const simClub = toSimClub(club);
       const draft = draftByClubId[simClub.id] ?? { missRate: 0, weaknessFactor: 0 };
       const treatedAsWeakClub = simClub.isWeakClub === true || simClub.successRate < 65;
-      const adjustedBaseSuccessRate = Math.max(
-        5,
-        Math.min(95, Math.round(simClub.successRate * BASE_RATE_ADJUSTMENT)),
-      );
       const effectiveSuccessRate = calculateEffectiveSuccessRate(
         simClub.successRate,
         {
@@ -143,7 +138,6 @@ export function PersonalDataInput() {
         clubLabel: `${club.name} ${club.number}`,
         treatedAsWeakClub,
         baseSuccessRate: simClub.successRate,
-        adjustedBaseSuccessRate,
         missRate: draft.missRate,
         weaknessFactor: draft.weaknessFactor,
         effectiveSuccessRate,
@@ -466,7 +460,7 @@ export function PersonalDataInput() {
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold">クラブ</th>
                   <th className="px-4 py-3 text-center font-semibold">弱クラブ扱い</th>
-                  <th className="px-4 py-3 text-right font-semibold">基本成功率(補正後)</th>
+                  <th className="px-4 py-3 text-right font-semibold">基本成功率</th>
                   <th className="px-4 py-3 text-right font-semibold">ミス率 (%)</th>
                   <th className="px-4 py-3 text-left font-semibold">弱点係数</th>
                   <th className="px-4 py-3 text-right font-semibold">クラブ成功率</th>
@@ -486,8 +480,7 @@ export function PersonalDataInput() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-slate-800">
-                      {row.adjustedBaseSuccessRate}%
-                      <span className="ml-1 text-xs font-normal text-slate-500">(元 {row.baseSuccessRate}%)</span>
+                      {row.baseSuccessRate}%
                     </td>
                     <td className="px-4 py-3">
                       <input
