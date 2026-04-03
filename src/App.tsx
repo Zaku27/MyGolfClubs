@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GolfClub } from './types/golf';
 import {
   DEFAULT_USER_LIE_ANGLE_STANDARDS,
@@ -6,7 +6,11 @@ import {
   type UserLieAngleStandards,
 } from './types/lieStandards';
 import { getAnalysisClubKey } from './utils/clubUtils';
-import { downloadClubsAsJson, readClubsFromJsonFile } from './utils/clubTransfer';
+import {
+  downloadAllClubsAsJson,
+  downloadBagClubsAsJson,
+  readClubsFromJsonFile,
+} from './utils/clubTransfer';
 import {
   readStoredJson,
   readStoredNumber,
@@ -16,8 +20,15 @@ import {
 import { ClubList } from './components/ClubList';
 import { ClubForm } from './components/ClubForm';
 import { AnalysisScreen } from './components/AnalysisScreen';
+import { GolfBagPanel } from './components/GolfBagPanel';
 import { SimulatorApp } from './components/simulator/SimulatorApp';
-import { selectSortedClubsForDisplay, useClubStore } from './store/clubStore';
+import {
+  selectActiveGolfBag,
+  selectSortedActiveBagClubs,
+  selectSortedClubsForDisplay,
+  useClubStore,
+} from './store/clubStore';
+import { useBagIdUrlSync } from './hooks/useBagIdUrlSync';
 import './App.css';
 
 const HEAD_SPEED_STORAGE_KEY = 'golfbag-head-speed-ms';
@@ -26,6 +37,7 @@ const SWING_TARGET_STORAGE_KEY = 'golfbag-swing-weight-target';
 const SWING_GOOD_TOLERANCE_STORAGE_KEY = 'golfbag-swing-good-tolerance';
 const SWING_ADJUST_THRESHOLD_STORAGE_KEY = 'golfbag-swing-adjust-threshold';
 const ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY = 'golfbag-analysis-hidden-clubs';
+const CLUB_LIST_SCOPE_STORAGE_KEY = 'golfbag-club-list-scope';
 const DEFAULT_SWING_TARGET = 2.0;
 const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
 const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
@@ -48,6 +60,10 @@ const parseHiddenAnalysisClubKeys = (value: unknown): string[] => {
   }
 
   return value.filter((entry): entry is string => typeof entry === 'string');
+};
+
+const parseClubListScope = (value: unknown): 'bag' | 'all' => {
+  return value === 'all' ? 'all' : 'bag';
 };
 
 function App() {
@@ -91,14 +107,20 @@ function App() {
   });
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
+  const [clubListScope, setClubListScope] = useState<'bag' | 'all'>(() => {
+    return readStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, 'bag', parseClubListScope);
+  });
   const sortedClubs = useClubStore(selectSortedClubsForDisplay);
-  const visibleAnalysisClubs = sortedClubs.filter(
-    (club) => !hiddenAnalysisClubKeys.includes(getAnalysisClubKey(club)),
-  );
+  const activeBagClubs = useClubStore(selectSortedActiveBagClubs);
+  const activeBag = useClubStore(selectActiveGolfBag);
+  const bags = useClubStore((state) => state.bags);
+  const activeBagClubCount = activeBag?.clubIds.length ?? 0;
+  const clubsForDisplay = clubListScope === 'bag' ? activeBagClubs : sortedClubs;
   const {
     loading,
     error,
     loadClubs,
+    loadBags,
     loadPersonalData,
     loadPlayerSkillLevel,
     addClub,
@@ -107,7 +129,19 @@ function App() {
     initializeDefaults,
     resetToDefaults,
     clearAllClubs,
+    createBag,
+    renameBag,
+    deleteBag,
+    setActiveBag,
+    toggleClubInActiveBag,
+    replaceActiveBagClubIds,
   } = useClubStore();
+
+  useBagIdUrlSync({
+    bags,
+    activeBagId: activeBag?.id ?? null,
+    setActiveBag,
+  });
 
   const handleClearAllClubs = async () => {
     const confirmed = confirm('全てのクラブデータを完全に削除します。よろしいですか？');
@@ -130,6 +164,12 @@ function App() {
         await addClub(club);
       }
       await loadClubs();
+      const nextClubIds = selectSortedClubsForDisplay(useClubStore.getState())
+        .slice(0, 14)
+        .map((club) => club.id)
+        .filter((clubId): clubId is number => typeof clubId === 'number');
+      await replaceActiveBagClubIds(nextClubIds);
+      setClubListScope('bag');
       alert('インポートが完了しました');
     } catch (error) {
       alert('インポートに失敗しました: ' + (error as Error).message);
@@ -139,17 +179,23 @@ function App() {
   };
 
   const handleExportJSON = () => {
-    downloadClubsAsJson(sortedClubs);
+    if (clubListScope === 'bag' && activeBag) {
+      downloadBagClubsAsJson(activeBag.name, activeBagClubs);
+      return;
+    }
+
+    downloadAllClubsAsJson(sortedClubs);
   };
 
   useEffect(() => {
     const initializeApp = async () => {
       await initializeDefaults();
       await loadClubs();
+      await loadBags();
       await Promise.all([loadPersonalData(), loadPlayerSkillLevel()]);
     };
-    initializeApp();
-  }, [initializeDefaults, loadClubs, loadPersonalData, loadPlayerSkillLevel]);
+    void initializeApp();
+  }, [initializeDefaults, loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel]);
 
   useEffect(() => {
     writeStoredValue(HEAD_SPEED_STORAGE_KEY, headSpeed);
@@ -174,6 +220,16 @@ function App() {
   useEffect(() => {
     writeStoredJson(ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY, hiddenAnalysisClubKeys);
   }, [hiddenAnalysisClubKeys]);
+
+  useEffect(() => {
+    writeStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, clubListScope);
+  }, [clubListScope]);
+
+  useEffect(() => {
+    if (clubListScope === 'bag' && activeBagClubCount === 0 && sortedClubs.length > 0 && bags.length === 1) {
+      setClubListScope('all');
+    }
+  }, [activeBagClubCount, bags.length, clubListScope, sortedClubs.length]);
 
   const handleSetSwingWeightTarget = (value: number) => {
     const rounded = Math.round(value * 10) / 10;
@@ -274,6 +330,51 @@ function App() {
     setShowForm(true);
   };
 
+  const handleCreateBag = async () => {
+    const suggestedName = `バッグ ${bags.length + 1}`;
+    const bagName = window.prompt('新しいゴルフバッグ名を入力してください', suggestedName);
+    if (bagName == null) {
+      return;
+    }
+
+    await createBag(bagName);
+    setClubListScope('bag');
+  };
+
+  const handleRenameActiveBag = async () => {
+    if (!activeBag?.id) {
+      return;
+    }
+
+    const nextName = window.prompt('バッグ名を入力してください', activeBag.name);
+    if (nextName == null) {
+      return;
+    }
+
+    await renameBag(activeBag.id, nextName);
+  };
+
+  const handleDeleteActiveBag = async () => {
+    if (!activeBag?.id) {
+      return;
+    }
+
+    const confirmed = window.confirm(`「${activeBag.name}」を削除します。よろしいですか？`);
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteBag(activeBag.id);
+  };
+
+  const handleToggleActiveBagMembership = async (club: GolfClub) => {
+    if (typeof club.id !== 'number') {
+      return;
+    }
+
+    await toggleClubInActiveBag(club.id);
+  };
+
   const handleEditClub = (club: GolfClub) => {
     setShowAnalysis(false);
     setEditingClub(club);
@@ -324,11 +425,20 @@ function App() {
     setEditingClub(undefined);
   };
 
+  const analysisHiddenKeys = useMemo(() => {
+    return hiddenAnalysisClubKeys.filter((clubKey) =>
+      activeBagClubs.some((club) => getAnalysisClubKey(club) === clubKey),
+    );
+  }, [activeBagClubs, hiddenAnalysisClubKeys]);
+
   if (showSimulator) {
     return (
       <SimulatorApp
         onBack={() => setShowSimulator(false)}
-        selectedClubs={sortedClubs}
+        selectedClubs={activeBagClubs}
+        allClubs={sortedClubs}
+        activeBagName={activeBag?.name}
+        bagId={activeBag?.id ?? null}
       />
     );
   }
@@ -346,14 +456,12 @@ function App() {
         />
       ) : showAnalysis ? (
         <AnalysisScreen
-          clubs={sortedClubs}
+          clubs={activeBagClubs}
           onBack={handleBackToList}
           onUpdateActualDistance={handleActualDistanceChange}
           headSpeed={headSpeed}
           onHeadSpeedChange={setHeadSpeed}
-          hiddenAnalysisClubKeys={hiddenAnalysisClubKeys.filter((clubKey) =>
-            sortedClubs.some((club) => getAnalysisClubKey(club) === clubKey),
-          )}
+          hiddenAnalysisClubKeys={analysisHiddenKeys}
           onSetAnalysisClubVisible={handleSetAnalysisClubVisible}
           swingWeightTarget={swingWeightTarget}
           swingGoodTolerance={swingGoodTolerance}
@@ -371,21 +479,44 @@ function App() {
           onResetLieStandards={handleResetLieStandards}
         />
       ) : (
-        <ClubList
-          clubs={sortedClubs}
-          onEdit={handleEditClub}
-          onDelete={handleDeleteClub}
-          onAdd={handleAddClub}
-          onReset={handleResetClubs}
-          onClearAll={handleClearAllClubs}
-          viewMode={viewMode}
-          onToggleViewMode={() => setViewMode((prev) => (prev === 'full' ? 'compact' : 'full'))}
-          onExport={handleExportJSON}
-          onImport={handleImportJSON}
-          onShowAnalysis={handleShowAnalysis}
-          onShowSimulator={() => setShowSimulator(true)}
-          loading={loading}
-        />
+        <>
+          <GolfBagPanel
+            bags={bags}
+            activeBagId={activeBag?.id ?? null}
+            activeBagClubCount={activeBagClubCount}
+            totalClubCount={sortedClubs.length}
+            onSelectBag={(bagId) => void setActiveBag(bagId)}
+            onCreateBag={() => void handleCreateBag()}
+            onRenameActiveBag={() => void handleRenameActiveBag()}
+            onDeleteActiveBag={() => void handleDeleteActiveBag()}
+            listScope={clubListScope}
+            onChangeListScope={setClubListScope}
+          />
+
+          <ClubList
+            clubs={clubsForDisplay}
+            onEdit={handleEditClub}
+            onDelete={handleDeleteClub}
+            onAdd={handleAddClub}
+            onReset={handleResetClubs}
+            onClearAll={handleClearAllClubs}
+            viewMode={viewMode}
+            onToggleViewMode={() => setViewMode((prev) => (prev === 'full' ? 'compact' : 'full'))}
+            onExport={handleExportJSON}
+            onImport={handleImportJSON}
+            onShowAnalysis={handleShowAnalysis}
+            onShowSimulator={() => setShowSimulator(true)}
+            activeBagName={activeBag?.name}
+            activeBagId={activeBag?.id}
+            activeBagClubIds={activeBag?.clubIds ?? []}
+            activeBagClubCount={activeBagClubCount}
+            isBagView={clubListScope === 'bag'}
+            allClubsCount={sortedClubs.length}
+            onSwitchToAllClubs={() => setClubListScope('all')}
+            onToggleActiveBagMembership={(club) => void handleToggleActiveBagMembership(club)}
+            loading={loading}
+          />
+        </>
       )}
     </div>
   );

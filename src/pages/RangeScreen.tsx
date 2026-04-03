@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { GolfBagPanel } from '../components/GolfBagPanel';
 
 // ショット品質の英語ラベル関数
 function qualityLabel(q: string) {
@@ -11,7 +12,13 @@ function qualityLabel(q: string) {
     default: return q;
   }
 }
-import { useClubStore } from '../store/clubStore';
+import {
+  selectActiveGolfBag,
+  selectSortedActiveBagClubs,
+  selectSortedClubsForDisplay,
+  useClubStore,
+} from '../store/clubStore';
+import { useBagIdUrlSync } from '../hooks/useBagIdUrlSync';
 import { useUserProfileStore } from '../store/userProfileStore';
 import { calculateEffectiveSuccessRate } from '../utils/clubUtils';
 import { formatGolfClubDisplayName } from '../utils/simClubLabel';
@@ -21,6 +28,7 @@ import ShotDispersionChart from '../components/ShotDispersionChart';
 import WindDirectionDial from '../components/WindDirectionDial';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
 import type { LieType, RiskLevel, ShotResult, WindDirection } from '../types/game';
+import type { GolfClub } from '../types/golf';
 import {
   convertMpsToMph,
   formatWindDirectionLabel,
@@ -246,10 +254,37 @@ function buildMonteCarloResult(rawResults: ShotResult[]): MonteCarloResult {
   };
 }
 
+function getSelectableRangeClubs(
+  clubs: GolfClub[],
+  seatType: 'robot' | 'personal',
+): GolfClub[] {
+  const filtered = clubs.filter((club) => seatType === 'robot' || club.clubType !== 'Putter');
+
+  return [...filtered].sort((a, b) => {
+    if (seatType === 'robot') {
+      const aIsPutter = a.clubType === 'Putter';
+      const bIsPutter = b.clubType === 'Putter';
+      if (aIsPutter && !bIsPutter) return 1;
+      if (!aIsPutter && bIsPutter) return -1;
+    }
+
+    return (a.loftAngle ?? 999) - (b.loftAngle ?? 999);
+  });
+}
+
 export default function RangeScreen() {
-  const { clubs, personalData } = useClubStore();
+  const allClubs = useClubStore(selectSortedClubsForDisplay);
+  const activeBagClubs = useClubStore(selectSortedActiveBagClubs);
+  const activeBag = useClubStore(selectActiveGolfBag);
+  const bags = useClubStore((state) => state.bags);
+  const personalData = useClubStore((state) => state.personalData);
+  const initializeDefaults = useClubStore((state) => state.initializeDefaults);
+  const loadClubs = useClubStore((state) => state.loadClubs);
+  const loadBags = useClubStore((state) => state.loadBags);
+  const loadPersonalData = useClubStore((state) => state.loadPersonalData);
   const loadPlayerSkillLevel = useClubStore((state) => state.loadPlayerSkillLevel);
   const storedPlayerSkillLevel = useClubStore((state) => state.playerSkillLevel);
+  const setActiveBag = useClubStore((state) => state.setActiveBag);
   const { profile } = useUserProfileStore();
   const initialRangePlayerSettings = loadRangePlayerSettings();
   const initialRangeConditionSettings = loadRangeConditionSettings();
@@ -282,6 +317,14 @@ export default function RangeScreen() {
     seatType === 'robot' ? `Robot Skill ${(robotSkillLevel * 100).toFixed(0)}%` : 'Personal Skill';
   const personalHeadSpeed = profile.headSpeed;
   const personalSkillLevel = storedPlayerSkillLevel;
+  const clubs = seatType === 'personal' ? activeBagClubs : allClubs;
+  const selectableClubs = getSelectableRangeClubs(clubs, seatType);
+
+  useBagIdUrlSync({
+    bags,
+    activeBagId: activeBag?.id ?? null,
+    setActiveBag,
+  });
   const gameLie = mapLieUiToGameLie(lie);
   // 既存シミュレーション API 互換のため、角度風向を旧3分類へ変換する。
   const gameWind: WindDirection = mapWindDirectionToLegacyType(windDirection);
@@ -297,8 +340,35 @@ export default function RangeScreen() {
   };
 
   useEffect(() => {
-    void loadPlayerSkillLevel();
-  }, [loadPlayerSkillLevel]);
+    const initializeScreen = async () => {
+      await initializeDefaults();
+      await Promise.all([
+        loadClubs(),
+        loadBags(),
+        loadPersonalData(),
+        loadPlayerSkillLevel(),
+      ]);
+    };
+
+    void initializeScreen();
+  }, [initializeDefaults, loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel]);
+
+  useEffect(() => {
+    if (clubs.length === 0) {
+      if (selectedClubId !== '') {
+        setSelectedClubId('');
+      }
+      return;
+    }
+
+    const hasSelectedClub = selectableClubs.some((club) => String(club.id) === String(selectedClubId));
+    if (hasSelectedClub) {
+      return;
+    }
+
+    const firstPlayableClub = selectableClubs[0] ?? null;
+    setSelectedClubId(firstPlayableClub?.id != null ? String(firstPlayableClub.id) : '');
+  }, [selectableClubs, selectedClubId]);
 
   useEffect(() => {
     saveRangePlayerSettings({
@@ -504,7 +574,7 @@ export default function RangeScreen() {
       </div>
 
 
-      {/* 打席リスト（ロボット／個人データ）＋ロボット設定 */}
+      {/* 打席リスト（ロボット／ユーザー）＋ロボット設定 */}
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
         <label className="block font-semibold mb-2">プレイヤー選択</label>
         <select
@@ -512,7 +582,7 @@ export default function RangeScreen() {
           value={seatType}
           onChange={e => setSeatType(e.target.value as 'robot' | 'personal')}
         >
-          <option value="personal">個人データ</option>
+          <option value="personal">ユーザー</option>
           <option value="robot">ロボット</option>
         </select>
 
@@ -549,16 +619,8 @@ export default function RangeScreen() {
 
         {seatType === 'personal' && (
           <div className="flex flex-col gap-2 mt-2 bg-green-50 rounded p-3 border border-green-200 text-sm text-green-900">
-            <div>
-              <span className="font-semibold">ヘッドスピード:</span>{' '}
-              {personalHeadSpeed !== null && personalHeadSpeed !== undefined ? `${personalHeadSpeed.toFixed(1)} m/s` : '未設定'}
-            </div>
-            <div>
-              <span className="font-semibold">スキルレベル:</span>{' '}
-              {(personalSkillLevel * 100).toFixed(0)}%
-            </div>
             <span className="text-xs text-green-700">
-              個人データの値は個人データ入力画面で保存された設定を使用します。
+              ユーザーの値は個人データ入力画面で保存された設定を使用します。
             </span>
           </div>
         )}
@@ -615,10 +677,29 @@ export default function RangeScreen() {
         )}
       </div>
 
+      {seatType === 'personal' && (
+        <div className="w-full max-w-xl">
+          <GolfBagPanel
+            bags={bags}
+            activeBagId={activeBag?.id ?? null}
+            activeBagClubCount={activeBag?.clubIds.length ?? 0}
+            totalClubCount={allClubs.length}
+            onSelectBag={(bagId) => void setActiveBag(bagId)}
+            showManagement={false}
+            compact
+            title="練習するバッグ"
+            description="個人データではバッグ内クラブを使用します。ロボットでは全クラブを使用します。"
+          />
+        </div>
+      )}
+
       {/* ...既存のクラブ選択UI... */}
       <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
         <label className="block font-semibold mb-2">クラブ選択</label>
-        <div className="mb-2 text-xs text-gray-500">クラブ本数: {clubs.length}</div>
+        <div className="mb-2 text-xs text-gray-500">
+          クラブ本数: {clubs.length}
+          {seatType === 'personal' && activeBag ? ` ・ ${activeBag.name}` : ''}
+        </div>
         {clubs.length === 0 ? (
           <div className="text-red-600 font-bold py-2">クラブが登録されていません。<br/>クラブ管理画面でクラブを追加してください。</div>
         ) : (
@@ -629,10 +710,7 @@ export default function RangeScreen() {
               onChange={(e) => setSelectedClubId(e.target.value)}
             >
               <option value="">-- クラブを選択 --</option>
-              {clubs
-                .filter(club => club.clubType !== 'Putter')
-                .sort((a, b) => (a.loftAngle ?? 999) - (b.loftAngle ?? 999))
-                .map((club) => (
+              {selectableClubs.map((club) => (
                   <option key={club.id} value={club.id}>
                     {formatGolfClubDisplayName(club)}
                   </option>

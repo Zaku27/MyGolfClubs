@@ -1,0 +1,205 @@
+.golf-bag-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid #d8e8db;
+  background:
+    radial-gradient(circle at top right, rgba(34, 139, 89, 0.16), transparent 34%),
+    linear-gradient(145deg, #fcfefc, #eef7f0);
+  box-shadow: 0 16px 32px rgba(32, 73, 49, 0.08);
+}
+
+.golf-bag-panel.compact {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 18px;
+}
+
+.golf-bag-panel-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.golf-bag-panel-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #4f8d66;
+}
+
+.golf-bag-panel h2 {
+  margin: 0;
+  font-size: clamp(22px, 3vw, 30px);
+  color: #143525;
+}
+
+.golf-bag-panel-description {
+  margin: 8px 0 0;
+  max-width: 620px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #587262;
+}
+
+.golf-bag-panel-summary {
+  min-width: 180px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid #cae2d0;
+  background: rgba(255, 255, 255, 0.86);
+  text-align: right;
+}
+
+.golf-bag-panel-summary-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #28543d;
+}
+
+.golf-bag-panel-summary-count {
+  margin-top: 4px;
+  font-size: 15px;
+  color: #315243;
+}
+
+.golf-bag-panel-summary-count strong {
+  font-size: 28px;
+  line-height: 1;
+  color: #163b28;
+}
+
+.golf-bag-panel-summary-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6a8373;
+}
+
+.golf-bag-single-name {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #cdded1;
+  color: #28543d;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.golf-bag-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.golf-bag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid #c7d7ca;
+  background: #ffffff;
+  color: #486454;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.golf-bag-chip.active {
+  border-color: #2f8052;
+  background: linear-gradient(135deg, #2f8052, #3c9b62);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(47, 128, 82, 0.22);
+}
+
+.golf-bag-chip:hover {
+  transform: translateY(-1px);
+}
+
+.golf-bag-scope-toggle {
+  display: inline-flex;
+  gap: 6px;
+  width: fit-content;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(20, 53, 37, 0.08);
+}
+
+.golf-bag-scope-toggle button {
+  border: 0;
+  background: transparent;
+  color: #476253;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.golf-bag-scope-toggle button.active {
+  background: #ffffff;
+  color: #173b28;
+  box-shadow: 0 6px 18px rgba(24, 59, 40, 0.12);
+}
+
+.golf-bag-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.golf-bag-panel-actions button {
+  border: 1px solid #c8d8cb;
+  background: #ffffff;
+  color: #355442;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.golf-bag-panel-actions button.primary {
+  border-color: #2f8052;
+  background: linear-gradient(135deg, #2f8052, #3c9b62);
+  color: #ffffff;
+}
+
+.golf-bag-panel-actions button.danger {
+  border-color: #efc3c3;
+  color: #b53d3d;
+}
+
+@media (max-width: 768px) {
+  .golf-bag-panel-main {
+    flex-direction: column;
+  }
+
+  .golf-bag-panel-summary {
+    width: 100%;
+    text-align: left;
+  }
+
+  .golf-bag-scope-toggle {
+    width: 100%;
+  }
+
+  .golf-bag-scope-toggle button {
+    flex: 1;
+  }
+
+  .golf-bag-panel-actions button {
+    width: 100%;
+  }
+}

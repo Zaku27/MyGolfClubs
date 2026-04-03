@@ -1,10 +1,12 @@
 import { create } from 'zustand';
-import type { ClubPersonalData, GolfClub } from '../types/golf';
+import type { ClubPersonalData, GolfBag, GolfClub } from '../types/golf';
 import { ClubService } from '../db/clubService';
 import { sortClubsForDisplay } from '../utils/clubSort';
 
 type ClubStoreState = {
   clubs: GolfClub[];
+  bags: GolfBag[];
+  activeBagId: number | null;
   loading: boolean;
   error: string | null;
   personalData: Record<string, ClubPersonalData>;
@@ -13,12 +15,19 @@ type ClubStoreState = {
 
 type ClubStoreActions = {
   loadClubs: () => Promise<void>;
+  loadBags: () => Promise<void>;
   addClub: (club: Omit<GolfClub, 'id'>) => Promise<void>;
   updateClub: (id: number, club: Partial<GolfClub>) => Promise<void>;
   deleteClub: (id: number) => Promise<void>;
   initializeDefaults: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
   clearAllClubs: () => Promise<void>;
+  createBag: (name: string) => Promise<void>;
+  renameBag: (id: number, name: string) => Promise<void>;
+  deleteBag: (id: number) => Promise<void>;
+  setActiveBag: (id: number) => Promise<void>;
+  toggleClubInActiveBag: (clubId: number) => Promise<void>;
+  replaceActiveBagClubIds: (clubIds: number[]) => Promise<void>;
   loadPersonalData: () => Promise<void>;
   setPersonalData: (data: ClubPersonalData) => Promise<void>;
   removePersonalData: (clubId: string) => Promise<void>;
@@ -30,6 +39,8 @@ type ClubStore = ClubStoreState & ClubStoreActions;
 
 const INITIAL_STATE: ClubStoreState = {
   clubs: [],
+  bags: [],
+  activeBagId: null,
   loading: false,
   error: null,
   personalData: {},
@@ -63,6 +74,22 @@ const refreshClubs = async (
   set({ clubs, loading: false, error: null });
 };
 
+const refreshBags = async (
+  set: (partial: Partial<ClubStore>) => void,
+): Promise<void> => {
+  await ClubService.ensureDefaultBag();
+  const [bags, activeBagId] = await Promise.all([
+    ClubService.getAllBags(),
+    ClubService.getActiveBagId(),
+  ]);
+  set({
+    bags,
+    activeBagId: activeBagId ?? bags[0]?.id ?? null,
+    loading: false,
+    error: null,
+  });
+};
+
 export const useClubStore = create<ClubStore>((set) => ({
   ...INITIAL_STATE,
 
@@ -70,6 +97,15 @@ export const useClubStore = create<ClubStore>((set) => ({
     set({ loading: true, error: null });
     try {
       await refreshClubs(set);
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  loadBags: async () => {
+    set({ loading: true, error: null });
+    try {
+      await refreshBags(set);
     } catch (error) {
       setStoreError(set, error);
     }
@@ -109,7 +145,13 @@ export const useClubStore = create<ClubStore>((set) => ({
     set({ error: null });
     try {
       await ClubService.deleteClub(id);
-      set((state) => ({ clubs: state.clubs.filter((c) => c.id !== id) }));
+      set((state) => ({
+        clubs: state.clubs.filter((c) => c.id !== id),
+        bags: state.bags.map((bag) => ({
+          ...bag,
+          clubIds: bag.clubIds.filter((clubId) => clubId !== id),
+        })),
+      }));
     } catch (error) {
       setStoreError(set, error);
     }
@@ -119,7 +161,10 @@ export const useClubStore = create<ClubStore>((set) => ({
     set({ error: null });
     try {
       await ClubService.deleteAllClubs();
-      set({ clubs: [] });
+      set((state) => ({
+        clubs: [],
+        bags: state.bags.map((bag) => ({ ...bag, clubIds: [] })),
+      }));
     } catch (error) {
       setStoreError(set, error);
     }
@@ -129,7 +174,18 @@ export const useClubStore = create<ClubStore>((set) => ({
     set({ loading: true, error: null });
     try {
       await ClubService.initializeDefaultClubs();
-      await refreshClubs(set);
+      const [clubs, bags, activeBagId] = await Promise.all([
+        ClubService.getAllClubs(),
+        ClubService.getAllBags(),
+        ClubService.getActiveBagId(),
+      ]);
+      set({
+        clubs,
+        bags,
+        activeBagId: activeBagId ?? bags[0]?.id ?? null,
+        loading: false,
+        error: null,
+      });
     } catch (error) {
       setStoreError(set, error);
     }
@@ -139,7 +195,106 @@ export const useClubStore = create<ClubStore>((set) => ({
     set({ loading: true, error: null });
     try {
       await ClubService.resetToDefaults();
-      await refreshClubs(set);
+      const [clubs, bags, activeBagId] = await Promise.all([
+        ClubService.getAllClubs(),
+        ClubService.getAllBags(),
+        ClubService.getActiveBagId(),
+      ]);
+      set({
+        clubs,
+        bags,
+        activeBagId: activeBagId ?? bags[0]?.id ?? null,
+        loading: false,
+        error: null,
+      });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  createBag: async (name) => {
+    set({ error: null });
+    try {
+      const bagId = await ClubService.createBag(name);
+      const bags = await ClubService.getAllBags();
+      await ClubService.setActiveBagId(bagId);
+      set({ bags, activeBagId: bagId, error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  renameBag: async (id, name) => {
+    set({ error: null });
+    try {
+      await ClubService.updateBag(id, { name });
+      const bags = await ClubService.getAllBags();
+      set({ bags, error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  deleteBag: async (id) => {
+    set({ error: null });
+    try {
+      await ClubService.deleteBag(id);
+      const [bags, activeBagId] = await Promise.all([
+        ClubService.getAllBags(),
+        ClubService.getActiveBagId(),
+      ]);
+      set({ bags, activeBagId: activeBagId ?? bags[0]?.id ?? null, error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  setActiveBag: async (id) => {
+    set({ error: null });
+    try {
+      await ClubService.setActiveBagId(id);
+      set({ activeBagId: id, error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  toggleClubInActiveBag: async (clubId) => {
+    set({ error: null });
+    try {
+      const activeBagId = await ClubService.getActiveBagId();
+      if (activeBagId == null) {
+        throw new Error('アクティブなゴルフバッグが見つかりません');
+      }
+
+      const bags = await ClubService.getAllBags();
+      const activeBag = bags.find((bag) => bag.id === activeBagId);
+      if (!activeBag) {
+        throw new Error('アクティブなゴルフバッグが見つかりません');
+      }
+
+      if (activeBag.clubIds.includes(clubId)) {
+        await ClubService.removeClubFromBag(activeBagId, clubId);
+      } else {
+        await ClubService.addClubToBag(activeBagId, clubId);
+      }
+
+      set({ bags: await ClubService.getAllBags(), activeBagId, error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  replaceActiveBagClubIds: async (clubIds) => {
+    set({ error: null });
+    try {
+      const activeBagId = await ClubService.getActiveBagId();
+      if (activeBagId == null) {
+        throw new Error('アクティブなゴルフバッグが見つかりません');
+      }
+
+      await ClubService.setBagClubIds(activeBagId, clubIds);
+      set({ bags: await ClubService.getAllBags(), activeBagId, error: null });
     } catch (error) {
       setStoreError(set, error);
     }
@@ -205,6 +360,13 @@ export const useClubStore = create<ClubStore>((set) => ({
 
 let lastClubsRef: GolfClub[] | null = null;
 let lastSortedClubs: GolfClub[] = [];
+let lastBagsRef: GolfBag[] | null = null;
+let lastActiveBagId: number | null = null;
+let lastActiveBag: GolfBag | null = null;
+let lastActiveBagClubsRef: GolfClub[] = [];
+let lastActiveBagClubsClubsRef: GolfClub[] | null = null;
+let lastActiveBagClubsBagsRef: GolfBag[] | null = null;
+let lastActiveBagClubsBagId: number | null = null;
 
 export const selectSortedClubsForDisplay = (state: ClubStoreState): GolfClub[] => {
   if (state.clubs === lastClubsRef) {
@@ -213,4 +375,47 @@ export const selectSortedClubsForDisplay = (state: ClubStoreState): GolfClub[] =
   lastClubsRef = state.clubs;
   lastSortedClubs = sortClubsForDisplay(state.clubs);
   return lastSortedClubs;
+};
+
+export const selectActiveGolfBag = (state: ClubStoreState): GolfBag | null => {
+  if (state.bags === lastBagsRef && state.activeBagId === lastActiveBagId) {
+    return lastActiveBag;
+  }
+
+  lastBagsRef = state.bags;
+  lastActiveBagId = state.activeBagId;
+
+  if (state.bags.length === 0) {
+    lastActiveBag = null;
+    return null;
+  }
+
+  lastActiveBag = state.bags.find((bag) => bag.id === state.activeBagId) ?? state.bags[0] ?? null;
+  return lastActiveBag;
+};
+
+export const selectSortedActiveBagClubs = (state: ClubStoreState): GolfClub[] => {
+  if (
+    state.clubs === lastActiveBagClubsClubsRef &&
+    state.bags === lastActiveBagClubsBagsRef &&
+    state.activeBagId === lastActiveBagClubsBagId
+  ) {
+    return lastActiveBagClubsRef;
+  }
+
+  lastActiveBagClubsClubsRef = state.clubs;
+  lastActiveBagClubsBagsRef = state.bags;
+  lastActiveBagClubsBagId = state.activeBagId;
+
+  const activeBag = selectActiveGolfBag(state);
+  if (!activeBag) {
+    lastActiveBagClubsRef = [];
+    return lastActiveBagClubsRef;
+  }
+
+  const clubIdSet = new Set(activeBag.clubIds);
+  lastActiveBagClubsRef = sortClubsForDisplay(
+    state.clubs.filter((club) => club.id != null && clubIdSet.has(club.id)),
+  );
+  return lastActiveBagClubsRef;
 };

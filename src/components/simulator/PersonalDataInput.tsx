@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useUserProfileStore } from "../../store/userProfileStore";
 import { Link } from "react-router-dom";
 import type { ClubCategory, ClubPersonalData, GolfClub } from "../../types/golf";
-import { useClubStore, selectSortedClubsForDisplay } from "../../store/clubStore";
+import { GolfBagPanel } from "../GolfBagPanel";
+import {
+  selectActiveGolfBag,
+  selectSortedActiveBagClubs,
+  useClubStore,
+} from "../../store/clubStore";
+import { useBagIdUrlSync } from "../../hooks/useBagIdUrlSync";
 import { toSimClub } from "../../utils/clubSimAdapter";
 import { calculateEffectiveSuccessRate } from "../../utils/calculateSuccessRate";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
@@ -57,17 +63,21 @@ export function PersonalDataInput() {
   // ユーザープロフィールストア
   const headSpeed = useUserProfileStore((state) => state.profile.headSpeed);
   const setHeadSpeed = useUserProfileStore((state) => state.setHeadSpeed);
-  const clubs = useClubStore(selectSortedClubsForDisplay);
+  const clubs = useClubStore(selectSortedActiveBagClubs);
+  const activeBag = useClubStore(selectActiveGolfBag);
+  const bags = useClubStore((state) => state.bags);
   const personalData = useClubStore((state) => state.personalData);
   const playerSkillLevel = useClubStore((state) => state.playerSkillLevel);
   const loading = useClubStore((state) => state.loading);
   const error = useClubStore((state) => state.error);
   const loadClubs = useClubStore((state) => state.loadClubs);
+  const loadBags = useClubStore((state) => state.loadBags);
   const initializeDefaults = useClubStore((state) => state.initializeDefaults);
   const loadPersonalData = useClubStore((state) => state.loadPersonalData);
   const loadPlayerSkillLevel = useClubStore((state) => state.loadPlayerSkillLevel);
   const setPersonalData = useClubStore((state) => state.setPersonalData);
   const setPlayerSkillLevel = useClubStore((state) => state.setPlayerSkillLevel);
+  const setActiveBag = useClubStore((state) => state.setActiveBag);
 
   const [draftByClubId, setDraftByClubId] = useState<Record<string, DraftRow>>({});
   const [saveMessage, setSaveMessage] = useState<string>("");
@@ -77,15 +87,22 @@ export function PersonalDataInput() {
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
+  useBagIdUrlSync({
+    bags,
+    activeBagId: activeBag?.id ?? null,
+    setActiveBag,
+  });
+
+  const appLink = activeBag?.id != null ? `/?bagId=${activeBag.id}` : "/";
+
   useEffect(() => {
     const init = async () => {
       await initializeDefaults();
-      await loadClubs();
-      await Promise.all([loadPersonalData(), loadPlayerSkillLevel()]);
-        setIsInitialized(true);
+      await Promise.all([loadClubs(), loadBags(), loadPersonalData(), loadPlayerSkillLevel()]);
+      setIsInitialized(true);
     };
     void init();
-  }, [initializeDefaults, loadClubs, loadPersonalData, loadPlayerSkillLevel]);
+  }, [initializeDefaults, loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel]);
 
   useEffect(() => {
     if (isSaving) return;
@@ -265,7 +282,7 @@ export function PersonalDataInput() {
           </div>
           <div className="flex flex-col items-stretch gap-2 sm:items-end">
             <Link
-              to="/"
+              to={appLink}
               className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
               アプリに戻る
@@ -281,6 +298,18 @@ export function PersonalDataInput() {
             {saveMessage && <p className="text-sm text-emerald-700 sm:text-right">{saveMessage}</p>}
           </div>
         </div>
+
+        <GolfBagPanel
+          bags={bags}
+          activeBagId={activeBag?.id ?? null}
+          activeBagClubCount={activeBag?.clubIds.length ?? 0}
+          totalClubCount={clubs.length}
+          onSelectBag={(bagId) => void setActiveBag(bagId)}
+          showManagement={false}
+          compact
+          title="設定対象のバッグ"
+          description="ここで表示されるのはアクティブバッグのクラブだけです。複数バッグを使い分ける場合は切り替えて編集します。"
+        />
 
         {error && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -524,7 +553,7 @@ export function PersonalDataInput() {
           </div>
         </div>
         <p className="text-xs text-slate-500">
-          ※ 弱クラブ扱いは「クラブが弱点指定」または「基本成功率が65%未満」の場合に適用されます。
+          ※ 表示対象は {activeBag?.name ?? 'アクティブバッグ'} のクラブです。弱クラブ扱いは「クラブが弱点指定」または「基本成功率が65%未満」の場合に適用されます。
         </p>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

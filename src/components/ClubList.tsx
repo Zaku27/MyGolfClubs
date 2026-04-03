@@ -33,6 +33,15 @@ interface ClubListProps {
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onShowAnalysis: () => void;
   onShowSimulator: () => void;
+  activeBagName?: string;
+  activeBagId?: number;
+  activeBagClubIds?: number[];
+  activeBagClubCount?: number;
+  activeBagLimit?: number;
+  isBagView?: boolean;
+  allClubsCount?: number;
+  onSwitchToAllClubs?: () => void;
+  onToggleActiveBagMembership?: (club: GolfClub) => void;
   loading?: boolean;
 }
 
@@ -50,9 +59,23 @@ export const ClubList: React.FC<ClubListProps> = ({
   onImport,
   onShowAnalysis,
   onShowSimulator,
+  activeBagName,
+  activeBagId,
+  activeBagClubIds = [],
+  activeBagClubCount = 0,
+  activeBagLimit = 14,
+  isBagView = false,
+  allClubsCount = clubs.length,
+  onSwitchToAllClubs,
+  onToggleActiveBagMembership,
   loading = false,
 }) => {
   const sortedClubs = sortClubsForDisplay(clubs);
+  const bagQuery = typeof activeBagId === 'number' ? `?bagId=${activeBagId}` : '';
+  const activeBagClubIdSet = new Set(activeBagClubIds);
+  const clubCountLabel = isBagView && activeBagName
+    ? `${activeBagName} ${activeBagClubCount}/${activeBagLimit}`
+    : `${clubs.length} clubs`;
 
   return (
     <div className="club-list-container">
@@ -61,7 +84,7 @@ export const ClubList: React.FC<ClubListProps> = ({
           <span className="title-main">My Golf Clubs</span>
           <span className="title-sub">- マイクラブを簡単管理＆上達サポート -</span>
         </h1>
-        <div className="club-count">{clubs.length} clubs</div>
+        <div className="club-count">{clubCountLabel}</div>
       </div>
 
       <div className="club-list-actions">
@@ -86,10 +109,10 @@ export const ClubList: React.FC<ClubListProps> = ({
             <button className="btn-icon btn-simulator" onClick={onShowSimulator} disabled={loading} title="コースシミュレーター" aria-label="コースシミュレーター">
               <SimulatorIcon size={20} />
             </button>
-            <Link className="btn-icon btn-range" to="/range" title="練習場" aria-label="練習場">
+            <Link className="btn-icon btn-range" to={`/range${bagQuery}`} title="練習場" aria-label="練習場">
               <RangeIcon size={20} />
             </Link>
-            <Link className="btn-icon btn-personal-data" to="/personal-data" title="パーソナルデータ" aria-label="パーソナルデータ">
+            <Link className="btn-icon btn-personal-data" to={`/personal-data${bagQuery}`} title="パーソナルデータ" aria-label="パーソナルデータ">
               <PersonalDataIcon size={20} />
             </Link>
           </>
@@ -100,11 +123,21 @@ export const ClubList: React.FC<ClubListProps> = ({
         <div className="loading">クラブを読み込み中...</div>
       ) : clubs.length === 0 ? (
         <div className="empty-state">
-          <p>クラブが見つかりません。バッグにクラブを追加してください!</p>
+          <p>
+            {isBagView && allClubsCount > 0
+              ? 'このバッグはまだ空です。全クラブ一覧から14本まで選んで入れてください。'
+              : 'クラブが見つかりません。バッグにクラブを追加してください!'}
+          </p>
           <div className="empty-state-buttons">
-            <button className="btn-primary" onClick={onAdd}>
-              最初のクラブを追加
-            </button>
+            {isBagView && allClubsCount > 0 && onSwitchToAllClubs ? (
+              <button className="btn-primary" onClick={onSwitchToAllClubs}>
+                全クラブから選ぶ
+              </button>
+            ) : (
+              <button className="btn-primary" onClick={onAdd}>
+                最初のクラブを追加
+              </button>
+            )}
             <button className="btn-reset-clubs" onClick={onReset} disabled={loading} title="初期14本に戻す">
               <ResetIcon size={18} />
               <span>初期14本に戻す</span>
@@ -121,6 +154,10 @@ export const ClubList: React.FC<ClubListProps> = ({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 viewMode={viewMode}
+                activeBagName={activeBagName}
+                isInActiveBag={club.id != null && activeBagClubIdSet.has(club.id)}
+                isActiveBagFull={activeBagClubCount >= activeBagLimit}
+                onToggleActiveBagMembership={onToggleActiveBagMembership}
               />
             ))}
           </div>

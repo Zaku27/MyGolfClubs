@@ -19,6 +19,14 @@ export interface GolfClub {
   updatedAt?: string;
 }
 
+export interface GolfBag {
+  id?: number;
+  name: string;
+  clubIds: number[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ClubPersonalData {
   clubId: string;
   missRate: number;        // 0-100 (user input, e.g. 35 = 35% miss)

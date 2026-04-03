@@ -13,13 +13,23 @@ import { Scorecard } from "./Scorecard";
 interface Props {
   onBack: () => void;
   selectedClubs: GolfClub[];
+  allClubs: GolfClub[];
+  activeBagName?: string;
+  bagId?: number | null;
 }
 
-function SetupScreen({ onStart, onBack, clubCount }: {
-  onStart: (holes: Hole[]) => void;
+function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagName, bagId }: {
+  onStart: (holes: Hole[], mode: "bag" | "robot") => void;
   onBack: () => void;
-  clubCount: number;
+  bagClubCount: number;
+  robotClubCount: number;
+  activeBagName?: string;
+  bagId?: number | null;
 }) {
+  const [playMode, setPlayMode] = useState<"bag" | "robot">("bag");
+  const bagQuery = typeof bagId === 'number' ? `?bagId=${bagId}` : '';
+  const clubCount = playMode === "robot" ? robotClubCount : bagClubCount;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex flex-col items-center justify-center p-6 gap-6">
       <div className="text-center">
@@ -33,6 +43,41 @@ function SetupScreen({ onStart, onBack, clubCount }: {
       </div>
 
       <div className="bg-emerald-50/90 border border-emerald-300 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-sm shadow-emerald-300/40">
+        <div className="rounded-xl border border-emerald-200 bg-white/80 p-3">
+          <p className="text-xs font-bold tracking-[0.12em] text-emerald-700">プレーモード</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPlayMode("bag")}
+              className={[
+                "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                playMode === "bag"
+                  ? "border-emerald-700 bg-emerald-700 text-white"
+                  : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+              ].join(" ")}
+            >
+              ゴルフバッグ
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlayMode("robot")}
+              className={[
+                "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                playMode === "robot"
+                  ? "border-sky-700 bg-sky-700 text-white"
+                  : "border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100",
+              ].join(" ")}
+            >
+              ロボット
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-emerald-700">
+            {playMode === "bag"
+              ? `個人データを使い、${activeBagName ?? "選択中バッグ"}でプレーします。`
+              : "ロボット設定で全クラブを使ってプレーします。"}
+          </p>
+        </div>
+
         <div className="text-center text-emerald-700 text-sm border-b border-emerald-200 pb-3">
           <span className="font-bold text-emerald-900">{clubCount}</span> 本のクラブでプレー
         </div>
@@ -61,28 +106,28 @@ function SetupScreen({ onStart, onBack, clubCount }: {
         </div>
 
         <button
-          onClick={() => onStart(COURSE_1HOLE)}
+          onClick={() => onStart(COURSE_1HOLE, playMode)}
           disabled={clubCount === 0}
           className="w-full py-3 bg-emerald-400 hover:bg-emerald-300 disabled:bg-emerald-700/60 disabled:text-emerald-100/70 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors"
         >
           1ホールでプレー
         </button>
         <button
-          onClick={() => onStart(COURSE_3HOLES)}
+          onClick={() => onStart(COURSE_3HOLES, playMode)}
           disabled={clubCount === 0}
           className="w-full py-3 bg-lime-500 hover:bg-lime-400 disabled:bg-lime-700/60 disabled:text-lime-100/70 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors"
         >
           3ホールでプレー
         </button>
         <button
-          onClick={() => onStart(COURSE_9HOLES)}
+          onClick={() => onStart(COURSE_9HOLES, playMode)}
           disabled={clubCount === 0}
           className="w-full py-3 bg-green-500 hover:bg-green-400 disabled:bg-green-700/60 disabled:text-green-100/70 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-lg"
         >
           9ホールでプレー
         </button>
         <button
-          onClick={() => onStart(COURSE_18HOLES)}
+          onClick={() => onStart(COURSE_18HOLES, playMode)}
           disabled={clubCount === 0}
           className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800/60 disabled:text-emerald-100/70 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors"
         >
@@ -97,13 +142,13 @@ function SetupScreen({ onStart, onBack, clubCount }: {
         ← クラブ管理に戻る
       </button>
       <Link
-        to="/range"
+        to={`/range${bagQuery}`}
         className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
       >
         練習場に戻る
       </Link>
       <Link
-        to="/personal-data"
+        to={`/personal-data${bagQuery}`}
         className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
       >
         パーソナルデータを調整
@@ -112,7 +157,7 @@ function SetupScreen({ onStart, onBack, clubCount }: {
   );
 }
 
-export function SimulatorApp({ onBack, selectedClubs }: Props) {
+export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, bagId }: Props) {
   const {
     phase,
     course,
@@ -122,15 +167,26 @@ export function SimulatorApp({ onBack, selectedClubs }: Props) {
   } = useGameStore();
   const [showDetailedScorecard, setShowDetailedScorecard] = useState(false);
   const bagSource = selectedClubs;
+  const robotSource = allClubs;
 
-  const handleStart = (holes: Hole[]) => {
-    const bag = bagSource.map(toSimClub);
+  const handleStart = (holes: Hole[], mode: "bag" | "robot") => {
+    const source = mode === "robot" ? robotSource : bagSource;
+    const bag = source.map(toSimClub);
     setShowDetailedScorecard(false);
-    startRound(holes, bag);
+    startRound(holes, bag, mode);
   };
 
   if (phase === "setup") {
-    return <SetupScreen onStart={handleStart} onBack={onBack} clubCount={bagSource.length} />;
+    return (
+      <SetupScreen
+        onStart={handleStart}
+        onBack={onBack}
+        bagClubCount={bagSource.length}
+        robotClubCount={robotSource.length}
+        activeBagName={activeBagName}
+        bagId={bagId}
+      />
+    );
   }
 
   // Show Scorecard only after dismissing the final hole result modal

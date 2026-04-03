@@ -8,11 +8,26 @@ interface ClubCardProps {
   onEdit: (club: GolfClub) => void;
   onDelete: (id: number) => void;
   viewMode?: 'full' | 'compact';
+  activeBagName?: string;
+  isInActiveBag?: boolean;
+  isActiveBagFull?: boolean;
+  onToggleActiveBagMembership?: (club: GolfClub) => void;
 }
 
-export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, viewMode = 'full' }) => {
+export const ClubCard: React.FC<ClubCardProps> = ({
+  club,
+  onEdit,
+  onDelete,
+  viewMode = 'full',
+  activeBagName,
+  isInActiveBag = false,
+  isActiveBagFull = false,
+  onToggleActiveBagMembership,
+}) => {
   const clubTypeDisplay = getClubTypeDisplay(club.clubType, club.number);
   const compactLoft = club.loftAngle != null ? `${club.loftAngle}°` : '-';
+  const canToggleBag = typeof onToggleActiveBagMembership === 'function' && !!activeBagName;
+  const bagButtonDisabled = !isInActiveBag && isActiveBagFull;
 
   return (
     <div className={`club-card ${viewMode === 'compact' ? 'compact' : ''}`}>
@@ -48,6 +63,21 @@ export const ClubCard: React.FC<ClubCardProps> = ({ club, onEdit, onDelete, view
           </button>
         </div>
       </div>
+      {canToggleBag && (
+        <div className="club-card-bag-row">
+          <span className={`club-bag-badge ${isInActiveBag ? 'in-bag' : 'out-of-bag'}`}>
+            {isInActiveBag ? `${activeBagName}に登録済み` : `${activeBagName}には未登録`}
+          </span>
+          <button
+            type="button"
+            className={`club-bag-toggle ${isInActiveBag ? 'remove' : 'add'}`}
+            onClick={() => onToggleActiveBagMembership?.(club)}
+            disabled={bagButtonDisabled}
+          >
+            {isInActiveBag ? 'バッグから外す' : isActiveBagFull ? 'バッグは14本です' : 'バッグに入れる'}
+          </button>
+        </div>
+      )}
       <div className="club-card-body">
           {viewMode === 'full' ? (
             <>

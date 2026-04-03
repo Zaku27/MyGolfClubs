@@ -2,10 +2,11 @@ import { useGameStore } from "../../store/gameStore";
 import { useMemo, useState, useEffect, useRef } from "react";
 import type { LieType, SimClub } from "../../types/game";
 import { useClubStore } from "../../store/clubStore";
-import { estimateBaseDistance } from "../../utils/shotSimulation";
+import { estimateBaseDistance, estimateEffectiveSuccessRate } from "../../utils/shotSimulation";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
 import { CompactScorecard } from "./Scorecard";
 import { useUserProfileStore } from "../../store/userProfileStore";
+import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 
 interface Props {
   onBack: () => void;
@@ -100,6 +101,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     selectClub,
     takeShot,
     lastShotResult,
+    playMode,
+    playerSkillLevel,
   } = useGameStore();
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [showMobileScorecard, setShowMobileScorecard] = useState(false);
@@ -147,7 +150,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   if (!currentHole) return null;
 
   const { remainingDistance, lie, wind, windStrength = 0, hazards = [] } = shotContext;
-  const { seatType, robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettingsFromStorage();
+  const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettingsFromStorage();
+  const seatType = playMode === "robot" ? "robot" : "personal";
   const displayedHeadSpeed = seatType === "robot" ? robotHeadSpeed : (personalHeadSpeed ?? 0);
   const completedRelativeToPar = scores.reduce((sum, s) => sum + (s.strokes - s.par), 0);
   const currentHoleRelativeToPar =
@@ -161,16 +165,27 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         : "E";
   const clubPreview = useMemo(() => {
     const preview = new Map<string, { effectiveRate: number }>();
+    const isRobotMode = playMode === "robot";
 
     for (const club of bag) {
-      // Robot mode: all clubs have 100% effective success rate
-      const effectiveRate = 100; // Robot mode always 100%
+      const effectiveRate = isRobotMode
+        ? 100
+        : estimateEffectiveSuccessRate(
+            club,
+            { lie },
+            "normal",
+            {
+              confidenceBoost,
+              personalData: resolvePersonalDataForSimClub(club, personalData),
+              playerSkillLevel,
+            },
+          );
 
       preview.set(club.id, { effectiveRate });
     }
 
     return preview;
-  }, [bag, confidenceBoost, lie, personalData]);
+  }, [bag, confidenceBoost, lie, personalData, playMode, playerSkillLevel]);
 
   const recommendedClubs = useMemo(
     () => {
@@ -252,7 +267,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   };
 
   // ショット注意案内の内容生成
-  const selectedEffectiveRate = selectedClub ? 100 : null;
+  const selectedEffectiveRate = selectedClub
+    ? Math.round(clubPreview.get(selectedClub.id)?.effectiveRate ?? selectedClub.successRate)
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 text-emerald-900">
@@ -313,10 +330,12 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-10 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-14">
           <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
           <span className="mt-3 inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-bold tracking-[0.08em] text-sky-800 sm:text-sm">
-            ロボットプレイ中
+            {playMode === "robot" ? "ロボットプレイ中" : "ゴルフバッグプレイ中"}
           </span>
           <div className="mt-2 text-xs font-semibold text-sky-800 sm:text-sm">
-            ヘッドスピード: {displayedHeadSpeed.toFixed(1)} m/s / スキルレベル: {(robotSkillLevel * 100).toFixed(0)}%
+            {playMode === "robot"
+              ? `ヘッドスピード: ${displayedHeadSpeed.toFixed(1)} m/s / スキルレベル: ${(robotSkillLevel * 100).toFixed(0)}%`
+              : `ヘッドスピード: ${displayedHeadSpeed.toFixed(1)} m/s / スキルレベル: ${(playerSkillLevel * 100).toFixed(0)}%`}
           </div>
           <h1 className="mt-4 text-4xl font-extrabold leading-tight text-emerald-900 sm:text-6xl">
             ピンまで {remainingDistance}ヤード
@@ -373,7 +392,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             </div>
             <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
               <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                クラブ成功率 100% (ロボット)
+                {playMode === "robot" ? "クラブ成功率 100% (ロボット)" : `クラブ成功率 ${Math.round(lastShotResult.effectiveSuccessRate)}%`}
               </span>
               {lastShotResult.landing && (
                 <>

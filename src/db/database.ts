@@ -1,14 +1,16 @@
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
-import type { GolfClub, ClubPersonalData } from '../types/golf';
+import type { GolfBag, GolfClub, ClubPersonalData } from '../types/golf';
 
 interface AppSettings {
   id: 'app';
   playerSkillLevel: number;
+  activeBagId?: number;
 }
 
 export class GolfBagDatabase extends Dexie {
   clubs!: Table<GolfClub>;
+  golfBags!: Table<GolfBag>;
   personalData!: Table<ClubPersonalData>;
   appSettings!: Table<AppSettings>;
 
@@ -42,6 +44,12 @@ export class GolfBagDatabase extends Dexie {
     // v4: add appSettings table for storing global app settings like playerSkillLevel
     this.version(4).stores({
       clubs: '++id, name',
+      personalData: 'clubId',
+      appSettings: 'id',
+    });
+    this.version(5).stores({
+      clubs: '++id, name',
+      golfBags: '++id, name',
       personalData: 'clubId',
       appSettings: 'id',
     });

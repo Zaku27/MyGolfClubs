@@ -1,6 +1,9 @@
 import { db } from './database';
-import type { GolfClub, ClubPersonalData } from '../types/golf';
+import type { GolfBag, GolfClub, ClubPersonalData } from '../types/golf';
 import { DEFAULT_CLUBS } from '../types/golf';
+import { sortClubsForDisplay } from '../utils/clubSort';
+
+const MAX_BAG_CLUBS = 14;
 
 const CLUB_VALUE_DEFAULTS = {
   number: '',
@@ -47,6 +50,45 @@ const createUpdatedClubRecord = (club: Partial<GolfClub>): Partial<GolfClub> => 
   updatedAt: createTimestamp(),
 });
 
+const normalizeBagName = (name: string): string => {
+  const trimmed = name.trim();
+  return trimmed.length > 0 ? trimmed : 'メインバッグ';
+};
+
+const normalizeBagClubIds = (clubIds: number[]): number[] => {
+  return [...new Set(clubIds.filter((clubId) => Number.isInteger(clubId) && clubId > 0))];
+};
+
+const validateBagClubIds = (clubIds: number[]): number[] => {
+  const normalized = normalizeBagClubIds(clubIds);
+  if (normalized.length > MAX_BAG_CLUBS) {
+    throw new Error(`ゴルフバッグに入れられるクラブは${MAX_BAG_CLUBS}本までです`);
+  }
+  return normalized;
+};
+
+const normalizeBagRecord = (bag: GolfBag): GolfBag => ({
+  ...bag,
+  name: normalizeBagName(bag.name),
+  clubIds: normalizeBagClubIds(bag.clubIds ?? []),
+});
+
+const createBagRecord = (name: string, clubIds: number[]): GolfBag => {
+  const timestamp = createTimestamp();
+  return {
+    name: normalizeBagName(name),
+    clubIds: validateBagClubIds(clubIds),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+};
+
+const createUpdatedBagRecord = (patch: Partial<Pick<GolfBag, 'name' | 'clubIds'>>): Partial<GolfBag> => ({
+  ...(patch.name != null ? { name: normalizeBagName(patch.name) } : {}),
+  ...(patch.clubIds != null ? { clubIds: validateBagClubIds(patch.clubIds) } : {}),
+  updatedAt: createTimestamp(),
+});
+
 export class ClubService {
   static async getAllClubs(): Promise<GolfClub[]> {
     const clubs = await db.clubs.toArray();
@@ -70,10 +112,22 @@ export class ClubService {
 
   static async deleteClub(id: number): Promise<void> {
     await db.clubs.delete(id);
+    const bags = await db.golfBags.toArray();
+    await Promise.all(
+      bags
+        .filter((bag) => (bag.clubIds ?? []).includes(id))
+        .map((bag) => db.golfBags.update(bag.id!, createUpdatedBagRecord({
+          clubIds: (bag.clubIds ?? []).filter((clubId) => clubId !== id),
+        }))),
+    );
   }
 
   static async deleteAllClubs(): Promise<void> {
     await db.clubs.clear();
+    const bags = await db.golfBags.toArray();
+    await Promise.all(
+      bags.map((bag) => db.golfBags.update(bag.id!, createUpdatedBagRecord({ clubIds: [] }))),
+    );
   }
 
   static async initializeDefaultClubs(): Promise<void> {
@@ -81,11 +135,139 @@ export class ClubService {
     if (count === 0) {
       await db.clubs.bulkAdd(DEFAULT_CLUBS.map(createClubRecord));
     }
+    await this.ensureDefaultBag();
   }
 
   static async resetToDefaults(): Promise<void> {
     await this.deleteAllClubs();
-    await this.initializeDefaultClubs();
+    await db.clubs.bulkAdd(DEFAULT_CLUBS.map(createClubRecord));
+    const clubs = await this.getAllClubs();
+    const defaultClubIds = sortClubsForDisplay(clubs)
+      .slice(0, MAX_BAG_CLUBS)
+      .map((club) => club.id)
+      .filter((clubId): clubId is number => typeof clubId === 'number');
+    const bags = await db.golfBags.toArray();
+
+    if (bags.length === 0) {
+      const bagId = await db.golfBags.add(createBagRecord('メインバッグ', defaultClubIds));
+      await this.setActiveBagId(bagId);
+      return;
+    }
+
+    const [firstBag, ...restBags] = bags;
+    await db.golfBags.update(firstBag.id!, createUpdatedBagRecord({
+      name: firstBag.name || 'メインバッグ',
+      clubIds: defaultClubIds,
+    }));
+    await Promise.all(
+      restBags.map((bag) => db.golfBags.update(bag.id!, createUpdatedBagRecord({ clubIds: [] }))),
+    );
+    await this.setActiveBagId(firstBag.id!);
+  }
+
+  static async ensureDefaultBag(): Promise<void> {
+    const bags = await db.golfBags.toArray();
+    if (bags.length === 0) {
+      const clubs = sortClubsForDisplay(await this.getAllClubs());
+      const defaultClubIds = clubs
+        .slice(0, MAX_BAG_CLUBS)
+        .map((club) => club.id)
+        .filter((clubId): clubId is number => typeof clubId === 'number');
+      const bagId = await db.golfBags.add(createBagRecord('メインバッグ', defaultClubIds));
+      await this.setActiveBagId(bagId);
+      return;
+    }
+
+    const activeBagId = await this.getActiveBagId();
+    if (activeBagId == null || !(await db.golfBags.get(activeBagId))) {
+      const firstBagId = bags[0].id;
+      if (typeof firstBagId === 'number') {
+        await this.setActiveBagId(firstBagId);
+      }
+    }
+  }
+
+  static async getAllBags(): Promise<GolfBag[]> {
+    const bags = await db.golfBags.toArray();
+    return bags
+      .map(normalizeBagRecord)
+      .sort((left, right) => (left.createdAt ?? '').localeCompare(right.createdAt ?? ''));
+  }
+
+  static async createBag(name: string, clubIds: number[] = []): Promise<number> {
+    return db.golfBags.add(createBagRecord(name, clubIds));
+  }
+
+  static async updateBag(
+    id: number,
+    patch: Partial<Pick<GolfBag, 'name' | 'clubIds'>>,
+  ): Promise<number> {
+    return db.golfBags.update(id, createUpdatedBagRecord(patch));
+  }
+
+  static async deleteBag(id: number): Promise<void> {
+    const bagCount = await db.golfBags.count();
+    if (bagCount <= 1) {
+      throw new Error('少なくとも1つのゴルフバッグが必要です');
+    }
+
+    await db.golfBags.delete(id);
+    const activeBagId = await this.getActiveBagId();
+    if (activeBagId === id) {
+      const nextBag = await db.golfBags.orderBy('createdAt').first();
+      await this.setActiveBagId(nextBag?.id ?? null);
+    }
+  }
+
+  static async getActiveBagId(): Promise<number | null> {
+    const settings = await db.appSettings.get('app');
+    return typeof settings?.activeBagId === 'number' ? settings.activeBagId : null;
+  }
+
+  static async setActiveBagId(activeBagId: number | null): Promise<void> {
+    const settings = await db.appSettings.get('app');
+    await db.appSettings.put({
+      id: 'app',
+      playerSkillLevel: settings?.playerSkillLevel ?? 0.5,
+      activeBagId: activeBagId ?? undefined,
+    });
+  }
+
+  static async addClubToBag(bagId: number, clubId: number): Promise<void> {
+    const bag = await db.golfBags.get(bagId);
+    if (!bag) {
+      throw new Error('対象のゴルフバッグが見つかりません');
+    }
+
+    const clubIds = normalizeBagClubIds(bag.clubIds ?? []);
+    if (clubIds.includes(clubId)) {
+      return;
+    }
+    if (clubIds.length >= MAX_BAG_CLUBS) {
+      throw new Error(`ゴルフバッグに入れられるクラブは${MAX_BAG_CLUBS}本までです`);
+    }
+
+    await db.golfBags.update(bagId, createUpdatedBagRecord({ clubIds: [...clubIds, clubId] }));
+  }
+
+  static async removeClubFromBag(bagId: number, clubId: number): Promise<void> {
+    const bag = await db.golfBags.get(bagId);
+    if (!bag) {
+      throw new Error('対象のゴルフバッグが見つかりません');
+    }
+
+    await db.golfBags.update(bagId, createUpdatedBagRecord({
+      clubIds: (bag.clubIds ?? []).filter((entry) => entry !== clubId),
+    }));
+  }
+
+  static async setBagClubIds(bagId: number, clubIds: number[]): Promise<void> {
+    const bag = await db.golfBags.get(bagId);
+    if (!bag) {
+      throw new Error('対象のゴルフバッグが見つかりません');
+    }
+
+    await db.golfBags.update(bagId, createUpdatedBagRecord({ clubIds }));
   }
 
   // ─── Personal Data (Miss Rate & Weakness Factor) ─────────────────────────────
@@ -119,9 +301,11 @@ export class ClubService {
   }
 
   static async setPlayerSkillLevel(level: number): Promise<void> {
+    const settings = await db.appSettings.get('app');
     await db.appSettings.put({
       id: 'app',
       playerSkillLevel: Math.max(0, Math.min(1, Math.round(level * 100) / 100)),
+      activeBagId: settings?.activeBagId,
     });
   }
 }

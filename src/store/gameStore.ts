@@ -14,10 +14,11 @@ import type {
 } from "../types/game";
 import { simulateShot } from "../utils/shotSimulation";
 import { buildClubUsageStats } from "../utils/roundAnalysis";
-import { useClubStore } from "./clubStore";
 import { formatSimClubDisplayName } from "../utils/simClubLabel";
-import { resolvePersonalDataForSimClub } from "../utils/personalData";
 import { ClubService } from "../db/clubService";
+import { useClubStore } from "./clubStore";
+import { resolvePersonalDataForSimClub } from "../utils/personalData";
+import { useUserProfileStore } from "./userProfileStore";
 
 // ─── Wind generation ──────────────────────────────────────────────────────────
 
@@ -56,10 +57,11 @@ interface GameStoreState {
   confidenceBoost: number;
   /** DBから取得したプレイヤースキルレベル (0-1)。パット確率に使用。 */
   playerSkillLevel: number;
+  playMode: "robot" | "bag";
 }
 
 interface GameStoreActions {
-  startRound: (course: Hole[], bag: SimClub[]) => void;
+  startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag") => void;
   selectClub: (clubId: string) => void;
   setShotPowerPercent: (powerPercent: number) => void;
   setRiskLevel: (risk: RiskLevel) => void;
@@ -96,6 +98,7 @@ const INITIAL_STATE: GameStoreState = {
   goodShotStreak: 0,
   confidenceBoost: 0,
   playerSkillLevel: 0.5,
+  playMode: "bag",
 };
 
 function buildInitialContext(hole: Hole): ShotContext {
@@ -169,12 +172,13 @@ function buildHoleSummary(hole: Hole, holeShots: ShotLog[], roundShots: ShotLog[
 export const useGameStore = create<GameStore>((set, get) => ({
   ...INITIAL_STATE,
 
-  startRound: (course, bag) => {
+  startRound: (course, bag, playMode = "bag") => {
     set({
       ...INITIAL_STATE,
       phase: "playing",
       course,
       bag,
+      playMode,
       currentHoleIndex: 0,
       shotContext: buildInitialContext(course[0]),
     });
@@ -209,21 +213,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
       confidenceBoost,
       holeSummaries,
       playerSkillLevel,
+      playMode,
     } = get();
 
     if (!selectedClubId) return;
     const club = bag.find((c) => c.id === selectedClubId);
     if (!club) return;
 
-    const clubForRobot = { ...club, successRate: 100, isWeakClub: false };
-    // パターはDBのスキルレベルを反映、非パターはロボット設定（forceEffectiveSuccessRate:100）を維持
+    const isRobotMode = playMode === "robot";
+    const profile = useUserProfileStore.getState().profile;
+    const clubPersonalData = resolvePersonalDataForSimClub(club, useClubStore.getState().personalData);
+    const clubForSimulation = isRobotMode
+      ? { ...club, successRate: 100, isWeakClub: false }
+      : club;
+
+    // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
     const isPutter = club.type === "Putter";
-    const result = simulateShot(clubForRobot, shotContext, riskLevel, {
+    const result = simulateShot(clubForSimulation, shotContext, riskLevel, {
       confidenceBoost,
-      personalData: undefined,
-      playerSkillLevel: isPutter ? playerSkillLevel : 1,
-      forceEffectiveSuccessRate: isPutter ? undefined : 100,
+      personalData: isRobotMode ? undefined : clubPersonalData,
+      playerSkillLevel: isRobotMode
+        ? (isPutter ? playerSkillLevel : 1)
+        : playerSkillLevel,
+      forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
       shotPowerPercent,
+      headSpeed: isRobotMode ? undefined : profile.headSpeed ?? undefined,
+      skillWeights: profile.skillWeights,
     });
     const newHoleStrokes = holeStrokes + result.strokesAdded;
     const confidenceBoostApplied = result.confidenceBoostApplied === true;
