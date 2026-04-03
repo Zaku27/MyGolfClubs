@@ -108,6 +108,15 @@ export const getClubCategoryByType = (clubType: string): ClubCategory => {
 export const getClubCategory = (club: GolfClub): ClubCategory =>
   getClubCategoryByType(club.clubType ?? '');
 
+const LOW_LOFT_PENALTY_LIMIT = 18;
+const LOW_LOFT_PENALTY_REFERENCE = 10.5;
+const LOW_LOFT_MAX_PENALTY = 20;
+const LOW_LOFT_SPEED_RELIEF = 0.14;
+const DRIVER_BOOST_RAMP_START = 43;
+const DRIVER_BOOST_RAMP_END = 45;
+const DRIVER_BOOST_AT_45 = 10.5;
+const DRIVER_BOOST_ABOVE_45_PER_SPEED = 4.9;
+
 export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   // 44.5m/sで調整した値を基準に、他ヘッドスピードでも自然に追従させる
   const loftAngle = club.loftAngle ?? 0;
@@ -120,6 +129,33 @@ export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
     model.base +
     (headSpeed - 44.5) * model.speedCoeff +
     (loftAngle - model.standardLoft) * model.loftCoeff;
+
+  // ドライバー限定ではなく、低ロフト帯全体へ緩やかに効く補正
+  const effectiveLoft = loftAngle > 0 ? loftAngle : model.standardLoft;
+  if (category !== 'putter' && effectiveLoft < LOW_LOFT_PENALTY_LIMIT) {
+    const loftRatio = clamp(
+      (LOW_LOFT_PENALTY_LIMIT - effectiveLoft) /
+        (LOW_LOFT_PENALTY_LIMIT - LOW_LOFT_PENALTY_REFERENCE),
+      0,
+      1,
+    );
+    const loftPenalty = LOW_LOFT_MAX_PENALTY * loftRatio * loftRatio;
+    const speedRelief = Math.max(0, headSpeed - 30) * LOW_LOFT_SPEED_RELIEF * loftRatio * loftRatio;
+    estimated -= loftPenalty;
+    estimated += speedRelief;
+  }
+
+  if (category === 'driver' && headSpeed > DRIVER_BOOST_RAMP_START) {
+    const rampRange = DRIVER_BOOST_RAMP_END - DRIVER_BOOST_RAMP_START;
+    const rampRatio = clamp((headSpeed - DRIVER_BOOST_RAMP_START) / rampRange, 0, 1);
+    const rampBoost = DRIVER_BOOST_AT_45 * rampRatio * rampRatio;
+    const highSpeedBoost =
+      headSpeed > DRIVER_BOOST_RAMP_END
+        ? (headSpeed - DRIVER_BOOST_RAMP_END) * DRIVER_BOOST_ABOVE_45_PER_SPEED
+        : 0;
+    estimated += rampBoost + highSpeedBoost;
+  }
+
   estimated = Math.max(model.min, Math.min(model.max, estimated));
   return Math.round(estimated);
 };
