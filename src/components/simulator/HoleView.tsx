@@ -45,7 +45,7 @@ function estimateBaseDistanceWithMode(
   if (seatType === "robot") {
     return estimateBaseDistance(club, robotHeadSpeed, undefined, true);
   }
-  return estimateBaseDistance(club, personalHeadSpeed ?? undefined, undefined, true);
+  return Math.max(1, Math.round(club.avgDistance));
 }
 
 

@@ -80,7 +80,7 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
           personalData: isRobot ? undefined : resolvePersonalDataForSimClub(club, personalData),
           playerSkillLevel: isRobot ? 1 : playerSkillLevel,
           headSpeed: isRobot ? robotHeadSpeed : personalHeadSpeed ?? undefined,
-          useTheoretical: true,
+          useTheoretical: isRobot,
         }
       )
     );

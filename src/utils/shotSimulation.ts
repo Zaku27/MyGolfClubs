@@ -35,6 +35,8 @@ interface SimulationOptions {
   useTheoretical?: boolean;
   shotIndex?: number;
   seedNonce?: string;
+  useStoredDistance?: boolean;
+  aimXOffset?: number;
 }
 
 const WEAK_CLUB_EFFECT_SCALE = 0.5;
@@ -557,12 +559,13 @@ export function simulateShot(
       mishitRate: 1 - effectiveSkill,
       sideSpinDispersion: 1 - effectiveSkill,
     },
-    aimXOffset: 0,
+    aimXOffset: options.aimXOffset ?? 0,
     conditions: {
       wind: mapWindToLanding(wind, windStrength, windDirectionDegrees),
       groundHardness: mapGroundHardnessByLie(lie),
       headSpeed: options.headSpeed,
       seed: landingSeed,
+      baseDistanceOverride: options.useStoredDistance && club.avgDistance > 0 ? club.avgDistance : undefined,
     },
   });
 

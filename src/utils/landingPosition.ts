@@ -24,6 +24,7 @@ export type ShotInput = {
     groundHardness: number;
     headSpeed?: number;
     seed?: string;
+  baseDistanceOverride?: number;
   };
 };
 
@@ -472,8 +473,10 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
   const wind = input.conditions?.wind ?? 0;
   const groundHardness = input.conditions?.groundHardness ?? 50;
 
-  // 共通インターフェース経由でクラブごとの基準値を作る。
-  const estimatedTotalDistance = estimateTheoreticalDistance(input.club, headSpeed);
+  // baseDistanceOverrideが指定されていればそれを実測ベースとして使う。
+  const estimatedTotalDistance = (input.conditions?.baseDistanceOverride ?? 0) > 0
+    ? input.conditions!.baseDistanceOverride!
+    : estimateTheoreticalDistance(input.club, headSpeed);
   const expectedCarry = estimateCarryFromTotalDistance(estimatedTotalDistance, input.club, groundHardness);
 
   // スキルレベルに応じた分散パラメータを作る。

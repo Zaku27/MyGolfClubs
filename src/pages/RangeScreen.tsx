@@ -44,7 +44,6 @@ import {
 } from '../types/lieStandards';
 import { readStoredJson, readStoredNumber } from '../utils/storage';
 import { resolvePersonalDataForSimClub } from '../utils/personalData';
-import { rangeAutoCalibrate } from '../utils/rangeUtils';
 import { toSimClub } from '../utils/clubSimAdapter';
 import {
   loadRangePlayerSettings,
@@ -74,6 +73,11 @@ const LIE_OPTIONS = [
   'グリーン',
 ];
 const SHOT_COUNTS = [5, 10, 20];
+
+function clampAimXOffset(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-50, Math.min(50, Math.round(value)));
+}
 
 const RANGE_CONDITION_SETTINGS_KEY = 'rangeConditionSettings';
 const SWING_TARGET_STORAGE_KEY = 'golfbag-swing-weight-target';
@@ -303,9 +307,10 @@ export default function RangeScreen() {
   // 風ダイアルは通常閉じ、必要な時だけ開いて調整できるようにする。
   const [isWindControlOpen, setIsWindControlOpen] = useState<boolean>(false);
   const [numShots, setNumShots] = useState<number>(10);
+  const [aimXOffset, setAimXOffset] = useState<number>(0);
   const [results, setResults] = useState<ShotResult[]>([]);
   const [summary, setSummary] = useState<RangeSummary | null>(null);
-  const [calibrated, setCalibrated] = useState(false);
+  const [, setCalibrated] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [reuseLastSeed, setReuseLastSeed] = useState(false);
   const [lastSimulationSeedNonce, setLastSimulationSeedNonce] = useState<string | null>(null);
@@ -313,6 +318,7 @@ export default function RangeScreen() {
   const robotHintRef = useRef<HTMLDivElement | null>(null);
   const monteCarloResult = buildMonteCarloResult(results);
   const chartTarget = { x: 0, y: summary?.estimatedDist ?? 0 };
+  const chartAim = { x: aimXOffset, y: summary?.estimatedDist ?? 0 };
   const skillLevelName =
     seatType === 'robot' ? `Robot Skill ${(robotSkillLevel * 100).toFixed(0)}%` : 'Personal Skill';
   const personalHeadSpeed = profile.headSpeed;
@@ -541,6 +547,7 @@ export default function RangeScreen() {
           personalData: undefined, // 個人データは使わない
           playerSkillLevel: robotSkillLevel,
           headSpeed: robotHeadSpeed,
+          aimXOffset,
           shotIndex: i,
           seedNonce: simulationSeedNonce,
         };
@@ -563,6 +570,8 @@ export default function RangeScreen() {
           personalData: clubPersonal ?? undefined,
           playerSkillLevel: personalSkillLevel,
           headSpeed: personalHeadSpeed ?? undefined,
+          useStoredDistance: true,
+          aimXOffset,
           shotIndex: i,
           seedNonce: simulationSeedNonce,
         };
@@ -581,7 +590,10 @@ export default function RangeScreen() {
     const success = shotResults.filter((r) => r.wasSuccessful).length / numShots;
 
     // 目安値との差分を計算
-    const estimatedDist = estimatedClubDistance;
+    // プレイヤーがpersonalの場合は実測飛距離を目安値とする
+    const estimatedDist = seatType === 'personal'
+      ? (selectedClub?.distance ?? 0)
+      : estimatedClubDistance;
     const diff = Math.round(avg - estimatedDist);
     const avgToTargetDistance =
       shotResults.reduce((sum, result) => {
@@ -597,15 +609,6 @@ export default function RangeScreen() {
     setIsSimulating(false);
   };
 
-  const handleCalibrate = () => {
-    if (!simClub || !selectedClub || !results.length || !clubPersonal) return;
-    const calibrationResults = results.map((result) => ({
-      outcome: result.penalty ? 'Penalty' : result.wasSuccessful ? 'Success' : 'Miss',
-      distance: result.distanceHit,
-    }));
-    rangeAutoCalibrate(selectedClub, clubPersonal, calibrationResults);
-    setCalibrated(true);
-  };
 
   // ...existing code...
 
@@ -682,10 +685,6 @@ export default function RangeScreen() {
             <div className="rounded border border-green-200 bg-white/80 px-3 py-2">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span>
-                  <span className="font-semibold">適用ヘッドスピード:</span>{' '}
-                  {personalHeadSpeed != null ? `${personalHeadSpeed.toFixed(1)} m/s` : '未設定（クラブ基準）'}
-                </span>
-                <span>
                   <span className="font-semibold">適用スキルレベル:</span>{' '}
                   {(personalSkillLevel * 100).toFixed(0)}% ({personalSkillLevelLabel})
                 </span>
@@ -739,7 +738,9 @@ export default function RangeScreen() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
                 <span className="font-bold">{selectedClub.name}</span>
                 <span>
-                  推定飛距離: {simClub ? estimatedClubDistance : '-'} y
+                  {seatType === 'personal'
+                    ? `実測飛距離: ${selectedClub?.distance ?? '-'} y`
+                    : `推定飛距離: ${simClub ? estimatedClubDistance : '-'} y`}
                 </span>
                 <div ref={robotHintRef} className="relative">
                   <span className="inline-flex items-center gap-2">
@@ -901,6 +902,35 @@ export default function RangeScreen() {
         {isSimulating ? 'シミュレーション中...' : `ショット実行（${numShots}回）`}
       </button>
 
+      <div className="w-full max-w-xl rounded border border-green-200 bg-white p-4 mb-4">
+        <label htmlFor="aim-x-offset" className="block font-semibold mb-1">狙い（左右）</label>
+        <p className="text-xs text-gray-600 mb-2">
+          目標は常に中央(0y)。狙いは左右 X 軸で -50〜50y を指定できます。
+        </p>
+        <div className="flex items-center gap-3">
+          <input
+            id="aim-x-offset"
+            type="range"
+            min={-50}
+            max={50}
+            step={1}
+            value={aimXOffset}
+            onChange={(e) => setAimXOffset(clampAimXOffset(Number(e.target.value)))}
+            className="w-full accent-green-700"
+          />
+          <input
+            type="number"
+            min={-50}
+            max={50}
+            step={1}
+            value={aimXOffset}
+            onChange={(e) => setAimXOffset(clampAimXOffset(Number(e.target.value)))}
+            className="w-20 border rounded p-1 text-right"
+          />
+          <span className="text-sm font-semibold text-green-900">y</span>
+        </div>
+      </div>
+
       {/* Results Section */}
       {results.length > 0 && summary && (
         <div className="w-full max-w-xl bg-white rounded shadow p-4 mb-4">
@@ -914,6 +944,7 @@ export default function RangeScreen() {
             <ShotDispersionChart
               monteCarloResult={monteCarloResult}
               target={chartTarget}
+              aim={chartAim}
               clubName={selectedClub?.name ?? 'Club'}
               skillLevelName={skillLevelName}
               numShots={numShots}

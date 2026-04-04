@@ -23,6 +23,7 @@ ChartJS.register(LinearScale, PointElement, LineElement, ScatterController, Titl
 type ShotDispersionChartProps = {
   monteCarloResult: MonteCarloResult;
   target: { x: number; y: number };
+  aim?: { x: number; y: number };
   clubName: string;
   skillLevelName: string;
   numShots: number;
@@ -78,6 +79,7 @@ function getRawPoint(context: TooltipItem<'scatter'>): DispersionPoint {
 export function ShotDispersionChart({
   monteCarloResult,
   target,
+  aim,
   clubName,
   skillLevelName,
   numShots,
@@ -124,11 +126,11 @@ export function ShotDispersionChart({
     const xValues = shotPoints
       .map((p) => Number(p.x))
       .filter((v) => Number.isFinite(v))
-      .concat(target.x, Number(meanPoint.x), confidenceEllipse.x - ellipseHalfWidth, confidenceEllipse.x + ellipseHalfWidth);
+      .concat(target.x, aim?.x ?? target.x, Number(meanPoint.x), confidenceEllipse.x - ellipseHalfWidth, confidenceEllipse.x + ellipseHalfWidth);
     const yValues = shotPoints
       .map((p) => Number(p.y))
       .filter((v) => Number.isFinite(v))
-      .concat(target.y, Number(meanPoint.y), confidenceEllipse.y - ellipseHalfHeight, confidenceEllipse.y + ellipseHalfHeight);
+      .concat(target.y, aim?.y ?? target.y, Number(meanPoint.y), confidenceEllipse.y - ellipseHalfHeight, confidenceEllipse.y + ellipseHalfHeight);
 
     const yRange = calculateAxisRange(yValues, -20, 240);
 
@@ -146,7 +148,7 @@ export function ShotDispersionChart({
         max: Math.max(yRange.min + 1, Math.ceil(cappedYMax)),
       },
     };
-  }, [confidenceEllipse.height, confidenceEllipse.width, confidenceEllipse.x, confidenceEllipse.y, meanPoint.x, meanPoint.y, shotPoints, target.x, target.y]);
+  }, [aim?.x, aim?.y, confidenceEllipse.height, confidenceEllipse.width, confidenceEllipse.x, confidenceEllipse.y, meanPoint.x, meanPoint.y, shotPoints, target.x, target.y]);
 
   const confidenceEllipseAnnotation = useMemo(() => {
     // chartjs-plugin-annotation v3 では label.enabled ではなく label.display を使う。
@@ -241,6 +243,18 @@ export function ShotDispersionChart({
           pointStyle: 'crossRot',
           clip: false,
         },
+        {
+          label: '狙い位置',
+          data: [{ x: aim?.x ?? target.x, y: aim?.y ?? target.y }],
+          backgroundColor: '#0ea5e9',
+          pointBackgroundColor: '#0ea5e9',
+          pointBorderColor: '#075985',
+          pointBorderWidth: 1.5,
+          pointRadius: 7,
+          pointHoverRadius: 9,
+          pointStyle: 'triangle',
+          clip: false,
+        },
         ...(showMeanPoint
           ? [
               {
@@ -255,7 +269,7 @@ export function ShotDispersionChart({
           : []),
       ],
     }),
-    [meanPoint, shotPoints, showMeanPoint, target.x, target.y],
+    [aim?.x, aim?.y, meanPoint, shotPoints, showMeanPoint, target.x, target.y],
   );
 
   const options = useMemo<ChartOptions<'scatter'>>(
