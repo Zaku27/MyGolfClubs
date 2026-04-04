@@ -4,7 +4,6 @@ import { useGameStore } from "../../store/gameStore";
 import { useClubStore } from "../../store/clubStore";
 import { estimateShotDistance } from "../../utils/shotSimulation";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
-import { useUserProfileStore } from "../../store/userProfileStore";
 import { loadRangePlayerSettings } from "../../utils/rangePlayerSettings";
 import {
   buildAnalysisPenaltyByClubId,
@@ -46,7 +45,6 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
   const allClubs = useClubStore((state) => state.clubs);
   const personalData = useClubStore((state) => state.personalData);
   const playerSkillLevel = useClubStore((state) => state.playerSkillLevel);
-  const personalHeadSpeed = useUserProfileStore((state) => state.profile.headSpeed);
   const sorted = sortBag(bag);
   const { robotHeadSpeed } = loadRangePlayerSettings();
   const analysisPenaltyByClubId = useMemo(
@@ -79,7 +77,7 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
         {
           personalData: isRobot ? undefined : resolvePersonalDataForSimClub(club, personalData),
           playerSkillLevel: isRobot ? 1 : playerSkillLevel,
-          headSpeed: isRobot ? robotHeadSpeed : personalHeadSpeed ?? undefined,
+          headSpeed: isRobot ? robotHeadSpeed : undefined,
           useTheoretical: isRobot,
         }
       )

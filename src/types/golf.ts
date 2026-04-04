@@ -55,6 +55,5 @@ export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
  
 // ─── ユーザープロフィール情報 ──────────────────────────────
 export interface UserProfile {
-  headSpeed: number | null; // ユーザーのヘッドスピード（m/s、nullなら未設定）
   // 今後、年齢・性別・身長・体重なども追加可能
 }

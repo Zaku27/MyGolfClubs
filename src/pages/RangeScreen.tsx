@@ -20,13 +20,13 @@ import {
   useClubStore,
 } from '../store/clubStore';
 import { useBagIdUrlSync } from '../hooks/useBagIdUrlSync';
-import { useUserProfileStore } from '../store/userProfileStore';
 import { formatGolfClubDisplayName } from '../utils/simClubLabel';
 import {
   simulateShot,
   estimateBaseDistance,
   getLieDistanceMultiplierValue,
 } from '../utils/shotSimulation';
+import { getSkillLabel } from '../utils/playerSkill';
 import {
   calculateDisplayClubSuccessRate,
   getAnalysisAdjustedBaseSuccessRate,
@@ -289,7 +289,6 @@ export default function RangeScreen() {
   const loadPlayerSkillLevel = useClubStore((state) => state.loadPlayerSkillLevel);
   const storedPlayerSkillLevel = useClubStore((state) => state.playerSkillLevel);
   const setActiveBag = useClubStore((state) => state.setActiveBag);
-  const { profile } = useUserProfileStore();
   const initialRangePlayerSettings = loadRangePlayerSettings();
   const initialRangeConditionSettings = loadRangeConditionSettings();
   // const { playerSkillLevel } = useGameStore();
@@ -319,12 +318,12 @@ export default function RangeScreen() {
   const monteCarloResult = buildMonteCarloResult(results);
   const chartTarget = { x: 0, y: summary?.estimatedDist ?? 0 };
   const chartAim = { x: aimXOffset, y: summary?.estimatedDist ?? 0 };
-  const skillLevelName =
-    seatType === 'robot' ? `Robot Skill ${(robotSkillLevel * 100).toFixed(0)}%` : 'Personal Skill';
-  const personalHeadSpeed = profile.headSpeed;
   const personalSkillLevel = storedPlayerSkillLevel;
-  const personalSkillLevelLabel =
-    personalSkillLevel < 0.35 ? '初心者' : personalSkillLevel < 0.7 ? '中級者' : '上級者';
+  const personalSkillLevelLabel = getSkillLabel(personalSkillLevel);
+  const skillLevelName =
+    seatType === 'robot'
+      ? `Robot Skill ${(robotSkillLevel * 100).toFixed(0)}%`
+      : `適用スキルレベル ${(personalSkillLevel * 100).toFixed(0)}% (${personalSkillLevelLabel})`;
   const clubs = seatType === 'personal' ? activeBagClubs : allClubs;
   const selectableClubs = getSelectableRangeClubs(clubs, seatType);
   const swingWeightTarget = readStoredNumber(
@@ -439,7 +438,7 @@ export default function RangeScreen() {
   const estimatedClubDistance = simClub
     ? estimateBaseDistance(
         simClub,
-        seatType === 'robot' ? robotHeadSpeed : personalHeadSpeed ?? undefined,
+        seatType === 'robot' ? robotHeadSpeed : undefined,
         undefined,
         true,
       )
@@ -569,7 +568,6 @@ export default function RangeScreen() {
         options = {
           personalData: clubPersonal ?? undefined,
           playerSkillLevel: personalSkillLevel,
-          headSpeed: personalHeadSpeed ?? undefined,
           useStoredDistance: true,
           aimXOffset,
           shotIndex: i,
@@ -680,7 +678,7 @@ export default function RangeScreen() {
         {seatType === 'personal' && (
           <div className="flex flex-col gap-2 mt-2 bg-green-50 rounded p-3 border border-green-200 text-sm text-green-900">
             <span className="text-xs text-green-700">
-              ユーザーの値は個人データ入力画面で保存された設定を使用します。
+              レンジでは個人データ入力画面で保存したスキルレベルが適用されます。
             </span>
             <div className="rounded border border-green-200 bg-white/80 px-3 py-2">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

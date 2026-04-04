@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useUserProfileStore } from "../../store/userProfileStore";
 import { Link } from "react-router-dom";
 import type { ClubPersonalData } from "../../types/golf";
 import { GolfBagPanel } from "../GolfBagPanel";
@@ -28,6 +27,7 @@ import {
   type UserLieAngleStandards,
 } from "../../types/lieStandards";
 import { readStoredJson, readStoredNumber } from "../../utils/storage";
+import { SKILL_PRESETS, getSkillLabel } from "../../utils/playerSkill";
 
 type DraftRow = {
   weaknessFactor: number;
@@ -37,14 +37,6 @@ type AnalysisPenalty = {
   points: number;
   reasons: string[];
 };
-
-const SKILL_PRESETS = [
-  { label: "初心者", value: 0.1, score: "120以上" },
-  { label: "初級者", value: 0.2, score: "110～119" },
-  { label: "中級者", value: 0.5, score: "90～109" },
-  { label: "上級者", value: 0.8, score: "80～89" },
-  { label: "超上級者", value: 1.0, score: "79以下" },
-] as const;
 
 const SWING_TARGET_STORAGE_KEY = "golfbag-swing-weight-target";
 const SWING_GOOD_TOLERANCE_STORAGE_KEY = "golfbag-swing-good-tolerance";
@@ -69,14 +61,6 @@ const toSkillLevel = (value: number): number => {
   return Math.round(clamp(value, 0, 1) * 100) / 100;
 };
 
-const getSkillLabel = (level: number): string => {
-  if (level < 0.15) return "初心者";
-  if (level < 0.35) return "初級者";
-  if (level < 0.65) return "中級者";
-  if (level < 0.9) return "上級者";
-  return "超上級者";
-};
-
 const parseUserLieAngleStandards = (value: unknown): UserLieAngleStandards => {
   if (!value || typeof value !== "object") {
     return DEFAULT_USER_LIE_ANGLE_STANDARDS;
@@ -90,9 +74,6 @@ const parseUserLieAngleStandards = (value: unknown): UserLieAngleStandards => {
 };
 
 export function PersonalDataInput() {
-  // ユーザープロフィールストア
-  const headSpeed = useUserProfileStore((state) => state.profile.headSpeed);
-  const setHeadSpeed = useUserProfileStore((state) => state.setHeadSpeed);
   const clubs = useClubStore(selectSortedActiveBagClubs);
   const activeBag = useClubStore(selectActiveGolfBag);
   const bags = useClubStore((state) => state.bags);
@@ -418,30 +399,6 @@ export function PersonalDataInput() {
           </div>
         )}
 
-        {/* ユーザーのヘッドスピード入力欄 */}
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
-          <h2 className="text-base font-semibold text-emerald-900 mb-2">ユーザーのヘッドスピード</h2>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <span>ヘッドスピード</span>
-              <input
-                type="number"
-                min={20}
-                max={60}
-                step={0.1}
-                value={headSpeed ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value === "" ? null : Number(e.target.value);
-                  setHeadSpeed(v);
-                }}
-                className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-slate-900 focus:border-emerald-500 focus:outline-none"
-                placeholder="例: 40.5"
-              />
-              <span>m/s</span>
-            </label>
-            <span className="text-xs text-slate-500 ml-2">※ あなた自身のヘッドスピード（ドライバー基準）を入力してください</span>
-          </div>
-        </section>
 
         <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

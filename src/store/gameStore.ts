@@ -18,7 +18,6 @@ import { formatSimClubDisplayName } from "../utils/simClubLabel";
 import { ClubService } from "../db/clubService";
 import { useClubStore } from "./clubStore";
 import { resolvePersonalDataForSimClub } from "../utils/personalData";
-import { useUserProfileStore } from "./userProfileStore";
 import {
   buildAnalysisPenaltyByClubId,
   getAnalysisAdjustedBaseSuccessRate,
@@ -226,7 +225,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!club) return;
 
     const isRobotMode = playMode === "robot";
-    const profile = useUserProfileStore.getState().profile;
     const allClubs = useClubStore.getState().clubs;
     const analysisPenaltyByClubId = buildAnalysisPenaltyByClubId(allClubs);
     const analysisPenaltyPoints = analysisPenaltyByClubId[club.id] ?? 0;
@@ -254,7 +252,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         : playerSkillLevel,
       forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
       shotPowerPercent,
-      headSpeed: isRobotMode ? undefined : profile.headSpeed ?? undefined,
       useStoredDistance: !isRobotMode,
     });
     const newHoleStrokes = holeStrokes + result.strokesAdded;
