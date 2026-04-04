@@ -10,9 +10,9 @@ function getDefaultSuccessRate(club: GolfClub): number {
     case "Hybrid":
       return 75;
     case "Iron":
-      return 80;
+      return 78;
     case "Wedge":
-      return 85;
+      return 80;
     case "Putter":
       return 100;
     default:
@@ -44,6 +44,7 @@ export function toSimClub(club: GolfClub): SimClub {
                 ? 46
                 : 3;
 
+  // isWeakClubは成功率65%未満のみ
   return {
     id: String(club.id ?? `${club.clubType}-${club.number}`),
     name: club.name,

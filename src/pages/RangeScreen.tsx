@@ -979,23 +979,7 @@ export default function RangeScreen() {
         </div>
       )}
 
-      {/* オートキャリブレーション（個人データ更新） */}
-      {results.length > 0 && (
-        <div className="w-full max-w-xl flex flex-col items-center mb-4">
-          <button
-            className={`px-4 py-2 rounded font-semibold shadow ${calibrated ? 'bg-green-100 text-green-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
-            disabled={calibrated}
-            onClick={handleCalibrate}
-          >
-            このセッションで個人データを更新
-          </button>
-          {calibrated && (
-            <span className="mt-2 text-green-800 font-semibold text-sm text-center">
-              個人データを更新しました。{selectedClub?.name}の弱点係数を反映しました。
-            </span>
-          )}
-        </div>
-      )}
+      {/* オートキャリブレーション（個人データ更新）削除済み */}
     </div>
   );
 }

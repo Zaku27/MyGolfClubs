@@ -406,14 +406,16 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           </div>
           <div className="form-group">
             <label htmlFor="weight">重さ(グラム)</label>
-            <input
-              type="number"
-              id="weight"
-              name="weight"
-              value={formData.weight || ''}
-              onChange={handleChange}
-              step="1"
-            />
+              <input
+                type="number"
+                id="weight"
+                name="weight"
+                value={formData.weight || ''}
+                onChange={handleChange}
+                step="0.1"
+                min="0"
+                max="999"
+              />
           </div>
         </div>
 

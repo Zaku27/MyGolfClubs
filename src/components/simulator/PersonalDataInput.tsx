@@ -12,6 +12,7 @@ import { useBagIdUrlSync } from "../../hooks/useBagIdUrlSync";
 import { toSimClub } from "../../utils/clubSimAdapter";
 import { calculateBaseClubSuccessRate } from "../../utils/calculateSuccessRate";
 import {
+  ANALYSIS_PENALTY_MULTIPLIER,
   getAnalysisAdjustedBaseSuccessRate,
   isWeakClubByAnalysisAdjustedRate,
 } from "../../utils/clubSuccessDisplay";
@@ -38,9 +39,11 @@ type AnalysisPenalty = {
 };
 
 const SKILL_PRESETS = [
-  { label: "初心者", value: 0.2 },
-  { label: "中級者", value: 0.5 },
-  { label: "上級者", value: 0.85 },
+  { label: "初心者", value: 0.1, score: "120以上" },
+  { label: "初級者", value: 0.2, score: "110～119" },
+  { label: "中級者", value: 0.5, score: "90～109" },
+  { label: "上級者", value: 0.8, score: "80～89" },
+  { label: "超上級者", value: 1.0, score: "79以下" },
 ] as const;
 
 const SWING_TARGET_STORAGE_KEY = "golfbag-swing-weight-target";
@@ -67,9 +70,11 @@ const toSkillLevel = (value: number): number => {
 };
 
 const getSkillLabel = (level: number): string => {
-  if (level < 0.35) return "初心者";
-  if (level < 0.7) return "中級者";
-  return "上級者";
+  if (level < 0.15) return "初心者";
+  if (level < 0.35) return "初級者";
+  if (level < 0.65) return "中級者";
+  if (level < 0.9) return "上級者";
+  return "超上級者";
 };
 
 const parseUserLieAngleStandards = (value: unknown): UserLieAngleStandards => {
@@ -125,6 +130,8 @@ export function PersonalDataInput() {
   );
 
   const [draftByClubId, setDraftByClubId] = useState<Record<string, DraftRow>>({});
+  // 分析減点の寄与割合（重み）: 全クラブ共通
+  const [analysisPenaltyWeight, setAnalysisPenaltyWeight] = useState(1.0);
   const [saveMessage, setSaveMessage] = useState<string>("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
@@ -233,8 +240,9 @@ export function PersonalDataInput() {
       const draft = draftByClubId[simClub.id] ?? { weaknessFactor: 0 };
       const analysisPenalty = analysisPenaltyByClubId[simClub.id]?.points ?? 0;
       const analysisPenaltyReasons = analysisPenaltyByClubId[simClub.id]?.reasons ?? [];
-      const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(simClub, analysisPenalty);
-      const treatedAsWeakClub = isWeakClubByAnalysisAdjustedRate(simClub, analysisPenalty);
+      // 全クラブ共通の寄与割合を反映
+      const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(simClub, analysisPenalty * analysisPenaltyWeight);
+      const treatedAsWeakClub = isWeakClubByAnalysisAdjustedRate(simClub, analysisPenalty * analysisPenaltyWeight);
       const effectiveSuccessRate = calculateBaseClubSuccessRate({
         baseSuccessRate: adjustedBaseSuccessRate,
         personalData: {
@@ -253,11 +261,12 @@ export function PersonalDataInput() {
         adjustedBaseSuccessRate,
         analysisPenalty,
         analysisPenaltyReasons,
+        penaltyWeight: analysisPenaltyWeight,
         weaknessFactor: draft.weaknessFactor,
         effectiveSuccessRate,
       };
     });
-  }, [clubs, draftByClubId, playerSkillLevel, analysisPenaltyByClubId]);
+  }, [clubs, draftByClubId, playerSkillLevel, analysisPenaltyByClubId, analysisPenaltyWeight]);
 
   const analysisAdjustedRows = useMemo(() => {
     return rows.filter((row) => row.analysisPenalty > 0);
@@ -293,6 +302,7 @@ export function PersonalDataInput() {
       const payload: ClubPersonalData = {
         clubId: row.clubId,
         weaknessFactor: row.weaknessFactor,
+        // penaltyWeightは現状保存しないが、必要ならここで拡張可
       };
       await setPersonalData(payload);
     }
@@ -365,61 +375,48 @@ export function PersonalDataInput() {
 
         {analysisAdjustedRows.length > 0 && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
-            <p className="font-semibold">分析結果により基本成功率を下げたクラブがあります。</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <p className="font-semibold mb-1 sm:mb-0">分析結果により基本成功率を下げたクラブがあります。</p>
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-slate-700">寄与割合</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={0.01}
+                  value={analysisPenaltyWeight}
+                  onChange={e => setAnalysisPenaltyWeight(Number(e.target.value))}
+                  className="w-32 accent-amber-700"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.01}
+                  value={analysisPenaltyWeight}
+                  onChange={e => setAnalysisPenaltyWeight(Number(e.target.value))}
+                  className="w-16 border border-slate-300 rounded px-1 py-0.5 text-xs text-right"
+                  style={{ fontSize: '0.85em' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setAnalysisPenaltyWeight(1.0)}
+                  className="ml-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  リセット
+                </button>
+              </span>
+            </div>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               {analysisAdjustedRows.map((row) => (
-                <li key={`analysis-${row.clubId}`}>
-                  {row.clubLabel}: -{row.analysisPenalty}%（{row.analysisPenaltyReasons.join(" / ")}）
+                <li key={`analysis-${row.clubId}`} className="flex items-center gap-2">
+                  <span>{row.clubLabel}: -{(row.analysisPenalty * row.penaltyWeight * ANALYSIS_PENALTY_MULTIPLIER).toFixed(1)}%（{row.analysisPenaltyReasons.join(" / ")}）</span>
                 </li>
               ))}
             </ul>
           </div>
         )}
-
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-emerald-900">プレイヤースキルレベル設定</h2>
-              <p className="text-sm text-emerald-800">
-                現在: {getSkillLabel(playerSkillLevel)} ({playerSkillLevel.toFixed(2)})
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {SKILL_PRESETS.map((preset) => {
-                const isActive = Math.abs(playerSkillLevel - preset.value) < 0.01;
-                return (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => void handleSkillLevelChange(preset.value)}
-                    className={[
-                      "rounded-md border px-3 py-1.5 text-sm font-medium transition",
-                      isActive
-                        ? "border-emerald-700 bg-emerald-700 text-white"
-                        : "border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-100",
-                    ].join(" ")}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-4 flex items-center gap-3">
-            <span className="w-10 text-xs text-slate-600">0.00</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={playerSkillLevel}
-              onChange={(event) => void handleSkillLevelChange(Number(event.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-emerald-200 accent-emerald-600"
-            />
-            <span className="w-10 text-right text-xs text-slate-600">1.00</span>
-          </div>
-        </section>
 
         {/* ユーザーのヘッドスピード入力欄 */}
         <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
@@ -446,6 +443,54 @@ export function PersonalDataInput() {
           </div>
         </section>
 
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-emerald-900">プレイヤースキルレベル設定</h2>
+              <p className="text-sm text-emerald-800">
+                現在: {getSkillLabel(playerSkillLevel)} ({playerSkillLevel.toFixed(2)})
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {SKILL_PRESETS.map((preset) => {
+                const isActive = Math.abs(playerSkillLevel - preset.value) < 0.01;
+                return (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => void handleSkillLevelChange(preset.value)}
+                    className={[
+                      "rounded-md border px-3 py-1.5 text-sm font-medium transition",
+                      isActive
+                        ? "border-emerald-700 bg-emerald-700 text-white"
+                        : "border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-100",
+                    ].join(" ")}
+                    title={`スコア目安: ${preset.score}`}
+                  >
+                    {preset.label}
+                    <span className="ml-1 text-xs text-emerald-900">({preset.score})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3">
+            <span className="w-10 text-xs text-slate-600">0.00</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={playerSkillLevel}
+              onChange={(event) => void handleSkillLevelChange(Number(event.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-emerald-200 accent-emerald-600"
+            />
+            <span className="w-10 text-right text-xs text-slate-600">1.00</span>
+          </div>
+
+        </section>
+
         <div className="overflow-hidden rounded-xl border border-slate-200">
           <div className="overflow-x-auto">
             <table className="min-w-[760px] w-full border-collapse text-sm">
@@ -466,7 +511,7 @@ export function PersonalDataInput() {
                       </button>
                       {showWeakClubHint && (
                         <div className="absolute left-0 top-full z-20 mt-2 w-[24rem] max-w-[85vw] rounded-md border border-amber-300 bg-white p-3 text-left text-xs leading-relaxed text-amber-900 shadow-lg">
-                          弱クラブ扱いは「クラブが弱点指定」または「基本成功率が 65% 未満」の場合に適用されます。
+                          弱クラブ扱いは「基本成功率が 65% 未満」の場合に適用されます。
                         </div>
                       )}
                     </span>
@@ -508,10 +553,10 @@ export function PersonalDataInput() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-slate-800">
-                      {row.adjustedBaseSuccessRate}%
+                      {row.adjustedBaseSuccessRate.toFixed(1)}%
                       {row.analysisPenalty > 0 && (
                         <span className="ml-1 text-xs font-normal text-amber-700">
-                          (元 {row.baseSuccessRate}% / -{row.analysisPenalty}%)
+                          (元 {row.baseSuccessRate.toFixed(1)}% / -{(row.analysisPenalty * row.penaltyWeight * ANALYSIS_PENALTY_MULTIPLIER).toFixed(1)}%)
                         </span>
                       )}
                     </td>
