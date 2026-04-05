@@ -60,3 +60,17 @@ export const WeightLegend = () => (
     <span><i className="legend-expected-band" />期待帯 ±12g</span>
   </div>
 );
+
+export const LieLengthLegend = ({ tolerance }: { tolerance: number }) => (
+  <div className="analysis-legend">
+    <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
+    <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
+    <span><i style={{ backgroundColor: '#00acc1' }} />ハイブリッド</span>
+    <span><i style={{ backgroundColor: '#0b8f5b' }} />アイアン</span>
+    <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
+    <span><i className="legend-upright-outlier" />アップライト寄り</span>
+    <span><i className="legend-flat-outlier" />フラット寄り</span>
+    <span><i className="legend-trend-line" />回帰トレンド線</span>
+    <span><i className="legend-lie-trend-band" />期待帯 ±{tolerance.toFixed(1)}°</span>
+  </div>
+);

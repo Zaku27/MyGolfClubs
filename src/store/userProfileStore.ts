@@ -23,12 +23,6 @@ function loadProfileFromStorage(): UserProfile {
   return {};
 }
 
-function saveProfileToStorage(profile: UserProfile) {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-  }
-}
-
 export const useUserProfileStore = create<UserProfileState>((set) => ({
   profile: loadProfileFromStorage(),
   loadProfile: () => {

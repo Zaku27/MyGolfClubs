@@ -74,6 +74,22 @@ export type LieAnglePoint = GolfClub & {
   lieStatus: ReturnType<typeof lieStatusFromDeviation>;
 };
 
+export type LieLengthPoint = GolfClub & {
+  category: ClubCategory;
+  expectedLieAngle: number;
+  deviationFromTrend: number;
+  lieTrendMessage: string;
+};
+
+type LieLengthChartBounds = {
+  minLength: number;
+  maxLength: number;
+  minLieAngle: number;
+  maxLieAngle: number;
+  xInterval: number;
+  yInterval: number;
+};
+
 export {
   clamp,
   createLieChartMappers,
@@ -229,6 +245,141 @@ export const getWeightRegression = (
 
 export const getExpectedWeight = (length: number, regression: WeightRegression) =>
   regression.slope * length + regression.intercept;
+
+const getLieLengthFallbackRegression = (
+  anchorLength: number,
+  anchorLieAngle: number,
+): WeightRegression => {
+  const slope = -0.9;
+  return {
+    slope,
+    intercept: anchorLieAngle - slope * anchorLength,
+  };
+};
+
+export const getLieLengthRegression = (
+  clubs: Pick<GolfClub, 'length' | 'lieAngle'>[],
+): WeightRegression => {
+  if (clubs.length === 0) {
+    return { slope: -0.9, intercept: 96 };
+  }
+
+  const meanLength = clubs.reduce((sum, club) => sum + club.length, 0) / clubs.length;
+  const meanLieAngle = clubs.reduce((sum, club) => sum + club.lieAngle, 0) / clubs.length;
+
+  let numerator = 0;
+  let denominator = 0;
+
+  for (const club of clubs) {
+    const dx = club.length - meanLength;
+    numerator += dx * (club.lieAngle - meanLieAngle);
+    denominator += dx * dx;
+  }
+
+  if (Math.abs(denominator) < 0.0001) {
+    return getLieLengthFallbackRegression(meanLength, meanLieAngle);
+  }
+
+  const slope = numerator / denominator;
+  if (!Number.isFinite(slope) || slope > -0.15 || slope < -2.8) {
+    return getLieLengthFallbackRegression(meanLength, meanLieAngle);
+  }
+
+  return {
+    slope,
+    intercept: meanLieAngle - slope * meanLength,
+  };
+};
+
+export const getExpectedLieAngle = (length: number, regression: WeightRegression) =>
+  regression.slope * length + regression.intercept;
+
+export const formatSignedDegrees = (value: number) =>
+  `${value > 0 ? '+' : ''}${value.toFixed(1)}°`;
+
+export const getLieLengthTrendMessage = (deviation: number) => {
+  const absDeviation = Math.abs(deviation);
+  if (absDeviation <= 0.5) return 'トレンド内';
+  if (absDeviation <= 1.0) return deviation > 0 ? 'ややアップライト寄り' : 'ややフラット寄り';
+  return deviation > 0 ? 'アップライト側の調整候補' : 'フラット側の調整候補';
+};
+
+export const getLieLengthDeviationLabel = (deviation: number) => {
+  const absDeviation = Math.abs(deviation);
+  if (absDeviation <= 0.5) {
+    return `${formatSignedDegrees(deviation)} / トレンド内`;
+  }
+
+  return deviation > 0
+    ? `${formatSignedDegrees(deviation)} トレンドよりアップライト`
+    : `${formatSignedDegrees(deviation)} トレンドよりフラット`;
+};
+
+export const getLieLengthPointStyle = (
+  club: Pick<GolfClub, 'clubType'> & { category: ClubCategory },
+  deviation: number,
+) => {
+  if (deviation >= 1.2) {
+    return {
+      fill: '#c62828',
+      stroke: '#7f0000',
+      strokeWidth: 2.5,
+      radius: 7,
+    };
+  }
+
+  if (deviation <= -1.2) {
+    return {
+      fill: '#1565c0',
+      stroke: '#0d47a1',
+      strokeWidth: 2.5,
+      radius: 7,
+    };
+  }
+
+  return {
+    fill: getCategoryColor(club.category),
+    stroke: '#ffffff',
+    strokeWidth: 2,
+    radius: getWeightLengthDotRadius(club),
+  };
+};
+
+export const getLieLengthChartBounds = (
+  points: LieLengthPoint[],
+  regression: WeightRegression,
+  tolerance: number,
+): LieLengthChartBounds => {
+  const lengths = points.map((club) => club.length);
+  const lieAngles = points.map((club) => club.lieAngle);
+  const expectedLieAngles = points.map((club) => club.expectedLieAngle);
+
+  const minLength = Math.max(28, Math.floor(Math.min(...lengths) - 1));
+  const maxLength = Math.min(50, Math.ceil(Math.max(...lengths) + 1));
+
+  const projectedMinLie = getExpectedLieAngle(maxLength, regression) - tolerance;
+  const projectedMaxLie = getExpectedLieAngle(minLength, regression) + tolerance;
+
+  const minLieAngle = Math.max(
+    48,
+    Math.floor((Math.min(...lieAngles, ...expectedLieAngles, projectedMinLie) - 0.8) * 2) / 2,
+  );
+  const maxLieAngle = Math.min(
+    72,
+    Math.ceil((Math.max(...lieAngles, ...expectedLieAngles, projectedMaxLie) + 0.8) * 2) / 2,
+  );
+
+  const yRange = maxLieAngle - minLieAngle;
+
+  return {
+    minLength,
+    maxLength,
+    minLieAngle,
+    maxLieAngle,
+    xInterval: maxLength - minLength <= 12 ? 1 : 2,
+    yInterval: yRange <= 8 ? 1 : 2,
+  };
+};
 
 export const formatSignedGrams = (value: number) =>
   `${value > 0 ? '+' : ''}${value.toFixed(1)} g`;
@@ -422,6 +573,38 @@ export const buildWeightTrendPoints = (
     .join(' ');
   const lower = [bounds.maxLength, bounds.minLength]
     .map((length) => `${mapX(length)},${mapY(getExpectedWeight(length, regression) - tolerance)}`)
+    .join(' ');
+
+  return {
+    linePoints,
+    bandPoints: `${upper} ${lower}`,
+  };
+};
+
+export const buildLieLengthTrendPoints = (
+  hasData: boolean,
+  bounds: {
+    minLength: number;
+    maxLength: number;
+  },
+  regression: WeightRegression,
+  tolerance: number,
+  mapX: (length: number) => number,
+  mapY: (lieAngle: number) => number,
+) => {
+  if (!hasData) {
+    return { linePoints: '', bandPoints: '' };
+  }
+
+  const linePoints = [bounds.minLength, bounds.maxLength]
+    .map((length) => `${mapX(length)},${mapY(getExpectedLieAngle(length, regression))}`)
+    .join(' ');
+
+  const upper = [bounds.minLength, bounds.maxLength]
+    .map((length) => `${mapX(length)},${mapY(getExpectedLieAngle(length, regression) + tolerance)}`)
+    .join(' ');
+  const lower = [bounds.maxLength, bounds.minLength]
+    .map((length) => `${mapX(length)},${mapY(getExpectedLieAngle(length, regression) - tolerance)}`)
     .join(' ');
 
   return {

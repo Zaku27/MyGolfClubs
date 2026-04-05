@@ -35,6 +35,17 @@ export type LieTooltipState = {
   };
 };
 
+export type LieLengthTooltipState = {
+  x: number;
+  y: number;
+  club: GolfClub & {
+    category: ClubCategory;
+    expectedLieAngle: number;
+    deviationFromTrend: number;
+    lieTrendMessage: string;
+  };
+};
+
 export type SwingTooltipState = {
   x: number;
   y: number;

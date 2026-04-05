@@ -9,6 +9,8 @@ export const MAX_DISTANCE = 320;
 
 export const WEIGHT_NORMAL_BAND_TOLERANCE = 12;
 export const WEIGHT_CHART_PADDING = { top: 24, right: 28, bottom: 52, left: 60 };
+export const LIE_LENGTH_TREND_BAND_TOLERANCE = 0.8;
+export const LIE_LENGTH_CHART_PADDING = { top: 24, right: 28, bottom: 52, left: 60 };
 
 export const LIE_MIN = 50;
 export const LIE_MAX = 70;

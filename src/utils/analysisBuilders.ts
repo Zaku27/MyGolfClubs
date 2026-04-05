@@ -7,7 +7,11 @@ import {
 import { sortClubsForDisplay } from './clubSort';
 import {
   getClubCategory,
+  getExpectedLieAngle,
   getEstimatedDistance,
+  getLieLengthChartBounds,
+  getLieLengthRegression,
+  getLieLengthTrendMessage,
   getExpectedWeight,
   getSwingStatus,
   getWeightChartBounds,
@@ -62,6 +66,15 @@ const DEFAULT_WEIGHT_BOUNDS: WeightChartBounds = {
   maxWeight: 550,
   xInterval: 2,
   yInterval: 50,
+};
+
+const DEFAULT_LIE_LENGTH_BOUNDS = {
+  minLength: 30,
+  maxLength: 48,
+  minLieAngle: 54,
+  maxLieAngle: 66,
+  xInterval: 2,
+  yInterval: 1,
 };
 
 export const buildLoftDistanceAnalysis = (
@@ -200,5 +213,51 @@ export const buildLieAngleAnalysis = (
 
   return {
     ...visibility,
+  };
+};
+
+export const buildLieLengthAnalysis = (
+  clubs: GolfClub[],
+  trendBandTolerance: number,
+  isVisible: ClubVisibilityPredicate,
+) => {
+  const baseClubs = sortClubsForDisplay(
+    clubs.filter(
+      (club) =>
+        Number.isFinite(club.length) &&
+        Number.isFinite(club.lieAngle) &&
+        club.length > 0 &&
+        club.lieAngle > 0 &&
+        getClubCategory(club) !== 'putter',
+    ),
+  ).map(withCategory);
+
+  const visibleBaseClubs = baseClubs.filter(isVisible);
+  const regression = getLieLengthRegression(
+    visibleBaseClubs.length > 0 ? visibleBaseClubs : baseClubs,
+  );
+
+  const tableClubs = baseClubs.map((club) => {
+    const expectedLieAngle = getExpectedLieAngle(club.length, regression);
+    const deviationFromTrend = club.lieAngle - expectedLieAngle;
+    return {
+      ...club,
+      expectedLieAngle,
+      deviationFromTrend,
+      lieTrendMessage: getLieLengthTrendMessage(deviationFromTrend),
+    };
+  });
+
+  const visibility = splitByVisibility(tableClubs, isVisible);
+  const bounds = visibility.hasVisibleData
+    ? getLieLengthChartBounds(visibility.chartClubs, regression, trendBandTolerance)
+    : DEFAULT_LIE_LENGTH_BOUNDS;
+
+  return {
+    ...visibility,
+    regression,
+    bounds,
+    lengthTicks: makeTickValues(bounds.minLength, bounds.maxLength, bounds.xInterval),
+    lieAngleTicks: makeTickValues(bounds.minLieAngle, bounds.maxLieAngle, bounds.yInterval),
   };
 };
