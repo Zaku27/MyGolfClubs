@@ -26,12 +26,40 @@ import {
 
 // ─── Wind generation ──────────────────────────────────────────────────────────
 
-function generateWind(): Pick<ShotContext, "wind" | "windStrength"> {
-  const roll = Math.random();
+function hashSeed(seed: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createSeededRandom(seed: string): () => number {
+  let state = hashSeed(seed) || 0x6d2b79f5;
+
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createRoundSeedNonce(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function generateWind(random: () => number = Math.random): Pick<ShotContext, "wind" | "windStrength"> {
+  const roll = random();
   if (roll < 0.40) return { wind: "none", windStrength: 0 };
   const directions: WindDirection[] = ["headwind", "tailwind", "crosswind"];
-  const wind = directions[Math.floor(Math.random() * directions.length)];
-  const windStrength = Math.round(5 + Math.random() * 15); // 5–20 mph
+  const wind = directions[Math.floor(random() * directions.length)];
+  const windStrength = Math.round(5 + random() * 15); // 5–20 mph
   return { wind, windStrength };
 }
 
@@ -59,6 +87,7 @@ interface GameStoreState {
   holeSummaries: HoleSummary[];
   goodShotStreak: number;
   confidenceBoost: number;
+  roundSeedNonce: string;
   /** DBから取得したプレイヤースキルレベル (0-1)。パット確率に使用。 */
   playerSkillLevel: number;
   playMode: "robot" | "bag";
@@ -101,17 +130,19 @@ const INITIAL_STATE: GameStoreState = {
   holeSummaries: [],
   goodShotStreak: 0,
   confidenceBoost: 0,
+  roundSeedNonce: "default",
   playerSkillLevel: 0.5,
   playMode: "bag",
 };
 
-function buildInitialContext(hole: Hole): ShotContext {
+function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: number): ShotContext {
+  const windRandom = createSeededRandom(`${roundSeedNonce}|hole:${holeIndex}|wind`);
   return {
     remainingDistance: hole.distanceFromTee,
     lie: "tee",
     greenRadius: hole.greenRadius,
     hazards: hole.hazards ?? [],
-    ...generateWind(),
+    ...generateWind(windRandom),
   };
 }
 
@@ -178,14 +209,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
   ...INITIAL_STATE,
 
   startRound: (course, bag, playMode = "bag") => {
+    const roundSeedNonce = createRoundSeedNonce();
     set({
       ...INITIAL_STATE,
       phase: "playing",
       course,
       bag,
       playMode,
+      roundSeedNonce,
       currentHoleIndex: 0,
-      shotContext: buildInitialContext(course[0]),
+      shotContext: buildInitialContext(course[0], roundSeedNonce, 0),
     });
     // パット確率用にプレイヤースキルレベルを非同期取得
     ClubService.getPlayerSkillLevel()
@@ -219,6 +252,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       holeSummaries,
       playerSkillLevel,
       playMode,
+      roundSeedNonce,
     } = get();
 
     if (!selectedClubId) return;
@@ -255,6 +289,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       shotPowerPercent,
       useStoredDistance: !isRobotMode,
       shotIndex: currentHoleShots.length,
+      seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
     });
     const newHoleStrokes = holeStrokes + result.strokesAdded;
     const confidenceBoostApplied = result.confidenceBoostApplied === true;
@@ -338,7 +373,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   dismissResult: () => set({ showResultModal: false }),
 
   advanceHole: () => {
-    const { currentHoleIndex, course } = get();
+    const { currentHoleIndex, course, roundSeedNonce } = get();
     const nextIndex = currentHoleIndex + 1;
     if (nextIndex >= course.length) return; // safety guard
 
@@ -350,7 +385,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       showResultModal: false,
       selectedClubId: null,
       currentHoleShots: [],
-      shotContext: buildInitialContext(course[nextIndex]),
+      shotContext: buildInitialContext(course[nextIndex], roundSeedNonce, nextIndex),
     });
   },
 

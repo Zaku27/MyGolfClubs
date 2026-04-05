@@ -291,6 +291,39 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               className="mt-3"
             />
           )}
+
+          <section className="mt-3 rounded-3xl border border-emerald-300 bg-emerald-50/90 px-4 py-5 shadow-sm shadow-emerald-300/30 sm:px-6 sm:py-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-bold tracking-[0.2em] text-emerald-700 sm:text-base">コース情報</h2>
+              <span className="text-xs font-medium text-emerald-700">{currentHole.number}H / PAR {currentHole.par}</span>
+            </div>
+
+            <div className="mt-4 w-full">
+              <HoleMapCanvas
+                hole={currentHole}
+                landingResults={landingHistory}
+                transientLandingResult={transientLandingResult}
+                showTrajectories
+              />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {hazards.length > 0 ? (
+                hazards.map((hazard, index) => (
+                  <span
+                    key={`${hazard.id ?? index}`}
+                    className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 sm:px-4 sm:text-sm"
+                  >
+                    {buildHazardDisplayName(hazard)}
+                  </span>
+                ))
+              ) : (
+                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
+                  大きなハザードなし
+                </span>
+              )}
+            </div>
+          </section>
         </div>
 
         <div className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
@@ -320,33 +353,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           </h1>
           <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">ライ: {LIE_LABEL[lie]}</p>
           <p className="mt-1 text-lg font-medium text-emerald-800 sm:text-2xl">{holeStrokes + 1}打目</p>
-
-          <div className="mt-6 w-full max-w-3xl">
-            <HoleMapCanvas
-              hole={currentHole}
-              landingResults={landingHistory}
-              transientLandingResult={transientLandingResult}
-              showTrajectories
-            />
-          </div>
-
-          {/* ハザード表示（OB等）を打数の下に移動 */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {hazards.length > 0 ? (
-              hazards.map((hazard, index) => (
-                <span
-                  key={`${hazard.id ?? index}`}
-                  className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 sm:px-4 sm:text-sm"
-                >
-                  {buildHazardDisplayName(hazard)}
-                </span>
-              ))
-            ) : (
-              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
-                大きなハザードなし
-              </span>
-            )}
-          </div>
 
 
 
@@ -573,6 +579,39 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             holeStrokes={holeStrokes}
             phase={phase}
           />
+
+          <section className="mt-4 rounded-3xl border border-emerald-300 bg-emerald-50/90 px-3 py-4 shadow-sm shadow-emerald-300/30">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-xs font-bold tracking-[0.16em] text-emerald-700">コース情報</h2>
+              <span className="text-[11px] font-medium text-emerald-700">{currentHole.number}H / PAR {currentHole.par}</span>
+            </div>
+
+            <div className="mt-3 w-full">
+              <HoleMapCanvas
+                hole={currentHole}
+                landingResults={landingHistory}
+                transientLandingResult={transientLandingResult}
+                showTrajectories
+              />
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {hazards.length > 0 ? (
+                hazards.map((hazard, index) => (
+                  <span
+                    key={`${hazard.id ?? index}`}
+                    className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800"
+                  >
+                    {buildHazardDisplayName(hazard)}
+                  </span>
+                ))
+              ) : (
+                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
+                  大きなハザードなし
+                </span>
+              )}
+            </div>
+          </section>
         </aside>
       </div>
     </main>
