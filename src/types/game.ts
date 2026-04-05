@@ -13,12 +13,29 @@ export interface SimClub {
   isWeakClub?: boolean;
 }
 
+// ─── Hazard model ─────────────────────────────────────────────────────────────
+export type HazardType = "bunker" | "water" | "ob" | "rough";
+export type HazardShape = "rectangle" | "polygon";
+
+export interface Hazard {
+  id: string;
+  type: HazardType;
+  shape: HazardShape;
+  yFront: number;   // distance to the front edge from tee direction, yards
+  yBack: number;    // distance to the back edge, yards
+  xCenter: number;  // lateral offset from center line, yards
+  width: number;    // total width, yards
+  penaltyStrokes: 1 | 2;
+  name?: string;
+}
+
 // ─── Course ───────────────────────────────────────────────────────────────────
 export interface Hole {
   number: number;
   par: 3 | 4 | 5;
   distanceFromTee: number; // yards
-  hazards?: string[];      // human-readable descriptions e.g. "water left"
+  targetDistance?: number; // ピンまでの距離。未指定時は distanceFromTee を使用
+  hazards?: Hazard[];
 }
 
 // ─── Shot context ─────────────────────────────────────────────────────────────
@@ -32,7 +49,7 @@ export interface ShotContext {
   wind?: WindDirection;
   windStrength?: number; // mph
   windDirectionDegrees?: number; // 0=北へ吹く, 時計回り
-  hazards?: string[];
+  hazards?: Hazard[];
 }
 
 // ─── Shot result ──────────────────────────────────────────────────────────────
@@ -72,6 +89,8 @@ export interface ShotResult {
   effectiveSuccessRate: number;
   confidenceBoostApplied?: boolean;
   landing?: ShotLanding;
+  finalOutcome: "fairway" | "bunker" | "water" | "ob" | "green";
+  penaltyStrokes: number;
 }
 
 export interface ShotLog {

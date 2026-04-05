@@ -1,7 +1,35 @@
 import type { Hole } from "../types/game";
 
 export const COURSE_9HOLES: Hole[] = [
-  { number: 1, par: 4, distanceFromTee: 380, hazards: [] },
+  {
+    number: 1,
+    par: 4,
+    distanceFromTee: 380,
+    hazards: [
+      {
+        id: "h1-1",
+        type: "bunker",
+        shape: "rectangle",
+        yFront: 250,
+        yBack: 290,
+        xCenter: 0,
+        width: 90,
+        penaltyStrokes: 1,
+        name: "グリーン手前バンカー",
+      },
+      {
+        id: "h1-2",
+        type: "water",
+        shape: "rectangle",
+        yFront: 150,
+        yBack: 175,
+        xCenter: -40,
+        width: 35,
+        penaltyStrokes: 1,
+        name: "左サイド池",
+      },
+    ],
+  },
   { number: 2, par: 3, distanceFromTee: 165, hazards: [] },
   { number: 3, par: 5, distanceFromTee: 530, hazards: [] },
   { number: 4, par: 4, distanceFromTee: 420, hazards: [] },

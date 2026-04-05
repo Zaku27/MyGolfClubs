@@ -515,6 +515,8 @@ export function simulateShot(
           { x: 0, y: puttDistance, z: 0 },
         ],
       },
+      finalOutcome: "green",
+      penaltyStrokes: 0,
     };
   }
 
@@ -641,6 +643,11 @@ export function simulateShot(
   }
 
   const newLie = resolveNewLie(newRemaining, isGoodShot, riskLevel, random);
+  const finalOutcome = newLie === "bunker"
+    ? "bunker"
+    : newLie === "green" || newRemaining === 0
+      ? "green"
+      : "fairway";
 
   // ── Message ────────────────────────────────────────────────────────────────
   const clubLabel = `${club.name}${club.number ? " " + club.number : ""}`;
@@ -663,6 +670,8 @@ export function simulateShot(
     effectiveSuccessRate: effectiveRate,
     confidenceBoostApplied,
     landing,
+    finalOutcome,
+    penaltyStrokes: 0,
   };
 }
 

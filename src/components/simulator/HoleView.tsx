@@ -308,10 +308,10 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             {hazards.length > 0 ? (
               hazards.map((hazard, index) => (
                 <span
-                  key={`${hazard}-${index}`}
+                  key={`${hazard.id ?? index}`}
                   className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 sm:px-4 sm:text-sm"
                 >
-                  {hazard}
+                  {hazard.name ?? hazard.type}
                 </span>
               ))
             ) : (
@@ -326,31 +326,28 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         {/* ショット結果表示（インライン） */}
         {lastShotResult && (
           <div className="mt-8 w-full max-w-md mx-auto rounded-2xl border border-emerald-300 bg-emerald-50/95 p-5 shadow-xl shadow-emerald-300/40">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="text-4xl leading-none">
-                {(() => {
-                  const iconMap = { excellent: "🌟", good: "✅", average: "👍", poor: "😬", mishit: "💥" };
-                  return iconMap[lastShotResult.shotQuality] || "";
-                })()}
-              </span>
-              <div>
-                <p className="text-lg font-bold text-emerald-900">
-                  {lastShotResult.newRemainingDistance === 0
-                    ? "カップイン"
-                    : lastShotResult.shotQuality === "excellent"
-                    ? "会心のショット"
-                    : lastShotResult.shotQuality === "good"
-                    ? "ナイスショット"
-                    : lastShotResult.shotQuality === "average"
-                    ? "まずまずの一打"
-                    : lastShotResult.shotQuality === "poor"
-                    ? "ミス気味"
-                    : "苦しい結果"}
-                </p>
-                <p className="text-sm text-emerald-700">飛距離: {(lastShotResult.landing?.totalDistance ?? lastShotResult.distanceHit).toFixed(1)}ヤード</p>
+            <div className="mb-4 rounded-3xl border border-emerald-200 bg-emerald-100 px-4 py-6 text-center shadow-sm shadow-emerald-100/80">
+              <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">最終結果</div>
+              <div className="mt-3 text-3xl font-bold text-emerald-900">
+                {lastShotResult.finalOutcome === "green"
+                  ? "グリーン"
+                  : lastShotResult.finalOutcome === "fairway"
+                  ? "フェアウェイ"
+                  : lastShotResult.finalOutcome === "bunker"
+                  ? "バンカー"
+                  : lastShotResult.finalOutcome === "water"
+                  ? "ウォーター"
+                  : "OB"}
+              </div>
+              {lastShotResult.penaltyStrokes > 0 && (
+                <p className="mt-2 text-sm text-rose-700">罰打 +{lastShotResult.penaltyStrokes}</p>
+              )}
+              <p className="mt-2 text-lg font-semibold text-emerald-800">
+                飛距離: {(lastShotResult.landing?.totalDistance ?? lastShotResult.distanceHit).toFixed(1)}ヤード
+              </p>
             </div>
-            </div>
-            <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
+
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
               <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
                 {SHOT_QUALITY_LABEL[lastShotResult.shotQuality] ?? lastShotResult.shotQuality}
               </span>
@@ -367,6 +364,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                   </span>
                 </>
               )}
+            </div>
               {lastShotResult.confidenceBoostApplied && (
                 <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
                   勢いボーナス適用
@@ -377,7 +375,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                   次の1打 +{confidenceBoost}%
                 </span>
               )}
-            </div>
 
             {/* 続ける/次のホールへ/スコアカードを見るボタン */}
             <div className="mt-4">
