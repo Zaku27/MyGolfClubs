@@ -1,6 +1,7 @@
 import type { CSSProperties, RefObject } from 'react';
 import { getAnalysisClubKey, getClubTypeDisplay } from '../utils/clubUtils';
 import { LoftLegend } from './AnalysisLegends';
+import { AnalysisChartWrapper } from './AnalysisChartWrapper';
 import type { LoftTooltipState } from './analysisTypes';
 import type { ClubCategory } from '../utils/analysisUtils';
 
@@ -55,16 +56,54 @@ export const AnalysisLoftChart: React.FC<AnalysisLoftChartProps> = ({
   return (
     <div className="analysis-card chart-card">
       <LoftLegend />
-      <div
-        className="chart-scroll interactive-chart-scroll"
-        ref={loftChartContainerRef}
+      <AnalysisChartWrapper
+        containerRef={loftChartContainerRef}
+        chartSize={loftChartSize}
         onMouseLeave={() => setLoftTooltip(null)}
-      >
-      <svg
-        viewBox={`0 0 ${loftChartSize.width} ${loftChartSize.height}`}
-        className="analysis-chart loft-analysis-chart"
-        role="img"
-        aria-label="ロフトと飛距離の散布図"
+        className="loft-analysis-chart"
+        ariaLabel="ロフトと飛距離の散布図"
+        tooltip={
+          loftTooltip && (
+            <div
+              ref={loftTooltipRef}
+              className="chart-tooltip"
+              style={{
+                left: loftTooltipPos?.left,
+                top: loftTooltipPos?.top,
+              }}
+            >
+              <div className="chart-tooltip-title">{loftTooltip.club.name}</div>
+              <div className="chart-tooltip-list">
+                <div className="chart-tooltip-row">
+                  <span className="chart-tooltip-label">クラブ種別</span>
+                  <span className="chart-tooltip-value">
+                    {getClubTypeDisplay(loftTooltip.club.clubType, loftTooltip.club.number)}
+                  </span>
+                </div>
+                <div className="chart-tooltip-row">
+                  <span className="chart-tooltip-label">ロフト</span>
+                  <span className="chart-tooltip-value">{loftTooltip.club.loftAngle.toFixed(1)}°</span>
+                </div>
+                <div className="chart-tooltip-row">
+                  <span className="chart-tooltip-label">推定</span>
+                  <span className="chart-tooltip-value">{loftTooltip.club.estimatedDistance.toFixed(0)} y</span>
+                </div>
+                <div className="chart-tooltip-row">
+                  <span className="chart-tooltip-label">実測</span>
+                  <span className="chart-tooltip-value">
+                    {loftTooltip.club.actualDistance > 0 ? `${loftTooltip.club.actualDistance.toFixed(0)} y` : '-'}
+                  </span>
+                </div>
+                <div className="chart-tooltip-row">
+                  <span className="chart-tooltip-label">選択点</span>
+                  <span className="chart-tooltip-value">
+                    {loftTooltip.pointType === 'estimated' ? '推定ポイント' : '実測ポイント'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        }
       >
         <rect
           x={LOFT_CHART_PADDING.left}
@@ -203,48 +242,7 @@ export const AnalysisLoftChart: React.FC<AnalysisLoftChartProps> = ({
         >
           飛距離（ヤード）
         </text>
-      </svg>
-      {loftTooltip && (
-        <div
-          ref={loftTooltipRef}
-          className="chart-tooltip"
-          style={{
-            left: loftTooltipPos?.left,
-            top: loftTooltipPos?.top,
-          }}
-        >
-          <div className="chart-tooltip-title">{loftTooltip.club.name}</div>
-          <div className="chart-tooltip-list">
-            <div className="chart-tooltip-row">
-              <span className="chart-tooltip-label">クラブ種別</span>
-              <span className="chart-tooltip-value">
-                {getClubTypeDisplay(loftTooltip.club.clubType, loftTooltip.club.number)}
-              </span>
-            </div>
-            <div className="chart-tooltip-row">
-              <span className="chart-tooltip-label">ロフト</span>
-              <span className="chart-tooltip-value">{loftTooltip.club.loftAngle.toFixed(1)}°</span>
-            </div>
-            <div className="chart-tooltip-row">
-              <span className="chart-tooltip-label">推定</span>
-              <span className="chart-tooltip-value">{loftTooltip.club.estimatedDistance.toFixed(0)} y</span>
-            </div>
-            <div className="chart-tooltip-row">
-              <span className="chart-tooltip-label">実測</span>
-              <span className="chart-tooltip-value">
-                {loftTooltip.club.actualDistance > 0 ? `${loftTooltip.club.actualDistance.toFixed(0)} y` : '-'}
-              </span>
-            </div>
-            <div className="chart-tooltip-row">
-              <span className="chart-tooltip-label">選択点</span>
-              <span className="chart-tooltip-value">
-                {loftTooltip.pointType === 'estimated' ? '推定ポイント' : '実測ポイント'}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-      </div>
+      </AnalysisChartWrapper>
     </div>
   );
 };

@@ -19,6 +19,10 @@ export interface GolfClub {
   updatedAt?: string;
 }
 
+export type GolfClubData = GolfClub & {
+  category: string;
+};
+
 export interface GolfBag {
   id?: number;
   name: string;

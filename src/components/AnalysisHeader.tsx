@@ -3,7 +3,8 @@ export type AnalysisTab =
   | 'loftDistance'
   | 'lieAngle'
   | 'lieLength'
-  | 'swingWeight';
+  | 'swingWeight'
+  | 'specComparison';
 
 const ANALYSIS_TAB_OPTIONS: Array<{ tab: AnalysisTab; label: string }> = [
   { tab: 'loftDistance', label: 'ロフトと飛距離' },
@@ -11,6 +12,7 @@ const ANALYSIS_TAB_OPTIONS: Array<{ tab: AnalysisTab; label: string }> = [
   { tab: 'lieLength', label: 'ライ角と長さ' },
   { tab: 'weightLength', label: '重量と長さ' },
   { tab: 'swingWeight', label: 'SW分布' },
+  { tab: 'specComparison', label: '3軸比較' },
 ];
 
 const ANALYSIS_TAB_TITLE: Record<AnalysisTab, string> = {
@@ -19,6 +21,7 @@ const ANALYSIS_TAB_TITLE: Record<AnalysisTab, string> = {
   swingWeight: 'スイングウェイト分布',
   lieAngle: 'ライ角分布',
   lieLength: 'ライ角 - 長さ',
+  specComparison: 'ロフト・重量・ライ角の比較',
 };
 
 const ANALYSIS_TAB_SUBTITLE: Record<AnalysisTab, string> = {
@@ -31,6 +34,8 @@ const ANALYSIS_TAB_SUBTITLE: Record<AnalysisTab, string> = {
     '全クラブのライ角分布を確認し、アイアンセットの一貫性やフィッティング問題を把握できます。',
   lieLength:
     '回帰トレンドからの偏差で、アップライト寄り/フラット寄りのクラブを見つけやすくします。',
+  specComparison:
+    'ロフト角-長さ、重量-長さ、ライ角分布を同時に表示して、セット全体の整合性を確認できます。',
 };
 
 type AnalysisHeaderProps = {

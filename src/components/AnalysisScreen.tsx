@@ -9,6 +9,7 @@ import { AnalysisLoftTable } from './AnalysisLoftTable';
 import { AnalysisLieTable } from './AnalysisLieTable';
 
 import { AnalysisLoftChart } from './AnalysisLoftChart';
+import { AnalysisLoftLengthChart } from './AnalysisLoftLengthChart';
 import { AnalysisSwingChart } from './AnalysisSwingChart';
 import { AnalysisSwingSettingsCard } from './AnalysisSwingSettingsCard';
 import { AnalysisSwingTable } from './AnalysisSwingTable';
@@ -23,6 +24,7 @@ import {
 import {
   type LieTooltipState,
   type LieLengthTooltipState,
+  type LoftLengthTooltipState,
   type LoftTooltipState,
   type SwingTooltipState,
   type TooltipBoxSize,
@@ -38,6 +40,7 @@ import {
   LIE_MIN,
   LIE_PADDING,
   LOFT_CHART_PADDING,
+  LOFT_LENGTH_CHART_PADDING,
   MAX_DISTANCE,
   MAX_LOFT,
   MIN_DISTANCE,
@@ -70,6 +73,7 @@ import {
   buildLieAngleAnalysis,
   buildLieLengthAnalysis,
   buildLoftDistanceAnalysis,
+  buildLoftLengthComparisonAnalysis,
   buildSwingWeightAnalysis,
   buildWeightLengthAnalysis,
 } from '../utils/analysisBuilders';
@@ -129,11 +133,13 @@ export const AnalysisScreen = ({
   const [showLieSettings, setShowLieSettings] = useState(false);
   const [showSwingSettings, setShowSwingSettings] = useState(false);
   const loftChartContainerRef = useRef<HTMLDivElement | null>(null);
+  const loftLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
   const weightChartContainerRef = useRef<HTMLDivElement | null>(null);
   const swingChartContainerRef = useRef<HTMLDivElement | null>(null);
   const lieChartContainerRef = useRef<HTMLDivElement | null>(null);
   const lieLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
   const loftTooltipRef = useRef<HTMLDivElement | null>(null);
+  const loftLengthTooltipRef = useRef<HTMLDivElement | null>(null);
   const weightTooltipRef = useRef<HTMLDivElement | null>(null);
   const swingTooltipRef = useRef<HTMLDivElement | null>(null);
   const lieTooltipRef = useRef<HTMLDivElement | null>(null);
@@ -146,6 +152,8 @@ export const AnalysisScreen = ({
   );
 
   const { tooltip: loftTooltip, setRawTooltip: setLoftTooltip } = useAnalysisTooltip<LoftTooltipState>(isClubVisible);
+  const { tooltip: loftLengthTooltip, setRawTooltip: setLoftLengthTooltip } =
+    useAnalysisTooltip<LoftLengthTooltipState>(isClubVisible);
   const { tooltip: weightTooltip, setRawTooltip: setWeightTooltip } = useAnalysisTooltip<WeightTooltipState>(isClubVisible);
   const { tooltip: swingTooltip, setRawTooltip: setSwingTooltip } = useAnalysisTooltip<SwingTooltipState>(isClubVisible);
   const { tooltip: lieTooltip, setRawTooltip: setLieTooltip } = useAnalysisTooltip<LieTooltipState>(isClubVisible);
@@ -161,8 +169,13 @@ export const AnalysisScreen = ({
     loftChartContainerRef,
     { width: CHART_WIDTH, height: CHART_HEIGHT },
   );
+  const loftLengthChartSize = useResponsiveChartSize(
+    activeTab === 'specComparison',
+    loftLengthChartContainerRef,
+    { width: CHART_WIDTH, height: CHART_HEIGHT },
+  );
   const weightChartSize = useResponsiveChartSize(
-    activeTab === 'weightLength',
+    activeTab === 'weightLength' || activeTab === 'specComparison',
     weightChartContainerRef,
     { width: CHART_WIDTH, height: CHART_HEIGHT },
   );
@@ -172,7 +185,7 @@ export const AnalysisScreen = ({
     { width: CHART_WIDTH, height: CHART_HEIGHT },
   );
   const lieChartSize = useResponsiveChartSize(
-    activeTab === 'lieAngle',
+    activeTab === 'lieAngle' || activeTab === 'specComparison',
     lieChartContainerRef,
     { width: CHART_WIDTH, height: CHART_HEIGHT },
   );
@@ -183,6 +196,7 @@ export const AnalysisScreen = ({
   );
 
   const loftTooltipBox: TooltipBoxSize = useTooltipBoxSize(loftTooltip, loftTooltipRef, { width: 200, height: 120 });
+  const loftLengthTooltipBox: TooltipBoxSize = useTooltipBoxSize(loftLengthTooltip, loftLengthTooltipRef, { width: 240, height: 140 });
   const weightTooltipBox: TooltipBoxSize = useTooltipBoxSize(weightTooltip, weightTooltipRef, { width: 200, height: 110 });
   const swingTooltipBox: TooltipBoxSize = useTooltipBoxSize(swingTooltip, swingTooltipRef, { width: 220, height: 130 });
   const lieTooltipBox: TooltipBoxSize = useTooltipBoxSize(lieTooltip, lieTooltipRef, { width: 200, height: 110 });
@@ -196,6 +210,16 @@ export const AnalysisScreen = ({
 
   const loftTicks = [10, 20, 30, 40, 50, 60];
   const distanceTicks = [0, 50, 100, 150, 200, 250, 300];
+
+  const {
+    chartClubs: loftLengthClubs,
+    regression: loftLengthRegression,
+    bounds: loftLengthBounds,
+    lengthTicks: loftLengthLengthTicks,
+    loftTicks: loftLengthLoftTicks,
+    hasAnyData: hasAnyLoftLengthData,
+    hasVisibleData: hasLoftLengthData,
+  } = buildLoftLengthComparisonAnalysis(clubs, isClubVisible);
 
   const {
     tableClubs: weightLengthTableClubs,
@@ -252,6 +276,23 @@ export const AnalysisScreen = ({
     },
   );
 
+  const { mapX: mapLoftLengthX, mapY: mapLoftLengthY } = createWeightChartMappers(
+    loftLengthChartSize,
+    LOFT_LENGTH_CHART_PADDING,
+    {
+      minLength: loftLengthBounds.minLength,
+      maxLength: loftLengthBounds.maxLength,
+      minWeight: loftLengthBounds.minLoft,
+      maxWeight: loftLengthBounds.maxLoft,
+    },
+  );
+
+  const loftLengthTrendLinePoints = `${mapLoftLengthX(loftLengthBounds.minLength)},${mapLoftLengthY(
+    loftLengthRegression.slope * loftLengthBounds.minLength + loftLengthRegression.intercept,
+  )} ${mapLoftLengthX(loftLengthBounds.maxLength)},${mapLoftLengthY(
+    loftLengthRegression.slope * loftLengthBounds.maxLength + loftLengthRegression.intercept,
+  )}`;
+
   const actualLinePoints = buildActualDistanceLinePoints(chartClubs, mapLoftX, mapLoftY);
 
   const { mapX: mapWeightLengthX, mapY: mapWeightLengthY } = createWeightChartMappers(
@@ -301,6 +342,15 @@ export const AnalysisScreen = ({
 
   const loftTooltipPos = loftTooltip
     ? getTooltipPosition(loftTooltip.x, loftTooltip.y, loftChartSize, loftTooltipBox)
+    : null;
+
+  const loftLengthTooltipPos = loftLengthTooltip
+    ? getTooltipPosition(
+      loftLengthTooltip.x,
+      loftLengthTooltip.y,
+      loftLengthChartSize,
+      loftLengthTooltipBox,
+    )
     : null;
 
   const lieTooltipPos = lieTooltip
@@ -455,6 +505,52 @@ export const AnalysisScreen = ({
     />
   );
 
+  const renderSpecComparisonCharts = () => (
+    <div className="comparison-grid">
+      <div className="comparison-chart-item">
+        <AnalysisLoftLengthChart
+          hasAnyLoftLengthData={hasAnyLoftLengthData}
+          hasLoftLengthData={hasLoftLengthData}
+          loftLengthChartContainerRef={loftLengthChartContainerRef}
+          loftLengthChartSize={loftLengthChartSize}
+          loftLengthTrendLinePoints={loftLengthTrendLinePoints}
+          lengthTicks={loftLengthLengthTicks}
+          loftTicks={loftLengthLoftTicks}
+          mapLoftLengthX={mapLoftLengthX}
+          mapLoftLengthY={mapLoftLengthY}
+          loftLengthClubs={loftLengthClubs}
+          getExpectedLoftAtLength={(length) =>
+            loftLengthRegression.slope * length + loftLengthRegression.intercept
+          }
+          getCategoryColor={getCategoryColor}
+          setLoftLengthTooltip={setLoftLengthTooltip}
+          loftLengthTooltip={loftLengthTooltip}
+          loftLengthTooltipRef={loftLengthTooltipRef}
+          loftLengthTooltipPos={loftLengthTooltipPos}
+          LOFT_LENGTH_CHART_PADDING={LOFT_LENGTH_CHART_PADDING}
+        />
+      </div>
+      <div className="comparison-chart-item">{renderWeightChart()}</div>
+      <div className="comparison-chart-item">
+        <AnalysisLieChart
+          hasAnyLieAngleData={hasAnyLieAngleData}
+          lieAngleClubs={lieAngleClubs}
+          lieChartContainerRef={lieChartContainerRef}
+          lieChartSize={lieChartSize}
+          mapLieX={mapLieX}
+          mapLieY={mapLieY}
+          lieBarWidth={lieBarWidth}
+          goodRangePolygonPoints={goodRangePolygonPoints}
+          standardLieLinePoints={standardLieLinePoints}
+          lieTooltip={lieTooltip}
+          lieTooltipRef={lieTooltipRef}
+          lieTooltipPos={lieTooltipPos}
+          setLieTooltip={setLieTooltip}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="analysis-screen">
       <AnalysisHeader
@@ -536,6 +632,10 @@ export const AnalysisScreen = ({
             onSetAnalysisClubVisible={onSetAnalysisClubVisible}
             swingWeightTarget={swingWeightTarget}
           />
+        </>
+      ) : activeTab === 'specComparison' ? (
+        <>
+          {renderSpecComparisonCharts()}
         </>
       ) : activeTab === 'lieLength' ? (
         <>

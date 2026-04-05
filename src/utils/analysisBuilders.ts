@@ -8,7 +8,10 @@ import { sortClubsForDisplay } from './clubSort';
 import {
   getClubCategory,
   getExpectedLieAngle,
+  getExpectedLoftAngle,
   getEstimatedDistance,
+  getLoftLengthChartBounds,
+  getLoftLengthRegression,
   getLieLengthChartBounds,
   getLieLengthRegression,
   getLieLengthTrendMessage,
@@ -20,6 +23,7 @@ import {
   makeTickValues,
   swingWeightToNumeric,
   type ClubCategory,
+  type LoftLengthPoint,
   type WeightLengthPoint,
 } from './analysisUtils';
 
@@ -75,6 +79,15 @@ const DEFAULT_LIE_LENGTH_BOUNDS = {
   maxLieAngle: 66,
   xInterval: 2,
   yInterval: 1,
+};
+
+const DEFAULT_LOFT_LENGTH_BOUNDS = {
+  minLength: 30,
+  maxLength: 48,
+  minLoft: 10,
+  maxLoft: 58,
+  xInterval: 2,
+  yInterval: 4,
 };
 
 export const buildLoftDistanceAnalysis = (
@@ -140,6 +153,57 @@ export const buildWeightLengthAnalysis = (
     bounds,
     lengthTicks: makeTickValues(bounds.minLength, bounds.maxLength, bounds.xInterval),
     weightTicks: makeTickValues(bounds.minWeight, bounds.maxWeight, bounds.yInterval),
+  };
+};
+
+export const buildLoftLengthComparisonAnalysis = (
+  clubs: GolfClub[],
+  isVisible: ClubVisibilityPredicate,
+) => {
+  const baseClubs = sortClubsForDisplay(
+    clubs.filter(
+      (club) =>
+        Number.isFinite(club.length) &&
+        Number.isFinite(club.loftAngle) &&
+        club.length > 0 &&
+        club.loftAngle > 0 &&
+        getClubCategory(club) !== 'putter',
+    ),
+  ).map(withCategory);
+
+  const visibleBaseClubs = baseClubs.filter(isVisible);
+  const regression = getLoftLengthRegression(
+    visibleBaseClubs.length > 0 ? visibleBaseClubs : baseClubs,
+  );
+
+  const tableClubs = baseClubs.map((club) => {
+    const expectedLoft = getExpectedLoftAngle(club.length, regression);
+    const deviationFromStandard = club.loftAngle - expectedLoft;
+    const recommendedLoftAdjustment = expectedLoft - club.loftAngle;
+    const projectedDistanceGap = Math.round(Math.abs(recommendedLoftAdjustment) * 3.5);
+    const projectedSwingWeightImpact = 0;
+
+    return {
+      ...club,
+      expectedLoft,
+      deviationFromStandard,
+      recommendedLoftAdjustment,
+      projectedDistanceGap,
+      projectedSwingWeightImpact,
+    };
+  });
+
+  const visibility = splitByVisibility(tableClubs, isVisible);
+  const bounds = visibility.hasVisibleData
+    ? getLoftLengthChartBounds(visibility.chartClubs as LoftLengthPoint[], regression)
+    : DEFAULT_LOFT_LENGTH_BOUNDS;
+
+  return {
+    ...visibility,
+    regression,
+    bounds,
+    lengthTicks: makeTickValues(bounds.minLength, bounds.maxLength, bounds.xInterval),
+    loftTicks: makeTickValues(bounds.minLoft, bounds.maxLoft, bounds.yInterval),
   };
 };
 

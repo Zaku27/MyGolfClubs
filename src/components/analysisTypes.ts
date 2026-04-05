@@ -46,6 +46,19 @@ export type LieLengthTooltipState = {
   };
 };
 
+export type LoftLengthTooltipState = {
+  x: number;
+  y: number;
+  club: GolfClub & {
+    category: ClubCategory;
+    expectedLoft: number;
+    deviationFromStandard: number;
+    recommendedLoftAdjustment: number;
+    projectedDistanceGap: number;
+    projectedSwingWeightImpact: number;
+  };
+};
+
 export type SwingTooltipState = {
   x: number;
   y: number;

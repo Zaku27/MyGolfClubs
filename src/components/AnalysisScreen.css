@@ -120,9 +120,102 @@
   display: flex;
   justify-content: flex-end;
 }
+.comparison-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.comparison-chart-item {
+  grid-column: span 12;
+}
+.loft-length-frame {
+  display: grid;
+  gap: 14px;
+}
+.loft-adjust-panel {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid #d9e7db;
+  background: linear-gradient(145deg, #f7fff7 0%, #eef8ee 100%);
+}
+.loft-adjust-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1f3d2a;
+  margin-bottom: 10px;
+}
+.loft-adjust-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.loft-adjust-input-row span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b6d63;
+}
+.loft-adjust-input-row input {
+  width: 120px;
+}
+.loft-adjust-input-row em {
+  font-style: normal;
+  font-size: 12px;
+  color: #6e8077;
+}
+.loft-adjust-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.metric-label {
+  font-size: 11px;
+  color: #6e8077;
+  margin-bottom: 4px;
+}
+.metric-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1f3d2a;
+}
+.gapping-alert {
+  margin-top: 12px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.gapping-alert.ok {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border: 1px solid #a5d6a7;
+}
+.gapping-alert.alert {
+  background: #ffebee;
+  color: #b71c1c;
+  border: 1px solid #ef9a9a;
+}
 
 .chart-section-heading {
   margin-bottom: 14px;
+}
+@media (min-width: 960px) {
+  .comparison-chart-item {
+    grid-column: span 6;
+  }
+
+  .comparison-chart-item:first-child {
+    grid-column: span 12;
+  }
+}
+@media (max-width: 640px) {
+  .loft-adjust-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .loft-adjust-input-row {
+    flex-wrap: wrap;
+  }
 }
 
 .chart-section-heading h2 {

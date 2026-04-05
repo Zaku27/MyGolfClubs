@@ -81,6 +81,15 @@ export type LieLengthPoint = GolfClub & {
   lieTrendMessage: string;
 };
 
+export type LoftLengthPoint = GolfClub & {
+  category: ClubCategory;
+  expectedLoft: number;
+  deviationFromStandard: number;
+  recommendedLoftAdjustment: number;
+  projectedDistanceGap: number;
+  projectedSwingWeightImpact: number;
+};
+
 type LieLengthChartBounds = {
   minLength: number;
   maxLength: number;
@@ -246,6 +255,53 @@ export const getWeightRegression = (
 export const getExpectedWeight = (length: number, regression: WeightRegression) =>
   regression.slope * length + regression.intercept;
 
+const getLoftLengthFallbackRegression = (
+  anchorLength: number,
+  anchorLoft: number,
+): WeightRegression => {
+  const slope = -7.2;
+  return {
+    slope,
+    intercept: anchorLoft - slope * anchorLength,
+  };
+};
+
+export const getLoftLengthRegression = (
+  clubs: Pick<GolfClub, 'length' | 'loftAngle'>[],
+): WeightRegression => {
+  if (clubs.length === 0) {
+    return { slope: -7.2, intercept: 86 };
+  }
+
+  const meanLength = clubs.reduce((sum, club) => sum + club.length, 0) / clubs.length;
+  const meanLoft = clubs.reduce((sum, club) => sum + club.loftAngle, 0) / clubs.length;
+
+  let numerator = 0;
+  let denominator = 0;
+  for (const club of clubs) {
+    const dx = club.length - meanLength;
+    numerator += dx * (club.loftAngle - meanLoft);
+    denominator += dx * dx;
+  }
+
+  if (Math.abs(denominator) < 0.0001) {
+    return getLoftLengthFallbackRegression(meanLength, meanLoft);
+  }
+
+  const slope = numerator / denominator;
+  if (!Number.isFinite(slope) || slope > -4 || slope < -10) {
+    return getLoftLengthFallbackRegression(meanLength, meanLoft);
+  }
+
+  return {
+    slope,
+    intercept: meanLoft - slope * meanLength,
+  };
+};
+
+export const getExpectedLoftAngle = (length: number, regression: WeightRegression) =>
+  regression.slope * length + regression.intercept;
+
 const getLieLengthFallbackRegression = (
   anchorLength: number,
   anchorLieAngle: number,
@@ -378,6 +434,40 @@ export const getLieLengthChartBounds = (
     maxLieAngle,
     xInterval: maxLength - minLength <= 12 ? 1 : 2,
     yInterval: yRange <= 8 ? 1 : 2,
+  };
+};
+
+export const getLoftLengthChartBounds = (
+  points: LoftLengthPoint[],
+  regression: WeightRegression,
+) => {
+  const lengths = points.map((club) => club.length);
+  const loftAngles = points.map((club) => club.loftAngle);
+  const expectedLofts = points.map((club) => club.expectedLoft);
+
+  const minLength = Math.max(28, Math.floor(Math.min(...lengths) - 1));
+  const maxLength = Math.min(50, Math.ceil(Math.max(...lengths) + 1));
+  const projectedMinLoft = getExpectedLoftAngle(maxLength, regression) - 2;
+  const projectedMaxLoft = getExpectedLoftAngle(minLength, regression) + 2;
+
+  const minLoft = Math.max(
+    7,
+    Math.floor((Math.min(...loftAngles, ...expectedLofts, projectedMinLoft) - 1) * 2) / 2,
+  );
+  const maxLoft = Math.min(
+    63,
+    Math.ceil((Math.max(...loftAngles, ...expectedLofts, projectedMaxLoft) + 1) * 2) / 2,
+  );
+
+  const loftRange = maxLoft - minLoft;
+
+  return {
+    minLength,
+    maxLength,
+    minLoft,
+    maxLoft,
+    xInterval: maxLength - minLength <= 12 ? 1 : 2,
+    yInterval: loftRange <= 20 ? 2 : 4,
   };
 };
 
