@@ -19,8 +19,10 @@ interface ClubFormProps {
   isLoading?: boolean;
 }
 
-type ClubFormData = Omit<GolfClub, 'id' | 'clubType'> & {
+type ClubFormData = Omit<GolfClub, 'id' | 'clubType' | 'lengthStandard' | 'lengthAdjustment'> & {
   clubType: ClubCategory | '';
+  lengthStandard: number;
+  lengthAdjustment: number;
 };
 
 const EMPTY_FORM_DATA: ClubFormData = {
@@ -28,6 +30,8 @@ const EMPTY_FORM_DATA: ClubFormData = {
   name: '',
   number: '',
   length: 0,
+  lengthStandard: 0,
+  lengthAdjustment: 0,
   weight: 0,
   swingWeight: '',
   lieAngle: 0,
@@ -44,11 +48,16 @@ const toFormData = (source?: GolfClub): ClubFormData => {
     return { ...EMPTY_FORM_DATA };
   }
 
+  const derivedStandard = source.lengthStandard ?? source.length;
+  const derivedAdjustment = source.lengthAdjustment ?? (source.length - derivedStandard);
+
   return {
     clubType: source.clubType,
     name: source.name,
     number: source.number,
     length: source.length,
+    lengthStandard: derivedStandard,
+    lengthAdjustment: derivedAdjustment,
     weight: source.weight,
     swingWeight: source.swingWeight,
     lieAngle: source.lieAngle,
@@ -72,6 +81,24 @@ export const ClubForm: React.FC<ClubFormProps> = ({
   ));
   const [formData, setFormData] = useState<ClubFormData>(() => toFormData(club));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showLengthBreakdown, setShowLengthBreakdown] = useState<boolean>(() =>
+    club !== undefined && (club.lengthStandard != null || club.lengthAdjustment != null)
+  );
+
+  const toggleLengthBreakdown = () => {
+    setShowLengthBreakdown((prev) => {
+      if (!prev) {
+        // 内訳を開く: 現在の長さを標準長さに初期値として設定
+        setFormData((fd) => {
+          if (fd.lengthStandard === 0 && fd.lengthAdjustment === 0 && fd.length > 0) {
+            return { ...fd, lengthStandard: fd.length, lengthAdjustment: 0 };
+          }
+          return fd;
+        });
+      }
+      return !prev;
+    });
+  };
 
   const applyClubTypeChange = (clubType: ClubCategory) => {
     const nextNumber = CLUB_NUMBER_DEFAULT[clubType];
@@ -86,6 +113,8 @@ export const ClubForm: React.FC<ClubFormProps> = ({
       const defaults = buildClubDefaults(clubType);
       setFormData((prev) => ({
         ...defaults,
+        lengthStandard: defaults.length,
+        lengthAdjustment: 0,
         name: prev.name,
         swingWeight: clubType === 'Putter' ? '' : defaults.swingWeight,
       }));
@@ -111,6 +140,12 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     setErrors((prev) => ({ ...prev, [name]: '' }));
 
     setFormData((prev) => {
+      if (name === 'lengthStandard' || name === 'lengthAdjustment') {
+        const val = parseFloat(value) || 0;
+        const std = name === 'lengthStandard' ? val : prev.lengthStandard;
+        const adj = name === 'lengthAdjustment' ? val : prev.lengthAdjustment;
+        return { ...prev, [name]: val, length: std + adj };
+      }
       if (name === 'torque') {
         return { ...prev, [name]: parseFloat(value) || 0 };
       }
@@ -150,6 +185,8 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         const defaults = buildClubDefaultsByTypeAndNumber(prev.clubType, value);
         return {
           ...defaults,
+          lengthStandard: defaults.length,
+          lengthAdjustment: 0,
           clubType: prev.clubType,
           name: prev.name,
           number: value,
@@ -389,10 +426,52 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           )}
         </div>
 
-        {/* Length, Weight Row */}
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="length">長さ(インチ)</label>
+        {/* Length field with optional breakdown */}
+        <div className="form-group">
+          <label htmlFor="length">
+            長さ(インチ)
+            <button
+              type="button"
+              className="length-breakdown-toggle"
+              onClick={toggleLengthBreakdown}
+            >
+              {showLengthBreakdown ? '▲ 内訳を隠す' : '▼ 内訳を入力'}
+            </button>
+          </label>
+          {showLengthBreakdown ? (
+            <div className="length-breakdown-inputs">
+              <div className="length-breakdown-field">
+                <span className="length-breakdown-label">標準長さ(カタログ)</span>
+                <input
+                  type="number"
+                  name="lengthStandard"
+                  value={formData.lengthStandard || ''}
+                  onChange={handleChange}
+                  step="0.25"
+                  min="0"
+                  placeholder="例: 44.0"
+                />
+              </div>
+              <span className="length-op">+</span>
+              <div className="length-breakdown-field">
+                <span className="length-breakdown-label">調整</span>
+                <input
+                  type="number"
+                  name="lengthAdjustment"
+                  value={formData.lengthAdjustment || ''}
+                  onChange={handleChange}
+                  step="0.25"
+                  placeholder="例: 0.5"
+                />
+              </div>
+              <span className="length-op">=</span>
+              <div className="length-total">
+                <span className="length-total-label">合計</span>
+                <div className="length-total-value">{formData.length || 0}</div>
+              </div>
+              <span className="form-help-text length-breakdown-note">標準長さに対する調整値を入力すると、合計が長さとして保存されます。</span>
+            </div>
+          ) : (
             <input
               type="number"
               id="length"
@@ -402,25 +481,11 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               step="0.25"
               className={errors.length ? 'error' : ''}
             />
-            {errors.length && <span className="error-message">{errors.length}</span>}
-          </div>
-          <div className="form-group">
-            <label htmlFor="weight">重さ(グラム)</label>
-              <input
-                type="number"
-                id="weight"
-                name="weight"
-                value={formData.weight || ''}
-                onChange={handleChange}
-                step="0.1"
-                min="0"
-                max="999"
-              />
-          </div>
+          )}
+          {errors.length && <span className="error-message">{errors.length}</span>}
         </div>
 
-      {/* Lie Angle, Swing Weight Row */}
-      <div className="form-row">
+        {/* Lie Angle */}
         <div className="form-group">
           <label htmlFor="lieAngle">ライ角(度数)</label>
           <input
@@ -432,22 +497,38 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             step="0.5"
           />
         </div>
-        {formData.clubType !== 'Putter' && (
+
+        {/* Weight, Swing Weight Row */}
+        <div className="form-row">
           <div className="form-group">
-            <label htmlFor="swingWeight">バランス</label>
+            <label htmlFor="weight">重さ(グラム)</label>
             <input
-              type="text"
-              id="swingWeight"
-              name="swingWeight"
-              value={formData.swingWeight}
+              type="number"
+              id="weight"
+              name="weight"
+              value={formData.weight || ''}
               onChange={handleChange}
-              placeholder="例: C9, D0.5, E1"
-              className={errors.swingWeight ? 'error' : ''}
+              step="0.1"
+              min="0"
+              max="999"
             />
-            {errors.swingWeight && <span className="error-message">{errors.swingWeight}</span>}
           </div>
-        )}
-      </div>
+          {formData.clubType !== 'Putter' && (
+            <div className="form-group">
+              <label htmlFor="swingWeight">バランス</label>
+              <input
+                type="text"
+                id="swingWeight"
+                name="swingWeight"
+                value={formData.swingWeight}
+                onChange={handleChange}
+                placeholder="例: C9, D0.5, E1"
+                className={errors.swingWeight ? 'error' : ''}
+              />
+              {errors.swingWeight && <span className="error-message">{errors.swingWeight}</span>}
+            </div>
+          )}
+        </div>
 
       {/* Shaft, Torque, Flex Row */}
       <div className="form-row">

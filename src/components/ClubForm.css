@@ -105,6 +105,110 @@
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 12px;
+
+/* ─── 長さ内訳 ────────────────────────────────────────── */
+.form-group label .length-breakdown-toggle {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #3a7d44;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 8px;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.4;
+}
+
+.form-group label .length-breakdown-toggle:hover {
+  background: #c8e6c9;
+}
+
+.length-breakdown-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.length-breakdown-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 80px;
+}
+
+.length-breakdown-label {
+  font-size: 11px;
+  color: #556b59;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.length-breakdown-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d4e0d7;
+  background: #fbfdfb;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text);
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.length-breakdown-field input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.length-op {
+  font-size: 18px;
+  color: #718096;
+  font-weight: 700;
+  padding-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.length-total {
+  display: flex;
+  flex-direction: column;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.length-total-label {
+  font-size: 11px;
+  color: #556b59;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.length-total-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  background: #edf2f7;
+  border: 1px solid #cbd5e0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a202c;
+  min-height: 36px;
+}
+
+.length-breakdown-note {
+  flex-basis: 100%;
+  margin-top: 2px;
+}
 }
 
 .helper-title {

@@ -83,19 +83,19 @@ export const ClubCard: React.FC<ClubCardProps> = ({
             <>
               <div className="spec-row">
                 <span className="spec-label">ロフト角:</span>
-                  <span className="spec-value">{club.loftAngle ?? '-'}°</span>
+                <span className="spec-value">{club.loftAngle ?? '-'}°</span>
               </div>
               <div className="spec-row">
                 <span className="spec-label">長さ:</span>
                 <span className="spec-value">{club.length}"</span>
               </div>
               <div className="spec-row">
-                <span className="spec-label">重さ:</span>
-                <span className="spec-value">{club.weight}g</span>
+                <span className="spec-label">ライ角:</span>
+                <span className="spec-value">{club.lieAngle ?? '-'}°</span>
               </div>
               <div className="spec-row">
-                <span className="spec-label">ライ角:</span>
-                  <span className="spec-value">{club.lieAngle ?? '-'}°</span>
+                <span className="spec-label">重さ:</span>
+                <span className="spec-value">{club.weight}g</span>
               </div>
               {club.clubType !== 'Putter' && (
                 <div className="spec-row">

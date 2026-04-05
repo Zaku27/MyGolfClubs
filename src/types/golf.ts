@@ -7,7 +7,9 @@ export interface GolfClub {
   clubType: ClubCategory; // Fixed categories: Driver, Wood, Hybrid, Iron, Wedge, Putter
   name: string; // Manufacturer + Model only, e.g., "Ping G430", "Titleist T150"
   number: string; // Club number / loft designation, e.g., "7", "PW", "W", "3W", "4H", "SW"
-  length: number; // inches
+  length: number; // inches (合計長さ)
+  lengthStandard?: number; // 標準長さ（インチ）
+  lengthAdjustment?: number; // 調整（インチ）
   weight: number; // grams
   swingWeight: string; // e.g., D0, D2
   lieAngle: number; // degrees
