@@ -1,12 +1,11 @@
 import type { Hole } from "../../types/game";
 import type { GolfClub } from "../../types/golf";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { useGameStore } from "../../store/gameStore";
 import { toSimClub } from "../../utils/clubSimAdapter";
 import { COURSE_1HOLE, COURSE_3HOLES, COURSE_9HOLES, COURSE_18HOLES } from "../../data/defaultCourses";
 import { HoleView } from "./HoleView";
-import { PostRoundAnalysis } from "./PostRoundAnalysis";
 import { CourseEditor } from "./CourseEditor";
 import { cloneCourse, generateRandomCourse } from "../../utils/courseGenerator";
 import { readStoredJson, writeStoredJson } from "../../utils/storage";
@@ -159,6 +158,78 @@ function normalizeHoleCount(value: unknown): 1 | 3 | 9 | 18 {
   return 9;
 }
 
+type CustomCourseLibraryExportPayload = {
+  format: 'custom-course-library-v1';
+  exportedAt: string;
+  courses: CustomCoursePreset[];
+};
+
+function createCustomCourseLibraryFileName(): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `custom_course_library_${timestamp}.json`;
+}
+
+function downloadCustomCourseLibraryAsJson(courses: CustomCoursePreset[]): void {
+  const payload: CustomCourseLibraryExportPayload = {
+    format: 'custom-course-library-v1',
+    exportedAt: new Date().toISOString(),
+    courses,
+  };
+
+  const data = JSON.stringify(payload, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+
+  anchor.href = url;
+  anchor.download = createCustomCourseLibraryFileName();
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+function parseImportedCustomCourses(value: unknown): CustomCoursePreset[] {
+  const normalizedPreset = (preset: unknown, fallbackName: string) =>
+    normalizePreset(preset as Partial<CustomCoursePreset>, fallbackName);
+
+  if (!value || typeof value !== 'object') {
+    throw new Error('JSON形式が不正です');
+  }
+
+  const payload = value as Record<string, unknown>;
+
+  if (payload.format === 'custom-course-library-v1' && Array.isArray(payload.courses)) {
+    return payload.courses
+      .map((course, index) => normalizedPreset(course, `インポートコース ${index + 1}`))
+      .filter((course): course is CustomCoursePreset => course !== null);
+  }
+
+  if (payload.format === 'custom-course-v1' && payload.course) {
+    const course = normalizedPreset(payload.course, 'インポートコース');
+    return course ? [course] : [];
+  }
+
+  if (Array.isArray(payload)) {
+    return payload
+      .map((item, index) => normalizedPreset(item, `インポートコース ${index + 1}`))
+      .filter((course): course is CustomCoursePreset => course !== null);
+  }
+
+  if ('courses' in payload && Array.isArray(payload.courses)) {
+    return payload.courses
+      .map((course, index) => normalizedPreset(course, `インポートコース ${index + 1}`))
+      .filter((course): course is CustomCoursePreset => course !== null);
+  }
+
+  if ('course' in payload) {
+    const course = normalizedPreset(payload, 'インポートコース');
+    return course ? [course] : [];
+  }
+
+  throw new Error('インポートできるコースデータが見つかりません');
+}
+
 function parseStoredCustomCourse(value: unknown): CustomCourseStorage {
   const fallbackPreset = buildDefaultPreset();
   const fallback: CustomCourseStorage = {
@@ -247,6 +318,8 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
   const [customNameInput, setCustomNameInput] = useState(initialPreset.name);
   const [customHoleCount, setCustomHoleCount] = useState<1 | 3 | 9 | 18>(initialPreset.holeCount);
   const [customCourse, setCustomCourse] = useState<Hole[]>(cloneCourse(initialPreset.course));
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bagQuery = typeof bagId === 'number' ? `?bagId=${bagId}` : '';
   const clubCount = playMode === "robot" ? robotClubCount : bagClubCount;
   const selectedCustomCourseIndex = savedCustomCourses.findIndex((course) => course.id === selectedCustomCourseId);
@@ -306,6 +379,56 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
       };
     }));
     setCustomNameInput(name);
+  };
+
+  const handleExportCustomCourseLibrary = () => {
+    downloadCustomCourseLibraryAsJson(savedCustomCourses);
+  };
+
+  const handleImportCustomCourseFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    setImportError(null);
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const importedCourses = parseImportedCustomCourses(parsed);
+
+      if (importedCourses.length === 0) {
+        throw new Error('インポートできるコースが見つかりません');
+      }
+
+      const nextCourses = [...savedCustomCourses];
+      const normalizedNewCourses = importedCourses.map((course) => {
+        const name = createUniqueCourseName(course.name, nextCourses);
+        const nextCourse: CustomCoursePreset = {
+          ...course,
+          id: createCourseId(),
+          name,
+        };
+        nextCourses.push(nextCourse);
+        return nextCourse;
+      });
+
+      const selected = normalizedNewCourses[0];
+
+      setSavedCustomCourses(nextCourses);
+      setSelectedCustomCourseId(selected.id);
+      setCustomNameInput(selected.name);
+      setCustomHoleCount(selected.holeCount);
+      setCustomCourse(cloneCourse(selected.course));
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'インポートに失敗しました');
+    }
+  };
+
+  const handleOpenImportDialog = () => {
+    fileInputRef.current?.click();
   };
 
   const handleMoveSelected = (direction: "up" | "down") => {
@@ -529,6 +652,20 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
           </button>
           <button
             type="button"
+            onClick={handleExportCustomCourseLibrary}
+            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
+          >
+            ライブラリをエクスポート
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenImportDialog}
+            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
+          >
+            ライブラリをインポート
+          </button>
+          <button
+            type="button"
             onClick={handleDeleteSelected}
             disabled={savedCustomCourses.length <= 1}
             className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-900 disabled:cursor-not-allowed disabled:opacity-50"
@@ -553,6 +690,18 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
           </button>
           <span className="text-xs text-emerald-700">保存済み: {savedCustomCourses.length}件</span>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          onChange={handleImportCustomCourseFile}
+          className="hidden"
+        />
+        {importError && (
+          <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+            {importError}
+          </div>
+        )}
 
         <CourseEditor holes={customCourse} onChange={setCustomCourse} />
 
@@ -591,10 +740,8 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
 export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, bagId }: Props) {
   const {
     phase,
-    course,
     startRound,
     resetGame,
-    showResultModal,
   } = useGameStore();
   const [showDetailedScorecard, setShowDetailedScorecard] = useState(false);
   const bagSource = selectedClubs;
@@ -620,50 +767,23 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
     );
   }
 
-  // Show Scorecard only after dismissing the final hole result modal
-  if (phase === "round_complete" && !showResultModal) {
-    const shouldShowPostAnalysis = course.length === 9 || course.length === 18;
-
-    if (!shouldShowPostAnalysis) {
-      return (
-        <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 p-4 overflow-y-auto">
-          <Scorecard onPlayAgain={resetGame} onBack={onBack} />
-        </div>
-      );
-    }
-
-    if (showDetailedScorecard) {
-      return (
-        <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 p-4 overflow-y-auto">
-          <Scorecard onPlayAgain={() => { setShowDetailedScorecard(false); resetGame(); }} onBack={() => { setShowDetailedScorecard(false); resetGame(); onBack(); }} />
-        </div>
-      );
-    }
-
+  if (phase === "round_complete" && showDetailedScorecard) {
     return (
-      <PostRoundAnalysis
-        onPlayAnotherRound={() => {
-          setShowDetailedScorecard(false);
-          resetGame();
-        }}
-        onViewDetailedScorecard={() => setShowDetailedScorecard(true)}
-        onBackToMenu={() => {
-          setShowDetailedScorecard(false);
-          resetGame();
-          onBack();
-        }}
-      />
+      <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 p-4 overflow-y-auto">
+        <Scorecard
+          onPlayAgain={() => { setShowDetailedScorecard(false); resetGame(); }}
+          onBack={() => { setShowDetailedScorecard(false); resetGame(); onBack(); }}
+        />
+      </div>
     );
   }
 
-  // Playing / hole_complete (modal open) / round_complete (modal open) → HoleView
   return (
     <>
       <HoleView
         onBack={() => { resetGame(); onBack(); }}
         onViewFinalScorecard={() => {
           setShowDetailedScorecard(true);
-          useGameStore.getState().dismissResult();
         }}
       />
 

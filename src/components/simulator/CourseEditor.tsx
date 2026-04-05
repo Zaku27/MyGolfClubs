@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Hazard, HazardType, Hole } from "../../types/game";
 import { generateRandomCourse } from "../../utils/courseGenerator";
 import { buildAutoHazardName } from "../../utils/shotOutcome";
@@ -54,6 +54,16 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
   const safeHoleIndex = Math.max(0, Math.min(selectedHoleIndex, holes.length - 1));
   const selectedHole = holes[safeHoleIndex];
+
+  useEffect(() => {
+    if (selectedHoleIndex >= holes.length) {
+      setSelectedHoleIndex(Math.max(0, holes.length - 1));
+    }
+  }, [holes.length, selectedHoleIndex]);
+
+  useEffect(() => {
+    setSelectedHazardId(null);
+  }, [safeHoleIndex]);
 
   const selectedHazard = useMemo(
     () => selectedHole?.hazards?.find((hazard) => hazard.id === selectedHazardId) ?? null,
@@ -217,6 +227,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
           landingResults={[]}
           showTrajectories={false}
           editable
+          currentHoleKey={selectedHole.number}
           selectedHazardId={selectedHazardId}
           onSelectHazardId={setSelectedHazardId}
           onHazardsChange={updateSelectedHoleHazards}

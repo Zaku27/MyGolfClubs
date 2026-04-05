@@ -1,5 +1,5 @@
 import { useGameStore } from "../../store/gameStore";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { LieType, SimClub } from "../../types/game";
 import { useClubStore } from "../../store/clubStore";
 import { estimateBaseDistance } from "../../utils/shotSimulation";
@@ -68,20 +68,18 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     lastShotResult,
     playMode,
     playerSkillLevel,
+    shotInProgress,
   } = useGameStore();
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [showMobileScorecard, setShowMobileScorecard] = useState(false);
   const [selectedClub, setSelectedClub] = useState<SimClub | null>(null);
   const [landingHistory, setLandingHistory] = useState<LandingResult[]>([]);
-  const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ショット結果モーダルが閉じられたらクラブ選択をリセット
-  const showResultModal = useGameStore((state) => state.showResultModal);
   useEffect(() => {
-    if (!showResultModal) {
+    if (lastShotResult) {
       setSelectedClub(null);
     }
-  }, [showResultModal]);
+  }, [lastShotResult]);
 
   useEffect(() => {
     const landing = lastShotResult?.landing;
@@ -93,33 +91,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   useEffect(() => {
     setLandingHistory([]);
   }, [currentHoleIndex]);
-
-  useEffect(() => {
-    if (autoDismissTimerRef.current) {
-      clearTimeout(autoDismissTimerRef.current);
-      autoDismissTimerRef.current = null;
-    }
-
-    if (!showResultModal || !lastShotResult) {
-      return;
-    }
-
-    if (phase === "hole_complete" || phase === "round_complete") {
-      return;
-    }
-
-    autoDismissTimerRef.current = setTimeout(() => {
-      useGameStore.getState().dismissResult();
-      autoDismissTimerRef.current = null;
-    }, 800);
-
-    return () => {
-      if (autoDismissTimerRef.current) {
-        clearTimeout(autoDismissTimerRef.current);
-        autoDismissTimerRef.current = null;
-      }
-    };
-  }, [lastShotResult, phase, showResultModal]);
   const personalData = useClubStore((state) => state.personalData);
   const allClubs = useClubStore((state) => state.clubs);
 
@@ -139,6 +110,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       : cumulativeRelativeToPar < 0
         ? `${cumulativeRelativeToPar}`
         : "E";
+  const showScoreDisplay = currentHoleIndex > 0 || phase !== "playing";
+  const isResultActionVisible = phase === "hole_complete" || phase === "round_complete";
   const analysisPenaltyByClubId = useMemo(
     () => buildAnalysisPenaltyByClubId(allClubs),
     [allClubs],
@@ -248,48 +221,91 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const transientLandingResult = lastShotResult?.finalOutcome === "ob"
     ? (lastShotResult.landing ?? null)
     : null;
+  const isGreenLie = lie === "green";
+  const isHoleComplete = phase === "hole_complete" || phase === "round_complete";
+  const currentStatusLabel = isHoleComplete
+    ? phase === "round_complete"
+      ? "ラウンド完了"
+      : "ホール完了"
+    : isGreenLie
+      ? "グリーン上"
+      : `ライ: ${LIE_LABEL[lie]}`;
+  const currentStrokeLabel = isHoleComplete
+    ? `${holeStrokes}打でホールアウト`
+    : isGreenLie
+      ? `${holeStrokes + 1}打目 (パット)`
+      : `${holeStrokes + 1}打目`;
+  const shotResultTitle = lastShotResult?.newRemainingDistance === 0 ? "最終結果" : "結果";
+  const showGreenRemaining = lastShotResult?.finalOutcome === "green" && (lastShotResult.newRemainingDistance ?? 0) > 0;
+  const resultDistanceLabel = lastShotResult?.finalOutcome === "green"
+    ? `パット距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}y`
+    : `飛距離: ${((lastShotResult?.landing?.totalDistance ?? lastShotResult?.distanceHit ?? 0)).toFixed(1)}y`;
+  const resultOutcomeLabel = lastShotResult?.finalOutcome === "green"
+    ? lastShotResult.newRemainingDistance === 0
+      ? "カップイン"
+      : "グリーン"
+    : lastShotResult?.finalOutcome === "fairway"
+      ? "フェアウェイ"
+      : lastShotResult?.finalOutcome === "rough"
+        ? "ラフ"
+        : lastShotResult?.finalOutcome === "bunker"
+          ? "バンカー"
+          : lastShotResult?.finalOutcome === "water"
+            ? "ウォーター"
+            : "OB";
+  const showShotBadges = !isGreenLie;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 text-emerald-900">
       <div className="fixed inset-x-0 top-0 z-20 border-b border-emerald-300 bg-emerald-50/90 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 text-xs font-semibold tracking-wide text-emerald-800 sm:h-16 sm:gap-4 sm:text-sm">
-          <div className="flex items-center justify-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <span>{currentHole.number}H</span>
             <span className="text-emerald-500">|</span>
             <span>PAR {currentHole.par}</span>
             <span className="text-emerald-500">|</span>
-            <span>スコア {scoreLabel}</span>
-            <span className="text-emerald-500">|</span>
-            <span>残り {remainingDistance}ヤード</span>
+            <span>{currentHole.distanceFromTee}ヤード</span>
           </div>
-          <button
-            type="button"
-            onClick={handleQuitGame}
-            className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-rose-400/70 hover:text-rose-700 sm:text-xs"
-          >
-            ラウンド終了
-          </button>
+          <div className="flex items-center gap-3 sm:gap-4">
+            {showScoreDisplay && (
+              <span className="font-semibold text-emerald-900">スコア {scoreLabel}</span>
+            )}
+            <button
+              type="button"
+              onClick={handleQuitGame}
+              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-rose-400/70 hover:text-rose-700 sm:text-xs"
+            >
+              ラウンド終了
+            </button>
+          </div>
         </div>
       </div>
 
       <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 pb-8 pt-20 sm:px-6 sm:pt-24">
+        {shotInProgress && (
+          <div className="fixed inset-0 z-50 cursor-wait bg-black/0 pointer-events-auto" />
+        )}
         <div className="mb-4 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setShowMobileScorecard((prev) => !prev)}
-            className="w-full rounded-xl border border-emerald-300 bg-emerald-50/90 px-4 py-2 text-sm font-bold text-emerald-800 transition hover:border-emerald-500"
-          >
-            {showMobileScorecard ? "スコアカードを閉じる" : "スコアカードを開く"}
-          </button>
-          {showMobileScorecard && (
-            <CompactScorecard
-              course={course}
-              scores={scores}
-              currentHoleIndex={currentHoleIndex}
-              holeStrokes={holeStrokes}
-              phase={phase}
-              className="mt-3"
-            />
+          {showScoreDisplay && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowMobileScorecard((prev) => !prev)}
+                className="w-full rounded-xl border border-emerald-300 bg-emerald-50/90 px-4 py-2 text-sm font-bold text-emerald-800 transition hover:border-emerald-500"
+              >
+                {showMobileScorecard ? "スコアカードを閉じる" : "スコアカードを開く"}
+              </button>
+              {showMobileScorecard && (
+                <CompactScorecard
+                  course={course}
+                  scores={scores}
+                  currentHoleIndex={currentHoleIndex}
+                  holeStrokes={holeStrokes}
+                  phase={phase}
+                  className="mt-3"
+                />
+              )}
+            </>
           )}
 
           <section className="mt-3 rounded-3xl border border-emerald-300 bg-emerald-50/90 px-4 py-5 shadow-sm shadow-emerald-300/30 sm:px-6 sm:py-6">
@@ -351,8 +367,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           <h1 className="mt-4 text-4xl font-extrabold leading-tight text-emerald-900 sm:text-6xl">
             ピンまで {remainingDistance}ヤード
           </h1>
-          <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">ライ: {LIE_LABEL[lie]}</p>
-          <p className="mt-1 text-lg font-medium text-emerald-800 sm:text-2xl">{holeStrokes + 1}打目</p>
+          <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStatusLabel}</p>
+          <p className="mt-1 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStrokeLabel}</p>
 
 
 
@@ -360,46 +376,41 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         {lastShotResult && (
           <div className="mt-8 w-full max-w-md mx-auto rounded-2xl border border-emerald-300 bg-emerald-50/95 p-5 shadow-xl shadow-emerald-300/40">
             <div className="mb-4 rounded-3xl border border-emerald-200 bg-emerald-100 px-4 py-6 text-center shadow-sm shadow-emerald-100/80">
-              <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">最終結果</div>
+              <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">{shotResultTitle}</div>
               <div className="mt-3 text-3xl font-bold text-emerald-900">
-                {lastShotResult.finalOutcome === "green"
-                  ? "グリーン"
-                  : lastShotResult.finalOutcome === "fairway"
-                  ? "フェアウェイ"
-                  : lastShotResult.finalOutcome === "rough"
-                  ? "ラフ"
-                  : lastShotResult.finalOutcome === "bunker"
-                  ? "バンカー"
-                  : lastShotResult.finalOutcome === "water"
-                  ? "ウォーター"
-                  : "OB"}
+                {resultOutcomeLabel}
               </div>
               {lastShotResult.penaltyStrokes > 0 && (
                 <p className="mt-2 text-sm text-rose-700">罰打 +{lastShotResult.penaltyStrokes}</p>
               )}
               <p className="mt-2 text-lg font-semibold text-emerald-800">
-                飛距離: {(lastShotResult.landing?.totalDistance ?? lastShotResult.distanceHit).toFixed(1)}ヤード
+                {resultDistanceLabel}
               </p>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
-              <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                {SHOT_QUALITY_LABEL[lastShotResult.shotQuality] ?? lastShotResult.shotQuality}
-              </span>
-              {lastShotResult.landing && (
-                <>
-                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                    キャリー {lastShotResult.landing.carry.toFixed(1)}y
-                  </span>
-                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                    ラン {lastShotResult.landing.roll.toFixed(1)}y
-                  </span>
-                  <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                    着地 X:{lastShotResult.landing.finalX.toFixed(1)} / Y:{lastShotResult.landing.finalY.toFixed(1)}
-                  </span>
-                </>
+              {showGreenRemaining && (
+                <p className="mt-2 text-sm text-sky-800">残り {lastShotResult.newRemainingDistance}ヤード</p>
               )}
             </div>
+
+            {showShotBadges && (
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
+                <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                  {SHOT_QUALITY_LABEL[lastShotResult.shotQuality] ?? lastShotResult.shotQuality}
+                </span>
+                {lastShotResult.landing && (
+                  <>
+                    <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                      キャリー {lastShotResult.landing.carry.toFixed(1)}y
+                    </span>
+                    <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                      ラン {lastShotResult.landing.roll.toFixed(1)}y
+                    </span>
+                    <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                      着地 X:{lastShotResult.landing.finalX.toFixed(1)} / Y:{lastShotResult.landing.finalY.toFixed(1)}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
               {lastShotResult.confidenceBoostApplied && (
                 <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
                   勢いボーナス適用
@@ -422,7 +433,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 </button>
               ) : phase === "round_complete" ? (
                 <button
-                  onClick={onViewFinalScorecard ?? useGameStore.getState().dismissResult}
+                  onClick={onViewFinalScorecard}
                   className="w-full rounded-xl bg-amber-400 py-3 text-sm font-bold text-emerald-950 transition hover:bg-amber-300"
                 >
                   スコアカードを見る
@@ -458,9 +469,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           {/* ショットボタン */}
           <button
             type="button"
-            disabled={!selectedClub}
+            disabled={!selectedClub || shotInProgress || isResultActionVisible}
             onClick={() => {
-              if (selectedClub) {
+              if (selectedClub && !isResultActionVisible) {
                 selectClub(selectedClub.id);
                 takeShot();
               }
@@ -468,7 +479,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             className={[
               "w-full rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
               "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
-              selectedClub ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500" : "cursor-not-allowed bg-emerald-200 text-emerald-500"
+              selectedClub && !shotInProgress && !isResultActionVisible
+                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500"
+                : "cursor-not-allowed bg-emerald-200 text-emerald-500"
             ].join(" ")}
           >
             ショット
@@ -489,7 +502,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               onChange={e => setShotPowerPercent(Number(e.target.value))}
               className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
               aria-label="ショットパワー"
-              disabled={!selectedClub}
+              disabled={!selectedClub || isResultActionVisible}
             />
             <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
               <span>0%</span>
@@ -501,84 +514,88 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         </section>
 
 
-        <section className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 sm:mt-8 sm:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-bold text-emerald-900 sm:text-2xl">
-              {showAllClubs ? `全クラブ (${bag.length}本)` : "おすすめクラブ"}
-            </h2>
-            {bag.length > recommendedClubs.length && (
-              <button
-                type="button"
-                onClick={() => setShowAllClubs((prev) => !prev)}
-                className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-sm"
-              >
-                {showAllClubs ? "おすすめに戻す" : "全クラブを見る"}
-              </button>
-            )}
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {clubsToRender.map((club) => {
-              const isRecommended = !showAllClubs && recommendedClubIds.has(club.id);
-              const effectiveRate = clubPreview.get(club.id)?.effectiveRate ?? club.successRate;
-              const todayStats = clubStatsToday.get(club.id);
-              const todayRate = todayStats && todayStats.attempts > 0
-                ? Math.round((todayStats.successes / todayStats.attempts) * 100)
-                : null;
-
-              return (
+        {!isResultActionVisible && (
+          <section className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 sm:mt-8 sm:px-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-emerald-900 sm:text-2xl">
+                {showAllClubs ? `全クラブ (${bag.length}本)` : "おすすめクラブ"}
+              </h2>
+              {bag.length > recommendedClubs.length && (
                 <button
-                  key={club.id}
                   type="button"
-                  onClick={() => setSelectedClub(club)}
-                  className={[
-                    "w-full rounded-xl border bg-emerald-50 p-4 text-left transition active:scale-[0.99]",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70",
-                    isRecommended
-                      ? "border-emerald-400/80 shadow-sm shadow-emerald-200/60"
-                      : "border-emerald-200 hover:border-emerald-400/80",
-                    selectedClub && selectedClub.id === club.id ? "ring-2 ring-emerald-400" : ""
-                  ].join(" ")}
+                  onClick={() => setShowAllClubs((prev) => !prev)}
+                  className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-sm"
                 >
-                  <div className="flex items-center gap-2">
-                    <p className="flex items-center gap-2 text-base font-bold text-emerald-900">
-                      <span className="rounded-md bg-emerald-700 px-2 py-0.5 text-xs font-semibold text-white">
-                        {formatSimClubLabel(club)}
-                      </span>
-                      <span>{club.name}</span>
-                    </p>
-                    {showAllClubs && recommendedClubIds.has(club.id) && (
-                      <span className="rounded-full border border-lime-300/70 bg-lime-100 px-2 py-0.5 text-[11px] font-bold tracking-[0.12em] text-lime-800">
-                        おすすめ5本
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-sm text-emerald-700">推定飛距離: {estimatedDistanceByClub.get(club.id) ?? 0}ヤード</p>
-                  <p className="mt-1 text-sm text-emerald-700">
-                    クラブ成功率: {effectiveRate}%
-                  </p>
-                  {todayRate !== null && (
-                    <p className="mt-1 text-xs text-emerald-700">
-                      今日の成功: {todayStats?.successes}/{todayStats?.attempts}本 ({todayRate}%)
-                    </p>
-                  )}
+                  {showAllClubs ? "おすすめに戻す" : "全クラブを見る"}
                 </button>
-              );
-            })}
-          </div>
+              )}
+            </div>
 
-          {/* ...existing code... */}
-        </section>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {clubsToRender.map((club) => {
+                const isRecommended = !showAllClubs && recommendedClubIds.has(club.id);
+                const effectiveRate = clubPreview.get(club.id)?.effectiveRate ?? club.successRate;
+                const todayStats = clubStatsToday.get(club.id);
+                const todayRate = todayStats && todayStats.attempts > 0
+                  ? Math.round((todayStats.successes / todayStats.attempts) * 100)
+                  : null;
+
+                return (
+                  <button
+                    key={club.id}
+                    type="button"
+                    onClick={() => setSelectedClub(club)}
+                    className={[
+                      "w-full rounded-xl border bg-emerald-50 p-4 text-left transition active:scale-[0.99]",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70",
+                      isRecommended
+                        ? "border-emerald-400/80 shadow-sm shadow-emerald-200/60"
+                        : "border-emerald-200 hover:border-emerald-400/80",
+                      selectedClub && selectedClub.id === club.id ? "ring-2 ring-emerald-400" : ""
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <p className="flex items-center gap-2 text-base font-bold text-emerald-900">
+                        <span className="rounded-md bg-emerald-700 px-2 py-0.5 text-xs font-semibold text-white">
+                          {formatSimClubLabel(club)}
+                        </span>
+                        <span>{club.name}</span>
+                      </p>
+                      {showAllClubs && recommendedClubIds.has(club.id) && (
+                        <span className="rounded-full border border-lime-300/70 bg-lime-100 px-2 py-0.5 text-[11px] font-bold tracking-[0.12em] text-lime-800">
+                          おすすめ5本
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm text-emerald-700">推定飛距離: {estimatedDistanceByClub.get(club.id) ?? 0}ヤード</p>
+                    <p className="mt-1 text-sm text-emerald-700">
+                      クラブ成功率: {effectiveRate}%
+                    </p>
+                    {todayRate !== null && (
+                      <p className="mt-1 text-xs text-emerald-700">
+                        今日の成功: {todayStats?.successes}/{todayStats?.attempts}本 ({todayRate}%)
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ...existing code... */}
+          </section>
+        )}
           </div>
 
         <aside className="hidden lg:sticky lg:top-24 lg:block">
-          <CompactScorecard
-            course={course}
-            scores={scores}
-            currentHoleIndex={currentHoleIndex}
-            holeStrokes={holeStrokes}
-            phase={phase}
-          />
+          {showScoreDisplay && (
+            <CompactScorecard
+              course={course}
+              scores={scores}
+              currentHoleIndex={currentHoleIndex}
+              holeStrokes={holeStrokes}
+              phase={phase}
+            />
+          )}
 
           <section className="mt-4 rounded-3xl border border-emerald-300 bg-emerald-50/90 px-3 py-4 shadow-sm shadow-emerald-300/30">
             <div className="flex items-center justify-between gap-2">

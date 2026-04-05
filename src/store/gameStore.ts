@@ -80,7 +80,7 @@ interface GameStoreState {
   selectedClubId: string | null;
   shotPowerPercent: number;
   riskLevel: RiskLevel;
-  showResultModal: boolean;
+  shotInProgress: boolean;
   currentHoleShots: ShotLog[];
   roundShots: ShotLog[];
   lastHoleSummary: HoleSummary | null;
@@ -99,7 +99,6 @@ interface GameStoreActions {
   setShotPowerPercent: (powerPercent: number) => void;
   setRiskLevel: (risk: RiskLevel) => void;
   takeShot: () => void;
-  dismissResult: () => void;
   advanceHole: () => void;
   resetGame: () => void;
 }
@@ -123,7 +122,7 @@ const INITIAL_STATE: GameStoreState = {
   selectedClubId: null,
   shotPowerPercent: 100,
   riskLevel: "normal",
-  showResultModal: false,
+  shotInProgress: false,
   currentHoleShots: [],
   roundShots: [],
   lastHoleSummary: null,
@@ -259,118 +258,120 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const club = bag.find((c) => c.id === selectedClubId);
     if (!club) return;
 
-    const isRobotMode = playMode === "robot";
-    const allClubs = useClubStore.getState().clubs;
-    const analysisPenaltyByClubId = buildAnalysisPenaltyByClubId(allClubs);
-    const analysisPenaltyPoints = analysisPenaltyByClubId[club.id] ?? 0;
-    const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(
-      club,
-      analysisPenaltyPoints,
-    );
-    const treatedAsWeakClub = isWeakClubByAnalysisAdjustedRate(club, analysisPenaltyPoints);
-    const clubPersonalData = resolvePersonalDataForSimClub(club, useClubStore.getState().personalData);
-    const clubForSimulation = isRobotMode
-      ? { ...club, successRate: 100, isWeakClub: false }
-      : {
-          ...club,
-          successRate: adjustedBaseSuccessRate,
-          isWeakClub: treatedAsWeakClub,
-        };
+    set({ shotInProgress: true });
 
-    // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
-    const isPutter = club.type === "Putter";
-    const result = simulateShot(clubForSimulation, shotContext, riskLevel, {
-      confidenceBoost,
-      personalData: isRobotMode ? undefined : clubPersonalData,
-      playerSkillLevel: isRobotMode
-        ? (isPutter ? playerSkillLevel : 1)
-        : playerSkillLevel,
-      forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
-      shotPowerPercent,
-      useStoredDistance: !isRobotMode,
-      shotIndex: currentHoleShots.length,
-      seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
-    });
-    const newHoleStrokes = holeStrokes + result.strokesAdded;
-    const confidenceBoostApplied = result.confidenceBoostApplied === true;
-    const streakAfterShot = confidenceBoostApplied
-      ? (result.wasSuccessful ? 1 : 0)
-      : (result.wasSuccessful ? goodShotStreak + 1 : 0);
-    const nextConfidenceBoost = !confidenceBoostApplied && streakAfterShot === 3 ? 6 : 0;
-    const shotLog: ShotLog = {
-      holeNumber: course[currentHoleIndex].number,
-      clubId: club.id,
-      clubLabel: getClubLabel(club),
-      success: result.wasSuccessful,
-      distanceHit: result.distanceHit,
-      distanceBeforeShot: shotContext.remainingDistance,
-      distanceAfterShot: result.newRemainingDistance,
-      strokeNumber: newHoleStrokes,
-      lieBefore: shotContext.lie,
-      lieAfter: result.lie,
-      shotQuality: result.shotQuality,
-      riskLevel,
-      wasWeakClub: isRobotMode ? false : treatedAsWeakClub,
-      confidenceBoostApplied: result.confidenceBoostApplied === true,
-    };
-    const nextHoleShots = [...currentHoleShots, shotLog];
-    const nextRoundShots = [...roundShots, shotLog];
+    setTimeout(() => {
+      const isRobotMode = playMode === "robot";
+      const allClubs = useClubStore.getState().clubs;
+      const analysisPenaltyByClubId = buildAnalysisPenaltyByClubId(allClubs);
+      const analysisPenaltyPoints = analysisPenaltyByClubId[club.id] ?? 0;
+      const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(
+        club,
+        analysisPenaltyPoints,
+      );
+      const treatedAsWeakClub = isWeakClubByAnalysisAdjustedRate(club, analysisPenaltyPoints);
+      const clubPersonalData = resolvePersonalDataForSimClub(club, useClubStore.getState().personalData);
+      const clubForSimulation = isRobotMode
+        ? { ...club, successRate: 100, isWeakClub: false }
+        : {
+            ...club,
+            successRate: adjustedBaseSuccessRate,
+            isWeakClub: treatedAsWeakClub,
+          };
 
-    if (result.newRemainingDistance === 0) {
-      // ── Hole complete ──
-      const currentHole = course[currentHoleIndex];
-      const holeSummary = buildHoleSummary(currentHole, nextHoleShots, nextRoundShots);
-      const newScores: HoleScore[] = [
-        ...scores,
-        { holeNumber: currentHole.number, par: currentHole.par, strokes: newHoleStrokes },
-      ];
-      const isRoundComplete = currentHoleIndex >= course.length - 1;
-      const clubUsageStats = isRoundComplete ? buildClubUsageStats(nextRoundShots, bag) : [];
-      const finalScore = isRoundComplete
-        ? newScores.reduce((sum, hole) => sum + hole.strokes, 0)
-        : null;
-
-      set({
-        holeStrokes: newHoleStrokes,
-        lastShotResult: result,
-        scores: newScores,
-        perHoleResults: newScores,
-        clubUsageStats,
-        finalScore,
-        phase: isRoundComplete ? "round_complete" : "hole_complete",
-        showResultModal: true,
-        selectedClubId: null,
-        shotPowerPercent: 100,
-        currentHoleShots: nextHoleShots,
-        roundShots: nextRoundShots,
-        lastHoleSummary: holeSummary,
-        holeSummaries: [...holeSummaries, holeSummary],
-        goodShotStreak: streakAfterShot,
-        confidenceBoost: nextConfidenceBoost,
+      // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
+      const isPutter = club.type === "Putter";
+      const result = simulateShot(clubForSimulation, shotContext, riskLevel, {
+        confidenceBoost,
+        personalData: isRobotMode ? undefined : clubPersonalData,
+        playerSkillLevel: isRobotMode
+          ? (isPutter ? playerSkillLevel : 1)
+          : playerSkillLevel,
+        forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
+        shotPowerPercent,
+        useStoredDistance: !isRobotMode,
+        shotIndex: currentHoleShots.length,
+        seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
       });
-    } else {
-      // ── Still playing ──
-      set({
-        holeStrokes: newHoleStrokes,
-        lastShotResult: result,
-        shotContext: {
-          ...shotContext,
-          remainingDistance: result.newRemainingDistance,
-          lie: result.lie,
-          // Keep wind and hazards from current hole
-        },
-        showResultModal: true,
-        selectedClubId: null,
-        shotPowerPercent: 100,
-        currentHoleShots: nextHoleShots,
-        roundShots: nextRoundShots,
-        goodShotStreak: streakAfterShot,
-        confidenceBoost: nextConfidenceBoost,
-      });
-    }
+      const newHoleStrokes = holeStrokes + result.strokesAdded;
+      const confidenceBoostApplied = result.confidenceBoostApplied === true;
+      const streakAfterShot = confidenceBoostApplied
+        ? (result.wasSuccessful ? 1 : 0)
+        : (result.wasSuccessful ? goodShotStreak + 1 : 0);
+      const nextConfidenceBoost = !confidenceBoostApplied && streakAfterShot === 3 ? 6 : 0;
+      const shotLog: ShotLog = {
+        holeNumber: course[currentHoleIndex].number,
+        clubId: club.id,
+        clubLabel: getClubLabel(club),
+        success: result.wasSuccessful,
+        distanceHit: result.distanceHit,
+        distanceBeforeShot: shotContext.remainingDistance,
+        distanceAfterShot: result.newRemainingDistance,
+        strokeNumber: newHoleStrokes,
+        lieBefore: shotContext.lie,
+        lieAfter: result.lie,
+        shotQuality: result.shotQuality,
+        riskLevel,
+        wasWeakClub: isRobotMode ? false : treatedAsWeakClub,
+        confidenceBoostApplied: result.confidenceBoostApplied === true,
+      };
+      const nextHoleShots = [...currentHoleShots, shotLog];
+      const nextRoundShots = [...roundShots, shotLog];
+
+      if (result.newRemainingDistance === 0) {
+        // ── Hole complete ──
+        const currentHole = course[currentHoleIndex];
+        const holeSummary = buildHoleSummary(currentHole, nextHoleShots, nextRoundShots);
+        const newScores: HoleScore[] = [
+          ...scores,
+          { holeNumber: currentHole.number, par: currentHole.par, strokes: newHoleStrokes },
+        ];
+        const isRoundComplete = currentHoleIndex >= course.length - 1;
+        const clubUsageStats = isRoundComplete ? buildClubUsageStats(nextRoundShots, bag) : [];
+        const finalScore = isRoundComplete
+          ? newScores.reduce((sum, hole) => sum + hole.strokes, 0)
+          : null;
+
+        set({
+          holeStrokes: newHoleStrokes,
+          lastShotResult: result,
+          scores: newScores,
+          perHoleResults: newScores,
+          clubUsageStats,
+          finalScore,
+          phase: isRoundComplete ? "round_complete" : "hole_complete",
+          selectedClubId: null,
+          shotPowerPercent: 100,
+          currentHoleShots: nextHoleShots,
+          roundShots: nextRoundShots,
+          lastHoleSummary: holeSummary,
+          holeSummaries: [...holeSummaries, holeSummary],
+          goodShotStreak: streakAfterShot,
+          confidenceBoost: nextConfidenceBoost,
+          shotInProgress: false,
+        });
+      } else {
+        // ── Still playing ──
+        set({
+          holeStrokes: newHoleStrokes,
+          lastShotResult: result,
+          shotContext: {
+            ...shotContext,
+            remainingDistance: result.newRemainingDistance,
+            lie: result.lie,
+            // Keep wind and hazards from current hole
+          },
+          selectedClubId: null,
+          shotPowerPercent: 100,
+          currentHoleShots: nextHoleShots,
+          roundShots: nextRoundShots,
+          goodShotStreak: streakAfterShot,
+          confidenceBoost: nextConfidenceBoost,
+          shotInProgress: false,
+        });
+      }
+    }, 0);
   },
-
-  dismissResult: () => set({ showResultModal: false }),
 
   advanceHole: () => {
     const { currentHoleIndex, course, roundSeedNonce } = get();
@@ -382,7 +383,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       phase: "playing",
       holeStrokes: 0,
       lastShotResult: null,
-      showResultModal: false,
       selectedClubId: null,
       currentHoleShots: [],
       shotContext: buildInitialContext(course[nextIndex], roundSeedNonce, nextIndex),

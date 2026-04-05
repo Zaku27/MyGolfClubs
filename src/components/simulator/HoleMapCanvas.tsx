@@ -11,6 +11,7 @@ interface HoleMapCanvasProps {
   className?: string;
   editable?: boolean;
   selectedHazardId?: string | null;
+  currentHoleKey?: string | number;
   onSelectHazardId?: (hazardId: string | null) => void;
   onHazardsChange?: (hazards: Hazard[]) => void;
 }
@@ -291,6 +292,7 @@ export function HoleMapCanvas({
   className,
   editable = false,
   selectedHazardId = null,
+  currentHoleKey,
   onSelectHazardId,
   onHazardsChange,
 }: HoleMapCanvasProps) {
@@ -307,11 +309,39 @@ export function HoleMapCanvas({
     () => buildAbsoluteShots(landingResults, targetDistance),
     [landingResults, targetDistance],
   );
+
+  const metrics = useMemo(() => {
+    if (size.width <= 0 || size.height <= 0) {
+      return null;
+    }
+
+    const padding = editable
+      ? { top: 26, right: 22, bottom: 30, left: 44 }
+      : { top: 20, right: 18, bottom: 18, left: 18 };
+    const drawWidth = size.width - padding.left - padding.right;
+    const drawHeight = size.height - padding.top - padding.bottom;
+    const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
+
+    return {
+      padding,
+      drawWidth,
+      drawHeight,
+      maxYardY,
+      halfYardX,
+    };
+  }, [editable, greenRadius, hazards, size.height, size.width, targetDistance, absoluteShots]);
   const transientShot = useMemo(() => {
     if (!transientLandingResult) return null;
     const origin = absoluteShots.at(-1)?.landing ?? { x: 0, y: 0 };
     return buildAbsoluteShotFromOrigin(origin, transientLandingResult, targetDistance);
   }, [absoluteShots, targetDistance, transientLandingResult]);
+
+  useEffect(() => {
+    if (currentHoleKey == null) {
+      return;
+    }
+    setDragState(null);
+  }, [currentHoleKey]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -343,8 +373,11 @@ export function HoleMapCanvas({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || size.width <= 0 || size.height <= 0) return;
+    if (!canvas || size.width <= 0 || size.height <= 0 || !metrics) return;
 
+    metricsRef.current = metrics;
+
+    const { padding, drawWidth, drawHeight, halfYardX, maxYardY } = metrics;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.round(size.width * dpr);
     canvas.height = Math.round(size.height * dpr);
@@ -358,22 +391,6 @@ export function HoleMapCanvas({
 
     // 再描画時は必ずクリアして、ゴースト描画が残らないようにする。
     context.clearRect(0, 0, size.width, size.height);
-
-    const padding = editable
-      ? { top: 26, right: 22, bottom: 30, left: 44 }
-      : { top: 20, right: 18, bottom: 18, left: 18 };
-    const drawWidth = size.width - padding.left - padding.right;
-    const drawHeight = size.height - padding.top - padding.bottom;
-
-    const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
-
-    metricsRef.current = {
-      padding,
-      drawWidth,
-      drawHeight,
-      maxYardY,
-      halfYardX,
-    };
 
     const yardToPxX = (yardX: number) => padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
     const yardToPxY = (yardY: number) => padding.top + drawHeight * (1 - yardY / maxYardY);
@@ -522,12 +539,12 @@ export function HoleMapCanvas({
   }, [absoluteShots, editable, greenRadius, hazards, showTrajectories, size.height, size.width, targetDistance, transientShot]);
 
   const metricToPx = (hazard: Hazard) => {
-    const metrics = metricsRef.current;
-    if (!metrics) {
+    const currentMetrics = metrics ?? metricsRef.current;
+    if (!currentMetrics) {
       return null;
     }
 
-    const { padding, drawHeight, drawWidth, halfYardX, maxYardY } = metrics;
+    const { padding, drawHeight, drawWidth, halfYardX, maxYardY } = currentMetrics;
     const yardToPxX = (yardX: number) => padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
     const yardToPxY = (yardY: number) => padding.top + drawHeight * (1 - yardY / maxYardY);
 
@@ -683,6 +700,7 @@ export function HoleMapCanvas({
             const startDrag = (event: React.PointerEvent<HTMLElement>, mode: DragMode, handle?: ResizeHandle) => {
               event.preventDefault();
               event.stopPropagation();
+              event.currentTarget.setPointerCapture(event.pointerId);
               onSelectHazardId?.(hazard.id);
               setDragState({
                 hazardId: hazard.id,
