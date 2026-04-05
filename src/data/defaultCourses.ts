@@ -37,7 +37,7 @@ export const COURSE_9HOLES: Hole[] = [
         yBack: 380,
         xCenter: -72,
         width: 24,
-        penaltyStrokes: 2,
+        penaltyStrokes: 1,
         name: "左OB",
       },
       {
@@ -48,7 +48,7 @@ export const COURSE_9HOLES: Hole[] = [
         yBack: 380,
         xCenter: 72,
         width: 24,
-        penaltyStrokes: 2,
+        penaltyStrokes: 1,
         name: "右OB",
       },
     ],

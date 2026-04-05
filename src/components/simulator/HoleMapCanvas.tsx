@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Hole, Hazard } from "../../types/game";
 import type { LandingResult } from "../../utils/landingPosition";
+import { buildAutoHazardName, buildHazardDisplayName } from "../../utils/shotOutcome";
 
 interface HoleMapCanvasProps {
   hole: Pick<Hole, "targetDistance" | "distanceFromTee" | "greenRadius" | "hazards">;
   landingResults: LandingResult[];
+  transientLandingResult?: LandingResult | null;
   showTrajectories?: boolean;
   className?: string;
+  editable?: boolean;
+  selectedHazardId?: string | null;
+  onSelectHazardId?: (hazardId: string | null) => void;
+  onHazardsChange?: (hazards: Hazard[]) => void;
 }
 
 type Size = {
@@ -19,6 +25,26 @@ type Point2D = {
   y: number;
 };
 
+type DragMode = "move" | "resize";
+type ResizeHandle = "nw" | "ne" | "sw" | "se";
+
+type DragState = {
+  hazardId: string;
+  mode: DragMode;
+  handle?: ResizeHandle;
+  startClientX: number;
+  startClientY: number;
+  initialHazard: Hazard;
+};
+
+type CanvasMetrics = {
+  padding: { top: number; right: number; bottom: number; left: number };
+  drawWidth: number;
+  drawHeight: number;
+  maxYardY: number;
+  halfYardX: number;
+};
+
 type AbsoluteShot = {
   origin: Point2D;
   landing: Point2D;
@@ -28,6 +54,25 @@ type AbsoluteShot = {
 
 const MIN_CANVAS_HEIGHT = 280;
 const DEFAULT_GREEN_RADIUS = 12;
+const MIN_HAZARD_WIDTH = 8;
+const MIN_HAZARD_DEPTH = 6;
+
+function chooseYardTickStep(range: number, targetTickCount = 8): number {
+  if (range <= 0) {
+    return 10;
+  }
+
+  const roughStep = range / Math.max(2, targetTickCount);
+  const powers = [1, 2, 5, 10, 20, 25, 50, 100];
+
+  for (const unit of powers) {
+    if (roughStep <= unit) {
+      return unit;
+    }
+  }
+
+  return 100;
+}
 
 /**
  * ハザード種別に応じて描画色を返す。
@@ -156,15 +201,104 @@ function buildAbsoluteShots(
   return transformed;
 }
 
+function buildAbsoluteShotFromOrigin(
+  origin: Point2D,
+  shot: LandingResult,
+  targetDistance: number,
+): AbsoluteShot {
+  const pin: Point2D = { x: 0, y: targetDistance };
+  const toPinX = pin.x - origin.x;
+  const toPinY = pin.y - origin.y;
+  const toPinDistance = Math.hypot(toPinX, toPinY);
+
+  const forward: Point2D = toPinDistance > 1e-6
+    ? { x: toPinX / toPinDistance, y: toPinY / toPinDistance }
+    : { x: 0, y: 1 };
+
+  const right: Point2D = { x: forward.y, y: -forward.x };
+
+  const toAbsolute = (localX: number, localY: number): Point2D => ({
+    x: origin.x + forward.x * localY + right.x * localX,
+    y: origin.y + forward.y * localY + right.y * localX,
+  });
+
+  const landing = toAbsolute(shot.finalX, shot.finalY);
+  const pathFromTrajectory = shot.trajectoryPoints?.map((point) => toAbsolute(point.x, point.y)) ?? [];
+
+  return {
+    origin,
+    landing,
+    path: pathFromTrajectory.length > 0 ? pathFromTrajectory : [origin, landing],
+    local: shot,
+  };
+}
+
+function drawShot(
+  context: CanvasRenderingContext2D,
+  shot: AbsoluteShot,
+  yardToPxX: (yardX: number) => number,
+  yardToPxY: (yardY: number) => number,
+  showTrajectories: boolean,
+  drawLandingPoint: boolean,
+) {
+  const landingX = yardToPxX(shot.landing.x);
+  const landingY = yardToPxY(shot.landing.y);
+  const originX = yardToPxX(shot.origin.x);
+  const originY = yardToPxY(shot.origin.y);
+
+  if (showTrajectories) {
+    context.save();
+    context.strokeStyle = "rgba(220, 38, 38, 0.55)";
+    context.lineWidth = 2;
+
+    if (shot.path.length > 1) {
+      context.beginPath();
+      context.moveTo(originX, originY);
+      for (const point of shot.path) {
+        context.lineTo(yardToPxX(point.x), yardToPxY(point.y));
+      }
+      context.stroke();
+    } else {
+      const controlX = yardToPxX((shot.origin.x + shot.landing.x) * 0.5 + shot.local.lateralDeviation * 0.15);
+      const controlY = yardToPxY(Math.max((shot.origin.y + shot.landing.y) * 0.52, 1));
+      context.beginPath();
+      context.moveTo(originX, originY);
+      context.quadraticCurveTo(controlX, controlY, landingX, landingY);
+      context.stroke();
+    }
+
+    context.restore();
+  }
+
+  if (!drawLandingPoint) {
+    return;
+  }
+
+  context.fillStyle = "#dc2626";
+  context.beginPath();
+  context.arc(landingX, landingY, 4.5, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = "rgba(255,255,255,0.9)";
+  context.lineWidth = 1.5;
+  context.stroke();
+}
+
 export function HoleMapCanvas({
   hole,
   landingResults,
+  transientLandingResult = null,
   showTrajectories = true,
   className,
+  editable = false,
+  selectedHazardId = null,
+  onSelectHazardId,
+  onHazardsChange,
 }: HoleMapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<Size>({ width: 0, height: MIN_CANVAS_HEIGHT });
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const metricsRef = useRef<CanvasMetrics | null>(null);
 
   const targetDistance = hole.targetDistance ?? hole.distanceFromTee;
   const greenRadius = hole.greenRadius ?? DEFAULT_GREEN_RADIUS;
@@ -173,6 +307,11 @@ export function HoleMapCanvas({
     () => buildAbsoluteShots(landingResults, targetDistance),
     [landingResults, targetDistance],
   );
+  const transientShot = useMemo(() => {
+    if (!transientLandingResult) return null;
+    const origin = absoluteShots.at(-1)?.landing ?? { x: 0, y: 0 };
+    return buildAbsoluteShotFromOrigin(origin, transientLandingResult, targetDistance);
+  }, [absoluteShots, targetDistance, transientLandingResult]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -220,11 +359,21 @@ export function HoleMapCanvas({
     // 再描画時は必ずクリアして、ゴースト描画が残らないようにする。
     context.clearRect(0, 0, size.width, size.height);
 
-    const padding = { top: 20, right: 18, bottom: 18, left: 18 };
+    const padding = editable
+      ? { top: 26, right: 22, bottom: 30, left: 44 }
+      : { top: 20, right: 18, bottom: 18, left: 18 };
     const drawWidth = size.width - padding.left - padding.right;
     const drawHeight = size.height - padding.top - padding.bottom;
 
     const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
+
+    metricsRef.current = {
+      padding,
+      drawWidth,
+      drawHeight,
+      maxYardY,
+      halfYardX,
+    };
 
     const yardToPxX = (yardX: number) => padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
     const yardToPxY = (yardY: number) => padding.top + drawHeight * (1 - yardY / maxYardY);
@@ -241,6 +390,50 @@ export function HoleMapCanvas({
     bg.addColorStop(1, "#86efac");
     context.fillStyle = bg;
     context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
+
+    if (editable) {
+      const xStep = chooseYardTickStep(halfYardX * 2, 10);
+      const yStep = chooseYardTickStep(maxYardY, 10);
+
+      context.save();
+      context.lineWidth = 1;
+      context.font = "11px sans-serif";
+      context.fillStyle = "rgba(6, 95, 70, 0.85)";
+
+      for (let x = -Math.floor(halfYardX / xStep) * xStep; x <= halfYardX + 0.01; x += xStep) {
+        const px = yardToPxX(x);
+        context.strokeStyle = x === 0 ? "rgba(6, 95, 70, 0.5)" : "rgba(6, 95, 70, 0.16)";
+        context.beginPath();
+        context.moveTo(px, padding.top);
+        context.lineTo(px, padding.top + drawHeight);
+        context.stroke();
+
+        context.textAlign = "center";
+        context.textBaseline = "top";
+        context.fillText(`${Math.round(x)}`, px, padding.top + drawHeight + 4);
+      }
+
+      for (let y = 0; y <= maxYardY + 0.01; y += yStep) {
+        const py = yardToPxY(y);
+        context.strokeStyle = y === 0 ? "rgba(6, 95, 70, 0.5)" : "rgba(6, 95, 70, 0.16)";
+        context.beginPath();
+        context.moveTo(padding.left, py);
+        context.lineTo(padding.left + drawWidth, py);
+        context.stroke();
+
+        context.textAlign = "right";
+        context.textBaseline = "middle";
+        context.fillText(`${Math.round(y)}`, padding.left - 8, py);
+      }
+
+      context.fillStyle = "rgba(6, 95, 70, 0.9)";
+      context.textAlign = "right";
+      context.textBaseline = "top";
+      context.fillText("Y (yd)", padding.left - 8, padding.top - 18);
+      context.textAlign = "right";
+      context.fillText("X (yd)", padding.left + drawWidth, padding.top + drawHeight + 16);
+      context.restore();
+    }
 
     // ピン周囲にグリーン領域を円として描画し、オン判定の範囲を視覚化する。
     context.fillStyle = "rgba(187, 247, 208, 0.72)";
@@ -309,44 +502,16 @@ export function HoleMapCanvas({
 
     // 複数球の着地点を描画。必要に応じて簡易軌跡も表示する。
     for (const shot of absoluteShots) {
-      const landingX = yardToPxX(shot.landing.x);
-      const landingY = yardToPxY(shot.landing.y);
-      const originX = yardToPxX(shot.origin.x);
-      const originY = yardToPxY(shot.origin.y);
+      drawShot(context, shot, yardToPxX, yardToPxY, showTrajectories, true);
+    }
 
-      if (showTrajectories) {
-        context.save();
-        context.strokeStyle = "rgba(220, 38, 38, 0.55)";
-        context.lineWidth = 2;
-
-        // trajectoryPoints がある場合は lineTo で線をつなぎ、
-        // ない場合は簡易2次ベジェで左右の曲がりを可視化する。
-        if (shot.path.length > 1) {
-          context.beginPath();
-          context.moveTo(originX, originY);
-          for (const point of shot.path) {
-            context.lineTo(yardToPxX(point.x), yardToPxY(point.y));
-          }
-          context.stroke();
-        } else {
-          const controlX = yardToPxX((shot.origin.x + shot.landing.x) * 0.5 + shot.local.lateralDeviation * 0.15);
-          const controlY = yardToPxY(Math.max((shot.origin.y + shot.landing.y) * 0.52, 1));
-          context.beginPath();
-          context.moveTo(originX, originY);
-          context.quadraticCurveTo(controlX, controlY, landingX, landingY);
-          context.stroke();
-        }
-
-        context.restore();
-      }
-
-      context.fillStyle = "#dc2626";
+    if (transientShot) {
+      context.save();
       context.beginPath();
-      context.arc(landingX, landingY, 4.5, 0, Math.PI * 2);
-      context.fill();
-      context.strokeStyle = "rgba(255,255,255,0.9)";
-      context.lineWidth = 1.5;
-      context.stroke();
+      context.rect(padding.left, padding.top, drawWidth, drawHeight);
+      context.clip();
+      drawShot(context, transientShot, yardToPxX, yardToPxY, showTrajectories, false);
+      context.restore();
     }
 
     // 右上に縮尺の目安を表示。
@@ -354,14 +519,218 @@ export function HoleMapCanvas({
     context.font = "12px sans-serif";
     context.textAlign = "right";
     context.fillText(`Scale: 1px = ${(maxYardY / drawHeight).toFixed(2)} yd`, size.width - 12, 18);
-  }, [absoluteShots, greenRadius, hazards, showTrajectories, size.height, size.width, targetDistance]);
+  }, [absoluteShots, editable, greenRadius, hazards, showTrajectories, size.height, size.width, targetDistance, transientShot]);
+
+  const metricToPx = (hazard: Hazard) => {
+    const metrics = metricsRef.current;
+    if (!metrics) {
+      return null;
+    }
+
+    const { padding, drawHeight, drawWidth, halfYardX, maxYardY } = metrics;
+    const yardToPxX = (yardX: number) => padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
+    const yardToPxY = (yardY: number) => padding.top + drawHeight * (1 - yardY / maxYardY);
+
+    const leftYard = hazard.xCenter - hazard.width / 2;
+    const rightYard = hazard.xCenter + hazard.width / 2;
+    const topYard = hazard.yBack;
+    const bottomYard = hazard.yFront;
+
+    const left = yardToPxX(leftYard);
+    const right = yardToPxX(rightYard);
+    const top = yardToPxY(topYard);
+    const bottom = yardToPxY(bottomYard);
+
+    return {
+      left,
+      top,
+      width: Math.max(2, right - left),
+      height: Math.max(2, bottom - top),
+    };
+  };
+
+  const updateHazardByDrag = (state: DragState, clientX: number, clientY: number) => {
+    if (!onHazardsChange) {
+      return;
+    }
+
+    const metrics = metricsRef.current;
+    if (!metrics) {
+      return;
+    }
+
+    const yardPerPxX = (metrics.halfYardX * 2) / metrics.drawWidth;
+    const yardPerPxY = metrics.maxYardY / metrics.drawHeight;
+    const deltaX = (clientX - state.startClientX) * yardPerPxX;
+    const deltaY = -(clientY - state.startClientY) * yardPerPxY;
+
+    const next = hazards.map((hazard) => {
+      if (hazard.id !== state.hazardId) {
+        return hazard;
+      }
+
+      const original = state.initialHazard;
+
+      let left = original.xCenter - original.width / 2;
+      let right = original.xCenter + original.width / 2;
+      let front = original.yFront;
+      let back = original.yBack;
+
+      if (state.mode === "move") {
+        left += deltaX;
+        right += deltaX;
+        front += deltaY;
+        back += deltaY;
+      } else if (state.handle) {
+        if (state.handle === "nw" || state.handle === "sw") {
+          left += deltaX;
+        }
+        if (state.handle === "ne" || state.handle === "se") {
+          right += deltaX;
+        }
+        if (state.handle === "nw" || state.handle === "ne") {
+          back += deltaY;
+        }
+        if (state.handle === "sw" || state.handle === "se") {
+          front += deltaY;
+        }
+      }
+
+      if (right - left < MIN_HAZARD_WIDTH) {
+        const center = (left + right) / 2;
+        left = center - MIN_HAZARD_WIDTH / 2;
+        right = center + MIN_HAZARD_WIDTH / 2;
+      }
+
+      if (back - front < MIN_HAZARD_DEPTH) {
+        const center = (front + back) / 2;
+        front = center - MIN_HAZARD_DEPTH / 2;
+        back = center + MIN_HAZARD_DEPTH / 2;
+      }
+
+      front = Math.max(0, front);
+      back = Math.min(metrics.maxYardY, back);
+
+      if (back - front < MIN_HAZARD_DEPTH) {
+        if (front <= 0) {
+          back = MIN_HAZARD_DEPTH;
+        } else {
+          front = Math.max(0, back - MIN_HAZARD_DEPTH);
+        }
+      }
+
+      const maxEdge = metrics.halfYardX;
+      const width = right - left;
+      const centerX = (left + right) / 2;
+      const minCenter = -maxEdge + width / 2;
+      const maxCenter = maxEdge - width / 2;
+      const clampedCenter = Math.max(minCenter, Math.min(maxCenter, centerX));
+
+      return {
+        ...hazard,
+        xCenter: clampedCenter,
+        width,
+        yFront: front,
+        yBack: back,
+        name: buildAutoHazardName(hazard.type, clampedCenter, width),
+      };
+    });
+
+    onHazardsChange(next);
+  };
+
+  useEffect(() => {
+    if (!dragState) {
+      return;
+    }
+
+    const move = (event: PointerEvent) => {
+      updateHazardByDrag(dragState, event.clientX, event.clientY);
+    };
+
+    const up = () => {
+      setDragState(null);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [dragState, hazards]);
 
   return (
     <div
       ref={wrapperRef}
-      className={className ?? "w-full overflow-hidden rounded-2xl border border-emerald-300 bg-emerald-50/70"}
+      className={className ?? "relative w-full overflow-hidden rounded-2xl border border-emerald-300 bg-emerald-50/70"}
     >
       <canvas ref={canvasRef} className="block w-full" aria-label="ホールマップ" />
+      {editable && (
+        <div className="pointer-events-none absolute inset-0">
+          {hazards.map((hazard) => {
+            const box = metricToPx(hazard);
+            if (!box) {
+              return null;
+            }
+
+            const isSelected = selectedHazardId === hazard.id;
+            const baseClass = isSelected
+              ? "border-emerald-900 bg-emerald-300/20"
+              : "border-emerald-700/70 bg-emerald-300/10";
+
+            const startDrag = (event: React.PointerEvent<HTMLElement>, mode: DragMode, handle?: ResizeHandle) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onSelectHazardId?.(hazard.id);
+              setDragState({
+                hazardId: hazard.id,
+                mode,
+                handle,
+                startClientX: event.clientX,
+                startClientY: event.clientY,
+                initialHazard: { ...hazard },
+              });
+            };
+
+            return (
+              <div
+                key={hazard.id}
+                className={`pointer-events-auto absolute border-2 ${baseClass}`}
+                style={{
+                  left: `${box.left}px`,
+                  top: `${box.top}px`,
+                  width: `${box.width}px`,
+                  height: `${box.height}px`,
+                }}
+                onPointerDown={(event) => startDrag(event, "move")}
+                onClick={() => onSelectHazardId?.(hazard.id)}
+              >
+                <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
+                  {buildHazardDisplayName(hazard)}
+                </div>
+                {(["nw", "ne", "sw", "se"] as ResizeHandle[]).map((handle) => {
+                  const styleByHandle: Record<ResizeHandle, string> = {
+                    nw: "-left-1.5 -top-1.5 cursor-nwse-resize",
+                    ne: "-right-1.5 -top-1.5 cursor-nesw-resize",
+                    sw: "-left-1.5 -bottom-1.5 cursor-nesw-resize",
+                    se: "-right-1.5 -bottom-1.5 cursor-nwse-resize",
+                  };
+
+                  return (
+                    <span
+                      key={`${hazard.id}-${handle}`}
+                      className={`absolute h-3 w-3 rounded-full border border-white bg-emerald-700 ${styleByHandle[handle]}`}
+                      onPointerDown={(event) => startDrag(event, "resize", handle)}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

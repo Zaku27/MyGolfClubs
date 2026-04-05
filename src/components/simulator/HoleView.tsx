@@ -13,6 +13,7 @@ import {
 } from "../../utils/clubSuccessDisplay";
 import type { LandingResult } from "../../utils/landingPosition";
 import { HoleMapCanvas } from "./HoleMapCanvas";
+import { buildHazardDisplayName } from "../../utils/shotOutcome";
 
 interface Props {
   onBack: () => void;
@@ -85,6 +86,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   useEffect(() => {
     const landing = lastShotResult?.landing;
     if (!landing) return;
+    if (lastShotResult.finalOutcome === "ob") return;
     setLandingHistory((prev) => [...prev, landing]);
   }, [lastShotResult]);
 
@@ -243,6 +245,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const selectedEffectiveRate = selectedClub
     ? Math.round((clubPreview.get(selectedClub.id)?.effectiveRate ?? selectedClub.successRate) * 10) / 10
     : null;
+  const transientLandingResult = lastShotResult?.finalOutcome === "ob"
+    ? (lastShotResult.landing ?? null)
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 text-emerald-900">
@@ -320,6 +325,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             <HoleMapCanvas
               hole={currentHole}
               landingResults={landingHistory}
+              transientLandingResult={transientLandingResult}
               showTrajectories
             />
           </div>
@@ -332,7 +338,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                   key={`${hazard.id ?? index}`}
                   className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 sm:px-4 sm:text-sm"
                 >
-                  {hazard.name ?? hazard.type}
+                  {buildHazardDisplayName(hazard)}
                 </span>
               ))
             ) : (
@@ -354,6 +360,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                   ? "グリーン"
                   : lastShotResult.finalOutcome === "fairway"
                   ? "フェアウェイ"
+                  : lastShotResult.finalOutcome === "rough"
+                  ? "ラフ"
                   : lastShotResult.finalOutcome === "bunker"
                   ? "バンカー"
                   : lastShotResult.finalOutcome === "water"

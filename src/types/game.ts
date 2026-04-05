@@ -25,7 +25,7 @@ export interface Hazard {
   yBack: number;    // distance to the back edge, yards
   xCenter: number;  // lateral offset from center line, yards
   width: number;    // total width, yards
-  penaltyStrokes: 1 | 2;
+  penaltyStrokes: 0 | 1 | 2;
   name?: string;
 }
 
@@ -91,7 +91,7 @@ export interface ShotResult {
   effectiveSuccessRate: number;
   confidenceBoostApplied?: boolean;
   landing?: ShotLanding;
-  finalOutcome: "fairway" | "bunker" | "water" | "ob" | "green";
+  finalOutcome: "fairway" | "rough" | "bunker" | "water" | "ob" | "green";
   penaltyStrokes: number;
 }
 
