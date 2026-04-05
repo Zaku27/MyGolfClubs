@@ -3,7 +3,7 @@ import type { ClubData, SkillLevel } from "./landingPosition";
 import type { Hazard, Hole, ShotResult, LieType } from "../types/game";
 
 const DEFAULT_GROUND_HARDNESS = 70;
-const GREEN_CAPTURE_RADIUS = 3;
+const DEFAULT_GREEN_CAPTURE_RADIUS = 12;
 
 function getHoleTargetDistance(hole: Hole): number {
   return hole.targetDistance ?? hole.distanceFromTee;
@@ -53,6 +53,35 @@ function isPointInRectangle(
 }
 
 /**
+ * OB は「矩形の幅全体」ではなく、コース中心に最も近い境界線を越えたかで判定する。
+ * 例:
+ * - 左OB: 着弾X が innerBoundary 以下なら OB
+ * - 右OB: 着弾X が innerBoundary 以上なら OB
+ *
+ * Y方向は従来どおり、そのOB区間内だけを有効範囲とする。
+ */
+function isPointInObArea(
+  x: number,
+  y: number,
+  xCenter: number,
+  width: number,
+  yFront: number,
+  yBack: number,
+): boolean {
+  const inYRange = y >= Math.min(yFront, yBack) && y <= Math.max(yFront, yBack);
+  if (!inYRange) return false;
+
+  const halfWidth = width / 2;
+  const innerBoundary = xCenter < 0 ? xCenter + halfWidth : xCenter - halfWidth;
+
+  if (xCenter < 0) {
+    return x <= innerBoundary;
+  }
+
+  return x >= innerBoundary;
+}
+
+/**
  * 着弾点が障害物内部にあるかを判定する。
  * polygon 形状は現状データが最小限なため、矩形境界で代用します。
  */
@@ -62,6 +91,13 @@ export function checkLandingInHazard(
   hazards: Hazard[],
 ): Hazard | null {
   for (const hazard of hazards) {
+    if (hazard.type === "ob") {
+      if (isPointInObArea(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack)) {
+        return hazard;
+      }
+      continue;
+    }
+
     if (hazard.shape === "rectangle") {
       if (isPointInRectangle(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack)) {
         return hazard;
@@ -90,6 +126,7 @@ function determineFinalOutcome(
   landingX: number,
   landingY: number,
   targetDistance: number,
+  greenRadius: number,
   hazards: Hazard[],
 ): ShotResult["finalOutcome"] {
   const hazard = checkLandingInHazard(landingX, landingY, hazards);
@@ -102,7 +139,7 @@ function determineFinalOutcome(
   }
 
   const distanceToPin = distanceToPinFromLanding(targetDistance, landingX, landingY);
-  if (distanceToPin <= GREEN_CAPTURE_RADIUS) {
+  if (distanceToPin <= greenRadius) {
     return "green";
   }
 
@@ -120,7 +157,9 @@ function determineLie(
 }
 
 function determinePenaltyStrokes(hazard: Hazard | null): number {
-  return hazard?.penaltyStrokes ?? 0;
+  if (!hazard) return 0;
+  if (hazard.type === "bunker") return 0;
+  return hazard.penaltyStrokes;
 }
 
 function buildOutcomeMessage(
@@ -156,6 +195,7 @@ export function simulateShotWithCourse(
   aimXOffset: number = 0,
 ): ShotResult {
   const targetDistance = getHoleTargetDistance(hole);
+  const greenRadius = hole.greenRadius ?? DEFAULT_GREEN_CAPTURE_RADIUS;
   const seed = buildCourseSimulationSeed(club, hole, aimXOffset);
   const landingOutcome = calculateLandingOutcome({
     club,
@@ -171,7 +211,7 @@ export function simulateShotWithCourse(
 
   const landing = landingOutcome.landing;
   const hazard = checkLandingInHazard(landing.finalX, landing.finalY, hole.hazards ?? []);
-  const finalOutcome = determineFinalOutcome(landing.finalX, landing.finalY, targetDistance, hole.hazards ?? []);
+  const finalOutcome = determineFinalOutcome(landing.finalX, landing.finalY, targetDistance, greenRadius, hole.hazards ?? []);
   const penaltyStrokes = determinePenaltyStrokes(hazard);
   const newRemainingDistance = Math.max(0, Math.round(distanceToPinFromLanding(targetDistance, landing.finalX, landing.finalY)));
   const lie = determineLie(finalOutcome, hazard);

@@ -35,6 +35,7 @@ export interface Hole {
   par: 3 | 4 | 5;
   distanceFromTee: number; // yards
   targetDistance?: number; // ピンまでの距離。未指定時は distanceFromTee を使用
+  greenRadius?: number; // ヤード。未指定時は既定値を使用
   hazards?: Hazard[];
 }
 
@@ -49,6 +50,7 @@ export interface ShotContext {
   wind?: WindDirection;
   windStrength?: number; // mph
   windDirectionDegrees?: number; // 0=北へ吹く, 時計回り
+  greenRadius?: number; // ヤード。ピン中心の捕捉半径
   hazards?: Hazard[];
 }
 

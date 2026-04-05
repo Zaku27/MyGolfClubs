@@ -109,6 +109,7 @@ function buildInitialContext(hole: Hole): ShotContext {
   return {
     remainingDistance: hole.distanceFromTee,
     lie: "tee",
+    greenRadius: hole.greenRadius,
     hazards: hole.hazards ?? [],
     ...generateWind(),
   };

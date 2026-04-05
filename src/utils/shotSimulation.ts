@@ -12,6 +12,7 @@ import { calculateBaseClubSuccessRate } from "./calculateSuccessRate";
 import { ClubService } from "../db/clubService";
 import { estimateTheoreticalDistance } from "./distanceEstimation";
 import { calculateLandingOutcome } from "./landingPosition";
+import { checkLandingInHazard } from "./courseSimulation";
 /**
  * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
  * @returns Promise<number> 0.0〜1.0（なければ0.5）
@@ -40,6 +41,7 @@ interface SimulationOptions {
 }
 
 const WEAK_CLUB_EFFECT_SCALE = 0.5;
+const DEFAULT_GREEN_RADIUS = 12;
 
 function hashSeed(seed: string): number {
   let hash = 2166136261;
@@ -272,9 +274,10 @@ function resolveNewLie(
   isGoodShot: boolean,
   risk: RiskLevel,
   random: () => number,
+  isOnGreen: boolean,
 ): LieType {
   if (remaining === 0) return "green";
-  if (remaining <= 30) return "green";
+  if (isOnGreen) return "green";
   if (!isGoodShot) {
     return random() < 0.28 ? "bunker" : "rough";
   }
@@ -348,6 +351,38 @@ function distanceToPinFromLanding(
   const dx = finalX;
   const dy = remainingDistance - finalY;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * ペナルティ系ハザード着弾時の次打位置を簡易的に決定する。
+ * - OB: ストローク&ディスタンスを採用し、前打位置相当へ戻す
+ * - Water: 進行方向に近い側へドロップした想定で、残り距離に一定ペナルティを加算
+ */
+function resolvePenaltyRelief(
+  hazardType: "water" | "ob",
+  currentLie: LieType,
+  remainingBeforeShot: number,
+  geometricRemainingAfterShot: number,
+): { newRemaining: number; newLie: LieType } {
+  if (hazardType === "ob") {
+    return {
+      newRemaining: Math.max(1, Math.round(remainingBeforeShot)),
+      newLie: currentLie,
+    };
+  }
+
+  // Water はドロップにより多少後退した地点から再開する。
+  // 「着弾後残り + 12y」を基本にし、極端な近距離になりすぎないよう下限を設ける。
+  const droppedRemaining = Math.max(
+    Math.round(geometricRemainingAfterShot + 12),
+    Math.round(remainingBeforeShot * 0.35),
+    1,
+  );
+
+  return {
+    newRemaining: droppedRemaining,
+    newLie: "rough",
+  };
 }
 
 /**
@@ -465,7 +500,15 @@ export function simulateShot(
   riskLevel: RiskLevel,
   options: SimulationOptions & { isPractice?: boolean } = {},
 ): ShotResult {
-  const { remainingDistance, lie, wind, windStrength = 7, windDirectionDegrees } = context;
+  const {
+    remainingDistance,
+    lie,
+    wind,
+    windStrength = 7,
+    windDirectionDegrees,
+    greenRadius = DEFAULT_GREEN_RADIUS,
+    hazards = [],
+  } = context;
   const confidenceBoost = options.confidenceBoost ?? 0;
   const playerSkillLevel = options.playerSkillLevel ?? 0.5;
   const shotPowerPercent = Math.max(0, Math.min(110, options.shotPowerPercent ?? 100));
@@ -632,9 +675,13 @@ export function simulateShot(
   newRemaining = Math.round(
     distanceToPinFromLanding(remainingDistance, landing.finalX, landing.finalY),
   );
+  const isOnGreen = newRemaining <= greenRadius;
+
+  // 着弾後にハザード侵入を判定し、結果へ反映する。
+  const landedHazard = checkLandingInHazard(landing.finalX, landing.finalY, hazards);
 
   // Non-putter hole-outs are intentionally rare.
-  if (newRemaining === 0) {
+  if (newRemaining === 0 && !landedHazard) {
     const holeOutChance = getNonPutterHoleOutChance(remainingDistance, shotQuality);
     const holedOut = random() < holeOutChance;
     if (!holedOut) {
@@ -642,17 +689,46 @@ export function simulateShot(
     }
   }
 
-  const newLie = resolveNewLie(newRemaining, isGoodShot, riskLevel, random);
-  const finalOutcome = newLie === "bunker"
-    ? "bunker"
-    : newLie === "green" || newRemaining === 0
-      ? "green"
-      : "fairway";
+  const penaltyStrokes = landedHazard
+    ? (landedHazard.type === "bunker" ? 0 : (landedHazard.penaltyStrokes ?? 0))
+    : 0;
+  const penalty = penaltyStrokes > 0;
+
+  let newLie: LieType;
+  let finalOutcome: ShotResult["finalOutcome"];
+  if (landedHazard?.type === "water") {
+    const relief = resolvePenaltyRelief("water", lie, remainingDistance, newRemaining);
+    newRemaining = relief.newRemaining;
+    newLie = relief.newLie;
+    finalOutcome = "water";
+  } else if (landedHazard?.type === "ob") {
+    const relief = resolvePenaltyRelief("ob", lie, remainingDistance, newRemaining);
+    newRemaining = relief.newRemaining;
+    newLie = relief.newLie;
+    finalOutcome = "ob";
+  } else if (landedHazard?.type === "bunker") {
+    newLie = "bunker";
+    finalOutcome = "bunker";
+  } else {
+    newLie = resolveNewLie(newRemaining, isGoodShot, riskLevel, random, isOnGreen);
+    finalOutcome = newLie === "bunker"
+      ? "bunker"
+      : newLie === "green" || newRemaining === 0
+        ? "green"
+        : "fairway";
+  }
 
   // ── Message ────────────────────────────────────────────────────────────────
   const clubLabel = `${club.name}${club.number ? " " + club.number : ""}`;
   let message: string;
-  if (newRemaining === 0) {
+  if (landedHazard) {
+    const hazardName = landedHazard.name ?? landedHazard.type.toUpperCase();
+    if (landedHazard.type === "water" || landedHazard.type === "ob") {
+      message = `${QUALITY_LABELS[shotQuality]} ${clubLabel} — ${actualDistance}y、${hazardName}に入り罰打+${penaltyStrokes}。救済後 残り${newRemaining}y（${LIE_LABELS[newLie]}）`;
+    } else {
+      message = `${QUALITY_LABELS[shotQuality]} ${clubLabel} — ${actualDistance}y、${hazardName}着弾（残り${newRemaining}y）`;
+    }
+  } else if (newRemaining === 0) {
     message = `${QUALITY_LABELS[shotQuality]} ${clubLabel} — ${actualDistance}yのショットがカップイン！🎉`;
   } else {
     message = `${QUALITY_LABELS[shotQuality]} ${clubLabel} — ${actualDistance}y、残り${newRemaining}y（${LIE_LABELS[newLie]}）`;
@@ -661,17 +737,17 @@ export function simulateShot(
   return {
     newRemainingDistance: newRemaining,
     outcomeMessage: message,
-    strokesAdded: 1,
+    strokesAdded: 1 + penaltyStrokes,
     lie: newLie,
-    penalty: false,
+    penalty,
     distanceHit: actualDistance,
     shotQuality,
-    wasSuccessful: isGoodShot,
+    wasSuccessful: landedHazard ? false : isGoodShot,
     effectiveSuccessRate: effectiveRate,
     confidenceBoostApplied,
     landing,
     finalOutcome,
-    penaltyStrokes: 0,
+    penaltyStrokes,
   };
 }
 

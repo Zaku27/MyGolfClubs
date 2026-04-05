@@ -3,7 +3,7 @@ import type { Hole, Hazard } from "../../types/game";
 import type { LandingResult } from "../../utils/landingPosition";
 
 interface HoleMapCanvasProps {
-  hole: Pick<Hole, "targetDistance" | "distanceFromTee" | "hazards">;
+  hole: Pick<Hole, "targetDistance" | "distanceFromTee" | "greenRadius" | "hazards">;
   landingResults: LandingResult[];
   showTrajectories?: boolean;
   className?: string;
@@ -14,7 +14,20 @@ type Size = {
   height: number;
 };
 
+type Point2D = {
+  x: number;
+  y: number;
+};
+
+type AbsoluteShot = {
+  origin: Point2D;
+  landing: Point2D;
+  path: Point2D[];
+  local: LandingResult;
+};
+
 const MIN_CANVAS_HEIGHT = 280;
+const DEFAULT_GREEN_RADIUS = 12;
 
 /**
  * ハザード種別に応じて描画色を返す。
@@ -56,23 +69,21 @@ function getHazardStyle(type: Hazard["type"]): { fill: string; stroke: string } 
  */
 function buildYardBounds(
   targetDistance: number,
+  greenRadius: number,
   hazards: Hazard[],
-  landingResults: LandingResult[],
+  absoluteShots: AbsoluteShot[],
 ): {
   maxYardY: number;
   halfYardX: number;
 } {
   const maxHazardY = hazards.reduce((max, hazard) => Math.max(max, hazard.yBack), 0);
-  const maxLandingY = landingResults.reduce((max, shot) => {
-    const pathMaxY = shot.trajectoryPoints?.reduce(
-      (innerMax, point) => Math.max(innerMax, point.y),
-      shot.finalY,
-    ) ?? shot.finalY;
+  const maxLandingY = absoluteShots.reduce((max, shot) => {
+    const pathMaxY = shot.path.reduce((innerMax, point) => Math.max(innerMax, point.y), shot.landing.y);
 
-    return Math.max(max, shot.finalY, pathMaxY);
+    return Math.max(max, shot.landing.y, pathMaxY);
   }, 0);
 
-  const baseMaxY = Math.max(targetDistance, maxHazardY, maxLandingY, 1);
+  const baseMaxY = Math.max(targetDistance + greenRadius, maxHazardY, maxLandingY, 1);
   const maxYardY = baseMaxY * 1.1;
 
   const maxHazardX = hazards.reduce((max, hazard) => {
@@ -80,18 +91,69 @@ function buildYardBounds(
     return Math.max(max, Math.abs(hazard.xCenter - half), Math.abs(hazard.xCenter + half));
   }, 0);
 
-  const maxLandingX = landingResults.reduce((max, shot) => {
-    const pathMaxX = shot.trajectoryPoints?.reduce(
-      (innerMax, point) => Math.max(innerMax, Math.abs(point.x)),
-      Math.abs(shot.finalX),
-    ) ?? Math.abs(shot.finalX);
+  const maxLandingX = absoluteShots.reduce((max, shot) => {
+    const pathMaxX = shot.path.reduce((innerMax, point) => Math.max(innerMax, Math.abs(point.x)), Math.abs(shot.landing.x));
 
-    return Math.max(max, Math.abs(shot.finalX), pathMaxX);
+    return Math.max(max, Math.abs(shot.landing.x), pathMaxX, Math.abs(shot.origin.x));
   }, 0);
 
-  const halfYardX = Math.max(maxHazardX, maxLandingX, 22) * 1.25;
+  const halfYardX = Math.max(maxHazardX, maxLandingX, greenRadius, 22) * 1.25;
 
   return { maxYardY, halfYardX };
+}
+
+/**
+ * ローカル座標(各ショット時点の「ピン方向基準」)を、
+ * ホール全体の絶対座標(ティー基準)へ逐次変換する。
+ *
+ * これにより2打目以降は
+ * 「前ショット着弾点から現在のピン方向へ打つ」
+ * 通常ゴルフに近い見え方で描画できる。
+ */
+function buildAbsoluteShots(
+  landingResults: LandingResult[],
+  targetDistance: number,
+): AbsoluteShot[] {
+  const pin: Point2D = { x: 0, y: targetDistance };
+  let current: Point2D = { x: 0, y: 0 };
+
+  const transformed: AbsoluteShot[] = [];
+
+  for (const shot of landingResults) {
+    const toPinX = pin.x - current.x;
+    const toPinY = pin.y - current.y;
+    const toPinDistance = Math.hypot(toPinX, toPinY);
+
+    // ピン方向の単位ベクトル。近距離で不安定な場合は真上方向を採用する。
+    const forward: Point2D = toPinDistance > 1e-6
+      ? { x: toPinX / toPinDistance, y: toPinY / toPinDistance }
+      : { x: 0, y: 1 };
+
+    // forward から見て右方向の単位ベクトル。
+    const right: Point2D = { x: forward.y, y: -forward.x };
+
+    const toAbsolute = (localX: number, localY: number): Point2D => {
+      return {
+        x: current.x + forward.x * localY + right.x * localX,
+        y: current.y + forward.y * localY + right.y * localX,
+      };
+    };
+
+    const landing = toAbsolute(shot.finalX, shot.finalY);
+    const pathFromTrajectory = shot.trajectoryPoints?.map((point) => toAbsolute(point.x, point.y)) ?? [];
+    const path = pathFromTrajectory.length > 0 ? pathFromTrajectory : [current, landing];
+
+    transformed.push({
+      origin: current,
+      landing,
+      path,
+      local: shot,
+    });
+
+    current = landing;
+  }
+
+  return transformed;
 }
 
 export function HoleMapCanvas({
@@ -105,7 +167,12 @@ export function HoleMapCanvas({
   const [size, setSize] = useState<Size>({ width: 0, height: MIN_CANVAS_HEIGHT });
 
   const targetDistance = hole.targetDistance ?? hole.distanceFromTee;
+  const greenRadius = hole.greenRadius ?? DEFAULT_GREEN_RADIUS;
   const hazards = useMemo(() => hole.hazards ?? [], [hole.hazards]);
+  const absoluteShots = useMemo(
+    () => buildAbsoluteShots(landingResults, targetDistance),
+    [landingResults, targetDistance],
+  );
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -157,7 +224,7 @@ export function HoleMapCanvas({
     const drawWidth = size.width - padding.left - padding.right;
     const drawHeight = size.height - padding.top - padding.bottom;
 
-    const { maxYardY, halfYardX } = buildYardBounds(targetDistance, hazards, landingResults);
+    const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
 
     const yardToPxX = (yardX: number) => padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
     const yardToPxY = (yardY: number) => padding.top + drawHeight * (1 - yardY / maxYardY);
@@ -166,6 +233,7 @@ export function HoleMapCanvas({
     const teeY = yardToPxY(0);
     const pinX = yardToPxX(0);
     const pinY = yardToPxY(targetDistance);
+    const greenRadiusPx = Math.max(10, (greenRadius / maxYardY) * drawHeight);
 
     // 背景グラデーションを引いて、地形の奥行きを視覚化する。
     const bg = context.createLinearGradient(0, padding.top, 0, size.height - padding.bottom);
@@ -173,6 +241,15 @@ export function HoleMapCanvas({
     bg.addColorStop(1, "#86efac");
     context.fillStyle = bg;
     context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
+
+    // ピン周囲にグリーン領域を円として描画し、オン判定の範囲を視覚化する。
+    context.fillStyle = "rgba(187, 247, 208, 0.72)";
+    context.strokeStyle = "rgba(21, 128, 61, 0.9)";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(pinX, pinY, greenRadiusPx, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
 
     // センターライン(ティー→ピン)を点線で描き、基準軸をわかりやすくする。
     context.save();
@@ -231,9 +308,11 @@ export function HoleMapCanvas({
     context.fill();
 
     // 複数球の着地点を描画。必要に応じて簡易軌跡も表示する。
-    for (const shot of landingResults) {
-      const landingX = yardToPxX(shot.finalX);
-      const landingY = yardToPxY(shot.finalY);
+    for (const shot of absoluteShots) {
+      const landingX = yardToPxX(shot.landing.x);
+      const landingY = yardToPxY(shot.landing.y);
+      const originX = yardToPxX(shot.origin.x);
+      const originY = yardToPxY(shot.origin.y);
 
       if (showTrajectories) {
         context.save();
@@ -242,19 +321,18 @@ export function HoleMapCanvas({
 
         // trajectoryPoints がある場合は lineTo で線をつなぎ、
         // ない場合は簡易2次ベジェで左右の曲がりを可視化する。
-        if (shot.trajectoryPoints && shot.trajectoryPoints.length > 1) {
+        if (shot.path.length > 1) {
           context.beginPath();
-          context.moveTo(teeX, teeY);
-          for (const point of shot.trajectoryPoints) {
+          context.moveTo(originX, originY);
+          for (const point of shot.path) {
             context.lineTo(yardToPxX(point.x), yardToPxY(point.y));
           }
-          context.lineTo(landingX, landingY);
           context.stroke();
         } else {
-          const controlX = yardToPxX(shot.finalX * 0.55 + shot.lateralDeviation * 0.15);
-          const controlY = yardToPxY(Math.max(shot.finalY * 0.58, 1));
+          const controlX = yardToPxX((shot.origin.x + shot.landing.x) * 0.5 + shot.local.lateralDeviation * 0.15);
+          const controlY = yardToPxY(Math.max((shot.origin.y + shot.landing.y) * 0.52, 1));
           context.beginPath();
-          context.moveTo(teeX, teeY);
+          context.moveTo(originX, originY);
           context.quadraticCurveTo(controlX, controlY, landingX, landingY);
           context.stroke();
         }
@@ -276,7 +354,7 @@ export function HoleMapCanvas({
     context.font = "12px sans-serif";
     context.textAlign = "right";
     context.fillText(`Scale: 1px = ${(maxYardY / drawHeight).toFixed(2)} yd`, size.width - 12, 18);
-  }, [hazards, landingResults, showTrajectories, size.height, size.width, targetDistance]);
+  }, [absoluteShots, greenRadius, hazards, showTrajectories, size.height, size.width, targetDistance]);
 
   return (
     <div
