@@ -1,3 +1,5 @@
+import type { ClubCategory as AnalysisClubCategory } from '../utils/analysisConstants';
+
 export type ClubCategory = 'Driver' | 'Wood' | 'Hybrid' | 'Iron' | 'Wedge' | 'Putter';
 
 export interface GolfClub {
@@ -20,7 +22,7 @@ export interface GolfClub {
 }
 
 export type GolfClubData = GolfClub & {
-  category: string;
+  category: AnalysisClubCategory;
 };
 
 export interface GolfBag {

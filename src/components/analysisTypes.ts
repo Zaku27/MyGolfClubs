@@ -1,12 +1,10 @@
-import type { GolfClub } from '../types/golf';
-import type { ClubCategory } from '../utils/analysisUtils';
+import type { GolfClubData } from '../types/golf';
 import type { LieAngleStatus } from '../types/lieStandards';
 
 export type WeightTooltipState = {
   x: number;
   y: number;
-  club: GolfClub & {
-    category: ClubCategory;
+  club: GolfClubData & {
     expectedWeight: number;
     deviation: number;
     weightTrendMessage: string;
@@ -16,8 +14,7 @@ export type WeightTooltipState = {
 export type LoftTooltipState = {
   x: number;
   y: number;
-  club: GolfClub & {
-    category: ClubCategory;
+  club: GolfClubData & {
     estimatedDistance: number;
     actualDistance: number;
   };
@@ -27,8 +24,7 @@ export type LoftTooltipState = {
 export type LieTooltipState = {
   x: number;
   y: number;
-  club: GolfClub & {
-    category: ClubCategory;
+  club: GolfClubData & {
     standardLieAngle: number;
     deviationFromStandard: number;
     lieStatus: LieAngleStatus;
@@ -38,8 +34,7 @@ export type LieTooltipState = {
 export type LieLengthTooltipState = {
   x: number;
   y: number;
-  club: GolfClub & {
-    category: ClubCategory;
+  club: GolfClubData & {
     expectedLieAngle: number;
     deviationFromTrend: number;
     lieTrendMessage: string;
@@ -49,8 +44,7 @@ export type LieLengthTooltipState = {
 export type LoftLengthTooltipState = {
   x: number;
   y: number;
-  club: GolfClub & {
-    category: ClubCategory;
+  club: GolfClubData & {
     expectedLoft: number;
     deviationFromStandard: number;
     recommendedLoftAdjustment: number;
@@ -62,8 +56,7 @@ export type LoftLengthTooltipState = {
 export type SwingTooltipState = {
   x: number;
   y: number;
-  club: GolfClub & {
-    category: ClubCategory;
+  club: GolfClubData & {
     swingWeightNumeric: number;
     swingDeviation: number;
     swingStatus: '良好' | 'やや重い' | 'やや軽い' | '調整推奨';

@@ -1,4 +1,4 @@
-import type { GolfClub } from '../types/golf';
+import type { GolfClub, GolfClubData } from '../types/golf';
 import {
   lieStatusFromDeviation,
   resolveStandardLieAngle,
@@ -22,7 +22,6 @@ import {
   getWeightTrendMessage,
   makeTickValues,
   swingWeightToNumeric,
-  type ClubCategory,
   type LoftLengthPoint,
   type WeightLengthPoint,
 } from './analysisUtils';
@@ -45,7 +44,7 @@ type WeightChartBounds = {
   yInterval: number;
 };
 
-const withCategory = <T extends GolfClub>(club: T): T & { category: ClubCategory } => ({
+const withCategory = <T extends GolfClub>(club: T): T & GolfClubData => ({
   ...club,
   category: getClubCategory(club),
 });

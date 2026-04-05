@@ -1,4 +1,4 @@
-import type { GolfClub } from '../types/golf';
+import type { GolfClub, GolfClubData } from '../types/golf';
 import {
   lieStatusFromDeviation,
 } from '../types/lieStandards';
@@ -39,13 +39,12 @@ export type WeightRegression = {
 };
 
 export type LoftDistancePoint = GolfClub & {
+  category: GolfClubData['category'];
   estimatedDistance: number;
   actualDistance: number;
-  category: ClubCategory;
 };
 
-export type WeightLengthPoint = GolfClub & {
-  category: ClubCategory;
+export type WeightLengthPoint = GolfClubData & {
   expectedWeight: number;
   deviation: number;
   weightTrendMessage: string;
@@ -60,29 +59,25 @@ type WeightChartBounds = {
   yInterval: number;
 };
 
-export type SwingWeightPoint = GolfClub & {
-  category: ClubCategory;
+export type SwingWeightPoint = GolfClubData & {
   swingWeightNumeric: number;
   swingDeviation: number;
   swingStatus: SwingStatus;
 };
 
-export type LieAnglePoint = GolfClub & {
-  category: ClubCategory;
+export type LieAnglePoint = GolfClubData & {
   standardLieAngle: number;
   deviationFromStandard: number;
   lieStatus: ReturnType<typeof lieStatusFromDeviation>;
 };
 
-export type LieLengthPoint = GolfClub & {
-  category: ClubCategory;
+export type LieLengthPoint = GolfClubData & {
   expectedLieAngle: number;
   deviationFromTrend: number;
   lieTrendMessage: string;
 };
 
-export type LoftLengthPoint = GolfClub & {
-  category: ClubCategory;
+export type LoftLengthPoint = GolfClubData & {
   expectedLoft: number;
   deviationFromStandard: number;
   recommendedLoftAdjustment: number;
