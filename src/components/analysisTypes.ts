@@ -48,7 +48,9 @@ export type LoftLengthTooltipState = {
     expectedLoft: number;
     deviationFromStandard: number;
     recommendedLoftAdjustment: number;
-    projectedDistanceGap: number;
+    projectedDistanceGap: number | null;
+    projectedGapTargetClubType: GolfClubData['clubType'] | null;
+    projectedGapTargetNumber: string | null;
     projectedSwingWeightImpact: number;
   };
 };

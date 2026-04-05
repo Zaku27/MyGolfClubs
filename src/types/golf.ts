@@ -13,7 +13,10 @@ export interface GolfClub {
   weight: number; // grams
   swingWeight: string; // e.g., D0, D2
   lieAngle: number; // degrees
+  lieStandard?: number; // 標準ライ角（度）
+  lieAdjustment?: number; // 調整（度）
   loftAngle: number; // degrees
+  bounceAngle?: number; // degrees (Wedge only)
   shaftType: string; // e.g., "Steel", "Graphite"
   torque: number; // トルク（小数1桁）
   flex: 'S' | 'SR' | 'R' | 'A' | 'L'; // フレックス
@@ -54,10 +57,10 @@ export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
   { clubType: 'Iron', name: 'Iron', number: '7', length: 37, weight: 424, swingWeight: 'D1', lieAngle: 63, loftAngle: 31, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 160, notes: '' },
   { clubType: 'Iron', name: 'Iron', number: '8', length: 36.5, weight: 430, swingWeight: 'D1', lieAngle: 63.5, loftAngle: 35, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 150, notes: '' },
   { clubType: 'Iron', name: 'Iron', number: '9', length: 36, weight: 436, swingWeight: 'D1', lieAngle: 64, loftAngle: 39, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 140, notes: '' },
-  { clubType: 'Wedge', name: 'Wedge', number: 'PW', length: 35.5, weight: 442, swingWeight: 'D1', lieAngle: 64, loftAngle: 44, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 120, notes: '' },
-  { clubType: 'Wedge', name: 'Wedge', number: 'GW', length: 35.25, weight: 450, swingWeight: 'D1', lieAngle: 64, loftAngle: 50, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 110, notes: '' },
-  { clubType: 'Wedge', name: 'Wedge', number: 'SW', length: 35, weight: 455, swingWeight: 'D1', lieAngle: 64, loftAngle: 54, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 100, notes: '' },
-  { clubType: 'Wedge', name: 'Wedge', number: 'LW', length: 34.75, weight: 460, swingWeight: 'D1', lieAngle: 64, loftAngle: 58, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 90, notes: '' },
+  { clubType: 'Wedge', name: 'Wedge', number: 'PW', length: 35.5, weight: 442, swingWeight: 'D1', lieAngle: 64, loftAngle: 44, bounceAngle: 10, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 120, notes: '' },
+  { clubType: 'Wedge', name: 'Wedge', number: 'GW', length: 35.25, weight: 450, swingWeight: 'D1', lieAngle: 64, loftAngle: 50, bounceAngle: 12, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 110, notes: '' },
+  { clubType: 'Wedge', name: 'Wedge', number: 'SW', length: 35, weight: 455, swingWeight: 'D1', lieAngle: 64, loftAngle: 54, bounceAngle: 14, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 100, notes: '' },
+  { clubType: 'Wedge', name: 'Wedge', number: 'LW', length: 34.75, weight: 460, swingWeight: 'D1', lieAngle: 64, loftAngle: 58, bounceAngle: 8, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 90, notes: '' },
   { clubType: 'Putter', name: 'Putter', number: 'P', length: 33, weight: 500, swingWeight: 'D1', lieAngle: 70, loftAngle: 3, shaftType: 'Steel', torque: 1.0, flex: 'S', distance: 10, notes: '' },
 ];
  

@@ -81,7 +81,9 @@ export type LoftLengthPoint = GolfClubData & {
   expectedLoft: number;
   deviationFromStandard: number;
   recommendedLoftAdjustment: number;
-  projectedDistanceGap: number;
+  projectedDistanceGap: number | null;
+  projectedGapTargetClubType: GolfClub['clubType'] | null;
+  projectedGapTargetNumber: string | null;
   projectedSwingWeightImpact: number;
 };
 
@@ -296,6 +298,37 @@ export const getLoftLengthRegression = (
 
 export const getExpectedLoftAngle = (length: number, regression: WeightRegression) =>
   regression.slope * length + regression.intercept;
+
+/**
+ * スロープ制約なしのカテゴリ専用回帰。フルバッグ用の ±4〜10°/inch 制約を外し
+ * ウェッジや短尺ウッドなど極端な傾きにも対応する。
+ */
+export const getCategoryLoftLengthRegression = (
+  clubs: Pick<GolfClub, 'length' | 'loftAngle'>[],
+): WeightRegression | null => {
+  if (clubs.length < 2) return null;
+
+  const meanLength = clubs.reduce((sum, c) => sum + c.length, 0) / clubs.length;
+  const meanLoft = clubs.reduce((sum, c) => sum + c.loftAngle, 0) / clubs.length;
+
+  let numerator = 0;
+  let denominator = 0;
+  for (const club of clubs) {
+    const dx = club.length - meanLength;
+    numerator += dx * (club.loftAngle - meanLoft);
+    denominator += dx * dx;
+  }
+
+  if (Math.abs(denominator) < 0.0001) {
+    // x 値がすべて同じ → 平均ロフトで水平線
+    return { slope: 0, intercept: meanLoft };
+  }
+
+  const slope = numerator / denominator;
+  if (!Number.isFinite(slope)) return null;
+
+  return { slope, intercept: meanLoft - slope * meanLength };
+};
 
 const getLieLengthFallbackRegression = (
   anchorLength: number,

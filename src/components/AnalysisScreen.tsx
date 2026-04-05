@@ -68,6 +68,7 @@ import {
   getWeightDeviationLabel,
   getWeightPointStyle,
   isAnalysisClubVisible,
+  type ClubCategory,
 } from '../utils/analysisUtils';
 import {
   buildLieAngleAnalysis,
@@ -214,6 +215,7 @@ export const AnalysisScreen = ({
   const {
     chartClubs: loftLengthClubs,
     regression: loftLengthRegression,
+    categoryRegressions: loftLengthCategoryRegressions,
     bounds: loftLengthBounds,
     lengthTicks: loftLengthLengthTicks,
     loftTicks: loftLengthLoftTicks,
@@ -287,11 +289,41 @@ export const AnalysisScreen = ({
     },
   );
 
-  const loftLengthTrendLinePoints = `${mapLoftLengthX(loftLengthBounds.minLength)},${mapLoftLengthY(
-    loftLengthRegression.slope * loftLengthBounds.minLength + loftLengthRegression.intercept,
-  )} ${mapLoftLengthX(loftLengthBounds.maxLength)},${mapLoftLengthY(
-    loftLengthRegression.slope * loftLengthBounds.maxLength + loftLengthRegression.intercept,
-  )}`;
+  const loftLengthCategoryRanges = loftLengthClubs.reduce<Partial<Record<ClubCategory, { minLength: number; maxLength: number }>>>(
+    (ranges, club) => {
+      const category = club.category as ClubCategory;
+      const current = ranges[category];
+      if (!current) {
+        ranges[category] = { minLength: club.length, maxLength: club.length };
+      } else {
+        ranges[category] = {
+          minLength: Math.min(current.minLength, club.length),
+          maxLength: Math.max(current.maxLength, club.length),
+        };
+      }
+      return ranges;
+    },
+    {},
+  );
+
+  const loftLengthTrendLines = (Object.entries(loftLengthCategoryRegressions) as [ClubCategory, typeof loftLengthRegression][]).flatMap(
+    ([category, regression]) => {
+      const range = loftLengthCategoryRanges[category];
+      if (!range) return [];
+      const startLength = Math.max(range.minLength, loftLengthBounds.minLength);
+      const endLength = Math.min(range.maxLength, loftLengthBounds.maxLength);
+      return [
+        {
+          category,
+          points: `${mapLoftLengthX(startLength)},${mapLoftLengthY(
+            regression.slope * startLength + regression.intercept,
+          )} ${mapLoftLengthX(endLength)},${mapLoftLengthY(
+            regression.slope * endLength + regression.intercept,
+          )}`,
+        },
+      ];
+    },
+  );
 
   const actualLinePoints = buildActualDistanceLinePoints(chartClubs, mapLoftX, mapLoftY);
 
@@ -513,15 +545,12 @@ export const AnalysisScreen = ({
           hasLoftLengthData={hasLoftLengthData}
           loftLengthChartContainerRef={loftLengthChartContainerRef}
           loftLengthChartSize={loftLengthChartSize}
-          loftLengthTrendLinePoints={loftLengthTrendLinePoints}
+          loftLengthTrendLines={loftLengthTrendLines}
           lengthTicks={loftLengthLengthTicks}
           loftTicks={loftLengthLoftTicks}
           mapLoftLengthX={mapLoftLengthX}
           mapLoftLengthY={mapLoftLengthY}
           loftLengthClubs={loftLengthClubs}
-          getExpectedLoftAtLength={(length) =>
-            loftLengthRegression.slope * length + loftLengthRegression.intercept
-          }
           getCategoryColor={getCategoryColor}
           setLoftLengthTooltip={setLoftLengthTooltip}
           loftLengthTooltip={loftLengthTooltip}

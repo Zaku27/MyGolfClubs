@@ -116,8 +116,6 @@ export function PersonalDataInput() {
   const [saveMessage, setSaveMessage] = useState<string>("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
-  const [showWeakClubHint, setShowWeakClubHint] = useState<boolean>(false);
-  const [showWeaknessHint, setShowWeaknessHint] = useState<boolean>(false);
 
   useBagIdUrlSync({
     bags,
@@ -460,17 +458,13 @@ export function PersonalDataInput() {
                       <button
                         type="button"
                         aria-label="弱クラブ扱いのヒント"
-                        aria-expanded={showWeakClubHint}
-                        onClick={() => setShowWeakClubHint((prev) => !prev)}
-                        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-xs font-bold text-amber-700"
+                        className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-xs font-bold text-amber-700"
                       >
                         ?
-                      </button>
-                      {showWeakClubHint && (
-                        <div className="absolute left-0 top-full z-20 mt-2 w-[24rem] max-w-[85vw] rounded-md border border-amber-300 bg-white p-3 text-left text-xs leading-relaxed text-amber-900 shadow-lg">
+                        <span className="help-tooltip-text">
                           弱クラブ扱いは「基本成功率が 65% 未満」の場合に適用されます。
-                        </div>
-                      )}
+                        </span>
+                      </button>
                     </span>
                   </th>
                   <th className="px-4 py-3 text-right font-semibold">基本成功率</th>
@@ -480,17 +474,13 @@ export function PersonalDataInput() {
                       <button
                         type="button"
                         aria-label="弱点係数のヒント"
-                        aria-expanded={showWeaknessHint}
-                        onClick={() => setShowWeaknessHint((prev) => !prev)}
-                        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 bg-emerald-100 text-xs font-bold text-emerald-700"
+                        className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 bg-emerald-100 text-xs font-bold text-emerald-700"
                       >
                         ?
-                      </button>
-                      {showWeaknessHint && (
-                        <div className="absolute left-0 top-full z-20 mt-2 w-[22rem] max-w-[85vw] rounded-md border border-emerald-300 bg-white p-3 text-xs leading-relaxed text-emerald-900 shadow-lg">
+                        <span className="help-tooltip-text">
                           弱点係数はクラブごとの苦手度です。0.00 は影響なし、1.00 に近いほど成功率が下がります。
-                        </div>
-                      )}
+                        </span>
+                      </button>
                     </span>
                   </th>
                   <th className="px-4 py-3 text-right font-semibold">クラブ成功率</th>

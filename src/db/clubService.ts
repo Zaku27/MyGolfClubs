@@ -19,6 +19,22 @@ const CLUB_VALUE_DEFAULTS = {
   notes: '',
 };
 
+const normalizeBounceAngle = (
+  clubType: GolfClub['clubType'],
+  bounceAngle: unknown,
+): number | undefined => {
+  if (clubType !== 'Wedge') {
+    return undefined;
+  }
+
+  const numeric = typeof bounceAngle === 'number' ? bounceAngle : Number(bounceAngle);
+  if (!Number.isFinite(numeric)) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.min(20, Math.round(numeric * 10) / 10));
+};
+
 const createTimestamp = (): string => new Date().toISOString();
 
 const normalizeClubRecord = (club: GolfClub): GolfClub => ({
@@ -34,12 +50,14 @@ const normalizeClubRecord = (club: GolfClub): GolfClub => ({
   length: club.length ?? CLUB_VALUE_DEFAULTS.length,
   weight: club.weight ?? CLUB_VALUE_DEFAULTS.weight,
   notes: club.notes ?? CLUB_VALUE_DEFAULTS.notes,
+  bounceAngle: normalizeBounceAngle(club.clubType, club.bounceAngle),
 });
 
 const createClubRecord = (club: Omit<GolfClub, 'id'>): GolfClub => {
   const timestamp = createTimestamp();
   return {
     ...club,
+    bounceAngle: normalizeBounceAngle(club.clubType, club.bounceAngle),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -106,7 +124,15 @@ export class ClubService {
   }
 
   static async updateClub(id: number, club: Partial<GolfClub>): Promise<number> {
-    const updatedClub = createUpdatedClubRecord(club);
+    const currentClub = await db.clubs.get(id);
+    const effectiveClubType = club.clubType ?? currentClub?.clubType;
+    const effectiveBounceAngle = club.bounceAngle ?? currentClub?.bounceAngle;
+    const updatedClub = createUpdatedClubRecord({
+      ...club,
+      ...(effectiveClubType
+        ? { bounceAngle: normalizeBounceAngle(effectiveClubType, effectiveBounceAngle) }
+        : {}),
+    });
     return await db.clubs.update(id, updatedClub);
   }
 

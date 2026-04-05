@@ -4,7 +4,6 @@ import type { ClubCategory } from '../utils/analysisUtils';
 import type { LoftLengthTooltipState } from './analysisTypes';
 import { LoftLengthLegend } from './AnalysisLegends';
 import { AnalysisChartWrapper } from './AnalysisChartWrapper';
-import { useAnalysisStore } from '../store/analysisStore';
 
 type LoftLengthChartClub = LoftLengthTooltipState['club'];
 
@@ -13,13 +12,12 @@ type AnalysisLoftLengthChartProps = {
   hasLoftLengthData: boolean;
   loftLengthChartContainerRef: RefObject<HTMLDivElement | null>;
   loftLengthChartSize: { width: number; height: number };
-  loftLengthTrendLinePoints: string | null;
+  loftLengthTrendLines: Array<{ category: ClubCategory; points: string }>;
   lengthTicks: number[];
   loftTicks: number[];
   mapLoftLengthX: (value: number) => number;
   mapLoftLengthY: (value: number) => number;
   loftLengthClubs: LoftLengthChartClub[];
-  getExpectedLoftAtLength: (length: number) => number;
   getCategoryColor: (category: ClubCategory) => string;
   setLoftLengthTooltip: (tooltip: LoftLengthTooltipState | null) => void;
   loftLengthTooltip: LoftLengthTooltipState | null;
@@ -33,7 +31,7 @@ type AnalysisLoftLengthChartProps = {
   };
 };
 
-const formatAdjustment = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)} deg`;
+const formatAdjustment = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}°`;
 const formatLabel = (clubType: string, number: string) => {
   if (clubType === 'Driver') return 'Driver';
   if (clubType === 'Wood') return `${number.replace(/W$/i, '')}W`;
@@ -42,18 +40,30 @@ const formatLabel = (clubType: string, number: string) => {
   return number || clubType;
 };
 
+const formatGapClubSummary = (club: LoftLengthChartClub): string => {
+  const clubLabel = club.clubType === 'Wedge'
+    ? `Wedge ${club.number}`
+    : getClubTypeDisplay(club.clubType, club.number);
+  const targetLabel = club.projectedGapTargetClubType
+    ? club.projectedGapTargetClubType === 'Wedge'
+      ? `Wedge ${club.projectedGapTargetNumber ?? ''}`.trim()
+      : getClubTypeDisplay(club.projectedGapTargetClubType, club.projectedGapTargetNumber ?? '')
+    : '比較対象なし';
+  const gapLabel = club.projectedDistanceGap == null ? '対象外' : `${club.projectedDistanceGap}yd`;
+  return `${clubLabel} → ${targetLabel} (${gapLabel})`;
+};
+
 export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = ({
   hasAnyLoftLengthData,
   hasLoftLengthData,
   loftLengthChartContainerRef,
   loftLengthChartSize,
-  loftLengthTrendLinePoints,
+  loftLengthTrendLines,
   lengthTicks,
   loftTicks,
   mapLoftLengthX,
   mapLoftLengthY,
   loftLengthClubs,
-  getExpectedLoftAtLength,
   getCategoryColor,
   setLoftLengthTooltip,
   loftLengthTooltip,
@@ -61,28 +71,23 @@ export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = (
   loftLengthTooltipPos,
   LOFT_LENGTH_CHART_PADDING,
 }) => {
-  const {
-    selectedLoftLengthClubId,
-    adjustedLoftLength,
-    selectLoftLengthClub,
-    setAdjustedLoftLength,
-  } = useAnalysisStore();
-
-  const selectedClub = loftLengthClubs.find((club) => club.id === selectedLoftLengthClubId) ?? null;
-  const selectedExpectedLoft = selectedClub ? getExpectedLoftAtLength(adjustedLoftLength) : 0;
-  const recommendedLoftAdjust = selectedClub ? selectedExpectedLoft - selectedClub.loftAngle : 0;
-  const projectedDistanceGap = Math.round(Math.abs(recommendedLoftAdjust) * 3.5);
-  const swingWeightImpact = selectedClub
-    ? Math.round((adjustedLoftLength - selectedClub.length) * 6 * 10) / 10
-    : 0;
+  const evaluatedGapClubs = loftLengthClubs.filter((club) => club.projectedDistanceGap != null);
+  const narrowGapClubs = evaluatedGapClubs.filter((club) => (club.projectedDistanceGap ?? 0) < 8);
+  const wideGapClubs = evaluatedGapClubs.filter((club) => (club.projectedDistanceGap ?? 0) > 18);
+  const narrowGapSummary = narrowGapClubs.map(formatGapClubSummary).join(' / ');
+  const wideGapSummary = wideGapClubs.map(formatGapClubSummary).join(' / ');
 
   const gappingAlert =
-    projectedDistanceGap < 8
-      ? 'ギャップが狭すぎる可能性があります（8yd未満）'
-      : projectedDistanceGap > 18
-        ? 'ギャップが広すぎる可能性があります（18yd超）'
-        : 'ギャップは標準範囲です（10-15yd目安）。';
-  const gappingClass = projectedDistanceGap < 8 || projectedDistanceGap > 18 ? 'alert' : 'ok';
+    evaluatedGapClubs.length === 0
+      ? '距離ギャップ評価対象クラブがありません（ドライバーのみ、または比較対象なし）。'
+      : narrowGapClubs.length > 0 && wideGapClubs.length > 0
+        ? '距離ギャップに注意が必要な組み合わせがあります。クラブ選択またはロフト設定の見直しを推奨します。'
+      : narrowGapClubs.length > 0
+        ? '距離ギャップが狭い可能性のある組み合わせがあります（8yd未満）。クラブ選択またはロフト設定の見直しを推奨します。'
+        : wideGapClubs.length > 0
+          ? '距離ギャップが広い可能性のある組み合わせがあります（18yd超）。クラブ選択またはロフト設定の見直しを推奨します。'
+          : '距離ギャップは全体として適正範囲内です（8〜18yd）。';
+  const gappingClass = narrowGapClubs.length > 0 || wideGapClubs.length > 0 ? 'alert' : 'ok';
 
   if (!hasAnyLoftLengthData) {
     return <div className="analysis-empty">クラブがまだ追加されていません</div>;
@@ -122,11 +127,11 @@ export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = (
                 </div>
                 <div className="chart-tooltip-row">
                   <span className="chart-tooltip-label">ロフト</span>
-                  <span className="chart-tooltip-value">{loftLengthTooltip.club.loftAngle.toFixed(1)} deg</span>
+                  <span className="chart-tooltip-value">{loftLengthTooltip.club.loftAngle.toFixed(1)}°</span>
                 </div>
                 <div className="chart-tooltip-row">
                   <span className="chart-tooltip-label">基準ロフト</span>
-                  <span className="chart-tooltip-value">{loftLengthTooltip.club.expectedLoft.toFixed(1)} deg</span>
+                  <span className="chart-tooltip-value">{loftLengthTooltip.club.expectedLoft.toFixed(1)}°</span>
                 </div>
                 <div className="chart-tooltip-row">
                   <span className="chart-tooltip-label">推奨調整</span>
@@ -134,7 +139,22 @@ export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = (
                 </div>
                 <div className="chart-tooltip-row">
                   <span className="chart-tooltip-label">距離ギャップ</span>
-                  <span className="chart-tooltip-value">約{loftLengthTooltip.club.projectedDistanceGap} yd</span>
+                  <span className="chart-tooltip-value">
+                    {loftLengthTooltip.club.projectedDistanceGap == null
+                      ? '対象外'
+                      : `約${loftLengthTooltip.club.projectedDistanceGap} yd`}
+                  </span>
+                </div>
+                <div className="chart-tooltip-row">
+                  <span className="chart-tooltip-label">比較対象</span>
+                  <span className="chart-tooltip-value">
+                    {loftLengthTooltip.club.projectedGapTargetClubType == null
+                      ? 'なし'
+                      : getClubTypeDisplay(
+                          loftLengthTooltip.club.projectedGapTargetClubType,
+                          loftLengthTooltip.club.projectedGapTargetNumber ?? '',
+                        )}
+                  </span>
                 </div>
               </div>
             </div>
@@ -165,7 +185,7 @@ export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = (
               textAnchor="end"
               className="chart-axis-label"
             >
-              {tick} deg
+              {tick}°
             </text>
           </g>
         ))}
@@ -190,15 +210,16 @@ export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = (
           </g>
         ))}
 
-        {loftLengthTrendLinePoints && (
+        {loftLengthTrendLines.map((line) => (
           <polyline
-            points={loftLengthTrendLinePoints}
+            key={line.category}
+            points={line.points}
             fill="none"
-            stroke="#00897b"
+            stroke={getCategoryColor(line.category)}
             strokeWidth="2.5"
             className="chart-standard-line"
           />
-        )}
+        ))}
 
         {loftLengthClubs.map((club, index) => (
           <g key={getAnalysisClubKey(club)} style={{ '--point-delay': `${index * 45}ms` } as CSSProperties}>
@@ -216,7 +237,6 @@ export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = (
                   y: mapLoftLengthY(club.loftAngle),
                   club,
                 });
-                selectLoftLengthClub(club.id ?? null, club.length);
               }}
               onClick={() => {
                 setLoftLengthTooltip({
@@ -224,7 +244,6 @@ export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = (
                   y: mapLoftLengthY(club.loftAngle),
                   club,
                 });
-                selectLoftLengthClub(club.id ?? null, club.length);
               }}
             />
             <text
@@ -252,46 +271,28 @@ export const AnalysisLoftLengthChart: React.FC<AnalysisLoftLengthChartProps> = (
           transform={`rotate(-90 10 ${loftLengthChartSize.height / 2})`}
           className="chart-title-label"
         >
-          静的ロフト角（degree）
+          静的ロフト角（°）
         </text>
       </AnalysisChartWrapper>
 
       <div className="loft-adjust-panel">
-        {selectedClub ? (
-          <>
-            <div className="loft-adjust-title">{selectedClub.name}</div>
-            <label className="loft-adjust-input-row">
-              <span>調整後の長さ</span>
-              <input
-                type="number"
-                min="30"
-                max="50"
-                step="0.25"
-                value={adjustedLoftLength}
-                onChange={(event) => setAdjustedLoftLength(Number(event.target.value) || 0)}
-                className="analysis-input"
-              />
-              <em>inch</em>
-            </label>
-            <div className="loft-adjust-metrics">
-              <div>
-                <div className="metric-label">推奨ロフト調整</div>
-                <div className="metric-value">{formatAdjustment(recommendedLoftAdjust)}</div>
-              </div>
-              <div>
-                <div className="metric-label">予想距離ギャップ</div>
-                <div className="metric-value">約{projectedDistanceGap} yd</div>
-              </div>
-              <div>
-                <div className="metric-label">SW影響</div>
-                <div className="metric-value">{swingWeightImpact > 0 ? '+' : ''}{swingWeightImpact.toFixed(1)} pt</div>
-              </div>
-            </div>
-            <div className={`gapping-alert ${gappingClass}`}>{gappingAlert}</div>
-          </>
-        ) : (
-          <div className="analysis-empty">ポイントを選択すると推奨調整を表示します</div>
-        )}
+        <div className={`gapping-alert ${gappingClass}`}>
+          <div className="gapping-alert-title">
+            {gappingAlert}
+            <span className="gapping-alert-tooltip" aria-label="距離ギャップの説明">
+              i
+              <span className="gapping-alert-tooltip-text">
+                距離ギャップはロフト差に基づく飛距離差の目安です。目安を確認し、クラブ選択やロフト設定を見直してください。
+              </span>
+            </span>
+          </div>
+          {narrowGapClubs.length > 0 && (
+            <div className="gapping-alert-detail">狭い候補（該当組み合わせ {narrowGapClubs.length}件）: {narrowGapSummary}</div>
+          )}
+          {wideGapClubs.length > 0 && (
+            <div className="gapping-alert-detail">広い候補（該当組み合わせ {wideGapClubs.length}件）: {wideGapSummary}</div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -85,6 +85,12 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                 <span className="spec-label">ロフト角:</span>
                 <span className="spec-value">{club.loftAngle ?? '-'}°</span>
               </div>
+              {club.clubType === 'Wedge' && club.bounceAngle != null && (
+                <div className="spec-row">
+                  <span className="spec-label">バウンス角:</span>
+                  <span className="spec-value">{club.bounceAngle}°</span>
+                </div>
+              )}
               <div className="spec-row">
                 <span className="spec-label">長さ:</span>
                 <span className="spec-value">{club.length}"</span>

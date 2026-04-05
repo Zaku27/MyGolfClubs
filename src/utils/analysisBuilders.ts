@@ -5,15 +5,18 @@ import {
   type UserLieAngleStandards,
 } from '../types/lieStandards';
 import { sortClubsForDisplay } from './clubSort';
+import { getAnalysisClubKey } from './clubUtils';
 import {
   getClubCategory,
   getExpectedLieAngle,
   getExpectedLoftAngle,
   getEstimatedDistance,
+  getCategoryLoftLengthRegression,
   getLoftLengthChartBounds,
   getLoftLengthRegression,
   getLieLengthChartBounds,
   getLieLengthRegression,
+  type ClubCategory,
   getLieLengthTrendMessage,
   getExpectedWeight,
   getSwingStatus,
@@ -175,11 +178,81 @@ export const buildLoftLengthComparisonAnalysis = (
     visibleBaseClubs.length > 0 ? visibleBaseClubs : baseClubs,
   );
 
+  const categoryGroups = visibleBaseClubs.reduce<Partial<Record<ClubCategory, Pick<GolfClub, 'length' | 'loftAngle'>[]>>>(
+    (groups, club) => {
+      const category = club.category;
+      if (!groups[category]) groups[category] = [];
+      groups[category]!.push(club);
+      return groups;
+    },
+    {},
+  );
+
+  const categoryRegressions = Object.fromEntries(
+    Object.entries(categoryGroups)
+      .filter(([, clubs]) => (clubs ?? []).length >= 1)
+      .map(([category, clubs]) => {
+        const catClubs = clubs ?? [];
+        if (catClubs.length === 1) {
+          // 1本のみ：そのクラブ自身のロフトを基準とし、差ゼロ（評価なし）にする
+          return [category, { slope: 0, intercept: catClubs[0].loftAngle }];
+        }
+        const reg = getCategoryLoftLengthRegression(catClubs);
+        // 退化ケース（全同一長さなど）はグローバル回帰にフォールバック
+        return [category, reg ?? regression];
+      }),
+  ) as Partial<Record<ClubCategory, ReturnType<typeof getLoftLengthRegression>>>;
+
+  const clubsByDescendingLoft = [...baseClubs].sort((a, b) => b.loftAngle - a.loftAngle);
+  const projectedGapByClubKey = new Map<
+    string,
+    {
+      gap: number | null;
+      targetClubType: GolfClub['clubType'] | null;
+      targetNumber: string | null;
+    }
+  >();
+
+  for (let i = 0; i < clubsByDescendingLoft.length; i += 1) {
+    const source = clubsByDescendingLoft[i];
+    const sourceKey = getAnalysisClubKey(source);
+
+    if (source.category === 'driver') {
+      projectedGapByClubKey.set(sourceKey, {
+        gap: null,
+        targetClubType: null,
+        targetNumber: null,
+      });
+      continue;
+    }
+
+    const target = clubsByDescendingLoft.slice(i + 1).find((club) => club.loftAngle < source.loftAngle);
+    if (!target) {
+      projectedGapByClubKey.set(sourceKey, {
+        gap: null,
+        targetClubType: null,
+        targetNumber: null,
+      });
+      continue;
+    }
+
+    const loftDiff = source.loftAngle - target.loftAngle;
+    projectedGapByClubKey.set(sourceKey, {
+      gap: Math.round(loftDiff * 3.5),
+      targetClubType: target.clubType,
+      targetNumber: target.number,
+    });
+  }
+
   const tableClubs = baseClubs.map((club) => {
-    const expectedLoft = getExpectedLoftAngle(club.length, regression);
+    const categoryRegression = categoryRegressions[club.category] ?? regression;
+    const expectedLoft = getExpectedLoftAngle(club.length, categoryRegression);
     const deviationFromStandard = club.loftAngle - expectedLoft;
     const recommendedLoftAdjustment = expectedLoft - club.loftAngle;
-    const projectedDistanceGap = Math.round(Math.abs(recommendedLoftAdjustment) * 3.5);
+    const projectedGapInfo = projectedGapByClubKey.get(getAnalysisClubKey(club));
+    const projectedDistanceGap = projectedGapInfo?.gap ?? null;
+    const projectedGapTargetClubType = projectedGapInfo?.targetClubType ?? null;
+    const projectedGapTargetNumber = projectedGapInfo?.targetNumber ?? null;
     const projectedSwingWeightImpact = 0;
 
     return {
@@ -188,6 +261,8 @@ export const buildLoftLengthComparisonAnalysis = (
       deviationFromStandard,
       recommendedLoftAdjustment,
       projectedDistanceGap,
+      projectedGapTargetClubType,
+      projectedGapTargetNumber,
       projectedSwingWeightImpact,
     };
   });
@@ -200,6 +275,7 @@ export const buildLoftLengthComparisonAnalysis = (
   return {
     ...visibility,
     regression,
+    categoryRegressions,
     bounds,
     lengthTicks: makeTickValues(bounds.minLength, bounds.maxLength, bounds.xInterval),
     loftTicks: makeTickValues(bounds.minLoft, bounds.maxLoft, bounds.yInterval),

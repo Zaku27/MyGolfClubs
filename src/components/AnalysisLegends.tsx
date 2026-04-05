@@ -82,6 +82,6 @@ export const LoftLengthLegend = () => (
     <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
     <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
     <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
-    <span><i className="legend-standard-line" />標準スペックライン</span>
+    <span><i className="legend-standard-line" />クラブ種別ごとの標準スペックライン</span>
   </div>
 );

@@ -53,6 +53,28 @@ export class GolfBagDatabase extends Dexie {
       personalData: 'clubId',
       appSettings: 'id',
     });
+    // v6: normalize bounceAngle to wedge-only field
+    this.version(6).stores({
+      clubs: '++id, name',
+      golfBags: '++id, name',
+      personalData: 'clubId',
+      appSettings: 'id',
+    }).upgrade(async (tx) => {
+      await tx.table('clubs').toCollection().modify((club) => {
+        if (club.clubType !== 'Wedge') {
+          club.bounceAngle = undefined;
+          return;
+        }
+
+        const numeric = typeof club.bounceAngle === 'number' ? club.bounceAngle : Number(club.bounceAngle);
+        if (!Number.isFinite(numeric)) {
+          club.bounceAngle = undefined;
+          return;
+        }
+
+        club.bounceAngle = Math.max(0, Math.min(20, Math.round(numeric * 10) / 10));
+      });
+    });
   }
 }
 

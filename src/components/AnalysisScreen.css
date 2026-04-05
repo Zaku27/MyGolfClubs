@@ -181,19 +181,77 @@
 .gapping-alert {
   margin-top: 12px;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #2f3b35;
+  line-height: 1.5;
+}
+.gapping-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.gapping-alert-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: #333;
   font-size: 12px;
   font-weight: 700;
+  cursor: help;
+}
+.gapping-alert-tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 220px;
+  max-width: 280px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(40, 40, 40, 0.95);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.4;
+  z-index: 10;
+  transition: opacity 0.2s ease;
+}
+.gapping-alert-tooltip-text::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: transparent transparent rgba(40, 40, 40, 0.95) transparent;
+}
+.gapping-alert-tooltip:hover .gapping-alert-tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+.gapping-alert-detail {
+  margin-top: 4px;
+  font-weight: 500;
+  color: #4b4b4b;
 }
 .gapping-alert.ok {
   background: #e8f5e9;
-  color: #1b5e20;
   border: 1px solid #a5d6a7;
 }
 .gapping-alert.alert {
-  background: #ffebee;
-  color: #b71c1c;
-  border: 1px solid #ef9a9a;
+  background: #fff0f0;
+  color: #3d1f1f;
+  border: 1px solid #f4c2c2;
 }
 
 .chart-section-heading {
