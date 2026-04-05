@@ -404,6 +404,15 @@ function simulatePutt(
   effectiveSuccessRate: number;
 } {
 
+  if (remaining <= 1) {
+    return {
+      made: true,
+      newRemaining: 0,
+      message: `パットが決まりました！ (${remaining}y)`,
+      effectiveSuccessRate: 100,
+    };
+  }
+
   // 距離ごとの基礎成功率
   let baseChance: number;
   if      (remaining <=  3) baseChance = 0.96;

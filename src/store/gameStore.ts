@@ -253,6 +253,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
       shotPowerPercent,
       useStoredDistance: !isRobotMode,
+      shotIndex: currentHoleShots.length,
     });
     const newHoleStrokes = holeStrokes + result.strokesAdded;
     const confidenceBoostApplied = result.confidenceBoostApplied === true;

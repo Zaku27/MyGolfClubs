@@ -44,7 +44,7 @@ type ConfidenceLevelOption = {
 
 const DEFAULT_CHART_HEIGHT = 360;
 const DEFAULT_CONFIDENCE_LEVEL: ConfidenceLevelOption['value'] = 0.95;
-const TARGET_GREEN_RADIUS_YARDS = 15;
+const TARGET_GREEN_RADIUS_YARDS = 10;
 const STANDARD_MAX_CARRY_MULTIPLIER = 1.15;
 const CONFIDENCE_LEVEL_OPTIONS: ConfidenceLevelOption[] = [
   { value: 0.68, label: '68%' },
@@ -209,7 +209,7 @@ export function ShotDispersionChart({
       borderWidth: 2,
       label: {
         display: true,
-        content: '目標 (半径15y)',
+        content: '目標 (半径10y)',
         position: { x: 'center', y: 'end' } as const,
         yAdjust: -8,
         color: 'rgba(20, 83, 45, 0.95)',
