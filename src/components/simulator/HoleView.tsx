@@ -11,6 +11,8 @@ import {
   buildAnalysisPenaltyByClubId,
   calculateDisplayClubSuccessRate,
 } from "../../utils/clubSuccessDisplay";
+import type { LandingResult } from "../../utils/landingPosition";
+import { HoleMapCanvas } from "./HoleMapCanvas";
 
 interface Props {
   onBack: () => void;
@@ -69,6 +71,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [showMobileScorecard, setShowMobileScorecard] = useState(false);
   const [selectedClub, setSelectedClub] = useState<SimClub | null>(null);
+  const [landingHistory, setLandingHistory] = useState<LandingResult[]>([]);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ショット結果モーダルが閉じられたらクラブ選択をリセット
@@ -78,6 +81,16 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       setSelectedClub(null);
     }
   }, [showResultModal]);
+
+  useEffect(() => {
+    const landing = lastShotResult?.landing;
+    if (!landing) return;
+    setLandingHistory((prev) => [...prev, landing]);
+  }, [lastShotResult]);
+
+  useEffect(() => {
+    setLandingHistory([]);
+  }, [currentHoleIndex]);
 
   useEffect(() => {
     if (autoDismissTimerRef.current) {
@@ -302,6 +315,14 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           </h1>
           <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">ライ: {LIE_LABEL[lie]}</p>
           <p className="mt-1 text-lg font-medium text-emerald-800 sm:text-2xl">{holeStrokes + 1}打目</p>
+
+          <div className="mt-6 w-full max-w-3xl">
+            <HoleMapCanvas
+              hole={currentHole}
+              landingResults={landingHistory}
+              showTrajectories
+            />
+          </div>
 
           {/* ハザード表示（OB等）を打数の下に移動 */}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
