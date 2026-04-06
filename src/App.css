@@ -1,7 +1,7 @@
 .app-container {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 40px 20px 56px;
+  padding: 48px 20px 60px;
 }
 
 .error-message {
@@ -21,13 +21,14 @@ button {
   cursor: pointer;
   border: 1px solid transparent;
   border-radius: 12px;
-  padding: 10px 16px;
-  font-size: 14px;
+  padding: 11px 18px;
+  font-size: 13px;
+  font-weight: 700;
   transition: all 0.2s ease;
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -74,28 +75,33 @@ button:disabled {
 }
 
 .btn-primary {
-  background-color: var(--primary);
+  background-color: #18794e;
   color: white;
-  font-weight: 600;
-  border-color: var(--primary);
-  box-shadow: var(--shadow-sm);
+  font-weight: 700;
+  border-color: #18794e;
+  box-shadow: 0 4px 12px rgba(24, 121, 78, 0.12);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-strong);
-  border-color: var(--primary-strong);
-  transform: translateY(-1px);
+  background-color: #106a42;
+  border-color: #106a42;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(24, 121, 78, 0.16);
 }
 
 .btn-secondary {
-  background-color: #eef2ee;
-  color: #2f4236;
-  font-weight: 500;
-  border-color: #d5dfd8;
+  background-color: #f5faf7;
+  color: #2a5f45;
+  font-weight: 700;
+  border-color: #d0dfd5;
+  box-shadow: 0 2px 8px rgba(24, 121, 78, 0.06);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #e4ebe6;
+  background-color: #eff5f1;
+  border-color: #b8cfc3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 121, 78, 0.08);
 }
 
 @media (max-width: 768px) {

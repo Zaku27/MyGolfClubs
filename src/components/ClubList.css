@@ -6,71 +6,81 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 18px;
 }
 
 .club-list-header h1 {
   margin: 0;
   font-size: clamp(28px, 5vw, 42px);
-  letter-spacing: -0.03em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--text);
   flex: 1;
   min-width: 260px;
+  line-height: 1.2;
 }
 
 .club-list-title {
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .club-list-title .title-main {
   display: inline-block;
+  font-weight: 600;
 }
 
 .club-list-title .title-sub {
-  font-size: clamp(13px, 1.6vw, 18px);
-  font-weight: 500;
-  letter-spacing: 0;
+  font-size: clamp(12px, 1.5vw, 16px);
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--text-soft);
 }
 
 .club-count {
-  background: linear-gradient(140deg, var(--primary), #2b9b66);
+  background: linear-gradient(135deg, #2c6d8d, #4aa3cd);
   color: #ffffff;
-  padding: 8px 15px;
+  padding: 10px 18px;
   border-radius: 999px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
-  letter-spacing: 0.01em;
-  box-shadow: var(--shadow-sm);
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 12px rgba(74, 163, 205, 0.16);
 }
 
 .btn-add-club {
-  background: linear-gradient(135deg, var(--primary), #2b9b66) !important;
+  background: linear-gradient(135deg, #18794e, #1f9660) !important;
   color: #ffffff;
-  border-color: var(--primary) !important;
+  border-color: #18794e !important;
+  box-shadow: 0 4px 12px rgba(24, 121, 78, 0.12) !important;
+}
+
+.btn-add-club:hover:not(:disabled) {
+  background: linear-gradient(135deg, #106a42, #168456) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(24, 121, 78, 0.16) !important;
 }
 
 .club-list-actions .btn-icon,
 .club-list-actions .btn-import-json {
-  background-color: #ffffff;
-  color: #335246;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  width: 44px;
-  height: 44px;
+  background-color: #122a51;
+  color: #ffffff;
+  border: 1.5px solid #2f587f;
+  border-radius: 14px;
+  width: 46px;
+  height: 46px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  font-size: 18px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 6px 16px rgba(18, 42, 81, 0.12);
   flex-shrink: 0;
   text-decoration: none;
 }
@@ -83,9 +93,9 @@
 .club-list-actions .btn-icon:hover:not(:disabled),
 .club-list-actions .btn-import-json:hover {
   transform: translateY(-2px);
-  background-color: var(--surface-2);
-  border-color: #c3d4c8;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background-color: #1f446f;
+  border-color: #4d74a6;
+  box-shadow: 0 8px 18px rgba(18, 42, 81, 0.18);
 }
 
 .club-list-actions .btn-icon:active:not(:disabled),
@@ -99,16 +109,17 @@
 }
 
 .btn-toggle-view {
-  background: #2b8db5 !important;
+  background: linear-gradient(135deg, #2c4d79, #5e7ab5) !important;
   color: #ffffff;
-  border-color: #2b8db5 !important;
+  border-color: #2c4d79 !important;
+  box-shadow: 0 6px 18px rgba(44, 77, 121, 0.18) !important;
 }
 
 .btn-toggle-view:hover:not(:disabled) {
-  background: #1e6a8c !important;
-  border-color: #1e6a8c !important;
+  background: linear-gradient(135deg, #203f67, #4f699f) !important;
+  border-color: #203f67 !important;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 8px 20px rgba(44, 77, 121, 0.22) !important;
 }
 
 .btn-toggle-view:active:not(:disabled) {
@@ -116,16 +127,17 @@
 }
 
 .btn-analysis {
-  background: #7a5af8 !important;
+  background: linear-gradient(135deg, #6b58c7, #8d7ff4) !important;
   color: #ffffff;
-  border-color: #7a5af8 !important;
+  border-color: #6b58c7 !important;
+  box-shadow: 0 6px 18px rgba(107, 88, 199, 0.18) !important;
 }
 
 .btn-analysis:hover:not(:disabled) {
-  background: #6948eb !important;
-  border-color: #6948eb !important;
+  background: linear-gradient(135deg, #5948b9, #7a6ee0) !important;
+  border-color: #5948b9 !important;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(122, 90, 248, 0.2) !important;
+  box-shadow: 0 8px 20px rgba(107, 88, 199, 0.22) !important;
 }
 
 .btn-analysis:active:not(:disabled) {
@@ -133,30 +145,20 @@
 }
 
 .btn-personal-data {
-  background: #0f9d8a !important;
+  background: linear-gradient(135deg, #1f7e87, #40b2c1) !important;
   color: #ffffff;
-  border-color: #0f9d8a !important;
+  border-color: #1f7e87 !important;
+  box-shadow: 0 6px 18px rgba(31, 126, 135, 0.18) !important;
 }
 
-.btn-personal-data:hover {
-  background: #0a8877 !important;
-  border-color: #0a8877 !important;
+.btn-personal-data:hover:not(:disabled) {
+  background: linear-gradient(135deg, #19666f, #35a1b1) !important;
+  border-color: #19666f !important;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(15, 157, 138, 0.2) !important;
+  box-shadow: 0 8px 20px rgba(31, 126, 135, 0.22) !important;
 }
 
 .btn-personal-data:active {
-  transform: translateY(-1px);
-}
-
-.btn-add-club:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--primary-strong), #208955) !important;
-  border-color: var(--primary-strong) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(47, 128, 82, 0.2) !important;
-}
-
-.btn-add-club:active:not(:disabled) {
   transform: translateY(-1px);
 }
 

@@ -41,9 +41,9 @@ export const ExportIcon: React.FC<IconProps> = ({ size = 24, className = '', str
 
 export const ImportIcon: React.FC<IconProps> = ({ size = 24, className = '', strokeWidth = 2 }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} className={className} width={size} height={size}>
-    <polyline points="8 7 12 3 16 7"></polyline>
-    <line x1="12" y1="12" x2="12" y2="3"></line>
-    <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path>
+    <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
+    <line x1="12" y1="10" x2="12" y2="20" />
+    <polyline points="8 14 12 10 16 14" />
   </svg>
 );
 

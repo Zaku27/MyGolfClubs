@@ -589,6 +589,7 @@ function App() {
             }}
             listScope={clubListScope}
             onChangeListScope={setClubListScope}
+            compact
           />
 
           <ClubList
