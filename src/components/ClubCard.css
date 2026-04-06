@@ -73,7 +73,7 @@
 
 .club-detail-popup-image {
   width: min(100%, 320px);
-  max-height: 180px;
+  max-width: 100%;
   margin: 0 auto 16px;
   border-radius: 20px;
   overflow: hidden;
@@ -84,9 +84,9 @@
 
 .club-detail-popup-image img {
   width: 100%;
-  height: 180px;
+  height: auto;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .club-detail-popup-image-switcher {

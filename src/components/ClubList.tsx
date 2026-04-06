@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { ClubCard } from './ClubCard';
 import { Link } from 'react-router-dom';
 import {
@@ -15,11 +16,17 @@ import { RangeIcon } from './RangeIcon';
 import type { GolfClub } from '../types/golf';
 import './ClubList.css';
 import { sortClubsForDisplay } from '../utils/clubSort';
+import { getClubTypeDisplay } from '../utils/clubUtils';
 
 const SHOW_HOME_RELEASE_LIMITED_ACTIONS = true;
+const CLUB_TYPE_OPTIONS: GolfClub['clubType'][] = ['Driver', 'Wood', 'Hybrid', 'Iron', 'Wedge', 'Putter'];
 
 interface ClubListProps {
   clubs: GolfClub[];
+  searchText: string;
+  selectedClubType: 'All' | GolfClub['clubType'];
+  onSearchTextChange: (value: string) => void;
+  onSelectedClubTypeChange: (value: 'All' | GolfClub['clubType']) => void;
   onEdit: (club: GolfClub) => void;
   onDelete: (id: number) => void;
   onAdd: () => void;
@@ -44,6 +51,10 @@ interface ClubListProps {
 
 export const ClubList: React.FC<ClubListProps> = ({
   clubs,
+  searchText,
+  selectedClubType,
+  onSearchTextChange,
+  onSelectedClubTypeChange,
   onEdit,
   onDelete,
   onAdd,
@@ -64,12 +75,39 @@ export const ClubList: React.FC<ClubListProps> = ({
   onToggleActiveBagMembership,
   loading = false,
 }) => {
-  const sortedClubs = sortClubsForDisplay(clubs);
+  const normalizedSearchText = searchText.trim().toLowerCase();
+  const hasFilter = selectedClubType !== 'All' || normalizedSearchText.length > 0;
+
+  const filteredClubs = useMemo(() => {
+    return clubs.filter((club) => {
+      if (selectedClubType !== 'All' && club.clubType !== selectedClubType) {
+        return false;
+      }
+
+      if (!normalizedSearchText) {
+        return true;
+      }
+
+      const clubTypeLabel = getClubTypeDisplay(club.clubType, club.number).toLowerCase();
+      const clubName = (club.name ?? '').toLowerCase();
+      const clubType = (club.clubType ?? '').toLowerCase();
+      return (
+        clubName.includes(normalizedSearchText)
+        || clubType.includes(normalizedSearchText)
+        || clubTypeLabel.includes(normalizedSearchText)
+      );
+    });
+  }, [clubs, selectedClubType, normalizedSearchText]);
+
+  const sortedClubs = useMemo(() => sortClubsForDisplay(filteredClubs), [filteredClubs]);
   const bagQuery = typeof activeBagId === 'number' ? `?bagId=${activeBagId}` : '';
   const activeBagClubIdSet = new Set(activeBagClubIds);
+  const isFilteredResult = hasFilter && filteredClubs.length !== clubs.length;
   const clubCountLabel = isBagView && activeBagName
     ? `${activeBagName} ${activeBagClubCount}/${activeBagLimit}`
-    : `${clubs.length} clubs`;
+    : isFilteredResult
+      ? `${filteredClubs.length}/${clubs.length} clubs`
+      : `${clubs.length} clubs`;
 
   return (
     <div className="club-list-container">
@@ -108,6 +146,39 @@ export const ClubList: React.FC<ClubListProps> = ({
             </Link>
           </>
         )}
+        <div className="club-list-actions-spacer" />
+        <div className="club-search-inline" aria-label="クラブ検索">
+          <select
+            id="club-type-filter"
+            aria-label="クラブ種別で絞り込み"
+            value={selectedClubType}
+            onChange={(event) => onSelectedClubTypeChange(event.target.value as 'All' | GolfClub['clubType'])}
+          >
+            <option value="All">すべて</option>
+            {CLUB_TYPE_OPTIONS.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+          <input
+            id="club-name-search"
+            aria-label="クラブ名称検索"
+            type="search"
+            placeholder="名称検索"
+            value={searchText}
+            onChange={(event) => onSearchTextChange(event.target.value)}
+          />
+          <button
+            type="button"
+            className="btn-clear-filter"
+            onClick={() => {
+              onSelectedClubTypeChange('All');
+              onSearchTextChange('');
+            }}
+            disabled={!hasFilter}
+          >
+            クリア
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -132,6 +203,22 @@ export const ClubList: React.FC<ClubListProps> = ({
             <button className="btn-reset-clubs" onClick={onReset} disabled={loading} title="初期14本に戻す">
               <ResetIcon size={18} />
               <span>初期14本に戻す</span>
+            </button>
+          </div>
+        </div>
+      ) : filteredClubs.length === 0 ? (
+        <div className="empty-state">
+          <p>検索条件に一致するクラブがありません。条件を変更してください。</p>
+          <div className="empty-state-buttons">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                onSelectedClubTypeChange('All');
+                onSearchTextChange('');
+              }}
+            >
+              条件をリセット
             </button>
           </div>
         </div>

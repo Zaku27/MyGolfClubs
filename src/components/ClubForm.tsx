@@ -207,12 +207,12 @@ export const ClubForm: React.FC<ClubFormProps> = ({
   };
 
   const initializeCropArea = () => {
-    const canvas = cropPreviewCanvasRef.current;
-    if (!canvas) {
+    const wrapper = cropWrapperRef.current;
+    if (!wrapper) {
       return;
     }
 
-    const rect = canvas.getBoundingClientRect();
+    const rect = wrapper.getBoundingClientRect();
     const size = Math.min(rect.width, rect.height);
     setCropSize(size);
     setCropPosition({
@@ -223,6 +223,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
 
   const handleImageFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
+    event.target.value = ''; // 同じファイルを再選択できるようリセット
     if (files.length === 0) {
       return;
     }
@@ -364,6 +365,44 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     setDragStart(null);
   };
 
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+    const wrapper = cropWrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+    const rect = wrapper.getBoundingClientRect();
+    setDragStart({ x: touch.clientX - rect.left, y: touch.clientY - rect.top });
+    setIsDraggingCrop(true);
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!isDraggingCrop || !dragStart) {
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+    const wrapper = cropWrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+    event.preventDefault();
+    const rect = wrapper.getBoundingClientRect();
+    const moveX = touch.clientX - rect.left;
+    const moveY = touch.clientY - rect.top;
+    const deltaX = moveX - dragStart.x;
+    const deltaY = moveY - dragStart.y;
+    const nextX = Math.max(0, Math.min(cropPosition.x + deltaX, rect.width - cropSize));
+    const nextY = Math.max(0, Math.min(cropPosition.y + deltaY, rect.height - cropSize));
+    setCropPosition({ x: nextX, y: nextY });
+    setDragStart({ x: moveX, y: moveY });
+  };
+
   const handleCropSizeChange = (value: number) => {
     const wrapper = cropWrapperRef.current;
     if (!wrapper) {
@@ -448,12 +487,13 @@ export const ClubForm: React.FC<ClubFormProps> = ({
 
   const drawCropPreviewCanvas = async (source: string) => {
     const canvas = cropPreviewCanvasRef.current;
-    if (!canvas) {
+    const wrapper = cropWrapperRef.current;
+    if (!canvas || !wrapper) {
       return;
     }
 
     const sourceCanvas = await createSourceCanvas(source, cropRotation);
-    const rect = canvas.getBoundingClientRect();
+    const rect = wrapper.getBoundingClientRect();
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
     canvas.width = width;
@@ -471,34 +511,51 @@ export const ClubForm: React.FC<ClubFormProps> = ({
   };
 
   const createCroppedImageDataUrl = async (_source: string, cropRect: { x: number; y: number; size: number }) => {
-    return new Promise<string>((resolve, reject) => {
-      const sourceCanvas = cropPreviewCanvasRef.current;
-      if (!sourceCanvas) {
-        reject(new Error('プレビューキャンバスが見つかりません')); return;
-      }
+    const sourceCanvas = await createSourceCanvas(_source, cropRotation);
+    const previewCanvas = cropPreviewCanvasRef.current;
+    if (!previewCanvas) {
+      throw new Error('プレビューキャンバスが見つかりません');
+    }
 
-      const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 400;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Canvas コンテキストを取得できませんでした')); return;
-      }
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(
-        sourceCanvas,
-        cropRect.x,
-        cropRect.y,
-        cropRect.size,
-        cropRect.size,
-        0,
-        0,
-        canvas.width,
-        canvas.height,
-      );
-      resolve(canvas.toDataURL('image/jpeg', 0.9));
-    });
+    const outputSize = 800;
+    const canvas = document.createElement('canvas');
+    canvas.width = outputSize;
+    canvas.height = outputSize;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Canvas コンテキストを取得できませんでした');
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const previewWidth = previewCanvas.width;
+    const previewHeight = previewCanvas.height;
+    const sourceWidth = sourceCanvas.width;
+    const sourceHeight = sourceCanvas.height;
+    const ratio = Math.max(previewWidth / sourceWidth, previewHeight / sourceHeight);
+    const drawWidth = sourceWidth * ratio;
+    const drawHeight = sourceHeight * ratio;
+    const offsetX = (previewWidth - drawWidth) / 2;
+    const offsetY = (previewHeight - drawHeight) / 2;
+
+    const sourceCropX = (cropRect.x - offsetX) / ratio;
+    const sourceCropY = (cropRect.y - offsetY) / ratio;
+    const sourceCropSize = cropRect.size / ratio;
+
+    ctx.drawImage(
+      sourceCanvas,
+      sourceCropX,
+      sourceCropY,
+      sourceCropSize,
+      sourceCropSize,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+    return canvas.toDataURL('image/jpeg', 0.9);
   };
 
   const closeCropModal = () => {
@@ -568,19 +625,38 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     }
   };
 
+  // モーダルを開いたとき・画像ソース変更時: 描画完了後に枠位置を初期化
   useEffect(() => {
     if (!cropModalOpen) {
       return;
     }
 
     const source = pendingImageSrc ?? formData.imageData[selectedImageIndex] ?? '';
-    initializeCropArea();
+    if (source) {
+      void (async () => {
+        await drawCropPreviewCanvas(source);
+        initializeCropArea();
+      })();
+    } else {
+      initializeCropArea();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cropModalOpen, pendingImageSrc, selectedImageIndex]);
+
+  // 回転時: 枠位置はリセットせず再描画のみ
+  useEffect(() => {
+    if (!cropModalOpen) {
+      return;
+    }
+
+    const source = pendingImageSrc ?? formData.imageData[selectedImageIndex] ?? '';
     if (source) {
       void (async () => {
         await drawCropPreviewCanvas(source);
       })();
     }
-  }, [cropModalOpen, pendingImageSrc, selectedImageIndex, cropRotation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cropRotation]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -1267,6 +1343,9 @@ export const ClubForm: React.FC<ClubFormProps> = ({
                 onMouseMove={handleCropMove}
                 onMouseUp={handleCropEnd}
                 onMouseLeave={handleCropEnd}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleCropEnd}
               >
                 <canvas
                   ref={cropPreviewCanvasRef}
@@ -1310,7 +1389,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
                   id="cropSize"
                   type="range"
                   min="80"
-                  max="400"
+                  max="500"
                   value={cropSize}
                   onChange={(e) => handleCropSizeChange(parseInt(e.target.value, 10))}
                 />

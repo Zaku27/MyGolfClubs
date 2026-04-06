@@ -66,6 +66,8 @@ const parseClubListScope = (value: unknown): 'bag' | 'all' => {
   return value === 'all' ? 'all' : 'bag';
 };
 
+type ClubTypeFilter = 'All' | GolfClub['clubType'];
+
 function App() {
   const [showForm, setShowForm] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -111,6 +113,8 @@ function App() {
   const [clubListScope, setClubListScope] = useState<'bag' | 'all'>(() => {
     return readStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, 'bag', parseClubListScope);
   });
+  const [clubNameSearchText, setClubNameSearchText] = useState('');
+  const [clubTypeFilter, setClubTypeFilter] = useState<ClubTypeFilter>('All');
   const sortedClubs = useClubStore(selectSortedClubsForDisplay);
   const activeBagClubs = useClubStore(selectSortedActiveBagClubs);
   const activeBag = useClubStore(selectActiveGolfBag);
@@ -411,9 +415,24 @@ function App() {
     await resetToDefaults();
   };
 
+  const isSameImageData = (a?: string[], b?: string[]) => {
+    if (!a || !b) {
+      return false;
+    }
+    if (a.length !== b.length) {
+      return false;
+    }
+    return a.every((value, index) => value === b[index]);
+  };
+
   const shouldAskImagePropagation = (clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>): boolean => {
     const name = (clubData.name ?? editingClub?.name)?.trim();
     if (!name || !clubData.imageData?.length) {
+      return false;
+    }
+
+    const imageChanged = !editingClub || !isSameImageData(clubData.imageData, editingClub.imageData);
+    if (!imageChanged) {
       return false;
     }
 
@@ -568,6 +587,10 @@ function App() {
 
           <ClubList
             clubs={clubsForDisplay}
+            searchText={clubNameSearchText}
+            selectedClubType={clubTypeFilter}
+            onSearchTextChange={setClubNameSearchText}
+            onSelectedClubTypeChange={setClubTypeFilter}
             onEdit={handleEditClub}
             onDelete={handleDeleteClub}
             onAdd={handleAddClub}

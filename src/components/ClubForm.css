@@ -313,13 +313,15 @@
   overflow: hidden;
   background: #f8fafc;
   cursor: grab;
-  min-height: 340px;
+  height: 480px;
 }
 
 .club-image-crop-frame img,
 .club-image-crop-preview {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
   user-select: none;
   pointer-events: none;
