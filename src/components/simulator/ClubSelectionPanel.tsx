@@ -72,8 +72,7 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
       club.id,
       estimateShotDistance(
         club,
-        { lie: lie as any, wind: "none", windStrength: 0 },
-        "normal",
+        { lie: lie as any, windStrength: 0 },
         {
           personalData: isRobot ? undefined : resolvePersonalDataForSimClub(club, personalData),
           playerSkillLevel: isRobot ? 1 : playerSkillLevel,

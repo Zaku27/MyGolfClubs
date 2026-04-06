@@ -9,8 +9,6 @@ import type {
   HoleScore,
   GamePhase,
   HoleSummary,
-  RiskLevel,
-  WindDirection,
 } from "../types/game";
 import { simulateShot, getAbsoluteLandingPoint, projectAlongLineToPin } from "../utils/shotSimulation";
 import { buildClubUsageStats } from "../utils/roundAnalysis";
@@ -54,13 +52,12 @@ function createRoundSeedNonce(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function generateWind(random: () => number = Math.random): Pick<ShotContext, "wind" | "windStrength"> {
+function generateWind(random: () => number = Math.random): Pick<ShotContext, "windStrength" | "windDirectionDegrees"> {
   const roll = random();
-  if (roll < 0.40) return { wind: "none", windStrength: 0 };
-  const directions: WindDirection[] = ["headwind", "tailwind", "crosswind"];
-  const wind = directions[Math.floor(random() * directions.length)];
+  if (roll < 0.40) return { windStrength: 0, windDirectionDegrees: 0 };
   const windStrength = Math.round(5 + random() * 15); // 5–20 mph
-  return { wind, windStrength };
+  const windDirectionDegrees = Math.floor(random() * 360);
+  return { windStrength, windDirectionDegrees };
 }
 
 // ─── State & action types ─────────────────────────────────────────────────────
@@ -79,7 +76,6 @@ interface GameStoreState {
   lastShotResult: ShotResult | null;
   selectedClubId: string | null;
   shotPowerPercent: number;
-  riskLevel: RiskLevel;
   shotInProgress: boolean;
   currentHoleShots: ShotLog[];
   roundShots: ShotLog[];
@@ -97,7 +93,6 @@ interface GameStoreActions {
   startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag") => void;
   selectClub: (clubId: string) => void;
   setShotPowerPercent: (powerPercent: number) => void;
-  setRiskLevel: (risk: RiskLevel) => void;
   takeShot: () => void;
   advanceHole: () => void;
   resetGame: () => void;
@@ -128,7 +123,6 @@ const INITIAL_STATE: GameStoreState = {
   lastShotResult: null,
   selectedClubId: null,
   shotPowerPercent: 100,
-  riskLevel: "normal",
   shotInProgress: false,
   currentHoleShots: [],
   roundShots: [],
@@ -163,8 +157,8 @@ function getClubLabel(club: SimClub): string {
 function buildHoleInsight(hole: Hole, holeShots: ShotLog[], roundShots: ShotLog[]): string {
   const successfulShots = holeShots.filter((shot) => shot.success);
 
-  if (hole.hazards?.length && holeShots.some((shot) => shot.riskLevel === "safe" && shot.success)) {
-    return `${hole.number}番ホールは無理をせず刻んだ判断が良かったです`;
+  if (hole.hazards?.length && holeShots.some((shot) => shot.success)) {
+    return `${hole.number}番ホールは慎重な判断が良かったです`;
   }
 
   const clubStats = new Map<string, { attempts: number; successes: number }>();
@@ -242,15 +236,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     shotPowerPercent: Math.max(0, Math.min(110, Math.round(powerPercent))),
   }),
 
-  setRiskLevel: (risk) => set({ riskLevel: risk }),
-
   takeShot: () => {
     const {
       selectedClubId,
       bag,
       shotContext,
       shotPowerPercent,
-      riskLevel,
       holeStrokes,
       course,
       currentHoleIndex,
@@ -292,7 +283,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
       const isPutter = club.type === "Putter";
-      const result = simulateShot(clubForSimulation, shotContext, riskLevel, {
+      const result = simulateShot(clubForSimulation, shotContext, {
         confidenceBoost,
         personalData: isRobotMode ? undefined : clubPersonalData,
         playerSkillLevel: isRobotMode
@@ -322,7 +313,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         lieBefore: shotContext.lie,
         lieAfter: result.lie,
         shotQuality: result.shotQuality,
-        riskLevel,
         wasWeakClub: isRobotMode ? false : treatedAsWeakClub,
         confidenceBoostApplied: result.confidenceBoostApplied === true,
       };

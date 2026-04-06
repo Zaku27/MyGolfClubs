@@ -3,9 +3,7 @@ import type {
   ShotContext,
   ShotResult,
   ShotQuality,
-  RiskLevel,
   LieType,
-  WindDirection,
 } from "../types/game";
 import type { ClubPersonalData } from "../types/golf";
 import { calculateBaseClubSuccessRate } from "./calculateSuccessRate";
@@ -158,24 +156,14 @@ function getCrossWindComponentMph(strength: number, windDirectionDegrees: number
 }
 
 function getWindYards(
-  wind: WindDirection | undefined,
   strength: number,
   windDirectionDegrees?: number,
 ): number {
-  // 360度風向がある場合は、向かい/追いの連続成分を優先して距離へ反映する。
   if (typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)) {
     const componentMph = getHeadTailWindComponentMph(strength, windDirectionDegrees);
-    // 既存チューニングとの連続性を保つため、向かい風と追い風で係数を分ける。
     return componentMph < 0 ? componentMph * 1.5 : componentMph * 0.8;
   }
-
-  if (!wind || wind === "none") return 0;
-  switch (wind) {
-    case "headwind":  return -(strength * 1.5);
-    case "tailwind":  return  strength * 0.8;
-    case "crosswind": return -(strength * 0.4); // slight distance loss
-    default:          return 0;
-  }
+  return 0;
 }
 
 
@@ -249,14 +237,12 @@ export function estimateBaseDistance(
 /**
  * ライ・風を考慮した飛距離推定（個人データ・ヘッドスピード・理論値も加味可能）
  * @param club SimClub
- * @param context lie, wind, windStrength
- * @param riskLevel RiskLevel
+ * @param context lie, windStrength, windDirectionDegrees
  * @param options personalData, headSpeed, useTheoretical（理論値も加味する場合true）
  */
 export function estimateShotDistance(
   club: SimClub,
-  context: Pick<ShotContext, "lie" | "wind" | "windStrength" | "windDirectionDegrees">,
-  _riskLevel: RiskLevel,
+  context: Pick<ShotContext, "lie" | "windStrength" | "windDirectionDegrees">,
   options?: {
     personalData?: ClubPersonalData;
     headSpeed?: number;
@@ -267,7 +253,7 @@ export function estimateShotDistance(
   if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance));
 
   const lieMultiplier = getLieDistanceMultiplier(context.lie, club.type);
-  const windYards = getWindYards(context.wind, context.windStrength ?? 7, context.windDirectionDegrees);
+  const windYards = getWindYards(context.windStrength ?? 7, context.windDirectionDegrees);
   const weakDistancePenaltyBase = isWeakClub(club)
     ? (club.successRate < 60 ? 0.14 : 0.10)
     : 0;
@@ -299,7 +285,6 @@ export function estimateShotDistance(
 function getEffectiveSuccessRate(
   club: SimClub,
   lie: LieType,
-  risk: RiskLevel,
   confidenceBoost: number,
   playerSkillLevel: number,
   personalData?: ClubPersonalData,
@@ -313,8 +298,6 @@ function getEffectiveSuccessRate(
   });
   if (lie === "rough")   rate -= 12;
   if (lie === "bunker")  rate -= 20;
-  if (risk === "aggressive") rate -= 15;
-  if (risk === "safe")       rate +=  8;
   if (weakClub) {
     const weakPenaltyBase = club.successRate < 60 ? 16 : 14;
     rate -= weakPenaltyBase * WEAK_CLUB_EFFECT_SCALE;
@@ -326,7 +309,6 @@ function getEffectiveSuccessRate(
 function resolveNewLie(
   remaining: number,
   isGoodShot: boolean,
-  risk: RiskLevel,
   random: () => number,
   isOnGreen: boolean,
 ): LieType {
@@ -335,7 +317,7 @@ function resolveNewLie(
   if (!isGoodShot) {
     return random() < 0.28 ? "bunker" : "rough";
   }
-  const roughChance = risk === "aggressive" ? 0.20 : risk === "safe" ? 0.05 : 0.12;
+  const roughChance = 0.12;
   return random() < roughChance ? "rough" : "fairway";
 }
 
@@ -372,17 +354,12 @@ function getNearCupLeaveDistance(shotQuality: ShotQuality, random: () => number)
 }
 
 function mapWindToLanding(
-  wind: WindDirection | undefined,
   windStrength: number,
   windDirectionDegrees?: number,
 ): number {
-  // 360度風向がある場合は、ランディング計算にも連続成分を渡す。
   if (typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)) {
     return getHeadTailWindComponentMph(windStrength, windDirectionDegrees);
   }
-
-  if (wind === "headwind") return -windStrength;
-  if (wind === "tailwind") return windStrength;
   return 0;
 }
 
@@ -509,13 +486,11 @@ function simulatePutt(
 export function simulateShot(
   club: SimClub,
   context: ShotContext,
-  riskLevel: RiskLevel,
   options: SimulationOptions & { isPractice?: boolean } = {},
 ): ShotResult {
   const {
     remainingDistance,
     lie,
-    wind,
     windStrength = 7,
     windDirectionDegrees,
     greenRadius = DEFAULT_GREEN_RADIUS,
@@ -532,10 +507,8 @@ export function simulateShot(
     club.avgDistance,
     remainingDistance,
     lie,
-    wind ?? "none",
     windStrength,
     typeof windDirectionDegrees === "number" ? normalizeDegrees(windDirectionDegrees) : "legacy",
-    riskLevel,
     playerSkillLevel,
     options.shotIndex ?? 0,
     options.seedNonce ?? "default",
@@ -582,7 +555,6 @@ export function simulateShot(
     : getEffectiveSuccessRate(
         club,
         lie,
-        riskLevel,
         confidenceBoost,
         playerSkillLevel,
         personalData,
@@ -595,7 +567,6 @@ export function simulateShot(
     club.id,
     remainingDistance,
     effectiveRate,
-    wind ?? "none",
     windStrength,
     typeof windDirectionDegrees === "number" ? normalizeDegrees(windDirectionDegrees) : "legacy",
     playerSkillLevel,
@@ -627,7 +598,7 @@ export function simulateShot(
     },
     aimXOffset: options.aimXOffset ?? 0,
     conditions: {
-      wind: mapWindToLanding(wind, windStrength, windDirectionDegrees),
+      wind: mapWindToLanding(windStrength, windDirectionDegrees),
       groundHardness: mapGroundHardnessByLie(lie),
       headSpeed: options.headSpeed,
       seed: landingSeed,
@@ -649,9 +620,7 @@ export function simulateShot(
   const crossWindComponentMph =
     typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)
       ? getCrossWindComponentMph(windStrength, windDirectionDegrees)
-      : wind === "crosswind"
-        ? windStrength
-        : 0;
+      : 0;
   const lateralWindYards = crossWindComponentMph * 0.9;
 
   const scaledCarry = Math.max(0.1, rawLanding.carry * powerMultiplier * distanceConditionMultiplier);
@@ -736,7 +705,7 @@ export function simulateShot(
     newLie = "rough";
     finalOutcome = "rough";
   } else {
-    newLie = resolveNewLie(newRemaining, isGoodShot, riskLevel, random, isOnGreen);
+    newLie = resolveNewLie(newRemaining, isGoodShot, random, isOnGreen);
     finalOutcome = newLie === "bunker"
       ? "bunker"
       : newLie === "rough"
@@ -779,7 +748,6 @@ export function simulateShot(
 export function estimateEffectiveSuccessRate(
   club: SimClub,
   context: Pick<ShotContext, "lie">,
-  riskLevel: RiskLevel,
   options: Pick<SimulationOptions, "confidenceBoost" | "personalData" | "playerSkillLevel"> = {},
 ): number {
   const confidenceBoost = options.confidenceBoost ?? 0;
@@ -787,7 +755,6 @@ export function estimateEffectiveSuccessRate(
   return getEffectiveSuccessRate(
     club,
     context.lie,
-    riskLevel,
     confidenceBoost,
     playerSkillLevel,
     options.personalData,

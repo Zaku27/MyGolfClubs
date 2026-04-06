@@ -41,8 +41,6 @@ export interface Hole {
 
 // ─── Shot context ─────────────────────────────────────────────────────────────
 export type LieType = "tee" | "fairway" | "semirough" | "rough" | "bareground" | "bunker" | "green";
-export type RiskLevel = "safe" | "normal" | "aggressive";
-export type WindDirection = "headwind" | "tailwind" | "crosswind" | "none";
 
 export interface ShotContext {
   remainingDistance: number;
@@ -50,7 +48,6 @@ export interface ShotContext {
   targetDistance: number; // absolute pin distance from tee or hole origin
   originX: number; // absolute shot origin X coordinate in hole space
   originY: number; // absolute shot origin Y coordinate in hole space
-  wind?: WindDirection;
   windStrength?: number; // mph
   windDirectionDegrees?: number; // 0=北へ吹く, 時計回り
   greenRadius?: number; // ヤード。ピン中心の捕捉半径
@@ -110,7 +107,6 @@ export interface ShotLog {
   lieBefore: LieType;
   lieAfter: LieType;
   shotQuality: ShotQuality;
-  riskLevel: RiskLevel;
   wasWeakClub: boolean;
   confidenceBoostApplied: boolean;
 }

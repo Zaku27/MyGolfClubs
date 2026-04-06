@@ -179,16 +179,19 @@ export function resolvePenaltyRelief(
   currentLie: LieType,
   remainingBeforeShot: number,
   geometricRemainingAfterShot: number,
+  hazardDifficulty: number,
 ): { newRemaining: number; newLie: LieType } {
+  const difficultyOffset = (hazardDifficulty - 3) * 4;
+
   if (hazardType === "ob") {
     return {
-      newRemaining: Math.max(1, Math.round(remainingBeforeShot)),
+      newRemaining: Math.max(1, Math.round(remainingBeforeShot + difficultyOffset)),
       newLie: currentLie,
     };
   }
 
   const droppedRemaining = Math.max(
-    Math.round(geometricRemainingAfterShot + 12),
+    Math.round(geometricRemainingAfterShot + 12 + difficultyOffset),
     Math.round(remainingBeforeShot * 0.35),
     1,
   );

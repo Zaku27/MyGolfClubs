@@ -53,12 +53,11 @@ import {
 import ShotDispersionChart from '../components/ShotDispersionChart';
 import WindDirectionDial from '../components/WindDirectionDial';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
-import type { LieType, RiskLevel, ShotResult, WindDirection } from '../types/game';
+import type { LieType, ShotResult } from '../types/game';
 import type { GolfClub } from '../types/golf';
 import {
   convertMpsToMph,
   formatWindDirectionLabel,
-  mapWindDirectionToLegacyType,
   normalizeWindDirection,
   normalizeWindSpeedMps,
 } from '../utils/windDirection';
@@ -353,8 +352,6 @@ export default function RangeScreen() {
     setActiveBag,
   });
   const gameLie = mapLieUiToGameLie(lie);
-  // 既存シミュレーション API 互換のため、角度風向を旧3分類へ変換する。
-  const gameWind: WindDirection = mapWindDirectionToLegacyType(windDirection);
   // 既存シミュレーションは mph 前提なので、UI(m/s)から変換して渡す。
   const windSpeedMph = convertMpsToMph(windSpeed);
   // 閉じた状態でも現在値が分かるよう、角度+方位ラベルを作って表示する。
@@ -527,15 +524,16 @@ export default function RangeScreen() {
     for (let i = 0; i < numShots; i++) {
       const context = {
         lie: gameLie,
-        wind: gameWind,
         windDirectionDegrees: windDirection,
         // Range 画面の入力は m/s だが、内部計算は互換のため mph を利用する。
         windStrength: windSpeedMph,
         remainingDistance: simClub.avgDistance,
+        targetDistance: simClub.avgDistance,
+        originX: 0,
+        originY: 0,
         hazards: [],
         shotPowerPercent: 100,
       };
-      const riskLevel: RiskLevel = 'normal';
 
       // ロボット打席の場合はクラブ成功率100%、スキル・ヘッドスピードをロボット値で渡す
       let clubForSim = simClub;
@@ -574,7 +572,7 @@ export default function RangeScreen() {
           seedNonce: simulationSeedNonce,
         };
       }
-      const shotResult = simulateShot(clubForSim, context, riskLevel, options);
+      const shotResult = simulateShot(clubForSim, context, options);
       shotResults.push(shotResult);
     }
     setResults(shotResults);
@@ -699,7 +697,6 @@ export default function RangeScreen() {
             bags={bags}
             activeBagId={activeBag?.id ?? null}
             activeBagClubCount={activeBag?.clubIds.length ?? 0}
-            totalClubCount={allClubs.length}
             onSelectBag={(bagId) => void setActiveBag(bagId)}
             showManagement={false}
             compact

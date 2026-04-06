@@ -536,6 +536,20 @@ export function HoleMapCanvas({
       context.lineWidth = 1.5;
       context.fillRect(leftPx, topPx, widthPx, heightPx);
       context.strokeRect(leftPx, topPx, widthPx, heightPx);
+
+      if (widthPx >= 26 && heightPx >= 16) {
+        const label = `難易度 ${hazard.difficulty}`;
+        context.save();
+        context.font = "bold 10px sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.lineWidth = 2;
+        context.strokeStyle = "rgba(0, 0, 0, 0.6)";
+        context.strokeText(label, leftPx + widthPx / 2, topPx + heightPx / 2);
+        context.fillStyle = "#ffffff";
+        context.fillText(label, leftPx + widthPx / 2, topPx + heightPx / 2);
+        context.restore();
+      }
     }
 
     // ティー位置を描画。

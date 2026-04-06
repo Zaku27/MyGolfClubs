@@ -98,7 +98,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const currentHole = course[currentHoleIndex];
   if (!currentHole) return null;
 
-  const { remainingDistance, lie, wind, windStrength = 0, hazards = [] } = shotContext;
+  const { remainingDistance, lie, windStrength = 0, hazards = [] } = shotContext;
   const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettings();
   const seatType = playMode === "robot" ? "robot" : "personal";
   const completedRelativeToPar = scores.reduce((sum, s) => sum + (s.strokes - s.par), 0);
@@ -166,7 +166,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       bag,
       lie,
       remainingDistance,
-      wind,
       windStrength,
       seatType,
       robotHeadSpeed,
