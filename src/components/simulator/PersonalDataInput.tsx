@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { ClubPersonalData } from "../../types/golf";
 import { GolfBagPanel } from "../GolfBagPanel";
 import {
   selectActiveGolfBag,
@@ -113,8 +112,6 @@ export function PersonalDataInput() {
   const [draftByClubId, setDraftByClubId] = useState<Record<string, DraftRow>>({});
   // 分析減点の寄与割合（重み）: 全クラブ共通
   const [analysisPenaltyWeight, setAnalysisPenaltyWeight] = useState(1.0);
-  const [saveMessage, setSaveMessage] = useState<string>("");
-  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   useBagIdUrlSync({
@@ -135,7 +132,6 @@ export function PersonalDataInput() {
   }, [initializeDefaults, loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel]);
 
   useEffect(() => {
-    if (isSaving) return;
     const nextDraft: Record<string, DraftRow> = {};
     for (const club of clubs) {
       const simClub = toSimClub(club);
@@ -145,7 +141,7 @@ export function PersonalDataInput() {
       };
     }
     setDraftByClubId(nextDraft);
-  }, [clubs, personalData, isSaving]);
+  }, [clubs, personalData]);
 
   const analysisPenaltyByClubId = useMemo(() => {
     const penaltyMap: Record<string, AnalysisPenalty> = {};
@@ -251,49 +247,39 @@ export function PersonalDataInput() {
     return rows.filter((row) => row.analysisPenalty > 0);
   }, [rows]);
 
-  const updateDraft = (clubId: string, patch: Partial<DraftRow>) => {
+  const updateDraft = async (clubId: string, patch: Partial<DraftRow>) => {
+    const nextWeaknessFactor = patch.weaknessFactor ?? draftByClubId[clubId]?.weaknessFactor ?? 0;
     setDraftByClubId((prev) => ({
       ...prev,
       [clubId]: {
-        weaknessFactor: patch.weaknessFactor ?? prev[clubId]?.weaknessFactor ?? 0,
+        weaknessFactor: nextWeaknessFactor,
       },
     }));
-    if (saveMessage) {
-      setSaveMessage("");
-    }
+    await setPersonalData({
+      clubId,
+      weaknessFactor: nextWeaknessFactor,
+    });
   };
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = async () => {
     const resetDraft: Record<string, DraftRow> = {};
     for (const club of clubs) {
-      const clubId = String(club.id ?? `${club.clubType}-${club.number}`);
+      const clubId = toSimClub(club).id;
       resetDraft[clubId] = {
         weaknessFactor: 0,
       };
     }
     setDraftByClubId(resetDraft);
-    setSaveMessage("");
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    for (const row of rows) {
-      const payload: ClubPersonalData = {
-        clubId: row.clubId,
-        weaknessFactor: row.weaknessFactor,
-        // penaltyWeightは現状保存しないが、必要ならここで拡張可
-      };
-      await setPersonalData(payload);
+    for (const club of clubs) {
+      await setPersonalData({
+        clubId: toSimClub(club).id,
+        weaknessFactor: 0,
+      });
     }
-    setIsSaving(false);
-    setSaveMessage("個人データをシミュレーター設定に保存しました。");
   };
 
   const handleSkillLevelChange = async (level: number) => {
     await setPlayerSkillLevel(toSkillLevel(level));
-    if (saveMessage) {
-      setSaveMessage("");
-    }
   };
 
   return (
@@ -309,7 +295,7 @@ export function PersonalDataInput() {
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">シミュレーター設定</p>
             <h1 className="text-2xl font-bold text-slate-900">個人データ入力</h1>
           </div>
-          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Link
               to="/range"
               className="inline-flex items-center justify-center rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
@@ -320,17 +306,8 @@ export function PersonalDataInput() {
               to={appLink}
               className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
-              アプリに戻る
+              戻る
             </Link>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
-              disabled={loading || rows.length === 0}
-            >
-              保存
-            </button>
-            {saveMessage && <p className="text-sm text-emerald-700 sm:text-right">{saveMessage}</p>}
           </div>
         </div>
 
@@ -338,11 +315,7 @@ export function PersonalDataInput() {
           bags={bags}
           activeBagId={activeBag?.id ?? null}
           activeBagClubCount={activeBag?.clubIds.length ?? 0}
-          totalClubCount={clubs.length}
           onSelectBag={(bagId) => void setActiveBag(bagId)}
-          showManagement={false}
-          compact
-          title="設定対象のバッグ"
           description="ここで表示されるのはアクティブバッグのクラブだけです。複数バッグを使い分ける場合は切り替えて編集します。"
         />
 

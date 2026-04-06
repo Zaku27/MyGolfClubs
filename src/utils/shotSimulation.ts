@@ -69,6 +69,55 @@ function createSeededRandom(seed: string): () => number {
   };
 }
 
+export function getAbsoluteLandingPoint(
+  originX: number,
+  originY: number,
+  targetDistance: number,
+  localX: number,
+  localY: number,
+): { x: number; y: number } {
+  const pinX = 0;
+  const pinY = targetDistance;
+  const toPinX = pinX - originX;
+  const toPinY = pinY - originY;
+  const toPinDistance = Math.hypot(toPinX, toPinY);
+  const forward = toPinDistance > 1e-6
+    ? { x: toPinX / toPinDistance, y: toPinY / toPinDistance }
+    : { x: 0, y: 1 };
+  const right = { x: forward.y, y: -forward.x };
+
+  return {
+    x: originX + forward.x * localY + right.x * localX,
+    y: originY + forward.y * localY + right.y * localX,
+  };
+}
+
+export function projectAlongLineToPin(
+  originX: number,
+  originY: number,
+  targetDistance: number,
+  newRemainingDistance: number,
+): { x: number; y: number } {
+  const pinX = 0;
+  const pinY = targetDistance;
+  const toPinX = pinX - originX;
+  const toPinY = pinY - originY;
+  const totalDistance = Math.hypot(toPinX, toPinY);
+  if (totalDistance < 1e-6) {
+    return { x: originX, y: originY };
+  }
+  if (Math.abs(toPinY) < 1e-6) {
+    return { x: originX, y: originY };
+  }
+  const desiredY = targetDistance - newRemainingDistance;
+  const t = (desiredY - originY) / toPinY;
+
+  return {
+    x: originX + toPinX * t,
+    y: originY + toPinY * t,
+  };
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 function getLieDistanceMultiplier(lie: LieType, clubType: string): number {
@@ -635,12 +684,23 @@ export function simulateShot(
   // New model: use landing X/Y to compute the geometric distance to the pin.
   // Pin is at (0, remainingDistance) in the shot coordinate system.
   let newRemaining: number;
-  const assessment = assessLanding(
+  const absoluteLanding = getAbsoluteLandingPoint(
+    context.originX,
+    context.originY,
+    context.targetDistance,
     landing.finalX,
     landing.finalY,
-    remainingDistance,
+  );
+  const absoluteTrajectoryPoints = landing.trajectoryPoints?.map((point) =>
+    getAbsoluteLandingPoint(context.originX, context.originY, context.targetDistance, point.x, point.y),
+  );
+  const assessment = assessLanding(
+    absoluteLanding.x,
+    absoluteLanding.y,
+    context.targetDistance,
     hazards,
     greenRadius,
+    absoluteTrajectoryPoints,
   );
   let { geometricRemainingDistance: geometricRemaining, hazard: landedHazard, isOnGreen } = assessment;
   newRemaining = geometricRemaining;

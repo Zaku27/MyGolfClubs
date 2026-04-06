@@ -220,10 +220,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     onBack();
   };
 
-  // ショット注意案内の内容生成
-  const selectedEffectiveRate = selectedClub
-    ? Math.round((clubPreview.get(selectedClub.id)?.effectiveRate ?? selectedClub.successRate) * 10) / 10
-    : null;
   const transientLandingResult = lastShotResult?.finalOutcome === "ob"
     ? (lastShotResult.landing ?? null)
     : null;
@@ -243,8 +239,13 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       : `${holeStrokes + 1}打目`;
   const shotResultTitle = lastShotResult?.newRemainingDistance === 0 ? "最終結果" : "結果";
   const showGreenRemaining = lastShotResult?.finalOutcome === "green" && (lastShotResult.newRemainingDistance ?? 0) > 0;
+  const lastShotLog = roundShots.length > 0 ? roundShots[roundShots.length - 1] : null;
+  const lastShotClub = lastShotLog ? bag.find((club) => club.id === lastShotLog.clubId) : null;
+  const lastShotWasPutter = lastShotClub?.type === "Putter";
   const resultDistanceLabel = lastShotResult?.finalOutcome === "green"
-    ? `パット距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}y`
+    ? lastShotWasPutter
+      ? `パット距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}y`
+      : `飛距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}y`
     : `飛距離: ${((lastShotResult?.landing?.totalDistance ?? lastShotResult?.distanceHit ?? 0)).toFixed(1)}y`;
   const resultOutcomeLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotResult.newRemainingDistance === 0
@@ -260,6 +261,12 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             ? "ウォーター"
             : "OB";
   const showShotBadges = !isGreenLie;
+  const selectedClubEstimatedDistance = selectedClub
+    ? estimatedDistanceByClub.get(selectedClub.id) ?? null
+    : null;
+  const selectedAimPoint = selectedClubEstimatedDistance !== null
+    ? { x: 0, y: selectedClubEstimatedDistance }
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 text-emerald-900">
@@ -271,6 +278,16 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             <span>PAR {currentHole.par}</span>
             <span className="text-emerald-500">|</span>
             <span>{currentHole.distanceFromTee}ヤード</span>
+            {playMode !== "robot" && (
+              <>
+                <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-sky-800">
+                  ゴルフバッグプレイ中
+                </span>
+                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-emerald-900">
+                  スキルレベル: {(playerSkillLevel * 100).toFixed(0)}%
+                </span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             {showScoreDisplay && (
@@ -334,6 +351,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 hole={currentHole}
                 landingResults={landingHistory}
                 transientLandingResult={transientLandingResult}
+                aimPoint={selectedAimPoint}
                 showTrajectories
               />
             </div>
@@ -371,15 +389,12 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
         <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-10 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-14">
           <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
-          <span className="mt-3 inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-bold tracking-[0.08em] text-sky-800 sm:text-sm">
-            {playMode === "robot" ? "ロボットプレイ中" : "ゴルフバッグプレイ中"}
-          </span>
-          <div className="mt-2 text-xs font-semibold text-sky-800 sm:text-sm">
+          <div className="mt-3 text-xs font-semibold text-sky-800 sm:text-sm">
             {playMode === "robot"
               ? `ヘッドスピード: ${robotHeadSpeed.toFixed(1)} m/s / スキルレベル: ${(robotSkillLevel * 100).toFixed(0)}%`
-              : `スキルレベル: ${(playerSkillLevel * 100).toFixed(0)}%`}
+              : ""}
           </div>
-          <h1 className="mt-4 text-4xl font-extrabold leading-tight text-emerald-900 sm:text-6xl">
+          <h1 className="mt-4 text-3xl font-extrabold leading-tight text-emerald-900 sm:text-4xl">
             ピンまで {remainingDistance}ヤード
           </h1>
           <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStatusLabel}</p>
@@ -463,24 +478,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
         {/* ショット操作グループ */}
         <section className="mt-8 w-full max-w-md mx-auto flex flex-col gap-5 items-stretch">
-          {/* ショット方針の注意案内 */}
-          <div className={[
-            "rounded-xl px-4 py-3 text-left",
-            "border border-emerald-300/70 bg-emerald-100/70 text-emerald-900"
-          ].join(" ")}>
-            <p className={["text-[11px] font-bold tracking-[0.16em]",
-              "text-emerald-700"
-            ].join(" ")}>ショット方針の注意</p>
-            <p className="mt-1 text-xs sm:text-sm">
-              {!selectedClub && "クラブを選ぶと、この位置にショット前の注意が表示されます。"}
-              {selectedClub && (
-                selectedEffectiveRate !== null
-                  ? `ショットはクラブ成功率:${selectedEffectiveRate}%で実行されます。`
-                  : "ショットはクラブ成功率:--%で実行されます。"
-              )}
-            </p>
-          </div>
-
           {/* ショットボタン */}
           <button
             type="button"
@@ -623,6 +620,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 hole={currentHole}
                 landingResults={landingHistory}
                 transientLandingResult={transientLandingResult}
+                aimPoint={selectedAimPoint}
                 showTrajectories
               />
             </div>

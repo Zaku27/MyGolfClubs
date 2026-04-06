@@ -89,7 +89,7 @@ export const AnalysisHeader = ({
         </button>
       )}
       <button className="btn-secondary" onClick={onBack}>
-        クラブ一覧へ戻る
+        クラブ管理に戻る
       </button>
     </div>
   </div>

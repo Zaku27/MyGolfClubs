@@ -622,12 +622,12 @@ export default function RangeScreen() {
           >
             個人データ入力へ
           </Link>
-          <button
-            className="bg-green-200 hover:bg-green-300 text-green-900 rounded px-4 py-2 font-semibold shadow"
-            onClick={() => window.history.back()}
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded bg-green-200 px-3 py-2 text-sm font-semibold text-green-900 shadow hover:bg-green-300"
           >
-            メニューに戻る
-          </button>
+            クラブ管理に戻る
+          </Link>
         </div>
       </div>
 

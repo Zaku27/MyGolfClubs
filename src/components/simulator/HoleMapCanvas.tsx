@@ -7,6 +7,7 @@ interface HoleMapCanvasProps {
   hole: Pick<Hole, "targetDistance" | "distanceFromTee" | "greenRadius" | "hazards">;
   landingResults: LandingResult[];
   transientLandingResult?: LandingResult | null;
+  aimPoint?: { x: number; y: number } | null;
   showTrajectories?: boolean;
   className?: string;
   editable?: boolean;
@@ -207,6 +208,41 @@ function buildAbsoluteShotFromOrigin(
   shot: LandingResult,
   targetDistance: number,
 ): AbsoluteShot {
+  const toAbsolute = (localX: number, localY: number): Point2D => {
+    const pin: Point2D = { x: 0, y: targetDistance };
+    const toPinX = pin.x - origin.x;
+    const toPinY = pin.y - origin.y;
+    const toPinDistance = Math.hypot(toPinX, toPinY);
+
+    const forward: Point2D = toPinDistance > 1e-6
+      ? { x: toPinX / toPinDistance, y: toPinY / toPinDistance }
+      : { x: 0, y: 1 };
+
+    const right: Point2D = { x: forward.y, y: -forward.x };
+
+    return {
+      x: origin.x + forward.x * localY + right.x * localX,
+      y: origin.y + forward.y * localY + right.y * localX,
+    };
+  };
+
+  const landing = toAbsolute(shot.finalX, shot.finalY);
+  const pathFromTrajectory = shot.trajectoryPoints?.map((point) => toAbsolute(point.x, point.y)) ?? [];
+
+  return {
+    origin,
+    landing,
+    path: pathFromTrajectory.length > 0 ? pathFromTrajectory : [origin, landing],
+    local: shot,
+  };
+}
+
+function buildAbsolutePointFromOrigin(
+  origin: Point2D,
+  targetDistance: number,
+  localX: number,
+  localY: number,
+): Point2D {
   const pin: Point2D = { x: 0, y: targetDistance };
   const toPinX = pin.x - origin.x;
   const toPinY = pin.y - origin.y;
@@ -218,19 +254,9 @@ function buildAbsoluteShotFromOrigin(
 
   const right: Point2D = { x: forward.y, y: -forward.x };
 
-  const toAbsolute = (localX: number, localY: number): Point2D => ({
+  return {
     x: origin.x + forward.x * localY + right.x * localX,
     y: origin.y + forward.y * localY + right.y * localX,
-  });
-
-  const landing = toAbsolute(shot.finalX, shot.finalY);
-  const pathFromTrajectory = shot.trajectoryPoints?.map((point) => toAbsolute(point.x, point.y)) ?? [];
-
-  return {
-    origin,
-    landing,
-    path: pathFromTrajectory.length > 0 ? pathFromTrajectory : [origin, landing],
-    local: shot,
   };
 }
 
@@ -288,6 +314,7 @@ export function HoleMapCanvas({
   hole,
   landingResults,
   transientLandingResult = null,
+  aimPoint = null,
   showTrajectories = true,
   className,
   editable = false,
@@ -316,8 +343,8 @@ export function HoleMapCanvas({
     }
 
     const padding = editable
-      ? { top: 26, right: 22, bottom: 30, left: 44 }
-      : { top: 20, right: 18, bottom: 18, left: 18 };
+      ? { top: 26, right: 22, bottom: 30, left: 56 }
+      : { top: 20, right: 18, bottom: 18, left: 30 };
     const drawWidth = size.width - padding.left - padding.right;
     const drawHeight = size.height - padding.top - padding.bottom;
     const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
@@ -335,6 +362,11 @@ export function HoleMapCanvas({
     const origin = absoluteShots.at(-1)?.landing ?? { x: 0, y: 0 };
     return buildAbsoluteShotFromOrigin(origin, transientLandingResult, targetDistance);
   }, [absoluteShots, targetDistance, transientLandingResult]);
+  const absoluteAimPoint = useMemo(() => {
+    if (!aimPoint) return null;
+    const origin = absoluteShots.at(-1)?.landing ?? { x: 0, y: 0 };
+    return buildAbsolutePointFromOrigin(origin, targetDistance, aimPoint.x, aimPoint.y);
+  }, [absoluteShots, aimPoint, targetDistance]);
 
   useEffect(() => {
     if (currentHoleKey == null) {
@@ -349,7 +381,7 @@ export function HoleMapCanvas({
 
     const updateSize = () => {
       const width = Math.max(1, Math.round(wrapper.clientWidth));
-      const height = Math.max(MIN_CANVAS_HEIGHT, Math.round(width * 0.62));
+      const height = Math.max(MIN_CANVAS_HEIGHT, Math.round(width * 1.75));
       setSize((prev) => {
         if (prev.width === width && prev.height === height) {
           return prev;
@@ -399,7 +431,8 @@ export function HoleMapCanvas({
     const teeY = yardToPxY(0);
     const pinX = yardToPxX(0);
     const pinY = yardToPxY(targetDistance);
-    const greenRadiusPx = Math.max(10, (greenRadius / maxYardY) * drawHeight);
+    const greenRadiusPxX = Math.max(1, Math.abs(greenRadius * (drawWidth / (halfYardX * 2))));
+    const greenRadiusPxY = Math.max(1, Math.abs(greenRadius * (drawHeight / maxYardY)));
 
     // 背景グラデーションを引いて、地形の奥行きを視覚化する。
     const bg = context.createLinearGradient(0, padding.top, 0, size.height - padding.bottom);
@@ -408,18 +441,44 @@ export function HoleMapCanvas({
     context.fillStyle = bg;
     context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
 
+    context.save();
+    context.lineWidth = 1;
+    context.font = "11px sans-serif";
+    context.fillStyle = "rgba(6, 95, 70, 0.85)";
+
+    for (let y = 0; y <= maxYardY + 0.01; y += 50) {
+      const py = yardToPxY(y);
+      const isMajorGuide = y % 100 === 0;
+      context.strokeStyle = y === 0
+        ? "rgba(6, 95, 70, 0.5)"
+        : isMajorGuide
+          ? "rgba(21, 94, 117, 0.45)"
+          : "rgba(6, 95, 70, 0.18)";
+      context.lineWidth = isMajorGuide ? 1.8 : 1;
+      context.beginPath();
+      context.moveTo(padding.left, py);
+      context.lineTo(padding.left + drawWidth, py);
+      context.stroke();
+
+      context.fillStyle = isMajorGuide
+        ? "rgba(21, 94, 117, 0.92)"
+        : "rgba(6, 95, 70, 0.85)";
+      context.font = isMajorGuide ? "bold 11px sans-serif" : "11px sans-serif";
+      context.textAlign = "right";
+      context.textBaseline = "middle";
+      context.fillText(`${Math.round(y)}`, padding.left - 2, py);
+    }
+
+    context.fillStyle = "rgba(6, 95, 70, 0.9)";
+    context.font = "11px sans-serif";
+
     if (editable) {
       const xStep = chooseYardTickStep(halfYardX * 2, 10);
-      const yStep = chooseYardTickStep(maxYardY, 10);
-
-      context.save();
-      context.lineWidth = 1;
-      context.font = "11px sans-serif";
-      context.fillStyle = "rgba(6, 95, 70, 0.85)";
 
       for (let x = -Math.floor(halfYardX / xStep) * xStep; x <= halfYardX + 0.01; x += xStep) {
         const px = yardToPxX(x);
         context.strokeStyle = x === 0 ? "rgba(6, 95, 70, 0.5)" : "rgba(6, 95, 70, 0.16)";
+        context.lineWidth = 1;
         context.beginPath();
         context.moveTo(px, padding.top);
         context.lineTo(px, padding.top + drawHeight);
@@ -430,34 +489,18 @@ export function HoleMapCanvas({
         context.fillText(`${Math.round(x)}`, px, padding.top + drawHeight + 4);
       }
 
-      for (let y = 0; y <= maxYardY + 0.01; y += yStep) {
-        const py = yardToPxY(y);
-        context.strokeStyle = y === 0 ? "rgba(6, 95, 70, 0.5)" : "rgba(6, 95, 70, 0.16)";
-        context.beginPath();
-        context.moveTo(padding.left, py);
-        context.lineTo(padding.left + drawWidth, py);
-        context.stroke();
-
-        context.textAlign = "right";
-        context.textBaseline = "middle";
-        context.fillText(`${Math.round(y)}`, padding.left - 8, py);
-      }
-
-      context.fillStyle = "rgba(6, 95, 70, 0.9)";
-      context.textAlign = "right";
-      context.textBaseline = "top";
-      context.fillText("Y (yd)", padding.left - 8, padding.top - 18);
       context.textAlign = "right";
       context.fillText("X (yd)", padding.left + drawWidth, padding.top + drawHeight + 16);
-      context.restore();
     }
 
-    // ピン周囲にグリーン領域を円として描画し、オン判定の範囲を視覚化する。
+    context.restore();
+
+    // ピン周囲にグリーン領域を楕円として描画し、X/Y スケールが異なる図面でも正しい範囲を視覚化する。
     context.fillStyle = "rgba(187, 247, 208, 0.72)";
     context.strokeStyle = "rgba(21, 128, 61, 0.9)";
     context.lineWidth = 2;
     context.beginPath();
-    context.arc(pinX, pinY, greenRadiusPx, 0, Math.PI * 2);
+    context.ellipse(pinX, pinY, greenRadiusPxX, greenRadiusPxY, 0, 0, Math.PI * 2);
     context.fill();
     context.stroke();
 
@@ -531,12 +574,28 @@ export function HoleMapCanvas({
       context.restore();
     }
 
+    if (absoluteAimPoint) {
+      const markerX = yardToPxX(absoluteAimPoint.x);
+      const markerY = yardToPxY(absoluteAimPoint.y);
+      context.save();
+      context.strokeStyle = "rgba(14, 116, 144, 0.95)";
+      context.lineWidth = 2.5;
+      const sizePx = 8;
+      context.beginPath();
+      context.moveTo(markerX - sizePx, markerY - sizePx);
+      context.lineTo(markerX + sizePx, markerY + sizePx);
+      context.moveTo(markerX - sizePx, markerY + sizePx);
+      context.lineTo(markerX + sizePx, markerY - sizePx);
+      context.stroke();
+      context.restore();
+    }
+
     // 右上に縮尺の目安を表示。
     context.fillStyle = "rgba(6, 95, 70, 0.78)";
     context.font = "12px sans-serif";
     context.textAlign = "right";
     context.fillText(`Scale: 1px = ${(maxYardY / drawHeight).toFixed(2)} yd`, size.width - 12, 18);
-  }, [absoluteShots, editable, greenRadius, hazards, showTrajectories, size.height, size.width, targetDistance, transientShot]);
+  }, [absoluteAimPoint, absoluteShots, editable, greenRadius, hazards, showTrajectories, size.height, size.width, targetDistance, transientShot]);
 
   const metricToPx = (hazard: Hazard) => {
     const currentMetrics = metrics ?? metricsRef.current;

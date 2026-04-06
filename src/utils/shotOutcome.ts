@@ -110,28 +110,44 @@ function isPointInObArea(
  * 着弾点が障害物内部にあるかを判定する。
  * polygon 形状は現状データが最小限なため、矩形境界で代用する。
  */
+function isPointInHazard(
+  x: number,
+  y: number,
+  hazard: Hazard,
+): boolean {
+  if (hazard.type === "ob") {
+    return isPointInObArea(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack);
+  }
+
+  return isPointInRectangle(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack);
+}
+
 export function checkLandingInHazard(
   x: number,
   y: number,
   hazards: Hazard[],
 ): Hazard | null {
   for (const hazard of hazards) {
-    if (hazard.type === "ob") {
-      if (isPointInObArea(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack)) {
-        return hazard;
-      }
-      continue;
+    if (isPointInHazard(x, y, hazard)) {
+      return hazard;
     }
+  }
 
-    if (hazard.shape === "rectangle") {
-      if (isPointInRectangle(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack)) {
-        return hazard;
-      }
-    } else if (hazard.shape === "polygon") {
-      if (isPointInRectangle(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack)) {
-        return hazard;
-      }
+  return null;
+}
+
+export function findFirstHazardEntryPoint(
+  trajectoryPoints: Array<{ x: number; y: number }>,
+  hazard: Hazard,
+): { x: number; y: number } | null {
+  let wasInside = false;
+
+  for (const point of trajectoryPoints) {
+    const isInside = isPointInHazard(point.x, point.y, hazard);
+    if (isInside && !wasInside) {
+      return point;
     }
+    wasInside = isInside;
   }
 
   return null;
@@ -269,6 +285,7 @@ export function assessLanding(
   targetDistance: number,
   hazards: Hazard[],
   greenRadius: number = DEFAULT_GREEN_RADIUS,
+  trajectoryPoints?: Array<{ x: number; y: number }>,
 ): {
   hazard: Hazard | null;
   geometricRemainingDistance: number;
@@ -276,9 +293,20 @@ export function assessLanding(
   finalOutcome: ShotResult["finalOutcome"];
 } {
   const hazard = checkLandingInHazard(landingX, landingY, hazards);
+  let crossingX = landingX;
+  let crossingY = landingY;
+
+  if (hazard && trajectoryPoints?.length && (hazard.type === "water" || hazard.type === "ob")) {
+    const entryPoint = findFirstHazardEntryPoint(trajectoryPoints, hazard);
+    if (entryPoint) {
+      crossingX = entryPoint.x;
+      crossingY = entryPoint.y;
+    }
+  }
+
   const geometricRemainingDistance = Math.max(
     0,
-    Math.round(distanceToPinFromLanding(targetDistance, landingX, landingY)),
+    Math.round(distanceToPinFromLanding(targetDistance, crossingX, crossingY)),
   );
   const isOnGreen = geometricRemainingDistance <= greenRadius;
 

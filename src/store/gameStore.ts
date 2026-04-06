@@ -12,7 +12,7 @@ import type {
   RiskLevel,
   WindDirection,
 } from "../types/game";
-import { simulateShot } from "../utils/shotSimulation";
+import { simulateShot, getAbsoluteLandingPoint, projectAlongLineToPin } from "../utils/shotSimulation";
 import { buildClubUsageStats } from "../utils/roundAnalysis";
 import { formatSimClubDisplayName } from "../utils/simClubLabel";
 import { ClubService } from "../db/clubService";
@@ -111,7 +111,14 @@ const INITIAL_STATE: GameStoreState = {
   phase: "setup",
   course: [],
   currentHoleIndex: 0,
-  shotContext: { remainingDistance: 0, lie: "tee", hazards: [] },
+  shotContext: {
+    remainingDistance: 0,
+    lie: "tee",
+    targetDistance: 0,
+    originX: 0,
+    originY: 0,
+    hazards: [],
+  },
   holeStrokes: 0,
   scores: [],
   finalScore: null,
@@ -136,9 +143,13 @@ const INITIAL_STATE: GameStoreState = {
 
 function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: number): ShotContext {
   const windRandom = createSeededRandom(`${roundSeedNonce}|hole:${holeIndex}|wind`);
+  const targetDistance = hole.targetDistance ?? hole.distanceFromTee;
   return {
-    remainingDistance: hole.distanceFromTee,
+    remainingDistance: targetDistance,
     lie: "tee",
+    targetDistance,
+    originX: 0,
+    originY: 0,
     greenRadius: hole.greenRadius,
     hazards: hole.hazards ?? [],
     ...generateWind(windRandom),
@@ -352,6 +363,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
         });
       } else {
         // ── Still playing ──
+        const isPenaltyRelief = result.penalty && (result.finalOutcome === "water" || result.finalOutcome === "ob");
+        const nextOrigin = isPenaltyRelief
+          ? projectAlongLineToPin(
+              shotContext.originX,
+              shotContext.originY,
+              shotContext.targetDistance,
+              result.newRemainingDistance,
+            )
+          : getAbsoluteLandingPoint(
+              shotContext.originX,
+              shotContext.originY,
+              shotContext.targetDistance,
+              result.landing?.finalX ?? 0,
+              result.landing?.finalY ?? 0,
+            );
+
         set({
           holeStrokes: newHoleStrokes,
           lastShotResult: result,
@@ -359,6 +386,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             ...shotContext,
             remainingDistance: result.newRemainingDistance,
             lie: result.lie,
+            originX: nextOrigin.x,
+            originY: nextOrigin.y,
             // Keep wind and hazards from current hole
           },
           selectedClubId: null,

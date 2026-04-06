@@ -190,11 +190,11 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
           距離(yd)
           <input
             type="number"
-            min={80}
+            min={30}
             max={700}
             value={selectedHole.distanceFromTee}
             onChange={(event) => {
-              const distance = Math.max(80, Math.min(700, Number(event.target.value) || 80));
+              const distance = Math.max(30, Math.min(700, Number(event.target.value) || 30));
               updateHole((hole) => ({
                 ...hole,
                 distanceFromTee: distance,
@@ -206,7 +206,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         </label>
 
         <label className="space-y-1 text-xs font-semibold text-emerald-800">
-          グリーン半径
+          グリーン半径 (ヤード)
           <input
             type="number"
             min={6}

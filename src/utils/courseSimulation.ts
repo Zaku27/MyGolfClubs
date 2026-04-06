@@ -69,6 +69,7 @@ export function simulateShotWithCourse(
     targetDistance,
     hole.hazards ?? [],
     greenRadius,
+    landing.trajectoryPoints,
   );
   const { hazard, finalOutcome, geometricRemainingDistance } = assessment;
   const penaltyStrokes = determinePenaltyStrokes(hazard);

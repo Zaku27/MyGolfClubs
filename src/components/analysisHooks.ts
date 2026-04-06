@@ -47,7 +47,7 @@ export const useResponsiveChartSize = (
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, [enabled, containerRef]);
+  }, [enabled, containerRef.current]);
 
   return size;
 };

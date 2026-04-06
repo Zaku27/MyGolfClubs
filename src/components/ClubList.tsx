@@ -17,8 +17,8 @@ import type { GolfClub } from '../types/golf';
 import './ClubList.css';
 import { sortClubsForDisplay } from '../utils/clubSort';
 import { getClubTypeDisplay } from '../utils/clubUtils';
+import { SHOW_HOME_RELEASE_LIMITED_ACTIONS } from '../config/featureFlags';
 
-const SHOW_HOME_RELEASE_LIMITED_ACTIONS = false;
 const CLUB_TYPE_OPTIONS: GolfClub['clubType'][] = ['Driver', 'Wood', 'Hybrid', 'Iron', 'Wedge', 'Putter'];
 
 interface ClubListProps {
