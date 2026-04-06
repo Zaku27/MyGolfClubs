@@ -14,6 +14,7 @@ import {
   getAnalysisAdjustedBaseSuccessRate,
   isWeakClubByAnalysisAdjustedRate,
 } from "../../utils/clubSuccessDisplay";
+import { ClubDisplayName } from "../ClubDisplayName";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 import {
   buildLieAngleAnalysis,
@@ -230,7 +231,9 @@ export function PersonalDataInput() {
 
       return {
         clubId: simClub.id,
-        clubLabel: `${club.name} ${club.number}`,
+        clubType: club.clubType,
+        clubNumber: club.number,
+        clubName: club.name ?? '',
         treatedAsWeakClub,
         baseSuccessRate: simClub.successRate,
         adjustedBaseSuccessRate,
@@ -363,7 +366,15 @@ export function PersonalDataInput() {
             <ul className="mt-2 list-disc pl-5 space-y-1">
               {analysisAdjustedRows.map((row) => (
                 <li key={`analysis-${row.clubId}`} className="flex items-center gap-2">
-                  <span>{row.clubLabel}: -{(row.analysisPenalty * row.penaltyWeight * ANALYSIS_PENALTY_MULTIPLIER).toFixed(1)}%（{row.analysisPenaltyReasons.join(" / ")}）</span>
+                  <ClubDisplayName
+                    clubType={row.clubType}
+                    number={row.clubNumber}
+                    name={row.clubName}
+                    className="mr-2"
+                  />
+                  <span>
+                    -{(row.analysisPenalty * row.penaltyWeight * ANALYSIS_PENALTY_MULTIPLIER).toFixed(1)}%（{row.analysisPenaltyReasons.join(" / ")}）
+                  </span>
                 </li>
               ))}
             </ul>
@@ -462,7 +473,13 @@ export function PersonalDataInput() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.clubId} className="border-t border-slate-200">
-                    <td className="px-4 py-3 text-slate-900">{row.clubLabel}</td>
+                    <td className="px-4 py-3 text-slate-900">
+                      <ClubDisplayName
+                        clubType={row.clubType}
+                        number={row.clubNumber}
+                        name={row.clubName}
+                      />
+                    </td>
                     <td className="px-4 py-3 text-center">
                       {row.treatedAsWeakClub ? (
                         <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">

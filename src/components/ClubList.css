@@ -160,6 +160,11 @@
   box-shadow: 0 6px 18px rgba(107, 88, 199, 0.18) !important;
 }
 
+.btn-analysis + .btn-personal-data,
+.btn-analysis + .btn-simulator {
+  margin-left: 12px;
+}
+
 .btn-analysis:hover:not(:disabled) {
   background: linear-gradient(135deg, #5948b9, #7a6ee0) !important;
   border-color: #5948b9 !important;

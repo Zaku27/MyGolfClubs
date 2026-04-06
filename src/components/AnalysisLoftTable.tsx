@@ -1,8 +1,9 @@
 import type { ChangeEvent } from 'react';
 import type { GolfClub } from '../types/golf';
-import { getAnalysisClubKey, getClubTypeDisplay } from '../utils/clubUtils';
+import { getAnalysisClubKey } from '../utils/clubUtils';
 import { type ClubCategory } from '../utils/analysisUtils';
 import { AnalysisSelectionCell, AnalysisSelectionHeaderCell } from './AnalysisSelectionColumn';
+import { ClubDisplayName } from './ClubDisplayName';
 
 type LoftTableClub = GolfClub & {
   category: ClubCategory;
@@ -48,10 +49,7 @@ export const AnalysisLoftTable = ({
                 onSetAnalysisClubVisible={onSetAnalysisClubVisible}
               />
               <td>
-                <div className="analysis-club-name">
-                  <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
-                  <span>{club.name}</span>
-                </div>
+                <ClubDisplayName clubType={club.clubType} number={club.number} name={club.name} />
               </td>
               <td>{club.loftAngle.toFixed(1)}°</td>
               <td>{club.estimatedDistance.toFixed(0)} y</td>

@@ -46,6 +46,16 @@
   color: #fbfdff;
 }
 
+.club-detail-popup-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.club-detail-popup-name {
+  color: #f8fbff;
+}
+
 .club-detail-popup-close {
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.08);
@@ -54,7 +64,7 @@
   height: 36px;
   border-radius: 999px;
   font-size: 18px;
-  line-height: 1;
+  line-height: 0;
   padding: 0;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -254,6 +264,12 @@
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.club-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 
 .club-card .btn-icon {

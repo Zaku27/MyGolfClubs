@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { GolfClub } from '../types/golf';
-import { getClubLabel, getClubTypeDisplay } from '../utils/clubUtils';
+import { ClubDisplayName } from './ClubDisplayName';
 import './ClubCard.css';
 
 interface ClubCardProps {
@@ -25,13 +25,12 @@ export const ClubCard: React.FC<ClubCardProps> = ({
   isActiveBagFull = false,
   onToggleActiveBagMembership,
 }) => {
-  const clubTypeDisplay = getClubTypeDisplay(club.clubType, club.number);
-  const clubLabel = getClubLabel(club.clubType, club.number, club.name);
   const compactLoft = club.loftAngle != null ? `${club.loftAngle}°` : '-';
   const canToggleBag = typeof onToggleActiveBagMembership === 'function' && !!activeBagName;
   const bagButtonDisabled = !isInActiveBag && isActiveBagFull;
   const [showDetails, setShowDetails] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const clubLabel = [club.number, club.name].filter(Boolean).join(' ');
   const displayImageIndex = club.imageData?.length
     ? Math.min(selectedImageIndex, club.imageData.length - 1)
     : 0;
@@ -58,41 +57,8 @@ export const ClubCard: React.FC<ClubCardProps> = ({
               <img src={club.imageData[0]} alt={`${club.name} の画像`} />
             </span>
           ) : null}
-          <span className="club-type">{clubTypeDisplay}</span>
-          <span className="club-fullname">{club.name}</span>
+          <ClubDisplayName clubType={club.clubType} number={club.number} name={club.name} />
         </h3>
-        <div className="club-card-actions">
-          <button
-            className="btn-icon btn-edit"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit(club);
-            }}
-            title="編集"
-            aria-label="編集"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-          </button>
-          <button
-            className="btn-icon btn-delete"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(club.id!);
-            }}
-            title="削除"
-            aria-label="削除"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
-        </div>
       </div>
       {canToggleBag && (
         <div className="club-card-bag-row">
@@ -163,13 +129,83 @@ export const ClubCard: React.FC<ClubCardProps> = ({
               )}
             </>
           ) : (
-            <div className="compact-view" aria-label="簡易スペック">
-              <span className="compact-item"><strong>Loft</strong>{compactLoft}</span>
-              <span className="compact-item"><strong>L</strong>{club.length}"</span>
-              <span className="compact-item"><strong>W</strong>{club.weight}g</span>
+            <div className="compact-row">
+              <div className="compact-view" aria-label="簡易スペック">
+                <span className="compact-item"><strong>Loft</strong>{compactLoft}</span>
+                <span className="compact-item"><strong>L</strong>{club.length}"</span>
+                <span className="compact-item"><strong>W</strong>{club.weight}g</span>
+              </div>
+              <div className="club-card-actions">
+                <button
+                  className="btn-icon btn-edit"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEdit(club);
+                  }}
+                  title="編集"
+                  aria-label="編集"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+                <button
+                  className="btn-icon btn-delete"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete(club.id!);
+                  }}
+                  title="削除"
+                  aria-label="削除"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
       </div>
+      {viewMode === 'full' && (
+        <div className="club-card-footer">
+          <div className="club-card-actions">
+            <button
+              className="btn-icon btn-edit"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit(club);
+              }}
+              title="編集"
+              aria-label="編集"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button
+              className="btn-icon btn-delete"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete(club.id!);
+              }}
+              title="削除"
+              aria-label="削除"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       </div>
       {showDetails && createPortal(
         <div
@@ -183,7 +219,15 @@ export const ClubCard: React.FC<ClubCardProps> = ({
         >
           <div className="club-detail-popup-card" onClick={(event) => event.stopPropagation()}>
             <div className="club-detail-popup-header">
-              <h4>{clubLabel}</h4>
+              <h4>
+                <ClubDisplayName
+                  className="club-detail-popup-title"
+                  clubType={club.clubType}
+                  number={club.number}
+                  name={club.name}
+                  nameClassName="club-detail-popup-name"
+                />
+              </h4>
               <button
                 type="button"
                 className="club-detail-popup-close"

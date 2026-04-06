@@ -1,8 +1,9 @@
 import type { GolfClub } from '../types/golf';
-import { getAnalysisClubKey, getClubTypeDisplay } from '../utils/clubUtils';
+import { getAnalysisClubKey } from '../utils/clubUtils';
 import { getCategoryLabel, type ClubCategory } from '../utils/analysisUtils';
 import { lieStatusColor, lieStatusLabelJa, type LieAngleStatus } from '../types/lieStandards';
 import { AnalysisSelectionCell, AnalysisSelectionHeaderCell } from './AnalysisSelectionColumn';
+import { ClubDisplayName } from './ClubDisplayName';
 
 type LieTableClub = GolfClub & {
   category: ClubCategory;
@@ -52,10 +53,7 @@ export const AnalysisLieTable = ({
                   onSetAnalysisClubVisible={onSetAnalysisClubVisible}
                 />
                 <td>
-                  <div className="analysis-club-name">
-                    <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
-                    <span>{club.name}</span>
-                  </div>
+                  <ClubDisplayName clubType={club.clubType} number={club.number} name={club.name} />
                 </td>
                 <td>{getCategoryLabel(club.category)}</td>
                 <td>{club.lieAngle.toFixed(1)}</td>

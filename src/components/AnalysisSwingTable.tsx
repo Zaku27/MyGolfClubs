@@ -1,5 +1,5 @@
 import type { GolfClub } from '../types/golf';
-import { getAnalysisClubKey, getClubTypeDisplay } from '../utils/clubUtils';
+import { getAnalysisClubKey } from '../utils/clubUtils';
 import {
   getCategoryLabel,
   getSwingStatusColor,
@@ -7,6 +7,7 @@ import {
   type ClubCategory,
 } from '../utils/analysisUtils';
 import { AnalysisSelectionCell, AnalysisSelectionHeaderCell } from './AnalysisSelectionColumn';
+import { ClubDisplayName } from './ClubDisplayName';
 
 type SwingTableClub = GolfClub & {
   category: ClubCategory;
@@ -57,10 +58,7 @@ export const AnalysisSwingTable = ({
                   onSetAnalysisClubVisible={onSetAnalysisClubVisible}
                 />
                 <td>
-                  <div className="analysis-club-name">
-                    <span className="analysis-club-type">{getClubTypeDisplay(club.clubType, club.number)}</span>
-                    <span>{club.name}</span>
-                  </div>
+                  <ClubDisplayName clubType={club.clubType} number={club.number} name={club.name} />
                 </td>
                 <td>{getCategoryLabel(club.category)}</td>
                 <td>{club.swingWeight || '-'}</td>
