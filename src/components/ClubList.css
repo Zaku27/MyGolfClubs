@@ -52,6 +52,33 @@
   box-shadow: 0 4px 12px rgba(74, 163, 205, 0.16);
 }
 
+.club-list-header-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.club-total-count {
+  background: #ffffff;
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(46, 85, 127, 0.12);
+  box-shadow: 0 4px 12px rgba(46, 85, 127, 0.08);
+}
+
+.club-total-count-inline {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  margin-right: 8px;
+  padding: 10px 14px;
+}
+
 .btn-add-club {
   background: linear-gradient(135deg, #18794e, #1f9660) !important;
   color: #ffffff;
@@ -177,10 +204,11 @@
 .club-search-inline {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   margin-left: auto;
   max-width: 430px;
-  width: min(100%, 430px);
+  width: auto;
 }
 
 .club-search-inline input,

@@ -7,7 +7,6 @@ type GolfBagPanelProps = {
   bags: GolfBag[];
   activeBagId: number | null;
   activeBagClubCount: number;
-  totalClubCount: number;
   maxClubs?: number;
   onSelectBag: (bagId: number) => void;
   onCreateBag?: () => void;
@@ -26,7 +25,6 @@ export const GolfBagPanel = ({
   bags,
   activeBagId,
   activeBagClubCount,
-  totalClubCount,
   maxClubs = 14,
   onSelectBag,
   onCreateBag,
@@ -36,7 +34,7 @@ export const GolfBagPanel = ({
   listScope,
   onChangeListScope,
   showManagement = true,
-  compact = false,
+  compact = true,
   title,
   description,
 }: GolfBagPanelProps) => {
@@ -46,23 +44,12 @@ export const GolfBagPanel = ({
     <section className={`golf-bag-panel ${compact ? 'compact' : ''}`}>
       <div className="golf-bag-panel-main">
         <div>
-          <p className="golf-bag-panel-eyebrow">Golf Bag</p>
-          <h2>{title ?? (compact ? '表示中のバッグ' : '現在のゴルフバッグ')}</h2>
+          <h2>{title ?? (compact ? 'Golf Bag' : 'Golf Bag')}</h2>
           <p className="golf-bag-panel-description">
-            {description ?? '通常は1つのバッグを使う前提で、ここで表示対象と14本を管理します。'}
+            {description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。'}
           </p>
         </div>
 
-        {activeBag && (
-          <div className="golf-bag-panel-summary">
-            <div className="golf-bag-panel-summary-name">{activeBag.name}</div>
-            <div className="golf-bag-panel-summary-count">
-              <strong>{activeBagClubCount}</strong>
-              <span>/ {maxClubs} 本</span>
-            </div>
-            <div className="golf-bag-panel-summary-meta">登録クラブ総数 {totalClubCount} 本</div>
-          </div>
-        )}
       </div>
 
       {bags.length > 1 ? (
