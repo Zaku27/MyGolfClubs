@@ -135,6 +135,12 @@ function sampleStandardNormal(rng: () => number): number {
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
+function sampleTruncatedNormal(rng: () => number, sigma: number, maxSigma = 1.5): number {
+  const value = sampleStandardNormal(rng);
+  const clipped = Math.max(-maxSigma, Math.min(maxSigma, value));
+  return clipped * sigma;
+}
+
 /**
  * 品質ラベルが外部から与えられたときに、分散を条件付きで制御する。
  */
@@ -511,7 +517,14 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
     qualityMetrics = forcedResult.metrics;
   } else {
     // 通常ショット分布 + 大ミス分布の混合モデルで carry と横ブレを生成する。
-    const wasMishit = rng() < profile.mishitProbability;
+    const isPerfectRobot =
+      input.skillLevel.dispersion === 0 &&
+      input.skillLevel.mishitRate === 0 &&
+      input.skillLevel.sideSpinDispersion === 0;
+    let wasMishit = rng() < profile.mishitProbability;
+    if (isPerfectRobot) {
+      wasMishit = false;
+    }
 
     if (wasMishit) {
       // 初心者ほど極端ミスが大きく、上級者ほど「軽いミス」で収まりやすくする。
@@ -539,10 +552,17 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
       resolvedQuality = classified.quality;
       qualityMetrics = classified.metrics;
     } else {
-      carry = expectedCarry + sampleStandardNormal(rng) * profile.carrySigma;
-      const startLine = sampleStandardNormal(rng) * profile.lateralSigma * 0.75;
-      const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.4;
-      lateralDeviation = startLine + curve;
+      if (isPerfectRobot) {
+        carry = expectedCarry + sampleTruncatedNormal(rng, profile.carrySigma, 1.25);
+        const startLine = sampleTruncatedNormal(rng, profile.lateralSigma * 0.25, 1.25);
+        const curve = sampleTruncatedNormal(rng, profile.lateralSigma * 0.15, 1.25);
+        lateralDeviation = startLine + curve;
+      } else {
+        carry = expectedCarry + sampleStandardNormal(rng) * profile.carrySigma;
+        const startLine = sampleStandardNormal(rng) * profile.lateralSigma * 0.75;
+        const curve = sampleStandardNormal(rng) * profile.lateralSigma * 0.4;
+        lateralDeviation = startLine + curve;
+      }
       const adjusted = applyLowSkillTargetAvoidance(carry, lateralDeviation, expectedCarry, profile.effectiveSkill, rng);
       carry = adjusted.carry;
       lateralDeviation = adjusted.lateralDeviation;

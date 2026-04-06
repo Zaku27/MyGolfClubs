@@ -33,9 +33,18 @@ type CustomCourseStorage = {
 };
 
 const CUSTOM_COURSE_STORAGE_KEY = "golfbag-custom-course-library-v1";
+const SIMULATOR_PLAY_MODE_STORAGE_KEY = "golfbag-simulator-play-mode-v1";
 
 function createCourseId(): string {
   return `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function loadStoredSimulatorPlayMode(): "bag" | "robot" {
+  if (typeof window === "undefined") {
+    return "bag";
+  }
+  const raw = window.localStorage.getItem(SIMULATOR_PLAY_MODE_STORAGE_KEY);
+  return raw === "robot" ? "robot" : "bag";
 }
 
 function sanitizeCourseName(value: string): string {
@@ -312,7 +321,7 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
   const initialPreset = initialCustom.courses.find((course) => course.id === initialCustom.selectedCourseId)
     ?? initialCustom.courses[0];
 
-  const [playMode, setPlayMode] = useState<"bag" | "robot">("bag");
+  const [playMode, setPlayMode] = useState<"bag" | "robot">(() => loadStoredSimulatorPlayMode());
   const [savedCustomCourses, setSavedCustomCourses] = useState<CustomCoursePreset[]>(initialCustom.courses);
   const [selectedCustomCourseId, setSelectedCustomCourseId] = useState(initialPreset.id);
   const [customNameInput, setCustomNameInput] = useState(initialPreset.name);
@@ -330,6 +339,12 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
       courses: savedCustomCourses,
     } satisfies CustomCourseStorage);
   }, [savedCustomCourses, selectedCustomCourseId]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SIMULATOR_PLAY_MODE_STORAGE_KEY, playMode);
+    }
+  }, [playMode]);
 
   const handleChangeHoleCount = (holeCount: 1 | 3 | 9 | 18) => {
     setCustomHoleCount(holeCount);
