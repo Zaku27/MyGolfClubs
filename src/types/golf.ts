@@ -22,6 +22,7 @@ export interface GolfClub {
   flex: 'S' | 'SR' | 'R' | 'A' | 'L'; // フレックス
   distance: number; // 飛距離（整数）
   notes: string;
+  imageData?: string[];
   createdAt?: string;
   updatedAt?: string;
 }

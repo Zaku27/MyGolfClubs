@@ -62,6 +62,11 @@ export const getClubTypeShort = (name: string): string => {
   return normalized;
 };
 
+export const getClubLabel = (clubType: string, number: string, name?: string): string => {
+  const typeName = getClubTypeDisplay(clubType, number).trim();
+  return name ? `${typeName} ${name}` : typeName;
+};
+
 export const getAnalysisClubKey = (
   club: Pick<GolfClub, 'id' | 'clubType' | 'name' | 'number' | 'createdAt'>,
 ): string => {

@@ -103,3 +103,50 @@ button:disabled {
     padding: 18px 12px 24px;
   }
 }
+
+.image-propagation-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.image-propagation-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.image-propagation-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 420px);
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 24px;
+  box-shadow: 0 32px 64px rgba(15, 23, 42, 0.16);
+  text-align: left;
+}
+
+.image-propagation-card h3 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: #111827;
+}
+
+.image-propagation-card p {
+  margin: 0 0 20px;
+  color: #334155;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.image-propagation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

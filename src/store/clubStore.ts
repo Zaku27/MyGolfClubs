@@ -16,8 +16,8 @@ type ClubStoreState = {
 type ClubStoreActions = {
   loadClubs: () => Promise<void>;
   loadBags: () => Promise<void>;
-  addClub: (club: Omit<GolfClub, 'id'>) => Promise<void>;
-  updateClub: (id: number, club: Partial<GolfClub>) => Promise<void>;
+  addClub: (club: Omit<GolfClub, 'id'>, propagateSameName?: boolean) => Promise<void>;
+  updateClub: (id: number, club: Partial<GolfClub>, propagateSameName?: boolean) => Promise<void>;
   deleteClub: (id: number) => Promise<void>;
   initializeDefaults: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
@@ -111,10 +111,10 @@ export const useClubStore = create<ClubStore>((set) => ({
     }
   },
 
-  addClub: async (club) => {
+  addClub: async (club, propagateSameName = true) => {
     set({ error: null });
     try {
-      const id = await ClubService.createClub(club);
+      const id = await ClubService.createClub(club, propagateSameName);
       const timestamp = createTimestamp();
       const newClub: GolfClub = {
         ...club,
@@ -122,20 +122,41 @@ export const useClubStore = create<ClubStore>((set) => ({
         createdAt: timestamp,
         updatedAt: timestamp,
       };
-      set((state) => ({ clubs: [newClub, ...state.clubs] }));
+      set((state) => ({
+        clubs: [
+          newClub,
+          ...state.clubs.map((c) =>
+            propagateSameName && club.imageData && club.name && c.name === club.name
+              ? { ...c, imageData: club.imageData, updatedAt: timestamp }
+              : c,
+          ),
+        ],
+      }));
     } catch (error) {
       setStoreError(set, error);
     }
   },
 
-  updateClub: async (id, club) => {
+  updateClub: async (id, club, propagateSameName = true) => {
     set({ error: null });
     try {
-      await ClubService.updateClub(id, club);
+      await ClubService.updateClub(id, club, propagateSameName);
       const updatedAt = createTimestamp();
-      set((state) => ({
-        clubs: state.clubs.map((c) => (c.id === id ? { ...c, ...club, updatedAt } : c)),
-      }));
+      set((state) => {
+        const targetClub = state.clubs.find((c) => c.id === id);
+        const nameToMatch = club.name ?? targetClub?.name;
+        return {
+          clubs: state.clubs.map((c) => {
+            if (c.id === id) {
+              return { ...c, ...club, updatedAt };
+            }
+            if (propagateSameName && club.imageData != null && nameToMatch && c.name === nameToMatch) {
+              return { ...c, imageData: club.imageData, updatedAt };
+            }
+            return c;
+          }),
+        };
+      });
     } catch (error) {
       setStoreError(set, error);
     }

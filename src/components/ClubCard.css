@@ -1,10 +1,183 @@
 .club-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 16px;
   box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
+}
+
+.club-detail-popup {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(25, 42, 72, 0.55);
+  backdrop-filter: blur(10px);
+  z-index: 9999;
+  padding: 28px;
+}
+
+.club-detail-popup-card {
+  width: min(100%, 560px);
+  background: linear-gradient(180deg, rgba(28, 48, 78, 0.95), rgba(20, 34, 60, 0.95));
+  border: 1px solid rgba(173, 216, 255, 0.16);
+  border-radius: 24px;
+  box-shadow: 0 28px 90px rgba(10, 30, 70, 0.22);
+  padding: 24px;
+  color: #f3f8ff;
+}
+
+.club-detail-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.club-detail-popup-header h4 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #fbfdff;
+}
+
+.club-detail-popup-close {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fbff;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.club-detail-popup-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.club-detail-popup-body {
+  display: grid;
+  gap: 14px;
+}
+
+.club-detail-popup-image {
+  width: min(100%, 320px);
+  max-height: 180px;
+  margin: 0 auto 16px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.club-detail-popup-image img {
+  width: 100%;
+  height: 180px;
+  display: block;
+  object-fit: cover;
+}
+
+.club-detail-popup-image-switcher {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  color: #cbd5e1;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.image-switcher-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fbff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.image-switcher-button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.image-switcher-list {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.image-switcher-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.image-switcher-thumb.active {
+  border-color: rgba(96, 165, 250, 0.95);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.18);
+}
+
+.image-switcher-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.club-detail-popup-card .spec-row {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 14px 16px;
+  color: #e9f1ff;
+}
+
+.club-detail-popup-card .spec-row:not(.notes) {
+  display: grid;
+  grid-template-columns: 0.65fr 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.club-detail-popup-card .spec-row.notes {
+  grid-column: 1 / -1;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 16px;
+}
+
+.club-detail-popup-card .spec-label {
+  color: #b9d0ff;
+}
+
+.club-detail-popup-card .spec-value {
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .club-card:hover {
@@ -30,6 +203,25 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
+}
+
+.club-image-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.club-image-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .club-type {

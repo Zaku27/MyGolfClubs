@@ -2,8 +2,6 @@ import { ClubCard } from './ClubCard';
 import { Link } from 'react-router-dom';
 import {
   AddIcon,
-  ToggleViewIcon,
-  CompactViewIcon,
   ExportIcon,
   ImportIcon,
   AnalysisIcon,
@@ -27,8 +25,6 @@ interface ClubListProps {
   onAdd: () => void;
   onReset: () => void;
   onClearAll: () => void;
-  viewMode: 'full' | 'compact';
-  onToggleViewMode: () => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onShowAnalysis: () => void;
@@ -53,8 +49,6 @@ export const ClubList: React.FC<ClubListProps> = ({
   onAdd,
   onReset,
   onClearAll,
-  viewMode,
-  onToggleViewMode,
   onExport,
   onImport,
   onShowAnalysis,
@@ -90,9 +84,6 @@ export const ClubList: React.FC<ClubListProps> = ({
       <div className="club-list-actions">
         <button className="btn-icon btn-add-club" onClick={onAdd} disabled={loading} title="クラブ追加" aria-label="クラブ追加">
           <AddIcon size={20} />
-        </button>
-        <button className="btn-icon btn-toggle-view" onClick={onToggleViewMode} disabled={loading} title={viewMode === 'full' ? '簡易表示へ' : '詳細表示へ'} aria-label={viewMode === 'full' ? '簡易表示へ' : '詳細表示へ'}>
-          {viewMode === 'full' ? <CompactViewIcon size={20} /> : <ToggleViewIcon size={20} />}
         </button>
         <button className="btn-icon btn-export-json" onClick={onExport} disabled={loading} title="エクスポート(JSON)" aria-label="エクスポート">
           <ExportIcon size={20} />
@@ -146,14 +137,14 @@ export const ClubList: React.FC<ClubListProps> = ({
         </div>
       ) : (
         <>
-          <div className={`club-list ${viewMode === 'compact' ? 'compact' : ''}`}>
+          <div className="club-list compact">
             {sortedClubs.map((club) => (
               <ClubCard
                 key={club.id}
                 club={club}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                viewMode={viewMode}
+                viewMode="compact"
                 activeBagName={activeBagName}
                 isInActiveBag={club.id != null && activeBagClubIdSet.has(club.id)}
                 isActiveBagFull={activeBagClubCount >= activeBagLimit}

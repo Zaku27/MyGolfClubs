@@ -38,7 +38,6 @@ const SWING_GOOD_TOLERANCE_STORAGE_KEY = 'golfbag-swing-good-tolerance';
 const SWING_ADJUST_THRESHOLD_STORAGE_KEY = 'golfbag-swing-adjust-threshold';
 const ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY = 'golfbag-analysis-hidden-clubs';
 const CLUB_LIST_SCOPE_STORAGE_KEY = 'golfbag-club-list-scope';
-const VIEW_MODE_STORAGE_KEY = 'golfbag-view-mode';
 const DEFAULT_SWING_TARGET = 2.0;
 const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
 const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
@@ -65,10 +64,6 @@ const parseHiddenAnalysisClubKeys = (value: unknown): string[] => {
 
 const parseClubListScope = (value: unknown): 'bag' | 'all' => {
   return value === 'all' ? 'all' : 'bag';
-};
-
-const parseViewMode = (value: unknown): 'full' | 'compact' => {
-  return value === 'compact' ? 'compact' : 'full';
 };
 
 function App() {
@@ -111,9 +106,8 @@ function App() {
     );
   });
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
-  const [viewMode, setViewMode] = useState<'full' | 'compact'>(() => {
-    return readStoredJson(VIEW_MODE_STORAGE_KEY, 'full', parseViewMode);
-  });
+  const [showImagePropagationConfirm, setShowImagePropagationConfirm] = useState(false);
+  const [pendingClubData, setPendingClubData] = useState<Omit<GolfClub, 'id'> | Partial<GolfClub> | null>(null);
   const [clubListScope, setClubListScope] = useState<'bag' | 'all'>(() => {
     return readStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, 'bag', parseClubListScope);
   });
@@ -231,10 +225,6 @@ function App() {
   useEffect(() => {
     writeStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, clubListScope);
   }, [clubListScope]);
-
-  useEffect(() => {
-    writeStoredJson(VIEW_MODE_STORAGE_KEY, viewMode);
-  }, [viewMode]);
 
   useEffect(() => {
     if (clubListScope === 'bag' && activeBagClubCount === 0 && sortedClubs.length > 0 && bags.length === 1) {
@@ -421,14 +411,44 @@ function App() {
     await resetToDefaults();
   };
 
-  const handleFormSubmit = async (clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>) => {
+  const shouldAskImagePropagation = (clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>): boolean => {
+    const name = (clubData.name ?? editingClub?.name)?.trim();
+    if (!name || !clubData.imageData?.length) {
+      return false;
+    }
+
+    const sameNameClubs = sortedClubs.filter((club) => {
+      if (editingClub && editingClub.id) {
+        return club.name === name && club.id !== editingClub.id;
+      }
+      return club.name === name;
+    });
+    return sameNameClubs.length > 0;
+  };
+
+  const submitClubData = async (
+    clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>,
+    propagateSameName = true,
+  ) => {
     if (editingClub && editingClub.id) {
-      await updateClub(editingClub.id, clubData);
+      await updateClub(editingClub.id, clubData, propagateSameName);
     } else {
-      await addClub(clubData as Omit<GolfClub, 'id'>);
+      await addClub(clubData as Omit<GolfClub, 'id'>, propagateSameName);
     }
     setShowForm(false);
     setEditingClub(undefined);
+    setShowImagePropagationConfirm(false);
+    setPendingClubData(null);
+  };
+
+  const handleFormSubmit = async (clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>) => {
+    const askPropagation = shouldAskImagePropagation(clubData);
+    if (askPropagation) {
+      setPendingClubData(clubData);
+      setShowImagePropagationConfirm(true);
+      return;
+    }
+    await submitClubData(clubData, true);
   };
 
   const handleFormCancel = () => {
@@ -454,9 +474,51 @@ function App() {
     );
   }
 
+  const handleConfirmPropagation = async (propagate: boolean) => {
+    if (!pendingClubData) {
+      setShowImagePropagationConfirm(false);
+      return;
+    }
+    await submitClubData(pendingClubData, propagate);
+  };
+
   return (
     <div className="app-container">
       {error && <div className="error-message">{error}</div>}
+      {showImagePropagationConfirm && pendingClubData && (
+        <div className="image-propagation-modal" role="dialog" aria-modal="true">
+          <div
+            className="image-propagation-backdrop"
+            onClick={() => {
+              setShowImagePropagationConfirm(false);
+              setPendingClubData(null);
+            }}
+          />
+          <div className="image-propagation-card">
+            <h3>同じクラブ名称の他のクラブにも画像を反映しますか？</h3>
+            <p>
+              同じクラブ名を持つ他のクラブにも、今回アップロードした画像を適用します。
+              反映したくない場合は「いいえ」を選択してください。
+            </p>
+            <div className="image-propagation-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => void handleConfirmPropagation(false)}
+              >
+                いいえ
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void handleConfirmPropagation(true)}
+              >
+                はい
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showForm ? (
         <ClubForm
@@ -511,8 +573,6 @@ function App() {
             onAdd={handleAddClub}
             onReset={handleResetClubs}
             onClearAll={handleClearAllClubs}
-            viewMode={viewMode}
-            onToggleViewMode={() => setViewMode((prev) => (prev === 'full' ? 'compact' : 'full'))}
             onExport={handleExportJSON}
             onImport={handleImportJSON}
             onShowAnalysis={handleShowAnalysis}

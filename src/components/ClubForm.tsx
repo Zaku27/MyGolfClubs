@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { GolfClub, ClubCategory } from '../types/golf';
 import {
   buildClubDefaults,
@@ -25,6 +25,7 @@ type ClubFormData = Omit<GolfClub, 'id' | 'clubType' | 'lengthStandard' | 'lengt
   lengthAdjustment: number;
   lieStandard: number;
   lieAdjustment: number;
+  imageData: string[];
 };
 
 const EMPTY_FORM_DATA: ClubFormData = {
@@ -46,6 +47,33 @@ const EMPTY_FORM_DATA: ClubFormData = {
   flex: 'S',
   distance: 0,
   notes: '',
+  imageData: [],
+};
+
+const readFileAsDataURL = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        resolve(result);
+      } else {
+        reject(new Error('画像の読み込みに失敗しました'));
+      }
+    };
+    reader.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+    reader.readAsDataURL(file);
+  });
+};
+
+const normalizeImageData = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return [value];
+  }
+  return [];
 };
 
 const toFormData = (source?: GolfClub): ClubFormData => {
@@ -77,6 +105,7 @@ const toFormData = (source?: GolfClub): ClubFormData => {
     flex: source.flex,
     distance: source.distance,
     notes: source.notes,
+    imageData: normalizeImageData(source.imageData),
   };
 };
 
@@ -97,6 +126,18 @@ export const ClubForm: React.FC<ClubFormProps> = ({
   const [showLieBreakdown, setShowLieBreakdown] = useState<boolean>(() =>
     club !== undefined && (club.lieStandard != null || club.lieAdjustment != null)
   );
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [pendingImageSrc, setPendingImageSrc] = useState<string | null>(null);
+  const [pendingCropIndex, setPendingCropIndex] = useState<number | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [cropRotation, setCropRotation] = useState(0);
+  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
+  const [cropSize, setCropSize] = useState(0);
+  const [isDraggingCrop, setIsDraggingCrop] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const cropPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cropWrapperRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const toggleLengthBreakdown = () => {
     setShowLengthBreakdown((prev) => {
@@ -147,6 +188,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         lieAdjustment: 0,
         name: prev.name,
         swingWeight: clubType === 'Putter' ? '' : defaults.swingWeight,
+        imageData: prev.imageData,
       }));
     }
     setNumberPreset(clubType === 'Putter' ? 'Putter' : inferNumberPreset(clubType, nextNumber));
@@ -163,6 +205,382 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     setNumberPreset('Custom');
     setErrors((prev) => ({ ...prev, clubType: '', number: '' }));
   };
+
+  const initializeCropArea = () => {
+    const canvas = cropPreviewCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const size = Math.min(rect.width, rect.height);
+    setCropSize(size);
+    setCropPosition({
+      x: 0,
+      y: 0,
+    });
+  };
+
+  const handleImageFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+
+    try {
+      const dataUrls = await Promise.all(files.map(readFileAsDataURL));
+      if (dataUrls.length === 1) {
+        setPendingImageSrc(dataUrls[0]);
+        setPendingCropIndex(formData.imageData.length);
+        setCropRotation(0);
+        setCropModalOpen(true);
+      } else {
+        setFormData((prev) => {
+          const nextImages = [...prev.imageData, ...dataUrls];
+          setSelectedImageIndex(prev.imageData.length);
+          return {
+            ...prev,
+            imageData: nextImages,
+          };
+        });
+      }
+      setErrors((prev) => ({ ...prev, imageData: '' }));
+    } catch (error) {
+      setErrors((prev) => ({ ...prev, imageData: '画像を読み込めませんでした' }));
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setFormData((prev) => {
+      const nextImages = [...prev.imageData];
+      nextImages.splice(index, 1);
+      setSelectedImageIndex((prevIndex) => {
+        const newLength = nextImages.length;
+        if (newLength === 0) {
+          return 0;
+        }
+        if (prevIndex >= newLength) {
+          return newLength - 1;
+        }
+        return prevIndex;
+      });
+      return {
+        ...prev,
+        imageData: nextImages,
+      };
+    });
+  };
+
+  const moveSelectedImage = (direction: -1 | 1) => {
+    setFormData((prev) => {
+      const currentIndex = selectedImageIndex;
+      const targetIndex = currentIndex + direction;
+      if (targetIndex < 0 || targetIndex >= prev.imageData.length) {
+        return prev;
+      }
+      const nextImages = [...prev.imageData];
+      [nextImages[currentIndex], nextImages[targetIndex]] = [nextImages[targetIndex], nextImages[currentIndex]];
+      setSelectedImageIndex(targetIndex);
+      return {
+        ...prev,
+        imageData: nextImages,
+      };
+    });
+  };
+
+  const handleCropStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const wrapper = cropWrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+
+    const rect = wrapper.getBoundingClientRect();
+    const startX = event.clientX - rect.left;
+    const startY = event.clientY - rect.top;
+
+    setDragStart({ x: startX, y: startY });
+    setIsDraggingCrop(true);
+  };
+
+  const rotateCropPosition = (prevPosition: { x: number; y: number }, wrapperRect: DOMRect, deltaDeg: number) => {
+    const centerX = wrapperRect.width / 2;
+    const centerY = wrapperRect.height / 2;
+    const currentCenterX = prevPosition.x + cropSize / 2;
+    const currentCenterY = prevPosition.y + cropSize / 2;
+    const dx = currentCenterX - centerX;
+    const dy = currentCenterY - centerY;
+    const rad = (deltaDeg * Math.PI) / 180;
+    const rotatedX = dx * Math.cos(rad) - dy * Math.sin(rad);
+    const rotatedY = dx * Math.sin(rad) + dy * Math.cos(rad);
+    const nextCenterX = centerX + rotatedX;
+    const nextCenterY = centerY + rotatedY;
+    const nextX = nextCenterX - cropSize / 2;
+    const nextY = nextCenterY - cropSize / 2;
+
+    return {
+      x: Math.max(0, Math.min(nextX, wrapperRect.width - cropSize)),
+      y: Math.max(0, Math.min(nextY, wrapperRect.height - cropSize)),
+    };
+  };
+
+  const rotateCropBy = (deltaDeg: number) => {
+    const wrapper = cropWrapperRef.current;
+    if (!wrapper) {
+      setCropRotation((prev) => ((prev + deltaDeg + 360) % 360));
+      return;
+    }
+
+    const rect = wrapper.getBoundingClientRect();
+    setCropPosition((prevPos) => rotateCropPosition(prevPos, rect, deltaDeg));
+    setCropRotation((prev) => ((prev + deltaDeg + 360) % 360));
+  };
+
+  const handleCropMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingCrop || !dragStart) {
+      return;
+    }
+
+    const wrapper = cropWrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+
+    const rect = wrapper.getBoundingClientRect();
+    const moveX = event.clientX - rect.left;
+    const moveY = event.clientY - rect.top;
+    const deltaX = moveX - dragStart.x;
+    const deltaY = moveY - dragStart.y;
+
+    const nextX = Math.max(0, Math.min(cropPosition.x + deltaX, rect.width - cropSize));
+    const nextY = Math.max(0, Math.min(cropPosition.y + deltaY, rect.height - cropSize));
+
+    setCropPosition({ x: nextX, y: nextY });
+    setDragStart({ x: moveX, y: moveY });
+  };
+
+  const handleCropEnd = () => {
+    setIsDraggingCrop(false);
+    setDragStart(null);
+  };
+
+  const handleCropSizeChange = (value: number) => {
+    const wrapper = cropWrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+    const maxSize = Math.min(wrapper.clientWidth, wrapper.clientHeight);
+    const nextSize = Math.max(80, Math.min(maxSize, value));
+    setCropPosition((prev) => ({
+      x: Math.min(prev.x, wrapper.clientWidth - nextSize),
+      y: Math.min(prev.y, wrapper.clientHeight - nextSize),
+    }));
+    setCropSize(nextSize);
+  };
+
+  const createSourceCanvas = async (source: string, angle: number) => {
+    return new Promise<HTMLCanvasElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const normalizedRotation = ((angle % 360) + 360) % 360;
+        const canvas = document.createElement('canvas');
+        const shouldSwap = normalizedRotation === 90 || normalizedRotation === 270;
+        canvas.width = shouldSwap ? img.naturalHeight : img.naturalWidth;
+        canvas.height = shouldSwap ? img.naturalWidth : img.naturalHeight;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas コンテキストを取得できませんでした')); return;
+        }
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (normalizedRotation !== 0) {
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate((normalizedRotation * Math.PI) / 180);
+          ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+        } else {
+          ctx.drawImage(img, 0, 0);
+        }
+        resolve(canvas);
+      };
+      img.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+      img.src = source;
+    });
+  };
+
+  const rotateImageDataUrl = async (source: string, angle: number) => {
+    const rotatedCanvas = await createSourceCanvas(source, angle);
+    return rotatedCanvas.toDataURL('image/jpeg', 0.9);
+  };
+
+  const drawImageCover = (
+    ctx: CanvasRenderingContext2D,
+    source: CanvasImageSource,
+    width: number,
+    height: number,
+  ) => {
+    const sourceWidth = source instanceof HTMLImageElement
+      ? source.naturalWidth
+      : source instanceof HTMLCanvasElement
+      ? source.width
+      : source instanceof HTMLVideoElement
+      ? source.videoWidth
+      : 0;
+    const sourceHeight = source instanceof HTMLImageElement
+      ? source.naturalHeight
+      : source instanceof HTMLCanvasElement
+      ? source.height
+      : source instanceof HTMLVideoElement
+      ? source.videoHeight
+      : 0;
+
+    const ratio = Math.max(width / sourceWidth, height / sourceHeight);
+    const drawWidth = sourceWidth * ratio;
+    const drawHeight = sourceHeight * ratio;
+    ctx.drawImage(
+      source,
+      (width - drawWidth) / 2,
+      (height - drawHeight) / 2,
+      drawWidth,
+      drawHeight,
+    );
+  };
+
+  const drawCropPreviewCanvas = async (source: string) => {
+    const canvas = cropPreviewCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const sourceCanvas = await createSourceCanvas(source, cropRotation);
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
+    drawImageCover(ctx, sourceCanvas, width, height);
+  };
+
+  const createCroppedImageDataUrl = async (_source: string, cropRect: { x: number; y: number; size: number }) => {
+    return new Promise<string>((resolve, reject) => {
+      const sourceCanvas = cropPreviewCanvasRef.current;
+      if (!sourceCanvas) {
+        reject(new Error('プレビューキャンバスが見つかりません')); return;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas コンテキストを取得できませんでした')); return;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(
+        sourceCanvas,
+        cropRect.x,
+        cropRect.y,
+        cropRect.size,
+        cropRect.size,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
+      resolve(canvas.toDataURL('image/jpeg', 0.9));
+    });
+  };
+
+  const closeCropModal = () => {
+    setCropModalOpen(false);
+    setCropRotation(0);
+    setPendingImageSrc(null);
+    setPendingCropIndex(null);
+  };
+
+  const handleConfirmCrop = async () => {
+    const source = pendingImageSrc;
+    if (!source || pendingCropIndex == null) {
+      closeCropModal();
+      return;
+    }
+
+    try {
+      const cropped = await createCroppedImageDataUrl(source, {
+        x: cropPosition.x,
+        y: cropPosition.y,
+        size: cropSize,
+      });
+      setFormData((prev) => {
+        const nextImages = [...prev.imageData];
+        if (pendingCropIndex >= 0 && pendingCropIndex < nextImages.length) {
+          nextImages[pendingCropIndex] = cropped;
+        } else {
+          nextImages.push(cropped);
+        }
+        return {
+          ...prev,
+          imageData: nextImages,
+        };
+      });
+      setSelectedImageIndex(pendingCropIndex);
+      closeCropModal();
+    } catch {
+      setErrors((prev) => ({ ...prev, imageData: '画像のトリミングに失敗しました' }));
+    }
+  };
+
+  const handleConfirmRotateOnly = async () => {
+    const source = pendingImageSrc ?? formData.imageData[selectedImageIndex];
+    if (!source || pendingCropIndex == null) {
+      closeCropModal();
+      return;
+    }
+
+    try {
+      const rotated = await rotateImageDataUrl(source, cropRotation);
+      setFormData((prev) => {
+        const nextImages = [...prev.imageData];
+        if (pendingCropIndex >= 0 && pendingCropIndex < nextImages.length) {
+          nextImages[pendingCropIndex] = rotated;
+        } else {
+          nextImages.push(rotated);
+        }
+        return {
+          ...prev,
+          imageData: nextImages,
+        };
+      });
+      setSelectedImageIndex(pendingCropIndex);
+      closeCropModal();
+    } catch {
+      setErrors((prev) => ({ ...prev, imageData: '画像の回転に失敗しました' }));
+    }
+  };
+
+  useEffect(() => {
+    if (!cropModalOpen) {
+      return;
+    }
+
+    const source = pendingImageSrc ?? formData.imageData[selectedImageIndex] ?? '';
+    initializeCropArea();
+    if (source) {
+      void (async () => {
+        await drawCropPreviewCanvas(source);
+      })();
+    }
+  }, [cropModalOpen, pendingImageSrc, selectedImageIndex, cropRotation]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -229,6 +647,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           clubType: prev.clubType,
           name: prev.name,
           number: value,
+          imageData: prev.imageData,
         };
       });
     } else {
@@ -444,6 +863,108 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           {errors.name && (
             <span className="error-message">{errors.name}</span>
           )}
+        </div>
+
+        <div className="form-group">
+          <label>クラブ画像</label>
+          <div className="club-image-upload">
+            {formData.imageData.length > 0 ? (
+              <>
+                <div className="club-image-preview">
+                  <img
+                    src={formData.imageData[selectedImageIndex]}
+                    alt={`クラブ画像プレビュー ${selectedImageIndex + 1}`}
+                  />
+                </div>
+                {formData.imageData.length > 1 && (
+                  <div className="club-image-thumbnails">
+                    {formData.imageData.map((src, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className={`club-image-thumb ${index === selectedImageIndex ? 'active' : ''}`}
+                        onClick={() => setSelectedImageIndex(index)}
+                        aria-label={`画像 ${index + 1}`}
+                      >
+                        <img src={src} alt={`サムネイル ${index + 1}`} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div
+                className="club-image-placeholder"
+                role="button"
+                tabIndex={0}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+              >
+                クラブ画像をアップロードできます
+              </div>
+            )}
+            <div className="club-image-actions">
+              <label className="club-image-upload-button">
+                画像を追加
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageFileChange}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  if (formData.imageData.length > 0) {
+                    setPendingImageSrc(formData.imageData[selectedImageIndex]);
+                    setPendingCropIndex(selectedImageIndex);
+                    setCropRotation(0);
+                    setCropModalOpen(true);
+                  }
+                }}
+                disabled={formData.imageData.length === 0}
+              >
+                編集/トリミング
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-move-image"
+                onClick={() => moveSelectedImage(-1)}
+                disabled={selectedImageIndex <= 0}
+              >
+                前に移動
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-move-image"
+                onClick={() => moveSelectedImage(1)}
+                disabled={selectedImageIndex >= formData.imageData.length - 1}
+              >
+                後ろに移動
+              </button>
+              {formData.imageData.length > 0 && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-remove-image"
+                  onClick={() => handleRemoveImage(selectedImageIndex)}
+                >
+                  画像を削除
+                </button>
+              )}
+            </div>
+            <span className="form-help-text">アップロード後にトリミングできます。正方形に切り抜かれます。</span>
+            {errors.imageData && (
+              <span className="error-message">{errors.imageData}</span>
+            )}
+          </div>
         </div>
 
         {/* Club Number */}
@@ -727,6 +1248,93 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           キャンセル
         </button>
       </div>
+
+      {cropModalOpen && (
+        <div className="club-image-crop-modal" role="dialog" aria-modal="true">
+          <div className="club-image-crop-backdrop" onClick={closeCropModal} />
+          <div className="club-image-crop-card">
+            <div className="club-image-crop-header">
+              <h3>画像をトリミング</h3>
+              <button type="button" className="club-image-crop-close" onClick={closeCropModal}>
+                ×
+              </button>
+            </div>
+            <div className="club-image-crop-body">
+              <div
+                className="club-image-crop-frame"
+                ref={cropWrapperRef}
+                onMouseDown={handleCropStart}
+                onMouseMove={handleCropMove}
+                onMouseUp={handleCropEnd}
+                onMouseLeave={handleCropEnd}
+              >
+                <canvas
+                  ref={cropPreviewCanvasRef}
+                  className="club-image-crop-preview"
+                />
+                <div
+                  className="club-image-crop-overlay"
+                  style={{
+                    left: `${cropPosition.x}px`,
+                    top: `${cropPosition.y}px`,
+                    width: `${cropSize}px`,
+                    height: `${cropSize}px`,
+                  }}
+                >
+                  <span className="club-image-crop-center" aria-hidden="true" />
+                </div>
+              </div>
+              <div className="club-image-crop-hint">
+                クロスがクラブの中心になるように合わせてください。
+              </div>
+              <div className="club-image-rotate-controls">
+                <span>回転: {cropRotation}°</span>
+                <button
+                  type="button"
+                  className="btn-secondary btn-rotate"
+                  onClick={() => rotateCropBy(270)}
+                >
+                  ⟲
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-rotate"
+                  onClick={() => rotateCropBy(90)}
+                >
+                  ⟳
+                </button>
+              </div>
+              <div className="club-image-crop-controls">
+                <label htmlFor="cropSize">トリミングサイズ</label>
+                <input
+                  id="cropSize"
+                  type="range"
+                  min="80"
+                  max="400"
+                  value={cropSize}
+                  onChange={(e) => handleCropSizeChange(parseInt(e.target.value, 10))}
+                />
+              </div>
+            </div>
+            <div className="club-image-crop-actions">
+              <button type="button" className="btn-primary" onClick={handleConfirmCrop}>
+                保存する
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleConfirmRotateOnly}
+                disabled={cropRotation === 0}
+              >
+                回転のみ適用
+              </button>
+              <button type="button" className="btn-secondary" onClick={closeCropModal}>
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 };

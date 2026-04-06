@@ -151,6 +151,268 @@
   margin-bottom: 3px;
 }
 
+.club-image-upload {
+  display: grid;
+  gap: 12px;
+}
+
+.club-image-preview,
+.club-image-placeholder {
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d4e0d7;
+  background: #fbfdfb;
+}
+
+.club-image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.club-image-placeholder {
+  color: #718096;
+  background: #f7fafb;
+  text-align: center;
+  padding: 14px;
+}
+
+.club-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-move-image {
+  min-width: 100px;
+}
+
+.club-image-upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.club-image-upload-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.club-image-thumbnails {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.club-image-thumb {
+  width: 52px;
+  height: 52px;
+  border: 1px solid #cbd5e0;
+  border-radius: 12px;
+  overflow: hidden;
+  padding: 0;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.club-image-thumb.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14);
+}
+
+.club-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-remove-image {
+  background: #fff1f1;
+  border-color: #f4c1c1;
+  color: #b74141;
+}
+
+.club-image-crop-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.club-image-crop-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 15, 29, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.club-image-crop-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 720px);
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.16);
+}
+
+.club-image-crop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.club-image-crop-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.club-image-crop-close {
+  border: 1px solid #dce4eb;
+  background: #f8fafc;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  color: #334155;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.club-image-crop-body {
+  display: grid;
+  gap: 16px;
+}
+
+.club-image-crop-frame {
+  position: relative;
+  border: 1px solid #d4e0d7;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #f8fafc;
+  cursor: grab;
+  min-height: 340px;
+}
+
+.club-image-crop-frame img,
+.club-image-crop-preview {
+  width: 100%;
+  height: auto;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.club-image-crop-overlay {
+  position: absolute;
+  border: 2px dashed rgba(59, 130, 246, 0.95);
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: inset 0 0 0 9999px rgba(15, 23, 42, 0.25);
+  touch-action: none;
+}
+
+.club-image-crop-overlay::before,
+.club-image-crop-overlay::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.club-image-crop-overlay::before {
+  width: 100%;
+  height: 1px;
+}
+
+.club-image-crop-overlay::after {
+  width: 1px;
+  height: 100%;
+}
+
+.club-image-crop-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(59, 130, 246, 0.95);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.club-image-crop-hint {
+  font-size: 13px;
+  color: #475569;
+  margin-top: 8px;
+}
+
+.club-image-rotate-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.btn-rotate {
+  min-width: 46px;
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.btn-rotate:hover {
+  background: #e5e7eb;
+}
+
+.club-image-crop-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.club-image-crop-controls label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.club-image-crop-controls input[type='range'] {
+  width: 100%;
+}
+
+.club-image-crop-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 .length-breakdown-field input {
   width: 100%;
   padding: 8px 10px;

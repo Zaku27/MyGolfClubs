@@ -37,6 +37,16 @@ const normalizeBounceAngle = (
 
 const createTimestamp = (): string => new Date().toISOString();
 
+const normalizeImageData = (value: unknown): string[] | undefined => {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return [value];
+  }
+  return undefined;
+};
+
 const normalizeClubRecord = (club: GolfClub): GolfClub => ({
   ...club,
   number: club.number ?? CLUB_VALUE_DEFAULTS.number,
@@ -50,6 +60,7 @@ const normalizeClubRecord = (club: GolfClub): GolfClub => ({
   length: club.length ?? CLUB_VALUE_DEFAULTS.length,
   weight: club.weight ?? CLUB_VALUE_DEFAULTS.weight,
   notes: club.notes ?? CLUB_VALUE_DEFAULTS.notes,
+  imageData: normalizeImageData(club.imageData),
   bounceAngle: normalizeBounceAngle(club.clubType, club.bounceAngle),
 });
 
@@ -67,6 +78,19 @@ const createUpdatedClubRecord = (club: Partial<GolfClub>): Partial<GolfClub> => 
   ...club,
   updatedAt: createTimestamp(),
 });
+
+const propagateImageToSameNameClubs = async (
+  name: string,
+  imageData: string[],
+  excludeId?: number,
+): Promise<void> => {
+  const query = db.clubs.where('name').equals(name);
+  if (typeof excludeId === 'number') {
+    await query.and((club) => club.id !== excludeId).modify({ imageData, updatedAt: createTimestamp() });
+  } else {
+    await query.modify({ imageData, updatedAt: createTimestamp() });
+  }
+};
 
 const normalizeBagName = (name: string): string => {
   const trimmed = name.trim();
@@ -118,12 +142,16 @@ export class ClubService {
     return club ? normalizeClubRecord(club) : undefined;
   }
 
-  static async createClub(club: Omit<GolfClub, 'id'>): Promise<number> {
+  static async createClub(club: Omit<GolfClub, 'id'>, propagateSameName = true): Promise<number> {
     const newClub = createClubRecord(club);
-    return await db.clubs.add(newClub);
+    const id = await db.clubs.add(newClub);
+    if (propagateSameName && newClub.imageData && newClub.name) {
+      await propagateImageToSameNameClubs(newClub.name, newClub.imageData, id);
+    }
+    return id;
   }
 
-  static async updateClub(id: number, club: Partial<GolfClub>): Promise<number> {
+  static async updateClub(id: number, club: Partial<GolfClub>, propagateSameName = true): Promise<number> {
     const currentClub = await db.clubs.get(id);
     const effectiveClubType = club.clubType ?? currentClub?.clubType;
     const effectiveBounceAngle = club.bounceAngle ?? currentClub?.bounceAngle;
@@ -133,7 +161,14 @@ export class ClubService {
         ? { bounceAngle: normalizeBounceAngle(effectiveClubType, effectiveBounceAngle) }
         : {}),
     });
-    return await db.clubs.update(id, updatedClub);
+    const result = await db.clubs.update(id, updatedClub);
+    if (propagateSameName && club.imageData != null) {
+      const name = club.name ?? currentClub?.name;
+      if (name) {
+        await propagateImageToSameNameClubs(name, club.imageData, id);
+      }
+    }
+    return result;
   }
 
   static async deleteClub(id: number): Promise<void> {
