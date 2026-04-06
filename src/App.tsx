@@ -5,7 +5,7 @@ import {
   normalizeLieStandardKey,
   type UserLieAngleStandards,
 } from './types/lieStandards';
-import { getAnalysisClubKey } from './utils/clubUtils';
+import { getAnalysisClubKey, getClubTypeDisplay } from './utils/clubUtils';
 import {
   downloadAllClubsAsJson,
   downloadBagClubsAsJson,
@@ -22,6 +22,8 @@ import { ClubForm } from './components/ClubForm';
 import { AnalysisScreen } from './components/AnalysisScreen';
 import { GolfBagPanel } from './components/GolfBagPanel';
 import { SimulatorApp } from './components/simulator/SimulatorApp';
+import { ConfirmationDialog } from './components/ConfirmationDialog';
+import { BagNameDialog } from './components/BagNameDialog';
 import {
   selectActiveGolfBag,
   selectSortedActiveBagClubs,
@@ -68,6 +70,14 @@ const parseClubListScope = (value: unknown): 'bag' | 'all' => {
 
 type ClubTypeFilter = 'All' | GolfClub['clubType'];
 
+type ConfirmDialogState = {
+  title?: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => Promise<void> | void;
+};
+
 function App() {
   const [showForm, setShowForm] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -110,12 +120,35 @@ function App() {
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
   const [showImagePropagationConfirm, setShowImagePropagationConfirm] = useState(false);
   const [pendingClubData, setPendingClubData] = useState<Omit<GolfClub, 'id'> | Partial<GolfClub> | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [showCreateBagDialog, setShowCreateBagDialog] = useState(false);
+  const [showRenameBagDialog, setShowRenameBagDialog] = useState(false);
+  const [renameBagTargetId, setRenameBagTargetId] = useState<number | null>(null);
+  const [renameBagDefaultName, setRenameBagDefaultName] = useState('');
   const [clubListScope, setClubListScope] = useState<'bag' | 'all'>(() => {
     return readStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, 'bag', parseClubListScope);
   });
   const [clubNameSearchText, setClubNameSearchText] = useState('');
   const [clubTypeFilter, setClubTypeFilter] = useState<ClubTypeFilter>('All');
   const sortedClubs = useClubStore(selectSortedClubsForDisplay);
+
+  const openConfirmDialog = (dialogState: ConfirmDialogState) => {
+    setConfirmDialog(dialogState);
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog(null);
+  };
+
+  const handleConfirmDialogConfirm = async () => {
+    if (!confirmDialog) {
+      return;
+    }
+
+    const action = confirmDialog.onConfirm;
+    closeConfirmDialog();
+    await action();
+  };
   const activeBagClubs = useClubStore(selectSortedActiveBagClubs);
   const activeBag = useClubStore(selectActiveGolfBag);
   const bags = useClubStore((state) => state.bags);
@@ -149,13 +182,18 @@ function App() {
     setActiveBag,
   });
 
-  const handleClearAllClubs = async () => {
-    const confirmed = confirm('全てのクラブデータを完全に削除します。よろしいですか？');
-    if (!confirmed) return;
-
-    await clearAllClubs();
-    setShowForm(false);
-    setEditingClub(undefined);
+  const handleClearAllClubs = () => {
+    openConfirmDialog({
+      title: 'クラブデータの削除',
+      message: '全てのクラブデータを完全に削除します。よろしいですか？',
+      confirmLabel: '削除する',
+      cancelLabel: 'キャンセル',
+      onConfirm: async () => {
+        await clearAllClubs();
+        setShowForm(false);
+        setEditingClub(undefined);
+      },
+    });
   };
 
   const handleImportJSON = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -337,13 +375,12 @@ function App() {
   };
 
   const handleCreateBag = async () => {
-    const suggestedName = `バッグ ${bags.length + 1}`;
-    const bagName = window.prompt('新しいゴルフバッグ名を入力してください', suggestedName);
-    if (bagName == null) {
-      return;
-    }
+    setShowCreateBagDialog(true);
+  };
 
+  const handleCreateBagConfirm = async (bagName: string) => {
     await createBag(bagName);
+    setShowCreateBagDialog(false);
     setClubListScope('bag');
   };
 
@@ -352,12 +389,20 @@ function App() {
       return;
     }
 
-    const nextName = window.prompt('バッグ名を入力してください', activeBag.name);
-    if (nextName == null) {
+    setRenameBagTargetId(activeBag.id);
+    setRenameBagDefaultName(activeBag.name);
+    setShowRenameBagDialog(true);
+  };
+
+  const handleRenameBagConfirm = async (bagName: string) => {
+    if (!renameBagTargetId) {
       return;
     }
 
-    await renameBag(activeBag.id, nextName);
+    await renameBag(renameBagTargetId, bagName);
+    setShowRenameBagDialog(false);
+    setRenameBagTargetId(null);
+    setRenameBagDefaultName('');
   };
 
   const handleDeleteActiveBag = async () => {
@@ -365,12 +410,15 @@ function App() {
       return;
     }
 
-    const confirmed = window.confirm(`「${activeBag.name}」を削除します。よろしいですか？`);
-    if (!confirmed) {
-      return;
-    }
-
-    await deleteBag(activeBag.id);
+    openConfirmDialog({
+      title: 'バッグの削除',
+      message: `「${activeBag.name}」を削除します。よろしいですか？`,
+      confirmLabel: '削除する',
+      cancelLabel: 'キャンセル',
+      onConfirm: async () => {
+        await deleteBag(activeBag.id);
+      },
+    });
   };
 
   const handleToggleActiveBagMembership = async (club: GolfClub) => {
@@ -398,22 +446,38 @@ function App() {
   };
 
   const handleDeleteClub = async (id: number) => {
-    if (confirm('このクラブを削除してもよろしいですか?')) {
-      await deleteClub(id);
-    }
+    const targetClub = sortedClubs.find((club) => club.id === id);
+    const deleteMessage = targetClub?.name
+      ? `${getClubTypeDisplay(targetClub.clubType, targetClub.number)}「${targetClub.name}」を削除してもよろしいですか?`
+      : 'このクラブを削除してもよろしいですか?';
+
+    openConfirmDialog({
+      title: 'クラブの削除',
+      message: deleteMessage,
+      confirmLabel: '削除する',
+      cancelLabel: 'キャンセル',
+      onConfirm: async () => {
+        await deleteClub(id);
+      },
+    });
   };
 
   const handleActualDistanceChange = async (id: number, distance: number) => {
     await updateClub(id, { distance });
   };
 
-  const handleResetClubs = async () => {
-    const confirmed = confirm('全てのクラブが削除され、初期14本に戻ります。よろしいですか？');
-    if (!confirmed) return;
-
-    setShowForm(false);
-    setEditingClub(undefined);
-    await resetToDefaults();
+  const handleResetClubs = () => {
+    openConfirmDialog({
+      title: 'クラブの初期化',
+      message: '全てのクラブが削除され、初期14本に戻ります。よろしいですか？',
+      confirmLabel: '戻す',
+      cancelLabel: 'キャンセル',
+      onConfirm: async () => {
+        setShowForm(false);
+        setEditingClub(undefined);
+        await resetToDefaults();
+      },
+    });
   };
 
   const isSameImageData = (a?: string[], b?: string[]) => {
@@ -539,6 +603,44 @@ function App() {
           </div>
         </div>
       )}
+
+      <ConfirmationDialog
+        open={confirmDialog !== null}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message ?? ''}
+        confirmLabel={confirmDialog?.confirmLabel}
+        cancelLabel={confirmDialog?.cancelLabel}
+        onCancel={closeConfirmDialog}
+        onConfirm={handleConfirmDialogConfirm}
+      />
+
+      <BagNameDialog
+        open={showCreateBagDialog}
+        title="新しいバッグを追加"
+        message="新しいゴルフバッグ名を入力してください。"
+        defaultValue={`バッグ ${bags.length + 1}`}
+        confirmLabel="追加する"
+        cancelLabel="キャンセル"
+        isSubmitting={loading}
+        onCancel={() => setShowCreateBagDialog(false)}
+        onConfirm={handleCreateBagConfirm}
+      />
+
+      <BagNameDialog
+        open={showRenameBagDialog}
+        title="バッグ名を変更"
+        message="新しいバッグ名を入力してください。"
+        defaultValue={renameBagDefaultName}
+        confirmLabel="保存する"
+        cancelLabel="キャンセル"
+        isSubmitting={loading}
+        onCancel={() => {
+          setShowRenameBagDialog(false);
+          setRenameBagTargetId(null);
+          setRenameBagDefaultName('');
+        }}
+        onConfirm={handleRenameBagConfirm}
+      />
 
       {showForm ? (
         <ClubForm

@@ -177,6 +177,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         number: nextNumber,
         bounceAngle: clubType === 'Wedge' ? prev.bounceAngle : undefined,
         swingWeight: clubType === 'Putter' ? '' : prev.swingWeight,
+        distance: clubType === 'Putter' ? 0 : prev.distance,
       }));
     } else {
       const defaults = buildClubDefaults(clubType);
@@ -188,6 +189,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         lieAdjustment: 0,
         name: prev.name,
         swingWeight: clubType === 'Putter' ? '' : defaults.swingWeight,
+        distance: clubType === 'Putter' ? 0 : defaults.distance,
         imageData: prev.imageData,
       }));
     }
@@ -792,6 +794,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         bounceAngle: selectedClubType === 'Wedge' ? formData.bounceAngle : undefined,
         swingWeight: selectedClubType === 'Putter' ? '' : formData.swingWeight.trim(),
         torque: selectedClubType === 'Putter' ? 0 : formData.torque,
+        distance: selectedClubType === 'Putter' ? 0 : formData.distance,
       });
     }
   };
@@ -1289,17 +1292,19 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         <h3 className="form-section-title">追加情報</h3>
         <p className="form-section-description">飛距離やノートなど、プレー時の記録をまとめます。</p>
 
-        <div className="form-group">
-          <label htmlFor="distance">飛距離</label>
-          <input
-            type="number"
-            id="distance"
-            name="distance"
-            value={formData.distance || ''}
-            onChange={handleChange}
-            min="0"
-          />
-        </div>
+        {formData.clubType !== 'Putter' && (
+          <div className="form-group">
+            <label htmlFor="distance">飛距離</label>
+            <input
+              type="number"
+              id="distance"
+              name="distance"
+              value={formData.distance || ''}
+              onChange={handleChange}
+              min="0"
+            />
+          </div>
+        )}
 
         {/* Notes */}
         <div className="form-group">

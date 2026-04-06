@@ -13,6 +13,7 @@ import {
 } from "../../utils/clubSuccessDisplay";
 import type { LandingResult } from "../../utils/landingPosition";
 import { HoleMapCanvas } from "./HoleMapCanvas";
+import { ConfirmationDialog } from "../ConfirmationDialog";
 import { buildHazardDisplayName } from "../../utils/shotOutcome";
 
 interface Props {
@@ -208,9 +209,14 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
     return stats;
   }, [roundShots]);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+
   const handleQuitGame = () => {
-    const shouldQuit = window.confirm("このラウンドを終了してクラブ管理に戻りますか？");
-    if (!shouldQuit) return;
+    setShowQuitConfirm(true);
+  };
+
+  const handleConfirmQuitGame = () => {
+    setShowQuitConfirm(false);
     onBack();
   };
 
@@ -281,6 +287,15 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         </div>
       </div>
 
+      <ConfirmationDialog
+        open={showQuitConfirm}
+        title="ラウンド終了の確認"
+        message="このラウンドを終了してクラブ管理に戻りますか？"
+        confirmLabel="終了する"
+        cancelLabel="キャンセル"
+        onCancel={() => setShowQuitConfirm(false)}
+        onConfirm={handleConfirmQuitGame}
+      />
       <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 pb-8 pt-20 sm:px-6 sm:pt-24">
         {shotInProgress && (
           <div className="fixed inset-0 z-50 cursor-wait bg-black/0 pointer-events-auto" />

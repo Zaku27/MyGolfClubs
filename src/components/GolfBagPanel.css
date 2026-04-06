@@ -226,9 +226,13 @@
 }
 
 .golf-bag-scope-toggle button.active {
-  background: #ffffff;
-  color: #0f2818;
-  box-shadow: 0 4px 14px rgba(24, 121, 78, 0.12);
+  background: linear-gradient(135deg, #1f8f54, #62c78e);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(31, 143, 84, 0.2);
+}
+
+.golf-bag-scope-toggle button:not(.active) {
+  color: #4d7b62;
 }
 
 .golf-bag-panel-actions {
@@ -259,16 +263,16 @@
 }
 
 .golf-bag-panel-actions button.primary {
-  background: linear-gradient(135deg, #18794e, #1f9660);
+  background: linear-gradient(135deg, #f18d3a, #ffb766);
   color: #ffffff;
-  border-color: #18794e;
-  box-shadow: 0 4px 12px rgba(24, 121, 78, 0.12);
+  border-color: #f18d3a;
+  box-shadow: 0 4px 12px rgba(241, 141, 58, 0.18);
 }
 
 .golf-bag-panel-actions button.primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #106a42, #168456);
-  border-color: #106a42;
-  box-shadow: 0 6px 16px rgba(24, 121, 78, 0.16);
+  background: linear-gradient(135deg, #d77626, #ffab44);
+  border-color: #d77626;
+  box-shadow: 0 6px 16px rgba(241, 141, 58, 0.2);
 }
 
 .golf-bag-panel-actions button.danger {

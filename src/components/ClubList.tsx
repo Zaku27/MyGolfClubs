@@ -104,13 +104,13 @@ export const ClubList: React.FC<ClubListProps> = ({
   const activeBagClubIdSet = new Set(activeBagClubIds);
   const isFilteredResult = hasFilter && filteredClubs.length !== clubs.length;
   const clubCountLabel = isBagView && activeBagName
-    ? `${activeBagName} ${activeBagClubCount}/${activeBagLimit}`
+    ? `${activeBagName} ${activeBagClubCount} 本`
     : isFilteredResult
       ? `${filteredClubs.length}/${clubs.length} clubs`
-      : `${clubs.length} clubs`;
+      : undefined;
 
-  const totalRegisteredClubsLabel = isBagView
-    ? `クラブ総数 ${allClubsCount} 本`
+  const totalRegisteredClubsLabel = typeof allClubsCount === 'number'
+    ? `総クラブ数 ${allClubsCount} 本`
     : undefined;
 
   return (
@@ -121,7 +121,12 @@ export const ClubList: React.FC<ClubListProps> = ({
           <span className="title-sub">- マイクラブを簡単管理＆上達サポート -</span>
         </h1>
         <div className="club-list-header-meta">
-          <div className="club-count">{clubCountLabel}</div>
+          {clubCountLabel && (
+            <div className="club-count">{clubCountLabel}</div>
+          )}
+          {totalRegisteredClubsLabel && (
+            <div className="club-total-count">{totalRegisteredClubsLabel}</div>
+          )}
         </div>
       </div>
 
@@ -154,9 +159,6 @@ export const ClubList: React.FC<ClubListProps> = ({
         )}
         <div className="club-list-actions-spacer" />
         <div className="club-search-inline" aria-label="クラブ検索">
-          {totalRegisteredClubsLabel && (
-            <div className="club-total-count club-total-count-inline">{totalRegisteredClubsLabel}</div>
-          )}
           <select
             id="club-type-filter"
             aria-label="クラブ種別で絞り込み"

@@ -1,43 +1,57 @@
 .club-form {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 22px;
-  max-width: 760px;
+  border-radius: 16px;
+  padding: 16px;
+  max-width: 720px;
   margin: 0 auto;
   box-shadow: var(--shadow-md);
 }
 
 .club-form h2 {
-  margin: 0 0 20px 0;
-  font-size: 28px;
+  margin: 0 0 16px 0;
+  font-size: 24px;
   letter-spacing: -0.02em;
   color: var(--text);
   text-align: left;
 }
 
 .form-group {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   font-weight: 600;
   color: #344b3e;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .form-group input,
-.form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 10px 12px;
+  max-width: 360px;
+  padding: 8px 10px;
   border: 1px solid #d4e0d7;
   background: #fbfdfb;
-  border-radius: 12px;
+  border-radius: 10px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--text);
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-group textarea {
+  width: 100%;
+  max-width: 520px;
+  padding: 8px 10px;
+  border: 1px solid #d4e0d7;
+  background: #fbfdfb;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
   color: var(--text);
   transition: all 0.2s ease;
   box-sizing: border-box;
@@ -47,26 +61,26 @@
 .form-section {
   background: #fafbfc;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 18px;
 }
 
 .form-section-title {
-  margin: 0 0 16px 0;
-  font-size: 14px;
+  margin: 0 0 12px 0;
+  font-size: 13px;
   font-weight: 700;
   color: #1a202c;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 2px solid #cbd5e0;
-  padding-bottom: 8px;
+  padding-bottom: 6px;
 }
 
 .form-section-description {
-  margin: -6px 0 16px;
-  font-size: 13px;
-  line-height: 1.5;
+  margin: -4px 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
   color: #556b59;
 }
 
@@ -201,11 +215,15 @@
   justify-content: center;
   padding: 10px 16px;
   border-radius: 12px;
-  background: var(--primary);
+  background: linear-gradient(135deg, #1fa6a5, #4dd6d8);
   color: white;
   border: none;
   cursor: pointer;
   font-weight: 600;
+}
+
+.club-image-upload-button:hover:not(:disabled) {
+  filter: brightness(0.95);
 }
 
 .club-image-upload-button input {
@@ -417,11 +435,11 @@
 
 .length-breakdown-field input {
   width: 100%;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid #d4e0d7;
   background: #fbfdfb;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text);
   box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -435,10 +453,10 @@
 }
 
 .length-op {
-  font-size: 18px;
+  font-size: 16px;
   color: #718096;
   font-weight: 700;
-  padding-bottom: 8px;
+  padding-bottom: 6px;
   flex-shrink: 0;
 }
 
@@ -453,21 +471,21 @@
   font-size: 11px;
   color: #556b59;
   font-weight: 600;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .length-total-value {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 10px;
+  padding: 6px 8px;
   background: #edf2f7;
   border: 1px solid #cbd5e0;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #1a202c;
-  min-height: 36px;
+  min-height: 32px;
 }
 
 .length-breakdown-note {
@@ -521,11 +539,11 @@
 
 .lie-breakdown-field input {
   width: 100%;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid #d4e0d7;
   background: #fbfdfb;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text);
   box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -539,10 +557,10 @@
 }
 
 .lie-op {
-  font-size: 18px;
+  font-size: 16px;
   color: #718096;
   font-weight: 700;
-  padding-bottom: 8px;
+  padding-bottom: 6px;
   flex-shrink: 0;
 }
 
@@ -557,21 +575,21 @@
   font-size: 11px;
   color: #556b59;
   font-weight: 600;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .lie-total-value {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 10px;
+  padding: 6px 8px;
   background: #edf2f7;
   border: 1px solid #cbd5e0;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #1a202c;
-  min-height: 36px;
+  min-height: 32px;
 }
 
 .lie-breakdown-note {
@@ -782,18 +800,19 @@
 .form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .form-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 10px;
+  margin-top: 16px;
   justify-content: flex-end;
 }
 
 .form-actions button {
-  min-width: 132px;
+  min-width: 120px;
+  padding: 8px 14px;
 }
 
 .club-type-hint {

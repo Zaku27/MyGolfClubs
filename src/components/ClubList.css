@@ -54,9 +54,9 @@
 
 .club-list-header-meta {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .club-total-count {
@@ -80,16 +80,16 @@
 }
 
 .btn-add-club {
-  background: linear-gradient(135deg, #18794e, #1f9660) !important;
+  background: linear-gradient(135deg, #1fa6a5, #4dd6d8) !important;
   color: #ffffff;
-  border-color: #18794e !important;
-  box-shadow: 0 4px 12px rgba(24, 121, 78, 0.12) !important;
+  border-color: #1fa6a5 !important;
+  box-shadow: 0 4px 12px rgba(31, 166, 165, 0.18) !important;
 }
 
 .btn-add-club:hover:not(:disabled) {
-  background: linear-gradient(135deg, #106a42, #168456) !important;
+  background: linear-gradient(135deg, #14a09f, #3fc9cf) !important;
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(24, 121, 78, 0.16) !important;
+  box-shadow: 0 6px 16px rgba(31, 166, 165, 0.2) !important;
 }
 
 .club-list-actions .btn-icon,
