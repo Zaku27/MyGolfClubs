@@ -13,6 +13,7 @@ type GolfBagPanelProps = {
   onCreateBag?: () => void;
   onRenameActiveBag?: () => void;
   onDeleteActiveBag?: () => void;
+  onShiftSelectedBagLeft?: () => void;
   listScope?: ListScope;
   onChangeListScope?: (scope: ListScope) => void;
   showManagement?: boolean;
@@ -31,6 +32,7 @@ export const GolfBagPanel = ({
   onCreateBag,
   onRenameActiveBag,
   onDeleteActiveBag,
+  onShiftSelectedBagLeft,
   listScope,
   onChangeListScope,
   showManagement = true,
@@ -117,6 +119,16 @@ export const GolfBagPanel = ({
           {activeBag && onRenameActiveBag && (
             <button type="button" onClick={onRenameActiveBag}>
               バッグ名を変更
+            </button>
+          )}
+          {activeBag && onShiftSelectedBagLeft && (
+            <button
+              type="button"
+              className="golf-bag-panel-shift-button"
+              onClick={onShiftSelectedBagLeft}
+              disabled={bags.findIndex((bag) => bag.id === activeBag.id) <= 0}
+            >
+              ← 左へ移動
             </button>
           )}
           {activeBag && bags.length > 1 && onDeleteActiveBag && (

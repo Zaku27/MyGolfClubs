@@ -81,6 +81,34 @@
   color: #6a8373;
 }
 
+.golf-bag-panel-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.golf-bag-panel-shift-button {
+  border: 1px solid #c8d8cb;
+  background: #ffffff;
+  color: #355442;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.golf-bag-panel-shift-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.golf-bag-panel-shift-button:hover:not(:disabled) {
+  background: #f3faf3;
+}
+
 .golf-bag-single-name {
   display: inline-flex;
   align-items: center;

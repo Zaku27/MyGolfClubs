@@ -138,6 +138,7 @@ function App() {
     renameBag,
     deleteBag,
     setActiveBag,
+    moveBagLeft,
     toggleClubInActiveBag,
     replaceActiveBagClubIds,
   } = useClubStore();
@@ -581,6 +582,11 @@ function App() {
             onCreateBag={() => void handleCreateBag()}
             onRenameActiveBag={() => void handleRenameActiveBag()}
             onDeleteActiveBag={() => void handleDeleteActiveBag()}
+            onShiftSelectedBagLeft={() => {
+              if (activeBag?.id != null) {
+                void moveBagLeft(activeBag.id);
+              }
+            }}
             listScope={clubListScope}
             onChangeListScope={setClubListScope}
           />

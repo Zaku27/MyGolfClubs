@@ -26,6 +26,8 @@ type ClubStoreActions = {
   renameBag: (id: number, name: string) => Promise<void>;
   deleteBag: (id: number) => Promise<void>;
   setActiveBag: (id: number) => Promise<void>;
+  moveBagLeft: (id: number) => Promise<void>;
+  moveBagRight: (id: number) => Promise<void>;
   toggleClubInActiveBag: (clubId: number) => Promise<void>;
   replaceActiveBagClubIds: (clubIds: number[]) => Promise<void>;
   loadPersonalData: () => Promise<void>;
@@ -275,6 +277,26 @@ export const useClubStore = create<ClubStore>((set) => ({
     try {
       await ClubService.setActiveBagId(id);
       set({ activeBagId: id, error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  moveBagLeft: async (id) => {
+    set({ error: null });
+    try {
+      await ClubService.moveBagPosition(id, 'left');
+      set({ bags: await ClubService.getAllBags(), error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  moveBagRight: async (id) => {
+    set({ error: null });
+    try {
+      await ClubService.moveBagPosition(id, 'right');
+      set({ bags: await ClubService.getAllBags(), error: null });
     } catch (error) {
       setStoreError(set, error);
     }

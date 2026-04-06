@@ -266,6 +266,31 @@ export class ClubService {
     return db.golfBags.update(id, createUpdatedBagRecord(patch));
   }
 
+  static async moveBagPosition(id: number, direction: 'left' | 'right'): Promise<void> {
+    const bags = await db.golfBags.toArray();
+    const sorted = bags.slice().sort((left, right) => (left.createdAt ?? '').localeCompare(right.createdAt ?? ''));
+    const currentIndex = sorted.findIndex((bag) => bag.id === id);
+    if (currentIndex < 0) {
+      throw new Error('対象のゴルフバッグが見つかりません');
+    }
+
+    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) {
+      return;
+    }
+
+    const currentBag = sorted[currentIndex];
+    const targetBag = sorted[targetIndex];
+    const currentCreatedAt = currentBag.createdAt;
+    const targetCreatedAt = targetBag.createdAt;
+    const updatedAt = createTimestamp();
+
+    await Promise.all([
+      db.golfBags.update(currentBag.id!, { createdAt: targetCreatedAt, updatedAt }),
+      db.golfBags.update(targetBag.id!, { createdAt: currentCreatedAt, updatedAt }),
+    ]);
+  }
+
   static async deleteBag(id: number): Promise<void> {
     const bagCount = await db.golfBags.count();
     if (bagCount <= 1) {
