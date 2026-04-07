@@ -100,7 +100,7 @@ function getLiePenaltyInfo(lie: string, clubType: string): string {
   }
 }
 
-const SHOT_COUNTS = [5, 10, 20];
+const SHOT_COUNTS = [5, 10, 20, 40];
 
 function clampAimXOffset(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -821,15 +821,6 @@ export default function RangeScreen() {
         </div>
       </div>
 
-      <div className="w-full max-w-7xl mb-4">
-        <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 shadow-sm">
-          <span className="text-xs font-semibold uppercase tracking-widest text-green-700">適用スキルレベル</span>
-          <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-900">
-            {(displayedSkillLevel * 100).toFixed(0)}% ({displayedSkillLabel})
-          </span>
-        </div>
-      </div>
-
       <div className="w-full max-w-7xl flex flex-col gap-4 lg:flex-row lg:items-start">
         <main className="w-full lg:flex-1 flex flex-col gap-4">
           <div className="w-full bg-white rounded shadow p-4">
@@ -1079,7 +1070,7 @@ export default function RangeScreen() {
             )}
           </div>
 
-          {seatType === 'personal' && (
+            {seatType === 'personal' && (
             <div className="w-full bg-white rounded shadow p-4">
               <GolfBagPanel
                 bags={bags}
@@ -1094,9 +1085,65 @@ export default function RangeScreen() {
             </div>
           )}
 
+          <div className="w-full bg-white rounded shadow p-4">
+              <label className="block font-semibold mb-2">試行設定</label>
+              <div className="space-y-4">
+                <div className="rounded border border-green-200 bg-green-50 p-3">
+                  <label className="block font-semibold mb-1">試行回数</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {SHOT_COUNTS.map((n) => (
+                      <button
+                        key={n}
+                        className={`px-3 py-1 rounded border ${numShots === n ? 'bg-green-200 border-green-600' : 'bg-white border-green-200'} font-semibold`}
+                        onClick={() => setNumShots(n)}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded border border-green-200 bg-green-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <label htmlFor="reuse-last-seed" className="block font-semibold text-green-900">
+                        再実行時の乱数
+                      </label>
+                      <p className="text-xs text-gray-600">
+                        {reuseLastSeed
+                          ? '前回と同じ乱数で再実行します。条件が同じなら結果も再現されます。'
+                          : '毎回新しい乱数で再実行します。'}
+                      </p>
+                    </div>
+                    <label htmlFor="reuse-last-seed" className="inline-flex cursor-pointer items-center gap-2">
+                      <span className={`text-sm font-medium ${reuseLastSeed ? 'text-green-900' : 'text-gray-500'}`}>
+                        同じ乱数
+                      </span>
+                      <span className="relative inline-flex items-center">
+                        <input
+                          id="reuse-last-seed"
+                          type="checkbox"
+                          className="peer sr-only"
+                          checked={reuseLastSeed}
+                          onChange={(e) => setReuseLastSeed(e.target.checked)}
+                        />
+                        <span className="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-green-600" />
+                        <span className="pointer-events-none absolute left-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+                      </span>
+                      <span className={`text-sm font-medium ${reuseLastSeed ? 'text-gray-500' : 'text-green-900'}`}>
+                        新しい乱数
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           <div className="w-full bg-white rounded shadow p-4 flex flex-col gap-3">
             <div>
-              <label className="block font-semibold mb-1">ライ</label>
+              <label className="block text-lg font-semibold mb-2">コースコンディション</label>
+            </div>
+            <div className="rounded border border-green-200 bg-green-50 p-3">
+              <label className="block font-semibold mb-1 text-green-900">ライ</label>
               <select
                 className="w-full border rounded p-2"
                 value={lie}
@@ -1106,11 +1153,11 @@ export default function RangeScreen() {
                   <option key={l} value={l}>{l}</option>
                 ))}
               </select>
-              <p className="text-xs text-gray-600">
+              <p className="mt-2 text-xs text-green-900">
                 ライペナルティ: {getLiePenaltyInfo(lie, simClub?.type ?? 'Iron')}
               </p>
             </div>
-            <div>
+            <div className="rounded border border-green-200 bg-green-50 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <label className="font-semibold">風向・風速</label>
                 <div className="flex items-center gap-2">
@@ -1217,53 +1264,6 @@ export default function RangeScreen() {
               <p className="mt-3 text-xs leading-relaxed text-emerald-800">
                 {formatSlopeEffectGuide(slopeAngle, slopeDirection)}
               </p>
-            </div>
-            <div>
-              <label className="block font-semibold mb-1">試行回数</label>
-              <div className="flex gap-2">
-                {SHOT_COUNTS.map((n) => (
-                  <button
-                    key={n}
-                    className={`px-3 py-1 rounded border ${numShots === n ? 'bg-green-200 border-green-600' : 'bg-white border-green-200'} font-semibold`}
-                    onClick={() => setNumShots(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="rounded border border-green-200 bg-green-50 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <label htmlFor="reuse-last-seed" className="block font-semibold text-green-900">
-                    再実行時の乱数
-                  </label>
-                  <p className="text-xs text-gray-600">
-                    {reuseLastSeed
-                      ? '前回と同じ乱数で再実行します。条件が同じなら結果も再現されます。'
-                      : '毎回新しい乱数で再実行します。'}
-                  </p>
-                </div>
-                <label htmlFor="reuse-last-seed" className="inline-flex cursor-pointer items-center gap-2">
-                  <span className={`text-sm font-medium ${reuseLastSeed ? 'text-green-900' : 'text-gray-500'}`}>
-                    同じ乱数
-                  </span>
-                  <span className="relative inline-flex items-center">
-                    <input
-                      id="reuse-last-seed"
-                      type="checkbox"
-                      className="peer sr-only"
-                      checked={reuseLastSeed}
-                      onChange={(e) => setReuseLastSeed(e.target.checked)}
-                    />
-                    <span className="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-green-600" />
-                    <span className="pointer-events-none absolute left-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
-                  </span>
-                  <span className={`text-sm font-medium ${reuseLastSeed ? 'text-gray-500' : 'text-green-900'}`}>
-                    新しい乱数
-                  </span>
-                </label>
-              </div>
             </div>
           </div>
         </aside>
