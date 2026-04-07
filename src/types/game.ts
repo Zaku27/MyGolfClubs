@@ -68,6 +68,9 @@ export interface ShotContext {
   windDirectionDegrees?: number; // 0=北へ吹く, 時計回り
   greenRadius?: number; // ヤード。ピン中心の捕捉半径
   hazards?: Hazard[];
+  groundHardness?: number; // 0-100 地面硬さ
+  groundSlopeAngle?: number; // degree
+  groundSlopeDirection?: number; // 0-359
 }
 
 // ─── Shot result ──────────────────────────────────────────────────────────────

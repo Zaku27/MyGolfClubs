@@ -1,5 +1,6 @@
 import type {
   Hazard,
+  GroundCondition,
   SimClub,
   ShotContext,
   ShotResult,
@@ -10,7 +11,7 @@ import type { ClubPersonalData } from "../types/golf";
 import { calculateBaseClubSuccessRate } from "./calculateSuccessRate";
 import { ClubService } from "../db/clubService";
 import { estimateTheoreticalDistance } from "./distanceEstimation";
-import { calculateLandingOutcome } from "./landingPosition";
+import { calculateLandingOutcome, applyGroundCondition } from "./landingPosition";
 import {
   assessLanding,
   buildDetailedShotMessage,
@@ -718,7 +719,8 @@ export function simulateShot(
         context.originY,
         context.targetDistance,
       ),
-      groundHardness: mapGroundHardnessByLie(lie),
+      // 初期着地は medium 相当で計算し、硬さ差分は後段 applyGroundCondition で反映する。
+      groundHardness: 75,
       headSpeed: options.headSpeed,
       seed: landingSeed,
       baseDistanceOverride: options.useStoredDistance && club.avgDistance > 0 ? club.avgDistance : undefined,
@@ -727,6 +729,37 @@ export function simulateShot(
 
   const shotQuality = landingOutcome.shotQuality;
   const rawLanding = landingOutcome.landing;
+  const groundHardnessValue = context.groundHardness ?? mapGroundHardnessByLie(lie);
+  const groundCondition: GroundCondition = {
+    hardness: groundHardnessValue >= 85 ? "firm" : groundHardnessValue <= 65 ? "soft" : "medium",
+    slopeAngle: context.groundSlopeAngle ?? 0,
+    slopeDirection: context.groundSlopeDirection ?? 0,
+  };
+  const adjustedLanding = applyGroundCondition(
+    rawLanding,
+    groundCondition,
+    {
+      clubType: club.type,
+      name: club.name,
+      number: club.number,
+      length: 0,
+      weight: 0,
+      swingWeight: "D0",
+      lieAngle: 0,
+      loftAngle: club.loftAngle ?? 30,
+      shaftType: "",
+      torque: 0,
+      flex: "S",
+      distance: club.avgDistance,
+      notes: "",
+    },
+    {
+      dispersion: 1 - effectiveSkill,
+      mishitRate: 1 - effectiveSkill,
+      sideSpinDispersion: 1 - effectiveSkill,
+      hazardRecoveryFactor: getHazardRecoveryFactor(effectiveSkill),
+    },
+  );
 
   // 360度風向がある場合は横風成分を着弾Xへ加算する。
   // 係数は現行モデルと同様に簡易線形として、調整しやすい形で定義する。
@@ -758,23 +791,23 @@ export function simulateShot(
   const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
   const distanceConditionMultiplier = lieDistanceMultiplier * weakDistanceMultiplier;
 
-  const scaledCarry = Math.max(0.1, rawLanding.carry * powerMultiplier * distanceConditionMultiplier);
-  const scaledRoll = Math.max(0, rawLanding.roll * powerMultiplier * distanceConditionMultiplier);
+  const scaledCarry = Math.max(0.1, adjustedLanding.carry * powerMultiplier * distanceConditionMultiplier);
+  const scaledRoll = Math.max(0, adjustedLanding.roll * powerMultiplier * distanceConditionMultiplier);
   const scaledTotalDistance = Math.max(0.1, scaledCarry + scaledRoll);
-  const scaledFinalX = rawLanding.finalX * powerMultiplier + lateralWindYards;
+  const scaledFinalX = adjustedLanding.finalX * powerMultiplier + lateralWindYards;
   const scaledFinalY = scaledTotalDistance;
-  const scaledLateralDeviation = rawLanding.lateralDeviation * powerMultiplier + lateralWindYards;
+  const scaledLateralDeviation = adjustedLanding.lateralDeviation * powerMultiplier + lateralWindYards;
   const landing = {
-    ...rawLanding,
+    ...adjustedLanding,
     carry: Math.round(scaledCarry * 10) / 10,
     roll: Math.round(scaledRoll * 10) / 10,
     totalDistance: Math.round(scaledTotalDistance * 10) / 10,
     lateralDeviation: Math.round(scaledLateralDeviation * 10) / 10,
     finalX: Math.round(scaledFinalX * 10) / 10,
     finalY: Math.round(scaledFinalY * 10) / 10,
-    trajectoryPoints: rawLanding.trajectoryPoints?.map((point) => ({
+    trajectoryPoints: adjustedLanding.trajectoryPoints?.map((point) => ({
       // 横風ドリフトは飛行進行に応じて徐々に効くよう、Y進捗比で配分する。
-      x: Math.round((point.x * powerMultiplier + lateralWindYards * (Math.max(0, point.y) / Math.max(1, rawLanding.finalY))) * 10) / 10,
+      x: Math.round((point.x * powerMultiplier + lateralWindYards * (Math.max(0, point.y) / Math.max(1, adjustedLanding.finalY))) * 10) / 10,
       y: Math.round(point.y * powerMultiplier * distanceConditionMultiplier * 10) / 10,
       z: Math.round((point.z ?? 0) * powerMultiplier * 10) / 10,
     })),

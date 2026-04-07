@@ -109,10 +109,15 @@ const DEFAULT_SWING_TARGET = 2.0;
 const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
 const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
 
+type GroundHardness = "soft" | "medium" | "firm";
+
 type RangeConditionSettings = {
   lie: string;
   windDirection: number;
   windSpeed: number;
+  groundHardness: GroundHardness;
+  slopeAngle: number;
+  slopeDirection: number;
 };
 
 type AnalysisPenalty = {
@@ -126,6 +131,9 @@ function loadRangeConditionSettings(): RangeConditionSettings {
       lie: 'ティー',
       windDirection: 180,
       windSpeed: 0,
+      groundHardness: 'medium',
+      slopeAngle: 0,
+      slopeDirection: 0,
     };
   }
 
@@ -136,22 +144,36 @@ function loadRangeConditionSettings(): RangeConditionSettings {
         lie: 'ティー',
         windDirection: 180,
         windSpeed: 0,
+        groundHardness: 'medium',
+        slopeAngle: 0,
+        slopeDirection: 0,
       };
     }
 
     const parsed = JSON.parse(raw) as Partial<RangeConditionSettings>;
     const safeLie = LIE_OPTIONS.includes(String(parsed.lie)) ? String(parsed.lie) : 'ティー';
 
+    const safeGroundHardness = parsed.groundHardness === 'soft' || parsed.groundHardness === 'firm' || parsed.groundHardness === 'medium'
+      ? parsed.groundHardness
+      : 'medium';
+    const slopeDirection = Number(parsed.slopeDirection);
+
     return {
       lie: safeLie,
       windDirection: normalizeWindDirection(Number(parsed.windDirection)),
       windSpeed: normalizeWindSpeedMps(Number(parsed.windSpeed)),
+      groundHardness: safeGroundHardness,
+      slopeAngle: Number(parsed.slopeAngle) || 0,
+      slopeDirection: Number.isFinite(slopeDirection) ? normalizeWindDirection(slopeDirection) : 0,
     };
   } catch {
     return {
       lie: 'ティー',
       windDirection: 180,
       windSpeed: 0,
+      groundHardness: 'medium',
+      slopeAngle: 0,
+      slopeDirection: 0,
     };
   }
 }
@@ -164,6 +186,9 @@ function saveRangeConditionSettings(settings: RangeConditionSettings) {
       lie: settings.lie,
       windDirection: normalizeWindDirection(settings.windDirection),
       windSpeed: normalizeWindSpeedMps(settings.windSpeed),
+      groundHardness: settings.groundHardness,
+      slopeAngle: settings.slopeAngle,
+      slopeDirection: normalizeWindDirection(settings.slopeDirection),
     }),
   );
 }
@@ -196,7 +221,44 @@ type RangeSummary = {
   estimatedDist: number;
   diff: number;
   avgToTargetDistance: number;
+  meanRoll: number;
+  meanLateral: number;
+  groundRollContribution: string;
+  groundLateralContribution: string;
+  appliedGroundHardness: GroundHardness;
 };
+
+function formatGroundHardnessImpact(groundHardness: GroundHardness, roll: number | undefined): string {
+  if (roll == null || !Number.isFinite(roll)) return '-';
+
+  const hardnessValue = groundHardness === 'firm' ? 90 : groundHardness === 'soft' ? 60 : 75;
+  const currentFactor = 0.8 + (hardnessValue / 100) * 0.4;
+  const mediumFactor = 0.8 + (75 / 100) * 0.4;
+  const baseline = roll * (mediumFactor / currentFactor);
+  const delta = roll - baseline;
+  const deltaLabel = delta === 0 ? '0.0y' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}y`;
+
+  return `ラン ${deltaLabel}`;
+}
+
+function formatSlopeDirectionLabel(direction: number): string {
+  if (direction === 0) return 'ピン方向 uphill';
+  if (direction === 180) return 'ピン方向 downhill';
+  if (direction === 90) return '右側 uphill';
+  if (direction === 270) return '左側 uphill';
+  if (direction > 0 && direction < 90) return '右前 uphill';
+  if (direction > 90 && direction < 180) return '右後 uphill';
+  if (direction > 180 && direction < 270) return '左後 uphill';
+  return '左前 uphill';
+}
+
+function formatSlopeImpact(slopeAngle: number, slopeDirection: number, finalX: number): string {
+  if (slopeAngle === 0) return '0.0y';
+  const directionLabel = formatSlopeDirectionLabel(slopeDirection);
+  const effectMagnitude = Math.min(10, Math.abs(slopeAngle) * 0.25);
+  const sign = finalX >= 0 ? '+' : '-';
+  return `${sign}${effectMagnitude.toFixed(1)}y (${directionLabel})`;
+}
 
 function mapLieUiToGameLie(lie: string): LieType {
   switch (lie) {
@@ -324,6 +386,9 @@ export default function RangeScreen() {
   const [windDirection, setWindDirection] = useState<number>(initialRangeConditionSettings.windDirection);
   // 風速は UI 仕様どおり m/s で保持する。
   const [windSpeed, setWindSpeed] = useState<number>(initialRangeConditionSettings.windSpeed);
+  const [groundHardness, setGroundHardness] = useState<GroundHardness>(initialRangeConditionSettings.groundHardness);
+  const [slopeAngle, setSlopeAngle] = useState<number>(initialRangeConditionSettings.slopeAngle);
+  const [slopeDirection, setSlopeDirection] = useState<number>(initialRangeConditionSettings.slopeDirection);
   // 風ダイアルは通常閉じ、必要な時だけ開いて調整できるようにする。
   const [isWindControlOpen, setIsWindControlOpen] = useState<boolean>(false);
   const [numShots, setNumShots] = useState<number>(10);
@@ -428,8 +493,11 @@ export default function RangeScreen() {
       lie,
       windDirection,
       windSpeed,
+      groundHardness,
+      slopeAngle,
+      slopeDirection,
     });
-  }, [lie, windDirection, windSpeed]);
+  }, [lie, windDirection, windSpeed, groundHardness, slopeAngle, slopeDirection]);
 
   useEffect(() => {
     if (!showRobotHint) return;
@@ -553,6 +621,9 @@ export default function RangeScreen() {
         originY: 0,
         hazards: [],
         shotPowerPercent: 100,
+        groundHardness: groundHardness === 'soft' ? 60 : groundHardness === 'firm' ? 90 : 75,
+        groundSlopeAngle: slopeAngle,
+        groundSlopeDirection: slopeDirection,
       };
 
       // ロボット打席の場合はクラブ成功率100%、スキル・ヘッドスピードをロボット値で渡す
@@ -596,14 +667,42 @@ export default function RangeScreen() {
       shotResults.push(shotResult);
     }
     setResults(shotResults);
-    // ...existing code...
-    // Summary
+    // 統計情報を集計する
     const distances = shotResults.map((r) => r.landing?.totalDistance ?? r.distanceHit);
     const avg = distances.reduce((a, b) => a + b, 0) / distances.length;
     const std = Math.sqrt(
       distances.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / distances.length
     );
     const success = shotResults.filter((r) => r.wasSuccessful).length / numShots;
+
+    const meanRoll = shotResults.reduce((sum, r) => sum + (r.landing?.roll ?? 0), 0) / Math.max(1, shotResults.length);
+    const meanLateral = shotResults.reduce((sum, r) => sum + Math.abs(r.landing?.lateralDeviation ?? 0), 0) / Math.max(1, shotResults.length);
+    const meanFinalX = shotResults.reduce((sum, r) => sum + (r.landing?.finalX ?? 0), 0) / Math.max(1, shotResults.length);
+
+    const hardnessFactor = groundHardness === 'firm' ? 1.35 : groundHardness === 'soft' ? 0.65 : 1;
+    const rollBaseline = meanRoll / hardnessFactor;
+    const rollContribution = meanRoll - rollBaseline;
+    const rollContributionLabel = groundHardness === 'medium'
+      ? '地面硬さは標準です。'
+      : `${rollContribution >= 0 ? '+' : ''}${rollContribution.toFixed(1)}yd（${groundHardness}の影響）`;
+
+    const slopeDirectionLabel = (() => {
+      if (slopeDirection === 0) return 'ピン方向 uphill';
+      if (slopeDirection === 180) return 'ピン方向 downhill';
+      if (slopeDirection === 90) return '右側 uphill';
+      if (slopeDirection === 270) return '左側 uphill';
+      if (slopeDirection > 0 && slopeDirection < 90) return '右前 uphill';
+      if (slopeDirection > 90 && slopeDirection < 180) return '右後 uphill';
+      if (slopeDirection > 180 && slopeDirection < 270) return '左後 uphill';
+      return '左前 uphill';
+    })();
+
+    const slopeLabel = slopeAngle === 0
+      ? 'フラット'
+      : `${slopeAngle > 0 ? `+${slopeAngle}° uphill` : `${slopeAngle}° downhill`} (${slopeDirectionLabel})`;
+    const slopeEffectLabel = slopeAngle === 0
+      ? 'フラットなので横ブレ影響は標準です。'
+      : `傾斜 ${slopeLabel} のため横ブレ平均は ${meanLateral.toFixed(1)}y、${meanFinalX >= 0 ? '右' : '左'}方向へやや影響しています。`;
 
     // 目安値との差分を計算
     // プレイヤーがpersonalの場合は実測飛距離を目安値とする
@@ -620,7 +719,19 @@ export default function RangeScreen() {
         return sum + Math.sqrt(dx * dx + dy * dy);
       }, 0) / Math.max(1, shotResults.length);
 
-    setSummary({ avg, std, success, estimatedDist, diff, avgToTargetDistance });
+    setSummary({
+      avg,
+      std,
+      success,
+      estimatedDist,
+      diff,
+      avgToTargetDistance,
+      meanRoll,
+      meanLateral,
+      groundRollContribution: rollContributionLabel,
+      groundLateralContribution: slopeEffectLabel,
+      appliedGroundHardness: groundHardness,
+    });
     setCalibrated(false);
     setIsSimulating(false);
   };
@@ -777,7 +888,16 @@ export default function RangeScreen() {
                   clubName={selectedClub?.name ?? 'Club'}
                   skillLevelName={skillLevelName}
                   numShots={numShots}
+                  groundHardness={groundHardness}
+                  slopeAngle={slopeAngle}
                 />
+              </div>
+              <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+                <div className="mb-1 font-semibold">地面条件の影響</div>
+                <div>平均ラン: {summary.meanRoll.toFixed(1)} y</div>
+                <div>平均横ブレ: {summary.meanLateral.toFixed(1)} y</div>
+                <div className="mt-2">{summary.groundRollContribution}</div>
+                <div>{summary.groundLateralContribution}</div>
               </div>
               {summary.estimatedDist && (
                 <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
@@ -797,8 +917,10 @@ export default function RangeScreen() {
                       <th className="px-1 py-0.5">キャリー</th>
                       <th className="px-1 py-0.5">ラン</th>
                       <th className="px-1 py-0.5">横ブレ</th>
-                      <th className="px-1 py-0.5">判定値</th>
-                      <th className="px-1 py-0.5">判定内訳(C/L)</th>
+                      <th className="px-1 py-0.5">地面影響</th>
+                      <th className="px-1 py-0.5">傾斜影響</th>
+                      {/* <th className="px-1 py-0.5">判定値</th>
+                      <th className="px-1 py-0.5">判定内訳(C/L)</th> */}
                       <th className="px-1 py-0.5">着地X</th>
                       <th className="px-1 py-0.5">着地Y</th>
                       <th className="px-1 py-0.5">ショット品質</th>
@@ -812,7 +934,11 @@ export default function RangeScreen() {
                         <td className="px-1 py-0.5 text-center">{r.landing?.carry?.toFixed(1) ?? '-'}</td>
                         <td className="px-1 py-0.5 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
                         <td className="px-1 py-0.5 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
-                        <td className={`px-1 py-0.5 text-center ${r.landing?.qualityMetrics && r.landing.qualityMetrics.score >= r.landing.qualityMetrics.poorThreshold ? 'text-red-600 font-bold' : ''}`}>
+                        <td className="px-1 py-0.5 text-center">{formatGroundHardnessImpact(summary.appliedGroundHardness, r.landing?.roll)}</td>
+                        <td className="px-1 py-0.5 text-center">
+                          {formatSlopeImpact(slopeAngle, slopeDirection, r.landing?.finalX ?? 0)}
+                        </td>
+                        {/* <td className={`px-1 py-0.5 text-center ${r.landing?.qualityMetrics && r.landing.qualityMetrics.score >= r.landing.qualityMetrics.poorThreshold ? 'text-red-600 font-bold' : ''}`}>
                           {r.landing?.qualityMetrics ? `${r.landing.qualityMetrics.score.toFixed(2)} / ${r.landing.qualityMetrics.poorThreshold.toFixed(2)}` : '-'}
                         </td>
                         <td className="px-1 py-0.5 text-center">
@@ -827,7 +953,7 @@ export default function RangeScreen() {
                               </span>
                             </>
                           ) : '-'}
-                        </td>
+                        </td> */}
                         <td className="px-1 py-0.5 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
                         <td className="px-1 py-0.5 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
                         <td className={`px-1 py-0.5 text-center font-bold ${qualityStatusColor(r.shotQuality)}`}>{qualityLabel(r.shotQuality)}</td>
@@ -966,6 +1092,56 @@ export default function RangeScreen() {
                   />
                 </div>
               )}
+            </div>
+            <div className="mt-4 rounded border border-green-200 bg-green-50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <label className="font-semibold">地面条件</label>
+                <span className="text-xs text-gray-600">風設定の下 / 試行回数の上</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                  地面硬さ
+                  <select
+                    value={groundHardness}
+                    onChange={(event) => setGroundHardness(event.target.value as GroundHardness)}
+                    className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                  >
+                    <option value="soft">Soft</option>
+                    <option value="medium">Medium</option>
+                    <option value="firm">Firm</option>
+                  </select>
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                  傾斜角度
+                  <input
+                    type="range"
+                    min={-20}
+                    max={20}
+                    step={1}
+                    value={slopeAngle}
+                    onChange={(event) => setSlopeAngle(Number(event.target.value))}
+                    className="w-full cursor-pointer"
+                  />
+                  <div className="text-right text-[11px] text-emerald-700">
+                    {slopeAngle > 0 ? `上り ${slopeAngle}°` : slopeAngle < 0 ? `下り ${Math.abs(slopeAngle)}°` : 'フラット'}
+                  </div>
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                  傾斜方向
+                  <input
+                    type="range"
+                    min={0}
+                    max={359}
+                    step={1}
+                    value={slopeDirection}
+                    onChange={(event) => setSlopeDirection(normalizeWindDirection(Number(event.target.value)))}
+                    className="w-full cursor-pointer"
+                  />
+                  <div className="text-right text-[11px] text-emerald-700">
+                    {slopeDirection}°
+                  </div>
+                </label>
+              </div>
             </div>
             <div>
               <label className="block font-semibold mb-1">試行回数</label>

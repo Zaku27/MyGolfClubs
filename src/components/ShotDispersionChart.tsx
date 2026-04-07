@@ -20,6 +20,8 @@ import { calculateConfidenceEllipse } from '../utils/confidenceEllipse';
 
 ChartJS.register(LinearScale, PointElement, LineElement, ScatterController, Title, Tooltip, Legend, annotationPlugin);
 
+type GroundHardness = 'soft' | 'medium' | 'firm';
+
 type ShotDispersionChartProps = {
   monteCarloResult: MonteCarloResult;
   target: { x: number; y: number };
@@ -28,6 +30,8 @@ type ShotDispersionChartProps = {
   skillLevelName: string;
   numShots: number;
   showMeanPoint?: boolean;
+  groundHardness?: GroundHardness;
+  slopeAngle?: number;
 };
 
 type DispersionPoint = ScatterDataPoint & {
@@ -84,6 +88,8 @@ export function ShotDispersionChart({
   skillLevelName,
   numShots,
   showMeanPoint = true,
+  groundHardness,
+  slopeAngle,
 }: ShotDispersionChartProps) {
   const [confidenceLevel, setConfidenceLevel] = useState<ConfidenceLevelOption['value']>(DEFAULT_CONFIDENCE_LEVEL);
 
@@ -272,6 +278,17 @@ export function ShotDispersionChart({
     [aim?.x, aim?.y, meanPoint, shotPoints, showMeanPoint, target.x, target.y],
   );
 
+  const groundLegendText = useMemo(() => {
+    if (groundHardness == null || slopeAngle == null) return null;
+    const slopeLabel = slopeAngle === 0
+      ? 'flat'
+      : slopeAngle > 0
+        ? `+${slopeAngle}° uphill`
+        : `${slopeAngle}° downhill`;
+
+    return `地面硬さ：${groundHardness.charAt(0).toUpperCase() + groundHardness.slice(1)} / 傾斜：${slopeLabel}`;
+  }, [groundHardness, slopeAngle]);
+
   const options = useMemo<ChartOptions<'scatter'>>(
     () => ({
       responsive: true,
@@ -391,6 +408,20 @@ export function ShotDispersionChart({
         }}
       >
         <div style={{ fontSize: 13, fontWeight: 600, color: '#255b52' }}>信頼範囲表示</div>
+        {groundLegendText ? (
+          <div
+            style={{
+              padding: '6px 10px',
+              borderRadius: 999,
+              background: 'rgba(59, 130, 246, 0.08)',
+              color: '#1e3a8a',
+              fontSize: 12,
+              border: '1px solid rgba(59, 130, 246, 0.18)',
+            }}
+          >
+            {groundLegendText}
+          </div>
+        ) : null}
         <div
           style={{
             display: 'inline-flex',

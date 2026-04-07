@@ -9,7 +9,7 @@ import {
   determinePenaltyStrokes,
 } from "./shotOutcome";
 
-const DEFAULT_GROUND_HARDNESS = 70;
+const DEFAULT_GROUND_HARDNESS = 75;
 
 function getHoleTargetDistance(hole: Hole): number {
   return hole.targetDistance ?? hole.distanceFromTee;

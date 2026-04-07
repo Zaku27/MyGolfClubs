@@ -191,26 +191,36 @@ export function applyGroundCondition(
   const rng = seedrandom(buildGroundConditionSeed(landingResult, ground, club, skillLevel));
   const hardnessMultiplier = HARDNESS_MULTIPLIER_BY_TYPE[ground.hardness];
   const adjustedSlopeAngle = clampGroundSlopeAngle(ground.slopeAngle);
-  const slopeFactor = Math.cos((adjustedSlopeAngle * Math.PI) / 180);
-
-  const adjustedRoll = Math.max(0, landingResult.roll * hardnessMultiplier * slopeFactor);
+  const slopeAngleRad = (adjustedSlopeAngle * Math.PI) / 180;
   const slopeStrength = Math.min(1, Math.abs(adjustedSlopeAngle) / 45);
-  const dispersionMultiplier = 1 + slopeStrength * MAX_SLOPE_DISPERSION_BONUS;
+  const slopeDirectionRad = ((ground.slopeDirection % 360) + 360) % 360 * (Math.PI / 180);
+
+  // 0度はピン方向uphillのため、+値ほどキャリーが減る。
+  const forwardSlopeComponent = slopeStrength * Math.cos(slopeDirectionRad);
+  // 90度は右uphillのため、横方向（左右）への影響に使う。
+  const crossSlopeComponent = slopeStrength * Math.sin(slopeDirectionRad);
+
+  const carryMultiplier = clamp(1 - forwardSlopeComponent * 0.08, 0.9, 1.1);
+  const rollMultiplier = clamp(hardnessMultiplier * Math.cos(slopeAngleRad) * (1 - forwardSlopeComponent * 0.22), 0.4, 1.7);
+  const adjustedCarry = Math.max(0.1, landingResult.carry * carryMultiplier);
+  const adjustedRoll = Math.max(0, landingResult.roll * rollMultiplier);
+
+  const dispersionMultiplier = 1 + slopeStrength * MAX_SLOPE_DISPERSION_BONUS * (0.4 + Math.abs(crossSlopeComponent) * 0.6);
   const mishitRateBonus =
     (ground.hardness === "soft" ? SOFT_GROUND_MISHIT_BONUS : 0) +
     (adjustedSlopeAngle > 0 ? Math.min(0.12, adjustedSlopeAngle * UPHILL_MISHIT_BONUS_PER_DEGREE) : 0);
 
   const adjustedLateralDeviation = landingResult.lateralDeviation * dispersionMultiplier;
-  const slopeDirectionRad = ((ground.slopeDirection % 360) + 360) % 360 * (Math.PI / 180);
-  const slopeShift = sampleTruncatedNormal(rng, slopeStrength * 0.35, 1.0) * 2 * Math.sin(slopeDirectionRad);
+  const slopeShift = sampleTruncatedNormal(rng, slopeStrength * (0.2 + Math.abs(crossSlopeComponent) * 0.25), 1.0) * 2 * crossSlopeComponent;
   const finalX = landingResult.finalX + (adjustedLateralDeviation - landingResult.lateralDeviation) + slopeShift;
-  const finalY = Math.max(0, landingResult.carry + adjustedRoll);
+  const finalY = Math.max(0, adjustedCarry + adjustedRoll);
   const totalDistance = finalY;
-  const apexHeight = calculateApexHeight(club.loftAngle, landingResult.carry);
+  const apexHeight = calculateApexHeight(club.loftAngle, adjustedCarry);
   const trajectoryPoints = buildTrajectoryPoints(finalX, finalY, apexHeight);
 
   return {
     ...landingResult,
+    carry: Math.round(adjustedCarry * 10) / 10,
     roll: Math.round(adjustedRoll * 10) / 10,
     totalDistance: Math.round(totalDistance * 10) / 10,
     lateralDeviation: Math.round(adjustedLateralDeviation * 10) / 10,
