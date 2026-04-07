@@ -48,6 +48,11 @@ export const GolfBagPanel = ({
           <p className="golf-bag-panel-description">
             {description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。'}
           </p>
+          {activeBag && (
+            <p className="golf-bag-panel-description">
+              選択中: {activeBagClubCount}/{maxClubs} 本
+            </p>
+          )}
         </div>
 
       </div>

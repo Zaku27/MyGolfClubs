@@ -65,6 +65,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     confidenceBoost,
     shotPowerPercent,
     setShotPowerPercent,
+    aimXOffset,
+    setAimXOffset,
     selectClub,
     takeShot,
     lastShotResult,
@@ -267,7 +269,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     ? estimatedDistanceByClub.get(selectedClub.id) ?? null
     : null;
   const selectedAimPoint = selectedClubEstimatedDistance !== null
-    ? { x: 0, y: selectedClubEstimatedDistance }
+    ? { x: aimXOffset, y: selectedClubEstimatedDistance }
     : null;
 
   return (
@@ -476,6 +478,34 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
         {/* ショット操作グループ */}
         <section className="mt-8 w-full max-w-md mx-auto flex flex-col gap-5 items-stretch">
+          {/* 狙い調整スライダー */}
+          {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
+            <div className="w-full rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-3">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
+                <span>狙い</span>
+                <span>
+                  {aimXOffset > 0 ? `右 ${aimXOffset}y` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}y` : "中央"}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-40}
+                max={40}
+                step={1}
+                value={aimXOffset}
+                onChange={e => setAimXOffset(Number(e.target.value))}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-sky-200 accent-sky-600"
+                aria-label="狙い"
+                disabled={!selectedClub || isResultActionVisible}
+              />
+              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-sky-700">
+                <span>左 40y</span>
+                <span>中央</span>
+                <span>右 40y</span>
+              </div>
+            </div>
+          ) : null}
+
           {/* ショットボタン */}
           <button
             type="button"
@@ -499,8 +529,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
           {/* パワー調整スライダー */}
           {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
-            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-4 py-4">
-              <div className="mb-2 flex items-center justify-between text-xs font-bold tracking-[0.08em] text-emerald-800">
+            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-3 py-3">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-emerald-800">
                 <span>パワー</span>
                 <span>{shotPowerPercent}%</span>
               </div>
@@ -511,7 +541,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 step={1}
                 value={shotPowerPercent}
                 onChange={e => setShotPowerPercent(Number(e.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
                 aria-label="ショットパワー"
                 disabled={!selectedClub || isResultActionVisible}
               />

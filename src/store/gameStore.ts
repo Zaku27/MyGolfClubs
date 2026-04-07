@@ -76,6 +76,7 @@ interface GameStoreState {
   lastShotResult: ShotResult | null;
   selectedClubId: string | null;
   shotPowerPercent: number;
+  aimXOffset: number;
   shotInProgress: boolean;
   currentHoleShots: ShotLog[];
   roundShots: ShotLog[];
@@ -93,6 +94,7 @@ interface GameStoreActions {
   startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag") => void;
   selectClub: (clubId: string) => void;
   setShotPowerPercent: (powerPercent: number) => void;
+  setAimXOffset: (aimXOffset: number) => void;
   takeShot: () => void;
   advanceHole: () => void;
   resetGame: () => void;
@@ -123,6 +125,7 @@ const INITIAL_STATE: GameStoreState = {
   lastShotResult: null,
   selectedClubId: null,
   shotPowerPercent: 100,
+  aimXOffset: 0,
   shotInProgress: false,
   currentHoleShots: [],
   roundShots: [],
@@ -236,12 +239,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     shotPowerPercent: Math.max(0, Math.min(110, Math.round(powerPercent))),
   }),
 
+  setAimXOffset: (aimXOffset) => set({
+    aimXOffset: Math.max(-40, Math.min(40, Math.round(aimXOffset))),
+  }),
+
   takeShot: () => {
     const {
       selectedClubId,
       bag,
       shotContext,
       shotPowerPercent,
+      aimXOffset,
       holeStrokes,
       course,
       currentHoleIndex,
@@ -291,6 +299,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           : playerSkillLevel,
         forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
         shotPowerPercent,
+        aimXOffset,
         useStoredDistance: !isRobotMode,
         shotIndex: currentHoleShots.length,
         seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
@@ -343,6 +352,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           phase: isRoundComplete ? "round_complete" : "hole_complete",
           selectedClubId: null,
           shotPowerPercent: 100,
+          aimXOffset: 0,
           currentHoleShots: nextHoleShots,
           roundShots: nextRoundShots,
           lastHoleSummary: holeSummary,
@@ -382,6 +392,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           },
           selectedClubId: null,
           shotPowerPercent: 100,
+          aimXOffset: 0,
           currentHoleShots: nextHoleShots,
           roundShots: nextRoundShots,
           goodShotStreak: streakAfterShot,

@@ -406,17 +406,19 @@ function App() {
   };
 
   const handleDeleteActiveBag = async () => {
-    if (!activeBag?.id) {
+    const activeBagId = activeBag?.id;
+    const activeBagName = activeBag?.name ?? 'このバッグ';
+    if (typeof activeBagId !== 'number') {
       return;
     }
 
     openConfirmDialog({
       title: 'バッグの削除',
-      message: `「${activeBag.name}」を削除します。よろしいですか？`,
+      message: `「${activeBagName}」を削除します。よろしいですか？`,
       confirmLabel: '削除する',
       cancelLabel: 'キャンセル',
       onConfirm: async () => {
-        await deleteBag(activeBag.id);
+        await deleteBag(activeBagId);
       },
     });
   };
@@ -679,7 +681,6 @@ function App() {
             bags={bags}
             activeBagId={activeBag?.id ?? null}
             activeBagClubCount={activeBagClubCount}
-            totalClubCount={sortedClubs.length}
             onSelectBag={(bagId) => void setActiveBag(bagId)}
             onCreateBag={() => void handleCreateBag()}
             onRenameActiveBag={() => void handleRenameActiveBag()}
