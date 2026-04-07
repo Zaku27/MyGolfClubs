@@ -1,7 +1,12 @@
-import seedrandom from "seedrandom";
+import * as seedrandomModule from "seedrandom";
 import { estimateTheoreticalDistance } from "./distanceEstimation";
 import type { GolfClub } from "../types/golf";
+import type { GroundCondition } from "../types/game";
 import type { ShotQuality, ShotQualityMetrics } from "../types/game";
+
+const seedrandom = ((seedrandomModule as unknown as { default?: typeof seedrandomModule }).default ?? seedrandomModule) as (
+  seed?: string
+) => () => number;
 
 export type ClubData = Pick<
   GolfClub,
@@ -13,6 +18,14 @@ export type SkillLevel = {
   mishitRate: number;
   sideSpinDispersion: number;
   hazardRecoveryFactor: number;
+};
+
+export type AdjustedLandingResult = LandingResult & {
+  nextShotAdjustment: {
+    dispersionMultiplier: number;
+    mishitRateBonus: number;
+    groundCondition: GroundCondition;
+  };
 };
 
 export type ShotInput = {
@@ -78,6 +91,16 @@ const DISPERSION_SKILL_CURVE_POWER = 1.8;
 const LOW_SKILL_NEAR_TARGET_RADIUS = 15;
 const LOW_SKILL_AVOID_START_SKILL = 0.45;
 const LOW_SKILL_AVOID_FULL_SKILL = 0.15;
+const MAX_GROUND_SLOPE_ANGLE = 60; // 極端な斜面を避けるための上限
+const HARDNESS_MULTIPLIER_BY_TYPE: Record<GroundCondition["hardness"], number> = {
+  firm: 1.35,
+  medium: 1.0,
+  soft: 0.65,
+};
+const MAX_SLOPE_DISPERSION_BONUS = 0.35; // 斜面が強いほど次のショットのブレが増す
+const SOFT_GROUND_MISHIT_BONUS = 0.06;
+const UPHILL_MISHIT_BONUS_PER_DEGREE = 0.0025; // 10度で約0.025
+const GROUND_CONDITION_SEED_PREFIX = "ground-condition";
 
 /**
  * 値を最小〜最大の範囲へ丸めるための共通関数。
@@ -125,6 +148,86 @@ function buildDeterministicSeed(input: ShotInput): string {
     conditions?.groundHardness ?? 50,
     conditions?.headSpeed ?? DEFAULT_HEAD_SPEED,
   ].join("|");
+}
+
+function buildGroundConditionSeed(
+  landingResult: LandingResult,
+  ground: GroundCondition,
+  club: ClubData,
+  skillLevel: SkillLevel,
+): string {
+  return [
+    GROUND_CONDITION_SEED_PREFIX,
+    club.clubType,
+    club.name,
+    club.number,
+    club.loftAngle,
+    club.distance,
+    landingResult.carry,
+    landingResult.roll,
+    landingResult.lateralDeviation,
+    ground.hardness,
+    ground.slopeAngle,
+    ground.slopeDirection,
+    skillLevel.dispersion,
+    skillLevel.mishitRate,
+    skillLevel.sideSpinDispersion,
+  ].join("|");
+}
+
+function clampGroundSlopeAngle(angle: number): number {
+  return clamp(angle, -MAX_GROUND_SLOPE_ANGLE, MAX_GROUND_SLOPE_ANGLE);
+}
+
+/**
+ * 着地後の地面条件を反映して、ラン量 / 位置 / 次ショット罰則を決定する純粋関数。
+ */
+export function applyGroundCondition(
+  landingResult: LandingResult,
+  ground: GroundCondition,
+  club: ClubData,
+  skillLevel: SkillLevel,
+): AdjustedLandingResult {
+  const rng = seedrandom(buildGroundConditionSeed(landingResult, ground, club, skillLevel));
+  const hardnessMultiplier = HARDNESS_MULTIPLIER_BY_TYPE[ground.hardness];
+  const adjustedSlopeAngle = clampGroundSlopeAngle(ground.slopeAngle);
+  const slopeFactor = Math.cos((adjustedSlopeAngle * Math.PI) / 180);
+
+  const adjustedRoll = Math.max(0, landingResult.roll * hardnessMultiplier * slopeFactor);
+  const slopeStrength = Math.min(1, Math.abs(adjustedSlopeAngle) / 45);
+  const dispersionMultiplier = 1 + slopeStrength * MAX_SLOPE_DISPERSION_BONUS;
+  const mishitRateBonus =
+    (ground.hardness === "soft" ? SOFT_GROUND_MISHIT_BONUS : 0) +
+    (adjustedSlopeAngle > 0 ? Math.min(0.12, adjustedSlopeAngle * UPHILL_MISHIT_BONUS_PER_DEGREE) : 0);
+
+  const adjustedLateralDeviation = landingResult.lateralDeviation * dispersionMultiplier;
+  const slopeDirectionRad = ((ground.slopeDirection % 360) + 360) % 360 * (Math.PI / 180);
+  const slopeShift = sampleTruncatedNormal(rng, slopeStrength * 0.35, 1.0) * 2 * Math.sin(slopeDirectionRad);
+  const finalX = landingResult.finalX + (adjustedLateralDeviation - landingResult.lateralDeviation) + slopeShift;
+  const finalY = Math.max(0, landingResult.carry + adjustedRoll);
+  const totalDistance = finalY;
+  const apexHeight = calculateApexHeight(club.loftAngle, landingResult.carry);
+  const trajectoryPoints = buildTrajectoryPoints(finalX, finalY, apexHeight);
+
+  return {
+    ...landingResult,
+    roll: Math.round(adjustedRoll * 10) / 10,
+    totalDistance: Math.round(totalDistance * 10) / 10,
+    lateralDeviation: Math.round(adjustedLateralDeviation * 10) / 10,
+    finalX: Math.round(finalX * 10) / 10,
+    finalY: Math.round(finalY * 10) / 10,
+    apexHeight: Math.round(apexHeight * 10) / 10,
+    trajectoryPoints: trajectoryPoints.map((p) => ({
+      x: Math.round(p.x * 10) / 10,
+      y: Math.round(p.y * 10) / 10,
+      z: Math.round(p.z * 10) / 10,
+    })),
+    nextShotAdjustment: {
+      dispersionMultiplier: Math.round(dispersionMultiplier * 100) / 100,
+      mishitRateBonus: Math.round(mishitRateBonus * 100) / 100,
+      groundCondition: ground,
+    },
+  };
 }
 
 /**

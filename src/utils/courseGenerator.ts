@@ -58,6 +58,11 @@ function generateHazard(hole: Hole, hazardIndex: number): Hazard {
     xCenter,
     width,
     penaltyStrokes,
+    groundCondition: {
+      hardness: "medium",
+      slopeAngle: 0,
+      slopeDirection: 0,
+    },
     name: `${type.toUpperCase()} ${hazardIndex + 1}`,
   };
 }
@@ -66,6 +71,7 @@ function cloneHole(hole: Hole): Hole {
   return {
     ...hole,
     hazards: (hole.hazards ?? []).map((hazard) => ({ ...hazard })),
+    groundCondition: hole.groundCondition ? { ...hole.groundCondition } : undefined,
   };
 }
 
@@ -91,6 +97,11 @@ export function generateRandomCourse(holeCount: number): Hole[] {
       targetDistance: distanceFromTee,
       greenRadius: randomInt(10, 16),
       hazards: [],
+      groundCondition: {
+        hardness: "medium",
+        slopeAngle: 0,
+        slopeDirection: 0,
+      },
     };
 
     hole.hazards = Array.from({ length: hazardCount }, (_, hazardIndex) => generateHazard(hole, hazardIndex));

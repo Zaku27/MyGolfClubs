@@ -32,7 +32,16 @@ export interface Hazard {
     mishitRateBonus: number;     // +0.15 = ミスヒット率15%上昇
     sideSpinBonus: number;       // ±RPM増加（曲がりやすくなる）
   };
+  groundCondition?: GroundCondition;
   name?: string;
+}
+
+export type GroundHardness = "soft" | "medium" | "firm";
+
+export interface GroundCondition {
+  hardness: GroundHardness;
+  slopeAngle: number; // degrees, + = uphill toward the pin
+  slopeDirection: number; // 0-359: 0 = uphill toward pin, 90 = uphill to the right
 }
 
 // ─── Course ───────────────────────────────────────────────────────────────────
@@ -43,6 +52,7 @@ export interface Hole {
   targetDistance?: number; // ピンまでの距離。未指定時は distanceFromTee を使用
   greenRadius?: number; // ヤード。未指定時は既定値を使用
   hazards?: Hazard[];
+  groundCondition?: GroundCondition; // 将来コースエディタで編集する予定の地面パラメータ
 }
 
 // ─── Shot context ─────────────────────────────────────────────────────────────

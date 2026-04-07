@@ -430,10 +430,24 @@ export function CustomCourseEditorScreen() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex flex-col items-center justify-center p-6 gap-6">
-      <div className="text-center">
-        <div className="text-6xl mb-3">🛠️</div>
-        <h1 className="text-3xl font-black text-emerald-900 tracking-tight">コースエディタ</h1>
-        <p className="text-emerald-700 mt-1 text-sm">カスタムコースを独立して編集・保存できます。</p>
+      <div className="w-full max-w-4xl">
+        <div className="flex flex-col gap-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-5 shadow-sm shadow-emerald-300/40 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3 text-emerald-900">
+            <div className="text-6xl">🛠️</div>
+            <div>
+              <h1 className="text-3xl font-black tracking-tight">コースエディタ</h1>
+              <p className="text-emerald-700 mt-1 text-sm">カスタムコースを独立して編集・保存できます。</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/"
+              className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-white px-5 py-3 text-sm font-semibold text-emerald-900 shadow-sm shadow-emerald-200 transition hover:bg-emerald-50"
+            >
+              クラブ管理に戻る
+            </Link>
+          </div>
+        </div>
       </div>
 
       <div className="w-full max-w-4xl rounded-2xl border border-emerald-300 bg-emerald-50/90 p-5 shadow-sm shadow-emerald-300/40">
@@ -461,50 +475,55 @@ export function CustomCourseEditorScreen() {
           </div>
         </div>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
-          <label className="space-y-1 text-xs font-semibold text-emerald-800">
-            編集するカスタムコース
-            <select
-              value={selectedCustomCourseId}
-              onChange={(event) => handleSelectCustomCourse(event.target.value)}
-              className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-2 text-sm"
-            >
-              {savedCustomCourses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-xs font-semibold text-emerald-800">
+              編集するカスタムコース
+              <select
+                value={selectedCustomCourseId}
+                onChange={(event) => handleSelectCustomCourse(event.target.value)}
+                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-2 text-sm"
+              >
+                {savedCustomCourses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="space-y-1 text-xs font-semibold text-emerald-800">
-            コース名
-            <input
-              type="text"
-              value={customNameInput}
-              onChange={(event) => setCustomNameInput(event.target.value)}
-              maxLength={40}
-              className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-2 text-sm"
-              placeholder="例: 風が強い海沿いコース"
-            />
-          </label>
+            <label className="space-y-1 text-xs font-semibold text-emerald-800">
+              コース名
+              <input
+                type="text"
+                value={customNameInput}
+                onChange={(event) => setCustomNameInput(event.target.value)}
+                maxLength={40}
+                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-2 text-sm"
+                placeholder="例: 風が強い海沿いコース"
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-end justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleSaveAsNew}
+              className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900 hover:bg-sky-100"
+            >
+              名前を付けて新規保存
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveOverwrite}
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+            >
+              選択中を上書き保存
+            </button>
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSaveAsNew}
-            className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900 hover:bg-sky-100"
-          >
-            名前を付けて新規保存
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveOverwrite}
-            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
-          >
-            選択中を上書き保存
-          </button>
           <button
             type="button"
             onClick={handleExportCustomCourseLibrary}
@@ -561,21 +580,6 @@ export function CustomCourseEditorScreen() {
         )}
 
         <CourseEditor holes={customCourse} onChange={setCustomCourse} />
-      </div>
-
-      <div className="flex gap-4">
-        <Link
-          to="/"
-          className="rounded-xl border border-emerald-300 bg-white px-5 py-3 text-sm font-semibold text-emerald-900 shadow-sm shadow-emerald-200 transition hover:bg-emerald-50"
-        >
-          ← トップに戻る
-        </Link>
-        <Link
-          to="/range"
-          className="rounded-xl border border-sky-300 bg-sky-50 px-5 py-3 text-sm font-semibold text-sky-900 shadow-sm shadow-sky-200 transition hover:bg-sky-100"
-        >
-          レンジへ移動
-        </Link>
       </div>
     </div>
   );

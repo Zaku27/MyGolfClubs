@@ -48,9 +48,8 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex flex-col items-center justify-center p-6 gap-6">
       <div className="text-center">
-        <div className="text-6xl mb-3">⛳</div>
         <h1 className="text-3xl font-black text-emerald-900 tracking-tight">
-          コースマネジメント
+          コースシミュレーター
         </h1>
         <p className="text-emerald-700 mt-1 text-sm">
           クラブ選択と戦略でスコアを目指せ
@@ -112,11 +111,11 @@ function SetupScreen({ onStart, onBack, bagClubCount, robotClubCount, activeBagN
           </div>
           <div className="flex items-start gap-2">
             <span className="text-emerald-600 font-bold flex-shrink-0">2.</span>
-            <span>バッグのクラブを選択し、リスクレベルを決定してショット</span>
+            <span>バッグのクラブを選択し、パワーを決定してショット</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-emerald-600 font-bold flex-shrink-0">3.</span>
-            <span>成功率・距離・ランダム性が絡み、結果が確定する</span>
+            <span>距離・難易度・成功率が絡み、結果が確定する</span>
           </div>
         </div>
 

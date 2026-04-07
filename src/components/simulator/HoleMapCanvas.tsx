@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Stage, Layer, Arrow, Text } from "react-konva";
 import type { Hole, Hazard } from "../../types/game";
 import type { LandingResult } from "../../utils/landingPosition";
 import { buildAutoHazardName, buildHazardDisplayName } from "../../utils/shotOutcome";
 
 interface HoleMapCanvasProps {
-  hole: Pick<Hole, "targetDistance" | "distanceFromTee" | "greenRadius" | "hazards">;
+  hole: Hole;
   landingResults: LandingResult[];
   transientLandingResult?: LandingResult | null;
   aimPoint?: { x: number; y: number } | null;
@@ -14,6 +15,7 @@ interface HoleMapCanvasProps {
   selectedHazardId?: string | null;
   currentHoleKey?: string | number;
   onSelectHazardId?: (hazardId: string | null) => void;
+  onSelectHoleArea?: () => void;
   onHazardsChange?: (hazards: Hazard[]) => void;
 }
 
@@ -321,6 +323,7 @@ export function HoleMapCanvas({
   selectedHazardId = null,
   currentHoleKey,
   onSelectHazardId,
+  onSelectHoleArea,
   onHazardsChange,
 }: HoleMapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -336,6 +339,17 @@ export function HoleMapCanvas({
     () => buildAbsoluteShots(landingResults, targetDistance),
     [landingResults, targetDistance],
   );
+
+  const selectedHazard = useMemo(
+    () => hazards.find((hazard) => hazard.id === selectedHazardId) ?? null,
+    [hazards, selectedHazardId],
+  );
+
+  const slopeCondition = selectedHazard?.groundCondition ?? hole.groundCondition ?? {
+    hardness: "medium",
+    slopeAngle: 0,
+    slopeDirection: 0,
+  };
 
   const metrics = useMemo(() => {
     if (size.width <= 0 || size.height <= 0) {
@@ -359,14 +373,45 @@ export function HoleMapCanvas({
   }, [editable, greenRadius, hazards, size.height, size.width, targetDistance, absoluteShots]);
   const transientShot = useMemo(() => {
     if (!transientLandingResult) return null;
-    const origin = absoluteShots.at(-1)?.landing ?? { x: 0, y: 0 };
+    const origin = absoluteShots.length > 0 ? absoluteShots[absoluteShots.length - 1].landing : { x: 0, y: 0 };
     return buildAbsoluteShotFromOrigin(origin, transientLandingResult, targetDistance);
   }, [absoluteShots, targetDistance, transientLandingResult]);
   const absoluteAimPoint = useMemo(() => {
     if (!aimPoint) return null;
-    const origin = absoluteShots.at(-1)?.landing ?? { x: 0, y: 0 };
+    const origin = absoluteShots.length > 0 ? absoluteShots[absoluteShots.length - 1].landing : { x: 0, y: 0 };
     return buildAbsolutePointFromOrigin(origin, targetDistance, aimPoint.x, aimPoint.y);
   }, [absoluteShots, aimPoint, targetDistance]);
+
+  const yardToPxX = (yardX: number) => {
+    if (!metrics) return 0;
+    const { padding, drawWidth, halfYardX } = metrics;
+    return padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
+  };
+
+  const yardToPxY = (yardY: number) => {
+    if (!metrics) return 0;
+    const { padding, drawHeight, maxYardY } = metrics;
+    return padding.top + drawHeight * (1 - yardY / maxYardY);
+  };
+
+  const slopeArrow = useMemo(() => {
+    if (!metrics) return null;
+    const centerYard = Math.max(0, targetDistance * 0.35);
+    const startX = yardToPxX(0);
+    const startY = yardToPxY(centerYard);
+    const length = Math.max(40, Math.min(100, 40 + Math.abs(slopeCondition.slopeAngle) * 2.5));
+    const rad = ((270 + slopeCondition.slopeDirection) % 360) * (Math.PI / 180);
+    const endX = startX + Math.cos(rad) * length;
+    const endY = startY + Math.sin(rad) * length;
+
+    return {
+      points: [startX, startY, endX, endY],
+      angleLabel: slopeCondition.slopeAngle,
+      directionLabel: slopeCondition.slopeDirection,
+      textX: startX + Math.cos(rad) * 6 + 4,
+      textY: startY + Math.sin(rad) * 6 - 18,
+    };
+  }, [metrics, targetDistance, slopeCondition]);
 
   useEffect(() => {
     if (currentHoleKey == null) {
@@ -538,7 +583,7 @@ export function HoleMapCanvas({
       context.strokeRect(leftPx, topPx, widthPx, heightPx);
 
       if (widthPx >= 26 && heightPx >= 16) {
-        const label = `難易度 ${hazard.difficulty}`;
+        const label = buildHazardDisplayName(hazard);
         context.save();
         context.font = "bold 10px sans-serif";
         context.textAlign = "center";
@@ -755,8 +800,41 @@ export function HoleMapCanvas({
     <div
       ref={wrapperRef}
       className={className ?? "relative w-full overflow-hidden rounded-2xl border border-emerald-300 bg-emerald-50/70"}
+      onClick={() => onSelectHoleArea?.()}
     >
       <canvas ref={canvasRef} className="block w-full" aria-label="ホールマップ" />
+      {metrics && slopeArrow && (
+        <Stage
+          width={size.width}
+          height={size.height}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            pointerEvents: "none",
+          }}
+        >
+          <Layer>
+            <Arrow
+              points={slopeArrow.points}
+              pointerLength={12}
+              pointerWidth={10}
+              fill="#f97316"
+              stroke="#ea580c"
+              strokeWidth={4}
+              tension={0}
+            />
+            <Text
+              x={slopeArrow.textX}
+              y={slopeArrow.textY}
+              text={`Slope ${slopeArrow.angleLabel}°, ${slopeArrow.directionLabel}°`}
+              fill="#065f46"
+              fontSize={12}
+              fontStyle="bold"
+            />
+          </Layer>
+        </Stage>
+      )}
       {editable && (
         <div className="pointer-events-none absolute inset-0">
           {hazards.map((hazard) => {
@@ -796,7 +874,10 @@ export function HoleMapCanvas({
                   height: `${box.height}px`,
                 }}
                 onPointerDown={(event) => startDrag(event, "move")}
-                onClick={() => onSelectHazardId?.(hazard.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectHazardId?.(hazard.id);
+                }}
               >
                 <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
                   {buildHazardDisplayName(hazard)}

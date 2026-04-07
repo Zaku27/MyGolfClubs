@@ -1,6 +1,6 @@
-import { calculateLandingOutcome } from "./landingPosition";
+import { calculateLandingOutcome, applyGroundCondition } from "./landingPosition";
 import type { ClubData, SkillLevel } from "./landingPosition";
-import type { Hole, ShotResult } from "../types/game";
+import type { GroundCondition, Hole, ShotResult } from "../types/game";
 import {
   assessLanding,
   buildOutcomeMessage,
@@ -28,6 +28,8 @@ function buildCourseSimulationSeed(
     .map((hazard) => `${hazard.id}:${hazard.type}:${hazard.shape}:${hazard.yFront}:${hazard.yBack}:${hazard.xCenter}:${hazard.width}:${hazard.penaltyStrokes}`)
     .join("|");
 
+  const condition = hole.groundCondition ?? { hardness: "medium", slopeAngle: 0, slopeDirection: 0 };
+
   return [
     club.clubType,
     club.name,
@@ -38,6 +40,9 @@ function buildCourseSimulationSeed(
     hole.number,
     getHoleTargetDistance(hole),
     hazardSeed,
+    condition.hardness,
+    condition.slopeAngle,
+    condition.slopeDirection,
   ].join("|");
 }
 
@@ -50,6 +55,12 @@ export function simulateShotWithCourse(
   const targetDistance = getHoleTargetDistance(hole);
   const greenRadius = hole.greenRadius ?? DEFAULT_GREEN_RADIUS;
   const seed = buildCourseSimulationSeed(club, hole, aimXOffset);
+  const groundCondition: GroundCondition = hole.groundCondition ?? {
+    hardness: "medium",
+    slopeAngle: 0,
+    slopeDirection: 0,
+  };
+
   const landingOutcome = calculateLandingOutcome({
     club,
     skillLevel: skill,
@@ -62,7 +73,13 @@ export function simulateShotWithCourse(
     },
   });
 
-  const landing = landingOutcome.landing;
+  const landing = applyGroundCondition(
+    landingOutcome.landing,
+    groundCondition,
+    club,
+    skill,
+  );
+
   const assessment = assessLanding(
     landing.finalX,
     landing.finalY,
