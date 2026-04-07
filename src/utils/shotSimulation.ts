@@ -1,4 +1,5 @@
 import type {
+  Hazard,
   SimClub,
   ShotContext,
   ShotResult,
@@ -13,6 +14,7 @@ import { calculateLandingOutcome } from "./landingPosition";
 import {
   assessLanding,
   buildDetailedShotMessage,
+  checkLandingInHazard,
   DEFAULT_GREEN_RADIUS,
   determinePenaltyStrokes,
   resolvePenaltyRelief,
@@ -374,6 +376,35 @@ function mapGroundHardnessByLie(lie: LieType): number {
   return 60;
 }
 
+function getHazardRecoveryFactor(playerSkillLevel: number): number {
+  const skill = Math.max(0, Math.min(1, playerSkillLevel));
+  if (skill < 0.35) return 0.4;
+  if (skill < 0.65) return 0.7;
+  return 0.95;
+}
+
+function getEffectiveHazardDistanceMultiplier(
+  hazard: Hazard | null,
+  hazardRecoveryFactor: number,
+): number {
+  if (!hazard?.liePenalty) return 1;
+  return Math.pow(hazard.liePenalty.distanceMultiplier, 1 - hazardRecoveryFactor);
+}
+
+function getEffectiveLieDistanceMultiplier(
+  lie: LieType,
+  clubType: string,
+  skillLevel: { hazardRecoveryFactor: number },
+  originX: number,
+  originY: number,
+  hazards: Hazard[],
+): number {
+  const base = getLieDistanceMultiplier(lie, clubType);
+  const hazard = checkLandingInHazard(originX, originY, hazards);
+  const effectivePenalty = getEffectiveHazardDistanceMultiplier(hazard, skillLevel.hazardRecoveryFactor);
+  return base * effectivePenalty;
+}
+
 /**
  * クラブ成功率(15〜95)を 0〜1 のスキル寄与へ正規化する。
  * 分布モデルへ直接渡して、表示成功率と体感を近づける。
@@ -595,6 +626,7 @@ export function simulateShot(
       dispersion: 1 - effectiveSkill,
       mishitRate: 1 - effectiveSkill,
       sideSpinDispersion: 1 - effectiveSkill,
+      hazardRecoveryFactor: getHazardRecoveryFactor(effectiveSkill),
     },
     aimXOffset: options.aimXOffset ?? 0,
     conditions: {
@@ -608,12 +640,6 @@ export function simulateShot(
 
   const shotQuality = landingOutcome.shotQuality;
   const rawLanding = landingOutcome.landing;
-  const lieDistanceMultiplier = getLieDistanceMultiplier(lie, club.type);
-  const weakDistancePenaltyBase = isWeakClub(club)
-    ? (club.successRate < 60 ? 0.14 : 0.10)
-    : 0;
-  const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
-  const distanceConditionMultiplier = lieDistanceMultiplier * weakDistanceMultiplier;
 
   // 360度風向がある場合は横風成分を着弾Xへ加算する。
   // 係数は現行モデルと同様に簡易線形として、調整しやすい形で定義する。
@@ -622,6 +648,22 @@ export function simulateShot(
       ? getCrossWindComponentMph(windStrength, windDirectionDegrees)
       : 0;
   const lateralWindYards = crossWindComponentMph * 0.9;
+
+  const lieDistanceMultiplier = getEffectiveLieDistanceMultiplier(
+    lie,
+    club.type,
+    {
+      hazardRecoveryFactor: getHazardRecoveryFactor(effectiveSkill),
+    },
+    context.originX,
+    context.originY,
+    hazards,
+  );
+  const weakDistancePenaltyBase = isWeakClub(club)
+    ? (club.successRate < 60 ? 0.14 : 0.10)
+    : 0;
+  const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
+  const distanceConditionMultiplier = lieDistanceMultiplier * weakDistanceMultiplier;
 
   const scaledCarry = Math.max(0.1, rawLanding.carry * powerMultiplier * distanceConditionMultiplier);
   const scaledRoll = Math.max(0, rawLanding.roll * powerMultiplier * distanceConditionMultiplier);

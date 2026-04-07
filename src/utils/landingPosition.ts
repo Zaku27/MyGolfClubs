@@ -12,6 +12,7 @@ export type SkillLevel = {
   dispersion: number;
   mishitRate: number;
   sideSpinDispersion: number;
+  hazardRecoveryFactor: number;
 };
 
 export type ShotInput = {

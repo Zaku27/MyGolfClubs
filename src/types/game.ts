@@ -26,6 +26,12 @@ export interface Hazard {
   xCenter: number;  // lateral offset from center line, yards
   width: number;    // total width, yards
   penaltyStrokes: 0 | 1 | 2;
+  liePenalty?: {
+    distanceMultiplier: number;  // 0.75 = 25%飛距離減
+    dispersionMultiplier: number; // 1.8 = 分散1.8倍（方向・飛距離ともにブレやすい）
+    mishitRateBonus: number;     // +0.15 = ミスヒット率15%上昇
+    sideSpinBonus: number;       // ±RPM増加（曲がりやすくなる）
+  };
   name?: string;
 }
 

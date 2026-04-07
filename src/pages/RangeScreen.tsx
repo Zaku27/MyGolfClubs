@@ -71,6 +71,30 @@ const LIE_OPTIONS = [
   'バンカー',
   'グリーン',
 ];
+
+function getLiePenaltyInfo(lie: string, clubType: string): string {
+  switch (lie) {
+    case 'ティー':
+      return '標準的なライです。飛距離の影響はほとんどありません。';
+    case 'フェアウェイ':
+      return 'ほぼ通常のライです。飛距離はほとんど落ちません。';
+    case 'セミラフ':
+      return '飛距離は約10%減少し、方向の安定性もやや低下します。';
+    case 'ラフ':
+      return '飛距離は約18%減少し、ショットが不安定になります。';
+    case 'ベアグラウンド':
+      return '飛距離は約40%減少し、非常に打ちにくいライです。';
+    case 'バンカー':
+      return clubType === 'Wedge'
+        ? 'ウェッジでは飛距離約30%減、その他番手では約50%減。砂では方向も乱れやすいです。'
+        : '飛距離は約50%減。砂地では方向も不安定になります。';
+    case 'グリーン':
+      return 'パター用のライです。飛距離補正はパット動作によります。';
+    default:
+      return '選択したライのペナルティ情報はありません。';
+  }
+}
+
 const SHOT_COUNTS = [5, 10, 20];
 
 function clampAimXOffset(value: number): number {
@@ -898,8 +922,8 @@ export default function RangeScreen() {
                   <option key={l} value={l}>{l}</option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-600">
-                飛距離補正: ×{lieDistanceMultiplier.toFixed(2)}
+              <p className="text-xs text-gray-600">
+                ライペナルティ: {getLiePenaltyInfo(lie, simClub?.type ?? 'Iron')}
               </p>
             </div>
             <div>
