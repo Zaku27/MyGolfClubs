@@ -622,7 +622,7 @@ export default function RangeScreen() {
           </Link>
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded bg-green-200 px-3 py-2 text-sm font-semibold text-green-900 shadow hover:bg-green-300"
+            className="inline-flex items-center justify-center rounded bg-white px-3 py-2 text-sm font-semibold text-green-900 shadow border border-green-200 hover:bg-green-50"
           >
             クラブ管理に戻る
           </Link>
