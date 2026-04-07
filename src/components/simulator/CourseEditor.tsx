@@ -14,6 +14,8 @@ const HAZARD_TYPE_LABEL: Record<HazardType, string> = {
   water: "ウォーター",
   ob: "OB",
   rough: "ラフ",
+  semirough: "セミラフ",
+  bareground: "ベアグラウンド",
 };
 
 function cloneHazards(hazards: Hazard[] | undefined): Hazard[] {

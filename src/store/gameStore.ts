@@ -363,8 +363,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         });
       } else {
         // ── Still playing ──
-        const isPenaltyRelief = result.penalty && (result.finalOutcome === "water" || result.finalOutcome === "ob");
-        const nextOrigin = isPenaltyRelief
+        const nextOrigin = result.penalty && result.finalOutcome === "water" && result.penaltyDropOrigin
+          ? result.penaltyDropOrigin
+          : result.penalty && result.finalOutcome === "ob"
           ? projectAlongLineToPin(
               shotContext.originX,
               shotContext.originY,

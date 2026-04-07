@@ -6,9 +6,11 @@ import { buildAutoHazardName, buildHazardDisplayName } from "../../utils/shotOut
 
 interface HoleMapCanvasProps {
   hole: Hole;
-  landingResults: LandingResult[];
+  landingResults: Array<{ origin: Point2D; landing: LandingResult }>;
   transientLandingResult?: LandingResult | null;
   aimPoint?: { x: number; y: number } | null;
+  shotOrigin?: { x: number; y: number } | null;
+  highlightPoint?: { x: number; y: number } | null;
   showTrajectories?: boolean;
   className?: string;
   editable?: boolean;
@@ -105,6 +107,13 @@ function getHazardStyle(type: Hazard["type"]): { fill: string; stroke: string } 
     };
   }
 
+  if (type === "bareground") {
+    return {
+      fill: "rgba(168, 162, 158, 0.35)",
+      stroke: "rgba(99, 92, 84, 0.95)",
+    };
+  }
+
   return {
     fill: "rgba(74, 222, 128, 0.22)",
     stroke: "rgba(22, 101, 52, 0.85)",
@@ -160,46 +169,41 @@ function buildYardBounds(
  * 通常ゴルフに近い見え方で描画できる。
  */
 function buildAbsoluteShots(
-  landingResults: LandingResult[],
+  landingResults: Array<{ origin: Point2D; landing: LandingResult }>,
   targetDistance: number,
 ): AbsoluteShot[] {
   const pin: Point2D = { x: 0, y: targetDistance };
-  let current: Point2D = { x: 0, y: 0 };
-
   const transformed: AbsoluteShot[] = [];
 
   for (const shot of landingResults) {
-    const toPinX = pin.x - current.x;
-    const toPinY = pin.y - current.y;
+    const origin = shot.origin;
+    const toPinX = pin.x - origin.x;
+    const toPinY = pin.y - origin.y;
     const toPinDistance = Math.hypot(toPinX, toPinY);
 
-    // ピン方向の単位ベクトル。近距離で不安定な場合は真上方向を採用する。
     const forward: Point2D = toPinDistance > 1e-6
       ? { x: toPinX / toPinDistance, y: toPinY / toPinDistance }
       : { x: 0, y: 1 };
 
-    // forward から見て右方向の単位ベクトル。
     const right: Point2D = { x: forward.y, y: -forward.x };
 
     const toAbsolute = (localX: number, localY: number): Point2D => {
       return {
-        x: current.x + forward.x * localY + right.x * localX,
-        y: current.y + forward.y * localY + right.y * localX,
+        x: origin.x + forward.x * localY + right.x * localX,
+        y: origin.y + forward.y * localY + right.y * localX,
       };
     };
 
-    const landing = toAbsolute(shot.finalX, shot.finalY);
-    const pathFromTrajectory = shot.trajectoryPoints?.map((point) => toAbsolute(point.x, point.y)) ?? [];
-    const path = pathFromTrajectory.length > 0 ? pathFromTrajectory : [current, landing];
+    const landing = toAbsolute(shot.landing.finalX, shot.landing.finalY);
+    const pathFromTrajectory = shot.landing.trajectoryPoints?.map((point) => toAbsolute(point.x, point.y)) ?? [];
+    const path = pathFromTrajectory.length > 0 ? pathFromTrajectory : [origin, landing];
 
     transformed.push({
-      origin: current,
+      origin,
       landing,
       path,
-      local: shot,
+      local: shot.landing,
     });
-
-    current = landing;
   }
 
   return transformed;
@@ -312,11 +316,33 @@ function drawShot(
   context.stroke();
 }
 
+function drawHighlightPoint(
+  context: CanvasRenderingContext2D,
+  point: Point2D,
+  yardToPxX: (yardX: number) => number,
+  yardToPxY: (yardY: number) => number,
+) {
+  const x = yardToPxX(point.x);
+  const y = yardToPxY(point.y);
+
+  context.save();
+  context.fillStyle = "rgba(220, 38, 38, 0.95)";
+  context.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.arc(x, y, 5, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.restore();
+}
+
 export function HoleMapCanvas({
   hole,
   landingResults,
   transientLandingResult = null,
   aimPoint = null,
+  shotOrigin = null,
+  highlightPoint = null,
   showTrajectories = true,
   className,
   editable = false,
@@ -371,16 +397,15 @@ export function HoleMapCanvas({
       halfYardX,
     };
   }, [editable, greenRadius, hazards, size.height, size.width, targetDistance, absoluteShots]);
+  const currentOrigin = shotOrigin ?? (absoluteShots.length > 0 ? absoluteShots[absoluteShots.length - 1].landing : { x: 0, y: 0 });
   const transientShot = useMemo(() => {
     if (!transientLandingResult) return null;
-    const origin = absoluteShots.length > 0 ? absoluteShots[absoluteShots.length - 1].landing : { x: 0, y: 0 };
-    return buildAbsoluteShotFromOrigin(origin, transientLandingResult, targetDistance);
-  }, [absoluteShots, targetDistance, transientLandingResult]);
+    return buildAbsoluteShotFromOrigin(currentOrigin, transientLandingResult, targetDistance);
+  }, [currentOrigin, targetDistance, transientLandingResult]);
   const absoluteAimPoint = useMemo(() => {
     if (!aimPoint) return null;
-    const origin = absoluteShots.length > 0 ? absoluteShots[absoluteShots.length - 1].landing : { x: 0, y: 0 };
-    return buildAbsolutePointFromOrigin(origin, targetDistance, aimPoint.x, aimPoint.y);
-  }, [absoluteShots, aimPoint, targetDistance]);
+    return buildAbsolutePointFromOrigin(currentOrigin, targetDistance, aimPoint.x, aimPoint.y);
+  }, [aimPoint, currentOrigin, targetDistance]);
 
   const yardToPxX = (yardX: number) => {
     if (!metrics) return 0;
@@ -647,6 +672,10 @@ export function HoleMapCanvas({
       context.lineTo(markerX + sizePx, markerY - sizePx);
       context.stroke();
       context.restore();
+    }
+
+    if (highlightPoint) {
+      drawHighlightPoint(context, highlightPoint, yardToPxX, yardToPxY);
     }
 
     // 右上に縮尺の目安を表示。

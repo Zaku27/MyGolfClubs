@@ -89,10 +89,10 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
             const yFront = Math.max(0, Number(h.yFront) || 0);
             const yBack = Math.max(yFront + 3, Number(h.yBack) || yFront + 15);
             const width = Math.max(6, Number(h.width) || 20);
-            const type = h.type === "bunker" || h.type === "water" || h.type === "ob" || h.type === "rough"
+            const type = h.type === "bunker" || h.type === "water" || h.type === "ob" || h.type === "rough" || h.type === "semirough" || h.type === "bareground"
               ? h.type
               : "bunker";
-            const penaltyStrokes: 1 | 2 = type === "ob" ? 2 : 1;
+            const penaltyStrokes: 0 | 1 | 2 = type === "ob" ? 2 : type === "water" ? 1 : 0;
 
             return {
               id: typeof h.id === "string" && h.id.length > 0
@@ -440,6 +440,13 @@ export function CustomCourseEditorScreen() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              to="/"
+              state={{ openSimulator: true }}
+              className="inline-flex items-center justify-center rounded-xl border border-sky-300 bg-sky-50 px-5 py-3 text-sm font-semibold text-sky-900 shadow-sm shadow-sky-200 transition hover:bg-sky-100"
+            >
+              コースシミュレーターへ
+            </Link>
             <Link
               to="/"
               className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-white px-5 py-3 text-sm font-semibold text-emerald-900 shadow-sm shadow-emerald-200 transition hover:bg-emerald-50"

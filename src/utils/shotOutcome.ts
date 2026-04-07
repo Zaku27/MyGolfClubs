@@ -7,6 +7,8 @@ const HAZARD_TYPE_LABEL: Record<Hazard["type"], string> = {
   water: "ウォーター",
   ob: "OB",
   rough: "ラフ",
+  semirough: "セミラフ",
+  bareground: "ベアグラウンド",
 };
 
 function isCenterLineInsideHazard(xCenter: number, width: number): boolean {

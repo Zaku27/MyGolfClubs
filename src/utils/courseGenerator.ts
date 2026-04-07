@@ -6,7 +6,7 @@ const PAR_DISTANCE_RANGE: Record<3 | 4 | 5, { min: number; max: number }> = {
   5: { min: 470, max: 590 },
 };
 
-const HAZARD_TYPES: HazardType[] = ["bunker", "water", "ob", "rough"];
+const HAZARD_TYPES: HazardType[] = ["bunker", "water", "ob", "rough", "semirough", "bareground"];
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -47,7 +47,7 @@ function generateHazard(hole: Hole, hazardIndex: number): Hazard {
     ? (Math.random() < 0.5 ? -1 : 1) * randomInt(62, lateralLimit)
     : randomInt(-lateralLimit, lateralLimit);
 
-  const penaltyStrokes = type === "ob" ? 2 : 1;
+  const penaltyStrokes = type === "ob" ? 2 : type === "water" ? 1 : 0;
 
   return {
     id: buildHazardId(hole.number, hazardIndex),

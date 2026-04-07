@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { GolfClub } from './types/golf';
 import {
   DEFAULT_USER_LIE_ANGLE_STANDARDS,
@@ -82,6 +83,7 @@ function App() {
   const [showForm, setShowForm] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
+  const location = useLocation();
   const [headSpeed, setHeadSpeed] = useState<number>(() => {
     return readStoredNumber(HEAD_SPEED_STORAGE_KEY, 42, { min: 0.1 });
   });
@@ -547,6 +549,12 @@ function App() {
       activeBagClubs.some((club) => getAnalysisClubKey(club) === clubKey),
     );
   }, [activeBagClubs, hiddenAnalysisClubKeys]);
+
+  useEffect(() => {
+    if (location.state?.openSimulator) {
+      setShowSimulator(true);
+    }
+  }, [location.state]);
 
   if (showSimulator) {
     return (

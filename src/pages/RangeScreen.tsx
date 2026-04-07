@@ -68,7 +68,6 @@ const LIE_OPTIONS = [
   'ラフ',
   'ベアグラウンド',
   'バンカー',
-  'グリーン',
 ];
 
 function getLiePenaltyInfo(lie: string, clubType: string): string {

@@ -18,6 +18,7 @@ import {
   DEFAULT_GREEN_RADIUS,
   determinePenaltyStrokes,
   resolvePenaltyRelief,
+  distanceToPinFromLanding,
 } from "./shotOutcome";
 /**
  * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
@@ -115,6 +116,45 @@ export function projectAlongLineToPin(
   return {
     x: originX + toPinX * t,
     y: originY + toPinY * t,
+  };
+}
+
+export function getWaterHazardDropOrigin(
+  hazard: Hazard,
+  absoluteLanding: { x: number; y: number },
+): { x: number; y: number } {
+  const halfWidth = hazard.width / 2;
+  const leftEdge = hazard.xCenter - halfWidth;
+  const rightEdge = hazard.xCenter + halfWidth;
+  const frontEdge = Math.min(hazard.yFront, hazard.yBack);
+  const backEdge = Math.max(hazard.yFront, hazard.yBack);
+  const dropOffset = 5;
+
+  const entryX = absoluteLanding.x;
+  const entryY = absoluteLanding.y;
+  const frontDistance = entryY - frontEdge;
+  const leftDistance = Math.abs(entryX - leftEdge);
+  const rightDistance = Math.abs(entryX - rightEdge);
+
+  if (frontDistance <= Math.min(leftDistance, rightDistance)) {
+    const dropX = Math.min(Math.max(entryX, leftEdge), rightEdge);
+    return {
+      x: dropX,
+      y: Math.max(frontEdge - dropOffset, 0),
+    };
+  }
+
+  const dropY = Math.min(Math.max(entryY, frontEdge), backEdge);
+  if (leftDistance <= rightDistance) {
+    return {
+      x: leftEdge - dropOffset,
+      y: dropY,
+    };
+  }
+
+  return {
+    x: rightEdge + dropOffset,
+    y: dropY,
   };
 }
 
@@ -327,8 +367,10 @@ function getEffectiveSuccessRate(
     isWeakClub: weakClub,
     playerSkillLevel,
   });
-  if (lie === "rough")   rate -= 12;
-  if (lie === "bunker")  rate -= 20;
+  if (lie === "semirough") rate -= 8;
+  if (lie === "rough")     rate -= 12;
+  if (lie === "bareground") rate -= 18;
+  if (lie === "bunker")    rate -= 20;
   if (weakClub) {
     const weakPenaltyBase = club.successRate < 60 ? 16 : 14;
     rate -= weakPenaltyBase * WEAK_CLUB_EFFECT_SCALE;
@@ -781,9 +823,12 @@ export function simulateShot(
 
   let newLie: LieType;
   let finalOutcome: ShotResult["finalOutcome"];
+  let penaltyDropOrigin: { x: number; y: number } | undefined;
+
   if (landedHazard?.type === "water") {
     const relief = resolvePenaltyRelief("water", lie, remainingDistance, newRemaining, landedHazard.penaltyStrokes ?? 3);
-    newRemaining = relief.newRemaining;
+    penaltyDropOrigin = getWaterHazardDropOrigin(landedHazard, absoluteLanding);
+    newRemaining = Math.round(distanceToPinFromLanding(context.targetDistance, penaltyDropOrigin.x, penaltyDropOrigin.y));
     newLie = relief.newLie;
     finalOutcome = "water";
   } else if (landedHazard?.type === "ob") {
@@ -835,6 +880,8 @@ export function simulateShot(
     landing,
     finalOutcome,
     penaltyStrokes,
+    penaltyDropOrigin,
+    origin: { x: context.originX, y: context.originY },
   };
 }
 

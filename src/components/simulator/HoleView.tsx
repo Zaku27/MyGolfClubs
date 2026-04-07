@@ -14,6 +14,11 @@ import {
 } from "../../utils/clubSuccessDisplay";
 import type { LandingResult } from "../../utils/landingPosition";
 import { HoleMapCanvas } from "./HoleMapCanvas";
+
+type LandingHistoryItem = {
+  origin: { x: number; y: number };
+  landing: LandingResult;
+};
 import { ConfirmationDialog } from "../ConfirmationDialog";
 import { buildHazardDisplayName } from "../../utils/shotOutcome";
 
@@ -77,7 +82,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [showMobileScorecard, setShowMobileScorecard] = useState(false);
   const [selectedClub, setSelectedClub] = useState<SimClub | null>(null);
-  const [landingHistory, setLandingHistory] = useState<LandingResult[]>([]);
+  const [landingHistory, setLandingHistory] = useState<LandingHistoryItem[]>([]);
 
   useEffect(() => {
     if (lastShotResult) {
@@ -89,8 +94,14 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     const landing = lastShotResult?.landing;
     if (!landing) return;
     if (lastShotResult.finalOutcome === "ob") return;
-    setLandingHistory((prev) => [...prev, landing]);
-  }, [lastShotResult]);
+    setLandingHistory((prev) => [
+      ...prev,
+      {
+        origin: lastShotResult.origin ?? { x: shotContext.originX, y: shotContext.originY },
+        landing,
+      },
+    ]);
+  }, [lastShotResult, shotContext.originX, shotContext.originY]);
 
   useEffect(() => {
     setLandingHistory([]);
@@ -246,6 +257,15 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const lastShotLog = roundShots.length > 0 ? roundShots[roundShots.length - 1] : null;
   const lastShotClub = lastShotLog ? bag.find((club) => club.id === lastShotLog.clubId) : null;
   const lastShotWasPutter = lastShotClub?.type === "Putter";
+  const hazardFeedbackMessage = lastShotResult && ["bunker", "water", "rough", "ob"].includes(lastShotResult.finalOutcome)
+    ? lastShotResult.finalOutcome === "water"
+      ? "ウォーターハザードに入ってしまいました。次は救済またはペナルティで続けます。"
+      : lastShotResult.finalOutcome === "bunker"
+        ? "バンカーに入りました。落ち着いて次の1打を狙いましょう。"
+        : lastShotResult.finalOutcome === "rough"
+          ? "ラフにつかまりました。次は脱出を意識しましょう。"
+          : "OB でした。仕切り直して次のショットを打ちましょう。"
+    : null;
   const resultDistanceLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotWasPutter
       ? `パット距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}y`
@@ -352,6 +372,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 landingResults={landingHistory}
                 transientLandingResult={transientLandingResult}
                 aimPoint={selectedAimPoint}
+                shotOrigin={{ x: shotContext.originX, y: shotContext.originY }}
+                highlightPoint={lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null}
                 showTrajectories
               />
             </div>
@@ -418,6 +440,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               </p>
               {showGreenRemaining && (
                 <p className="mt-2 text-sm text-sky-800">残り {lastShotResult.newRemainingDistance}ヤード</p>
+              )}
+              {hazardFeedbackMessage && (
+                <p className="mt-3 text-sm text-emerald-700">{hazardFeedbackMessage}</p>
               )}
             </div>
 
@@ -651,6 +676,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 landingResults={landingHistory}
                 transientLandingResult={transientLandingResult}
                 aimPoint={selectedAimPoint}
+                shotOrigin={{ x: shotContext.originX, y: shotContext.originY }}
+                highlightPoint={lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null}
                 showTrajectories
               />
             </div>
