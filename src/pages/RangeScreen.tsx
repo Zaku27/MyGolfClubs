@@ -70,6 +70,13 @@ const LIE_OPTIONS = [
   'バンカー',
 ];
 
+const SLOPE_DIRECTION_PRESETS = [
+  { label: '前', value: 0 },
+  { label: '右', value: 90 },
+  { label: '後', value: 180 },
+  { label: '左', value: 270 },
+];
+
 function getLiePenaltyInfo(lie: string, clubType: string): string {
   switch (lie) {
     case 'ティー':
@@ -241,10 +248,31 @@ function formatGroundHardnessImpact(groundHardness: GroundHardness, roll: number
   return `ラン ${deltaLabel}`;
 }
 
+function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
+  const normalizedDirection = normalizeWindDirection(slopeDirection);
+  if (slopeAngle < 0) {
+    return {
+      slopeAngle: Math.abs(slopeAngle),
+      slopeDirection: normalizeWindDirection(normalizedDirection + 180),
+    };
+  }
+
+  return {
+    slopeAngle,
+    slopeDirection: normalizedDirection,
+  };
+}
+
+function toStoredSlopeDirection(slopeAngle: number, displayedDirection: number): number {
+  return slopeAngle < 0
+    ? normalizeWindDirection(displayedDirection - 180)
+    : normalizeWindDirection(displayedDirection);
+}
+
 function formatSlopeDirectionLabel(direction: number): string {
   if (direction === 0) return 'ピン方向 uphill';
-  if (direction === 180) return 'ピン方向 downhill';
   if (direction === 90) return '右側 uphill';
+  if (direction === 180) return 'ピン反対方向 uphill';
   if (direction === 270) return '左側 uphill';
   if (direction > 0 && direction < 90) return '右前 uphill';
   if (direction > 90 && direction < 180) return '右後 uphill';
@@ -252,12 +280,40 @@ function formatSlopeDirectionLabel(direction: number): string {
   return '左前 uphill';
 }
 
-function formatSlopeImpact(slopeAngle: number, slopeDirection: number, finalX: number): string {
-  if (slopeAngle === 0) return '0.0y';
-  const directionLabel = formatSlopeDirectionLabel(slopeDirection);
-  const effectMagnitude = Math.min(10, Math.abs(slopeAngle) * 0.25);
-  const sign = finalX >= 0 ? '+' : '-';
-  return `${sign}${effectMagnitude.toFixed(1)}y (${directionLabel})`;
+function formatSlopeEffectGuide(slopeAngle: number, slopeDirection: number): string {
+  const normalizedSlope = normalizeSlopeForDisplay(slopeAngle, slopeDirection);
+  if (normalizedSlope.slopeAngle === 0) {
+    return 'フラット: キャリー・ラン・横ブレの傾斜補正は入りません。';
+  }
+
+  const direction = normalizedSlope.slopeDirection;
+  const directionLabel = formatSlopeDirectionLabel(direction);
+  let effect = '前後と左右の補正が混在します。';
+
+  if (direction === 0) effect = 'ピン方向が上りになり、キャリーとランは減りやすくなります。';
+  else if (direction === 180) effect = 'ピン方向が下りになり、キャリーとランは伸びやすくなります。';
+  else if (direction === 90) effect = '右側が上りになり、左へ流れやすくなります。';
+  else if (direction === 270) effect = '左側が上りになり、右へ流れやすくなります。';
+  else if (direction > 0 && direction < 90) effect = '右前上りで、キャリーとランが減りつつ左へ流れやすくなります。';
+  else if (direction > 90 && direction < 180) effect = '右後上りで、キャリーとランが伸びつつ左へ流れやすくなります。';
+  else if (direction > 180 && direction < 270) effect = '左後上りで、キャリーとランが伸びつつ右へ流れやすくなります。';
+  else if (direction > 270 && direction < 360) effect = '左前上りで、キャリーとランが減りつつ右へ流れやすくなります。';
+
+  return `${normalizedSlope.slopeAngle}° / ${directionLabel}: ${effect}`;
+}
+
+function formatSlopeImpact(
+  landing: ShotResult['landing'] | undefined,
+  baselineLanding: ShotResult['landing'] | undefined,
+): string {
+  if (!landing || !baselineLanding) return '-';
+
+  const carryDiff = (landing.carry ?? 0) - (baselineLanding.carry ?? 0);
+  const rollDiff = (landing.roll ?? 0) - (baselineLanding.roll ?? 0);
+  const lateralDiff = (landing.lateralDeviation ?? 0) - (baselineLanding.lateralDeviation ?? 0);
+  const fmt = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}y`;
+
+  return `C ${fmt(carryDiff)} / R ${fmt(rollDiff)} / X ${fmt(lateralDiff)}`;
 }
 
 function mapLieUiToGameLie(lie: string): LieType {
@@ -394,6 +450,7 @@ export default function RangeScreen() {
   const [numShots, setNumShots] = useState<number>(10);
   const [aimXOffset, setAimXOffset] = useState<number>(0);
   const [results, setResults] = useState<ShotResult[]>([]);
+  const [flatBaselineResults, setFlatBaselineResults] = useState<ShotResult[]>([]);
   const [summary, setSummary] = useState<RangeSummary | null>(null);
   const [, setCalibrated] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -605,6 +662,7 @@ export default function RangeScreen() {
     if (!simClub) return;
     setIsSimulating(true);
     const shotResults: ShotResult[] = [];
+    const baselineResults: ShotResult[] = [];
     const simulationSeedNonce = reuseLastSeed && lastSimulationSeedNonce
       ? lastSimulationSeedNonce
       : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -664,9 +722,20 @@ export default function RangeScreen() {
         };
       }
       const shotResult = simulateShot(clubForSim, context, options);
+      const baselineResult = simulateShot(
+        clubForSim,
+        {
+          ...context,
+          groundSlopeAngle: 0,
+          groundSlopeDirection: 0,
+        },
+        options,
+      );
       shotResults.push(shotResult);
+      baselineResults.push(baselineResult);
     }
     setResults(shotResults);
+    setFlatBaselineResults(baselineResults);
     // 統計情報を集計する
     const distances = shotResults.map((r) => r.landing?.totalDistance ?? r.distanceHit);
     const avg = distances.reduce((a, b) => a + b, 0) / distances.length;
@@ -686,21 +755,13 @@ export default function RangeScreen() {
       ? '地面硬さは標準です。'
       : `${rollContribution >= 0 ? '+' : ''}${rollContribution.toFixed(1)}yd（${groundHardness}の影響）`;
 
-    const slopeDirectionLabel = (() => {
-      if (slopeDirection === 0) return 'ピン方向 uphill';
-      if (slopeDirection === 180) return 'ピン方向 downhill';
-      if (slopeDirection === 90) return '右側 uphill';
-      if (slopeDirection === 270) return '左側 uphill';
-      if (slopeDirection > 0 && slopeDirection < 90) return '右前 uphill';
-      if (slopeDirection > 90 && slopeDirection < 180) return '右後 uphill';
-      if (slopeDirection > 180 && slopeDirection < 270) return '左後 uphill';
-      return '左前 uphill';
-    })();
+    const normalizedSlope = normalizeSlopeForDisplay(slopeAngle, slopeDirection);
+    const slopeDirectionLabel = formatSlopeDirectionLabel(normalizedSlope.slopeDirection);
 
-    const slopeLabel = slopeAngle === 0
+    const slopeLabel = normalizedSlope.slopeAngle === 0
       ? 'フラット'
-      : `${slopeAngle > 0 ? `+${slopeAngle}° uphill` : `${slopeAngle}° downhill`} (${slopeDirectionLabel})`;
-    const slopeEffectLabel = slopeAngle === 0
+      : `${normalizedSlope.slopeAngle}° (${slopeDirectionLabel})`;
+    const slopeEffectLabel = normalizedSlope.slopeAngle === 0
       ? 'フラットなので横ブレ影響は標準です。'
       : `傾斜 ${slopeLabel} のため横ブレ平均は ${meanLateral.toFixed(1)}y、${meanFinalX >= 0 ? '右' : '左'}方向へやや影響しています。`;
 
@@ -892,13 +953,6 @@ export default function RangeScreen() {
                   slopeAngle={slopeAngle}
                 />
               </div>
-              <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
-                <div className="mb-1 font-semibold">地面条件の影響</div>
-                <div>平均ラン: {summary.meanRoll.toFixed(1)} y</div>
-                <div>平均横ブレ: {summary.meanLateral.toFixed(1)} y</div>
-                <div className="mt-2">{summary.groundRollContribution}</div>
-                <div>{summary.groundLateralContribution}</div>
-              </div>
               {summary.estimatedDist && (
                 <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
                   <span className="font-semibold">目安との比較：</span>
@@ -936,7 +990,7 @@ export default function RangeScreen() {
                         <td className="px-1 py-0.5 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
                         <td className="px-1 py-0.5 text-center">{formatGroundHardnessImpact(summary.appliedGroundHardness, r.landing?.roll)}</td>
                         <td className="px-1 py-0.5 text-center">
-                          {formatSlopeImpact(slopeAngle, slopeDirection, r.landing?.finalX ?? 0)}
+                          {formatSlopeImpact(r.landing, flatBaselineResults[i]?.landing)}
                         </td>
                         {/* <td className={`px-1 py-0.5 text-center ${r.landing?.qualityMetrics && r.landing.qualityMetrics.score >= r.landing.qualityMetrics.poorThreshold ? 'text-red-600 font-bold' : ''}`}>
                           {r.landing?.qualityMetrics ? `${r.landing.qualityMetrics.score.toFixed(2)} / ${r.landing.qualityMetrics.poorThreshold.toFixed(2)}` : '-'}
@@ -1094,11 +1148,10 @@ export default function RangeScreen() {
               )}
             </div>
             <div className="mt-4 rounded border border-green-200 bg-green-50 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="mb-2">
                 <label className="font-semibold">地面条件</label>
-                <span className="text-xs text-gray-600">風設定の下 / 試行回数の上</span>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3">
                 <label className="space-y-1 text-xs font-semibold text-emerald-800">
                   地面硬さ
                   <select
@@ -1111,37 +1164,59 @@ export default function RangeScreen() {
                     <option value="firm">Firm</option>
                   </select>
                 </label>
-                <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                  傾斜角度
-                  <input
-                    type="range"
-                    min={-20}
-                    max={20}
-                    step={1}
-                    value={slopeAngle}
-                    onChange={(event) => setSlopeAngle(Number(event.target.value))}
-                    className="w-full cursor-pointer"
-                  />
-                  <div className="text-right text-[11px] text-emerald-700">
-                    {slopeAngle > 0 ? `上り ${slopeAngle}°` : slopeAngle < 0 ? `下り ${Math.abs(slopeAngle)}°` : 'フラット'}
-                  </div>
-                </label>
-                <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                  傾斜方向
-                  <input
-                    type="range"
-                    min={0}
-                    max={359}
-                    step={1}
-                    value={slopeDirection}
-                    onChange={(event) => setSlopeDirection(normalizeWindDirection(Number(event.target.value)))}
-                    className="w-full cursor-pointer"
-                  />
-                  <div className="text-right text-[11px] text-emerald-700">
-                    {slopeDirection}°
-                  </div>
-                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                    傾斜角度
+                    <input
+                      type="range"
+                      min={-20}
+                      max={20}
+                      step={1}
+                      value={slopeAngle}
+                      onChange={(event) => setSlopeAngle(Number(event.target.value))}
+                      className="w-full cursor-pointer"
+                    />
+                    <div className="text-right text-[11px] text-emerald-700">
+                      {slopeAngle === 0 ? 'フラット' : `傾斜量 ${Math.abs(slopeAngle)}°`}
+                    </div>
+                  </label>
+                  <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                    uphill方向
+                    <input
+                      type="range"
+                      min={0}
+                      max={359}
+                      step={1}
+                      value={slopeDirection}
+                      onChange={(event) => setSlopeDirection(normalizeWindDirection(Number(event.target.value)))}
+                      className="w-full cursor-pointer"
+                    />
+                    <div className="text-right text-[11px] text-emerald-700">
+                      {normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection}°
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {SLOPE_DIRECTION_PRESETS.map((preset) => (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          onClick={() => setSlopeDirection(toStoredSlopeDirection(slopeAngle, preset.value))}
+                          className={[
+                            'min-w-10 rounded border px-2 py-1 text-[11px] font-bold transition',
+                            normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === preset.value
+                              ? 'border-emerald-700 bg-emerald-700 text-white'
+                              : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                          ].join(' ')}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                </div>
               </div>
+              <p className="mt-3 text-xs leading-relaxed text-emerald-800">
+                {formatSlopeEffectGuide(slopeAngle, slopeDirection)}
+              </p>
             </div>
             <div>
               <label className="block font-semibold mb-1">試行回数</label>

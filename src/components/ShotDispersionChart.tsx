@@ -282,9 +282,7 @@ export function ShotDispersionChart({
     if (groundHardness == null || slopeAngle == null) return null;
     const slopeLabel = slopeAngle === 0
       ? 'flat'
-      : slopeAngle > 0
-        ? `+${slopeAngle}° uphill`
-        : `${slopeAngle}° downhill`;
+      : `${Math.abs(slopeAngle)}° slope`;
 
     return `地面硬さ：${groundHardness.charAt(0).toUpperCase() + groundHardness.slice(1)} / 傾斜：${slopeLabel}`;
   }, [groundHardness, slopeAngle]);

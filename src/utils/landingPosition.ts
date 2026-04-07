@@ -156,6 +156,8 @@ function buildGroundConditionSeed(
   club: ClubData,
   skillLevel: SkillLevel,
 ): string {
+  const normalizedSlope = normalizeGroundSlope(ground);
+
   return [
     GROUND_CONDITION_SEED_PREFIX,
     club.clubType,
@@ -167,8 +169,8 @@ function buildGroundConditionSeed(
     landingResult.roll,
     landingResult.lateralDeviation,
     ground.hardness,
-    ground.slopeAngle,
-    ground.slopeDirection,
+    normalizedSlope.slopeAngle,
+    normalizedSlope.slopeDirection,
     skillLevel.dispersion,
     skillLevel.mishitRate,
     skillLevel.sideSpinDispersion,
@@ -177,6 +179,23 @@ function buildGroundConditionSeed(
 
 function clampGroundSlopeAngle(angle: number): number {
   return clamp(angle, -MAX_GROUND_SLOPE_ANGLE, MAX_GROUND_SLOPE_ANGLE);
+}
+
+function normalizeGroundSlope(ground: GroundCondition): { slopeAngle: number; slopeDirection: number } {
+  const slopeAngle = clampGroundSlopeAngle(ground.slopeAngle);
+  const normalizedDirection = ((ground.slopeDirection % 360) + 360) % 360;
+
+  if (slopeAngle < 0) {
+    return {
+      slopeAngle: Math.abs(slopeAngle),
+      slopeDirection: (normalizedDirection + 180) % 360,
+    };
+  }
+
+  return {
+    slopeAngle,
+    slopeDirection: normalizedDirection,
+  };
 }
 
 /**
@@ -190,10 +209,11 @@ export function applyGroundCondition(
 ): AdjustedLandingResult {
   const rng = seedrandom(buildGroundConditionSeed(landingResult, ground, club, skillLevel));
   const hardnessMultiplier = HARDNESS_MULTIPLIER_BY_TYPE[ground.hardness];
-  const adjustedSlopeAngle = clampGroundSlopeAngle(ground.slopeAngle);
+  const normalizedSlope = normalizeGroundSlope(ground);
+  const adjustedSlopeAngle = normalizedSlope.slopeAngle;
   const slopeAngleRad = (adjustedSlopeAngle * Math.PI) / 180;
   const slopeStrength = Math.min(1, Math.abs(adjustedSlopeAngle) / 45);
-  const slopeDirectionRad = ((ground.slopeDirection % 360) + 360) % 360 * (Math.PI / 180);
+  const slopeDirectionRad = (normalizedSlope.slopeDirection * Math.PI) / 180;
 
   // 0度はピン方向uphillのため、+値ほどキャリーが減る。
   const forwardSlopeComponent = slopeStrength * Math.cos(slopeDirectionRad);
