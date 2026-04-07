@@ -142,19 +142,48 @@ function normalizeDegrees(degrees: number): number {
   return (normalized + 360) % 360;
 }
 
+// 風向(0=北へ, 180=南へ)から風の世界座標成分を返す。
+// 本プロジェクトでは角度を「その方角へ吹く風」として扱う。
+function getWindVector(strength: number, windDirectionDegrees: number): { x: number; y: number } {
+  const normalized = normalizeDegrees(windDirectionDegrees);
+  const rad = (normalized * Math.PI) / 180;
+  return {
+    x: Math.sin(rad) * strength,
+    y: Math.cos(rad) * strength,
+  };
+}
+
+// 風の世界座標成分をショットの進行方向に投影して、
+// その方向に沿った向風/追い風成分と横風成分を得る。
+function getWindComponentsRelativeToShotDirection(
+  strength: number,
+  windDirectionDegrees: number,
+  originX: number,
+  originY: number,
+  targetDistance: number,
+): { headTail: number; crossWind: number } {
+  const wind = getWindVector(strength, windDirectionDegrees);
+  const pinX = 0;
+  const pinY = targetDistance;
+  const toPinX = pinX - originX;
+  const toPinY = pinY - originY;
+  const toPinDistance = Math.hypot(toPinX, toPinY);
+  const forward = toPinDistance > 1e-6
+    ? { x: toPinX / toPinDistance, y: toPinY / toPinDistance }
+    : { x: 0, y: 1 };
+  const right = { x: forward.y, y: -forward.x };
+  return {
+    headTail: forward.x * wind.x + forward.y * wind.y,
+    crossWind: right.x * wind.x + right.y * wind.y,
+  };
+}
+
 // 風向(0=北へ, 180=南へ)から「ショット進行方向成分」の mph を返す。
 // 本プロジェクトでは角度を「その方角へ吹く風」として扱う。
 function getHeadTailWindComponentMph(strength: number, windDirectionDegrees: number): number {
   const normalized = normalizeDegrees(windDirectionDegrees);
   const rad = (normalized * Math.PI) / 180;
   return Math.cos(rad) * strength;
-}
-
-// 風向(0=北へ, 90=東へ)から横風成分 mph を返す。
-function getCrossWindComponentMph(strength: number, windDirectionDegrees: number): number {
-  const normalized = normalizeDegrees(windDirectionDegrees);
-  const rad = (normalized * Math.PI) / 180;
-  return Math.sin(rad) * strength;
 }
 
 function getWindYards(
@@ -357,10 +386,20 @@ function getNearCupLeaveDistance(shotQuality: ShotQuality, random: () => number)
 
 function mapWindToLanding(
   windStrength: number,
-  windDirectionDegrees?: number,
+  windDirectionDegrees: number | undefined,
+  originX: number,
+  originY: number,
+  targetDistance: number,
 ): number {
   if (typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)) {
-    return getHeadTailWindComponentMph(windStrength, windDirectionDegrees);
+    const windComponents = getWindComponentsRelativeToShotDirection(
+      windStrength,
+      windDirectionDegrees,
+      originX,
+      originY,
+      targetDistance,
+    );
+    return windComponents.headTail;
   }
   return 0;
 }
@@ -630,7 +669,13 @@ export function simulateShot(
     },
     aimXOffset: options.aimXOffset ?? 0,
     conditions: {
-      wind: mapWindToLanding(windStrength, windDirectionDegrees),
+      wind: mapWindToLanding(
+        windStrength,
+        windDirectionDegrees,
+        context.originX,
+        context.originY,
+        context.targetDistance,
+      ),
       groundHardness: mapGroundHardnessByLie(lie),
       headSpeed: options.headSpeed,
       seed: landingSeed,
@@ -643,11 +688,17 @@ export function simulateShot(
 
   // 360度風向がある場合は横風成分を着弾Xへ加算する。
   // 係数は現行モデルと同様に簡易線形として、調整しやすい形で定義する。
-  const crossWindComponentMph =
+  const windComponents =
     typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)
-      ? getCrossWindComponentMph(windStrength, windDirectionDegrees)
-      : 0;
-  const lateralWindYards = crossWindComponentMph * 0.9;
+      ? getWindComponentsRelativeToShotDirection(
+          windStrength,
+          windDirectionDegrees,
+          context.originX,
+          context.originY,
+          context.targetDistance,
+        )
+      : { headTail: 0, crossWind: 0 };
+  const lateralWindYards = windComponents.crossWind * 0.9;
 
   const lieDistanceMultiplier = getEffectiveLieDistanceMultiplier(
     lie,
@@ -731,12 +782,12 @@ export function simulateShot(
   let newLie: LieType;
   let finalOutcome: ShotResult["finalOutcome"];
   if (landedHazard?.type === "water") {
-    const relief = resolvePenaltyRelief("water", lie, remainingDistance, newRemaining);
+    const relief = resolvePenaltyRelief("water", lie, remainingDistance, newRemaining, landedHazard.penaltyStrokes ?? 3);
     newRemaining = relief.newRemaining;
     newLie = relief.newLie;
     finalOutcome = "water";
   } else if (landedHazard?.type === "ob") {
-    const relief = resolvePenaltyRelief("ob", lie, remainingDistance, newRemaining);
+    const relief = resolvePenaltyRelief("ob", lie, remainingDistance, newRemaining, landedHazard.penaltyStrokes ?? 3);
     newRemaining = relief.newRemaining;
     newLie = relief.newLie;
     finalOutcome = "ob";

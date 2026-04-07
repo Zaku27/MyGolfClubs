@@ -3,6 +3,7 @@ import { useMemo, useState, useEffect } from "react";
 import type { LieType, SimClub } from "../../types/game";
 import { useClubStore } from "../../store/clubStore";
 import { estimateBaseDistance } from "../../utils/shotSimulation";
+import { getSkillLabel } from "../../utils/playerSkill";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
 import { CompactScorecard } from "./Scorecard";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
@@ -101,6 +102,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const { remainingDistance, lie, windStrength = 0, hazards = [] } = shotContext;
   const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettings();
   const seatType = playMode === "robot" ? "robot" : "personal";
+  const displayedSkillLevel = playMode === "robot" ? robotSkillLevel : playerSkillLevel;
+  const displayedSkillLabel = getSkillLabel(displayedSkillLevel);
   const completedRelativeToPar = scores.reduce((sum, s) => sum + (s.strokes - s.par), 0);
   const currentHoleRelativeToPar =
     phase === "playing" && holeStrokes > 0 ? holeStrokes - currentHole.par : 0;
@@ -277,16 +280,12 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             <span>PAR {currentHole.par}</span>
             <span className="text-emerald-500">|</span>
             <span>{currentHole.distanceFromTee}ヤード</span>
-            {playMode !== "robot" && (
-              <>
-                <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-sky-800">
-                  ゴルフバッグプレイ中
-                </span>
-                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-emerald-900">
-                  スキルレベル: {(playerSkillLevel * 100).toFixed(0)}%
-                </span>
-              </>
-            )}
+            <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-sky-800">
+              {playMode === "robot" ? "ロボットプレイ中" : "ゴルフバッグプレイ中"}
+            </span>
+            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-emerald-900">
+              適用スキルレベル {(displayedSkillLevel * 100).toFixed(0)}% ({displayedSkillLabel})
+            </span>
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             {showScoreDisplay && (
@@ -390,7 +389,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
           <div className="mt-3 text-xs font-semibold text-sky-800 sm:text-sm">
             {playMode === "robot"
-              ? `ヘッドスピード: ${robotHeadSpeed.toFixed(1)} m/s / スキルレベル: ${(robotSkillLevel * 100).toFixed(0)}%`
+              ? `ヘッドスピード: ${robotHeadSpeed.toFixed(1)} m/s`
               : ""}
           </div>
           <h1 className="mt-4 text-3xl font-extrabold leading-tight text-emerald-900 sm:text-4xl">
@@ -499,28 +498,30 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           </button>
 
           {/* パワー調整スライダー */}
-          <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-4 py-4">
-            <div className="mb-2 flex items-center justify-between text-xs font-bold tracking-[0.08em] text-emerald-800">
-              <span>パワー</span>
-              <span>{shotPowerPercent}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={110}
-              step={1}
-              value={shotPowerPercent}
-              onChange={e => setShotPowerPercent(Number(e.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
-              aria-label="ショットパワー"
-              disabled={!selectedClub || isResultActionVisible}
-            />
-            <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
-              <span>0%</span>
+          {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
+            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-4 py-4">
+              <div className="mb-2 flex items-center justify-between text-xs font-bold tracking-[0.08em] text-emerald-800">
+                <span>パワー</span>
+                <span>{shotPowerPercent}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={110}
+                step={1}
+                value={shotPowerPercent}
+                onChange={e => setShotPowerPercent(Number(e.target.value))}
+                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
+                aria-label="ショットパワー"
+                disabled={!selectedClub || isResultActionVisible}
+              />
+              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
+                <span>0%</span>
 
-              <span>110%</span>
+                <span>110%</span>
+              </div>
             </div>
-          </div>
+          ) : null}
 
         </section>
 

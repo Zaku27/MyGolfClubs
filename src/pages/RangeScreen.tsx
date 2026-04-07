@@ -24,7 +24,6 @@ import { formatGolfClubDisplayName } from '../utils/simClubLabel';
 import {
   simulateShot,
   estimateBaseDistance,
-  getLieDistanceMultiplierValue,
 } from '../utils/shotSimulation';
 import { getSkillLabel } from '../utils/playerSkill';
 import {
@@ -343,10 +342,9 @@ export default function RangeScreen() {
   const chartAim = { x: aimXOffset, y: summary?.estimatedDist ?? 0 };
   const personalSkillLevel = storedPlayerSkillLevel;
   const personalSkillLevelLabel = getSkillLabel(personalSkillLevel);
-  const skillLevelName =
-    seatType === 'robot'
-      ? `Robot Skill ${(robotSkillLevel * 100).toFixed(0)}%`
-      : `適用スキルレベル ${(personalSkillLevel * 100).toFixed(0)}% (${personalSkillLevelLabel})`;
+  const displayedSkillLevel = seatType === 'robot' ? robotSkillLevel : personalSkillLevel;
+  const displayedSkillLabel = getSkillLabel(displayedSkillLevel);
+  const skillLevelName = `適用スキルレベル ${(displayedSkillLevel * 100).toFixed(0)}% (${displayedSkillLabel})`;
   const clubs = seatType === 'personal' ? activeBagClubs : allClubs;
   const selectableClubs = getSelectableRangeClubs(clubs, seatType);
   const swingWeightTarget = readStoredNumber(
@@ -464,7 +462,6 @@ export default function RangeScreen() {
         true,
       )
     : 0;
-  const lieDistanceMultiplier = getLieDistanceMultiplierValue(gameLie, simClub?.type ?? 'Iron');
   const analysisPenaltyByClubId = (() => {
     const penaltyMap: Record<string, AnalysisPenalty> = {};
 
@@ -653,6 +650,14 @@ export default function RangeScreen() {
         </div>
       </div>
 
+      <div className="w-full max-w-7xl mb-4">
+        <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 shadow-sm">
+          <span className="text-xs font-semibold uppercase tracking-widest text-green-700">適用スキルレベル</span>
+          <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-900">
+            {(displayedSkillLevel * 100).toFixed(0)}% ({displayedSkillLabel})
+          </span>
+        </div>
+      </div>
 
       <div className="w-full max-w-7xl flex flex-col gap-4 lg:flex-row lg:items-start">
         <main className="w-full lg:flex-1 flex flex-col gap-4">
