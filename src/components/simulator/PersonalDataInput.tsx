@@ -296,7 +296,7 @@ export function PersonalDataInput() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">シミュレーター設定</p>
-            <h1 className="text-2xl font-bold text-slate-900">個人データ入力</h1>
+            <h1 className="text-2xl font-bold text-slate-900">パーソナルデータ</h1>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Link

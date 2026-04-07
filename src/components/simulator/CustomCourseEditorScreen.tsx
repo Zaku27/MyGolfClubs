@@ -5,14 +5,14 @@ import { CourseEditor } from "./CourseEditor";
 import { cloneCourse, generateRandomCourse } from "../../utils/courseGenerator";
 import { readStoredJson, writeStoredJson } from "../../utils/storage";
 
-interface CustomCoursePreset {
+export interface CustomCoursePreset {
   id: string;
   name: string;
   holeCount: 1 | 3 | 9 | 18;
   course: Hole[];
 }
 
-interface CustomCourseStorage {
+export interface CustomCourseStorage {
   selectedCourseId: string;
   courses: CustomCoursePreset[];
 }
@@ -239,7 +239,7 @@ function parseStoredCustomCourse(value: unknown): CustomCourseStorage {
   };
 }
 
-function loadStoredCustomCourse(): CustomCourseStorage {
+export function loadStoredCustomCourse(): CustomCourseStorage {
   return readStoredJson<CustomCourseStorage>(
     CUSTOM_COURSE_STORAGE_KEY,
     (() => {
