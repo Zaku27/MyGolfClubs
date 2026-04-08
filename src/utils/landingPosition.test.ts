@@ -4,22 +4,13 @@ import { getWaterHazardDropOrigin } from './shotSimulation';
 import { assessLanding, buildNextShotAdvice, buildOutcomeMessage, determineLieFromFinalOutcome } from './shotOutcome';
 import type { GroundCondition, Hazard } from '../types/game';
 
-const BASE_LANDING: LandingResult = {
-  carry: 100,
-  roll: 20,
-  totalDistance: 120,
-  lateralDeviation: 0,
-  finalX: 0,
-  finalY: 120,
-};
-
 const BASE_CLUB: ClubData = {
   clubType: 'Iron',
   name: 'Test Iron',
   number: '7',
   length: 37,
   weight: 430,
-  swingWeight: 2,
+  swingWeight: 'D2',
   lieAngle: 62,
   loftAngle: 34,
   shaftType: 'Steel',

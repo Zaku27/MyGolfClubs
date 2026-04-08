@@ -235,7 +235,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   }),
 
   setAimXOffset: (aimXOffset) => set({
-    aimXOffset: Math.max(-40, Math.min(40, Math.round(aimXOffset))),
+    aimXOffset: Math.max(-50, Math.min(50, Math.round(aimXOffset))),
   }),
 
   takeShot: () => {

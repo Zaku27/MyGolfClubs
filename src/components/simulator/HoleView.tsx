@@ -506,8 +506,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               </div>
               <input
                 type="range"
-                min={-40}
-                max={40}
+                min={-50}
+                max={50}
                 step={1}
                 value={aimXOffset}
                 onChange={e => setAimXOffset(Number(e.target.value))}
@@ -516,9 +516,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 disabled={!selectedClub || isResultActionVisible}
               />
               <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-sky-700">
-                <span>左 40y</span>
+                <span>左 50y</span>
                 <span>中央</span>
-                <span>右 40y</span>
+                <span>右 50y</span>
               </div>
             </div>
           ) : null}
