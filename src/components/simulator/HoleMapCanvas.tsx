@@ -513,7 +513,7 @@ export function HoleMapCanvas({
   };
 
   const handleCanvasWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
-    if (!metrics) return;
+    if (editable || !metrics) return;
     event.preventDefault();
 
     const delta = -event.deltaY * 0.0015;
@@ -578,13 +578,13 @@ export function HoleMapCanvas({
   }, []);
 
   useEffect(() => {
-    if (!metrics || holeComplete) return;
+    if (!metrics || holeComplete || editable) return;
     if (distanceToPin <= 100) {
       const targetScale = getAutoZoomScale(distanceToPin);
       const targetViewport = buildCenteredViewport(targetScale, pinPoint);
       animateViewportTo(targetViewport);
     }
-  }, [distanceToPin, metrics, size.width, size.height, targetDistance, pinPoint, animateViewportTo, holeComplete]);
+  }, [distanceToPin, metrics, size.width, size.height, targetDistance, pinPoint, animateViewportTo, holeComplete, editable]);
 
   useEffect(() => {
     if (holeComplete) {
@@ -795,19 +795,29 @@ export function HoleMapCanvas({
       context.fillRect(leftPx, topPx, widthPx, heightPx);
       context.strokeRect(leftPx, topPx, widthPx, heightPx);
 
+      const label = buildHazardDisplayName(hazard);
+      context.save();
+      context.font = "bold 10px sans-serif";
+      context.textAlign = "center";
+      context.lineWidth = 2;
+      context.strokeStyle = "rgba(0, 0, 0, 0.6)";
+      context.fillStyle = "#ffffff";
+
       if (widthPx >= 26 && heightPx >= 16) {
-        const label = buildHazardDisplayName(hazard);
-        context.save();
-        context.font = "bold 10px sans-serif";
-        context.textAlign = "center";
+        const labelX = leftPx + widthPx / 2;
+        const labelY = topPx + heightPx / 2;
         context.textBaseline = "middle";
-        context.lineWidth = 2;
-        context.strokeStyle = "rgba(0, 0, 0, 0.6)";
-        context.strokeText(label, leftPx + widthPx / 2, topPx + heightPx / 2);
-        context.fillStyle = "#ffffff";
-        context.fillText(label, leftPx + widthPx / 2, topPx + heightPx / 2);
-        context.restore();
+        context.strokeText(label, labelX, labelY);
+        context.fillText(label, labelX, labelY);
+      } else if (widthPx >= 14 && heightPx >= 10) {
+        const labelX = leftPx + widthPx / 2;
+        const labelY = topPx - 4;
+        context.textBaseline = "bottom";
+        context.strokeText(label, labelX, labelY);
+        context.fillText(label, labelX, labelY);
       }
+
+      context.restore();
     }
 
     // ティー位置を描画。
@@ -875,9 +885,9 @@ export function HoleMapCanvas({
       return null;
     }
 
-    const { padding, drawHeight, drawWidth, halfYardX, maxYardY } = currentMetrics;
-    const yardToPxX = (yardX: number) => padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
-    const yardToPxY = (yardY: number) => padding.top + drawHeight * (1 - yardY / maxYardY);
+    const { offsetX, offsetY, yardScale, maxYardY } = currentMetrics;
+    const yardToPxX = (yardX: number) => offsetX + (yardX + currentMetrics.halfYardX) * yardScale;
+    const yardToPxY = (yardY: number) => offsetY + (maxYardY - yardY) * yardScale;
 
     const leftYard = hazard.xCenter - hazard.width / 2;
     const rightYard = hazard.xCenter + hazard.width / 2;
@@ -907,10 +917,9 @@ export function HoleMapCanvas({
       return;
     }
 
-    const yardPerPxX = (metrics.halfYardX * 2) / metrics.drawWidth;
-    const yardPerPxY = metrics.maxYardY / metrics.drawHeight;
-    const deltaX = (clientX - state.startClientX) * yardPerPxX;
-    const deltaY = -(clientY - state.startClientY) * yardPerPxY;
+    const yardPerPx = 1 / metrics.yardScale;
+    const deltaX = (clientX - state.startClientX) * yardPerPx;
+    const deltaY = -(clientY - state.startClientY) * yardPerPx;
 
     const next = hazards.map((hazard) => {
       if (hazard.id !== state.hazardId) {
@@ -1026,7 +1035,7 @@ export function HoleMapCanvas({
         onPointerLeave={handleCanvasPointerUp}
       />
       <div className="pointer-events-none absolute inset-0 flex items-start justify-end gap-2 p-3">
-        {!isViewportDefault && (
+        {!editable && !isViewportDefault && (
           <button
             type="button"
             onClick={resetViewport}
@@ -1079,10 +1088,15 @@ export function HoleMapCanvas({
             const isSelected = selectedHazardId === hazard.id;
             const baseClass = isSelected
               ? "border-emerald-900 bg-emerald-300/20"
-              : "border-emerald-700/70 bg-emerald-300/10";
+              : "border-transparent bg-transparent";
 
             const startDrag = (event: React.PointerEvent<HTMLElement>, mode: DragMode, handle?: ResizeHandle) => {
-              event.preventDefault();
+              if (dragState) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+
               event.stopPropagation();
               event.currentTarget.setPointerCapture(event.pointerId);
               onSelectHazardId?.(hazard.id);
@@ -1112,25 +1126,29 @@ export function HoleMapCanvas({
                   onSelectHazardId?.(hazard.id);
                 }}
               >
-                <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
-                  {buildHazardDisplayName(hazard)}
-                </div>
-                {(["nw", "ne", "sw", "se"] as ResizeHandle[]).map((handle) => {
-                  const styleByHandle: Record<ResizeHandle, string> = {
-                    nw: "-left-1.5 -top-1.5 cursor-nwse-resize",
-                    ne: "-right-1.5 -top-1.5 cursor-nesw-resize",
-                    sw: "-left-1.5 -bottom-1.5 cursor-nesw-resize",
-                    se: "-right-1.5 -bottom-1.5 cursor-nwse-resize",
-                  };
+                {isSelected && (
+                  <>
+                    <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
+                      {buildHazardDisplayName(hazard)}
+                    </div>
+                    {(["nw", "ne", "sw", "se"] as ResizeHandle[]).map((handle) => {
+                      const styleByHandle: Record<ResizeHandle, string> = {
+                        nw: "-left-1.5 -top-1.5 cursor-nwse-resize",
+                        ne: "-right-1.5 -top-1.5 cursor-nesw-resize",
+                        sw: "-left-1.5 -bottom-1.5 cursor-nesw-resize",
+                        se: "-right-1.5 -bottom-1.5 cursor-nwse-resize",
+                      };
 
-                  return (
-                    <span
-                      key={`${hazard.id}-${handle}`}
-                      className={`absolute h-3 w-3 rounded-full border border-white bg-emerald-700 ${styleByHandle[handle]}`}
-                      onPointerDown={(event) => startDrag(event, "resize", handle)}
-                    />
-                  );
-                })}
+                      return (
+                        <span
+                          key={`${hazard.id}-${handle}`}
+                          className={`absolute h-3 w-3 rounded-full border border-white bg-emerald-700 ${styleByHandle[handle]}`}
+                          onPointerDown={(event) => startDrag(event, "resize", handle)}
+                        />
+                      );
+                    })}
+                  </>
+                )}
               </div>
             );
           })}

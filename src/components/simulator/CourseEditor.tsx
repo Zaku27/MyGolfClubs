@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { GroundCondition, Hazard, HazardType, Hole } from "../../types/game";
 import { generateRandomCourse } from "../../utils/courseGenerator";
-import { buildAutoHazardName } from "../../utils/shotOutcome";
 import { HoleMapCanvas } from "./HoleMapCanvas";
 
 interface CourseEditorProps {
@@ -9,18 +8,22 @@ interface CourseEditorProps {
   onChange: (holes: Hole[]) => void;
 }
 
-function formatSlopeDirectionLabel(direction: number): string {
-  if (direction === 0) return 'ピン方向上り';
-  if (direction === 90) return '右側上り';
-  if (direction === 180) return 'ピン反対方向上り';
-  if (direction === 270) return '左側上り';
-  if (direction > 0 && direction < 90) return '右前上り';
-  if (direction > 90 && direction < 180) return '右後上り';
-  if (direction > 180 && direction < 270) return '左後上り';
-  return '左前上り';
-}
+const DEFAULT_GROUND_CONDITION: GroundCondition = {
+  hardness: "medium",
+  slopeAngle: 0,
+  slopeDirection: 0,
+};
 
-function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
+const HAZARD_TYPE_LABEL: Record<HazardType, string> = {
+  bunker: "バンカー",
+  water: "ウォーター",
+  ob: "OB",
+  rough: "ラフ",
+  semirough: "セミラフ",
+  bareground: "ベアグラウンド",
+};
+
+function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number) {
   const normalizedDirection = ((slopeDirection % 360) + 360) % 360;
   if (slopeAngle < 0) {
     return {
@@ -35,7 +38,7 @@ function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number): {
   };
 }
 
-function toCanonicalSlopeSettings(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
+function toCanonicalSlopeSettings(slopeAngle: number, slopeDirection: number) {
   const safeAngle = Number.isFinite(slopeAngle) ? slopeAngle : 0;
   const clampedAngle = Math.min(45, Math.abs(safeAngle));
   const normalizedDirection = Number.isFinite(slopeDirection)
@@ -55,77 +58,60 @@ function toCanonicalSlopeSettings(slopeAngle: number, slopeDirection: number): {
   };
 }
 
-function formatSlopeGuide(slopeAngle: number, slopeDirection: number): string {
+function formatSlopeGuide(slopeAngle: number, slopeDirection: number) {
   const normalized = normalizeSlopeForDisplay(slopeAngle, slopeDirection);
-
   if (normalized.slopeAngle === 0) {
-    return 'フラット: キャリー・ラン・横ブレの傾斜補正は入りません。';
+    return "平坦です。補正は入りません。";
   }
 
-  const directionLabel = formatSlopeDirectionLabel(normalized.slopeDirection);
-  let effect = '前後と左右の補正が混在します。';
-  if (normalized.slopeDirection === 0) effect = 'ピン方向が上りになり、キャリーとランは減りやすくなります。';
-  else if (normalized.slopeDirection === 180) effect = 'ピン方向が下りになり、キャリーとランは伸びやすくなります。';
-  else if (normalized.slopeDirection === 90) effect = '右側が上りになり、左へ流れやすくなります。';
-  else if (normalized.slopeDirection === 270) effect = '左側が上りになり、右へ流れやすくなります。';
-  else if (normalized.slopeDirection > 0 && normalized.slopeDirection < 90) effect = '右前上りで、キャリーとランが減りつつ左へ流れやすくなります。';
-  else if (normalized.slopeDirection > 90 && normalized.slopeDirection < 180) effect = '右後上りで、キャリーとランが伸びつつ左へ流れやすくなります。';
-  else if (normalized.slopeDirection > 180 && normalized.slopeDirection < 270) effect = '左後上りで、キャリーとランが伸びつつ右へ流れやすくなります。';
-  else if (normalized.slopeDirection > 270 && normalized.slopeDirection < 360) effect = '左前上りで、キャリーとランが減りつつ右へ流れやすくなります。';
+  const label =
+    normalized.slopeDirection === 0 ? "ピン方向上り" :
+    normalized.slopeDirection === 90 ? "右側上り" :
+    normalized.slopeDirection === 180 ? "ピン反対方向上り" :
+    normalized.slopeDirection === 270 ? "左側上り" :
+    normalized.slopeDirection < 90 ? "右前上り" :
+    normalized.slopeDirection < 180 ? "右後上り" :
+    normalized.slopeDirection < 270 ? "左後上り" : "左前上り";
 
-  return `${normalized.slopeAngle}° / ${directionLabel}: ${effect}`;
+  return `${normalized.slopeAngle}° / ${label}`;
 }
 
-function toStoredSlopeDirection(slopeAngle: number, displayedDirection: number): number {
+function toStoredSlopeDirection(slopeAngle: number, displayedDirection: number) {
   const normalizedDirection = ((displayedDirection % 360) + 360) % 360;
-  return slopeAngle < 0
-    ? (normalizedDirection + 180) % 360
-    : normalizedDirection;
+  return slopeAngle < 0 ? (normalizedDirection + 180) % 360 : normalizedDirection;
 }
 
-const HAZARD_TYPE_LABEL: Record<HazardType, string> = {
-  bunker: "バンカー",
-  water: "ウォーター",
-  ob: "OB",
-  rough: "ラフ",
-  semirough: "セミラフ",
-  bareground: "ベアグラウンド",
-};
-
-function cloneHazards(hazards: Hazard[] | undefined): Hazard[] {
+function cloneHazards(hazards: Hazard[] | undefined) {
   return (hazards ?? []).map((hazard) => ({ ...hazard }));
 }
 
-function buildHazardNameFromPosition(xCenter: number, width: number, type: HazardType): string {
-  return buildAutoHazardName(type, xCenter, width);
+function buildHazardName(type: HazardType, xCenter: number, width: number) {
+  return `${type.toUpperCase()} ${Math.round(xCenter)} ${Math.round(width)}`;
 }
 
 function buildEmptyHazard(hole: Hole): Hazard {
   const holeLength = hole.targetDistance ?? hole.distanceFromTee;
-  const yFront = Math.round(holeLength * 0.45);
+  const yFront = Math.max(10, Math.round(holeLength * 0.35));
   const xCenter = 0;
-  const type: HazardType = "bunker";
+  const width = 30;
 
   return {
-    id: `manual-${hole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    type,
+    id: `hazard-${hole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type: "bunker",
     shape: "rectangle",
     yFront,
     yBack: yFront + 18,
     xCenter,
-    width: 30,
+    width,
     penaltyStrokes: 0,
-    groundCondition: {
-      hardness: "medium",
-      slopeAngle: 0,
-      slopeDirection: 0,
-    },
-    name: buildHazardNameFromPosition(xCenter, 30, type),
+    groundCondition: { ...DEFAULT_GROUND_CONDITION },
+    name: buildHazardName("bunker", xCenter, width),
   };
 }
 
-function getPenaltyStrokesByType(type: HazardType): 0 | 1 {
-  if (type === "water" || type === "ob") return 1;
+function getPenaltyStrokesByType(type: HazardType): 0 | 1 | 2 {
+  if (type === "ob") return 2;
+  if (type === "water") return 1;
   return 0;
 }
 
@@ -136,46 +122,13 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const safeHoleIndex = Math.max(0, Math.min(selectedHoleIndex, holes.length - 1));
   const selectedHole = holes[safeHoleIndex];
 
-  const defaultGroundCondition: GroundCondition = {
-    hardness: "medium",
-    slopeAngle: 0,
-    slopeDirection: 0,
-  };
-
   const selectedHazard = useMemo(
     () => selectedHole?.hazards?.find((hazard) => hazard.id === selectedHazardId) ?? null,
     [selectedHazardId, selectedHole],
   );
 
-  const selectedGroundCondition = selectedHazard?.groundCondition ?? selectedHole?.groundCondition ?? defaultGroundCondition;
-  const normalizedSelectedSlope = normalizeSlopeForDisplay(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection);
-
-  const updateGroundCondition = (updater: (condition: GroundCondition) => GroundCondition) => {
-    if (!selectedHole) return;
-
-    const normalizeAndSave = (condition: GroundCondition) => {
-      const updated = updater(condition);
-      const canonical = toCanonicalSlopeSettings(updated.slopeAngle, updated.slopeDirection);
-      return {
-        ...updated,
-        slopeAngle: canonical.slopeAngle,
-        slopeDirection: canonical.slopeDirection,
-      };
-    };
-
-    if (selectedHazard) {
-      updateSelectedHazard((hazard) => ({
-        ...hazard,
-        groundCondition: normalizeAndSave(hazard.groundCondition ?? defaultGroundCondition),
-      }));
-      return;
-    }
-
-    updateHole((hole) => ({
-      ...hole,
-      groundCondition: normalizeAndSave(hole.groundCondition ?? defaultGroundCondition),
-    }));
-  };
+  const selectedGroundCondition = selectedHazard?.groundCondition ?? selectedHole?.groundCondition ?? DEFAULT_GROUND_CONDITION;
+  const normalizedSlope = normalizeSlopeForDisplay(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection);
 
   useEffect(() => {
     if (selectedHoleIndex >= holes.length) {
@@ -190,18 +143,10 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const updateHole = (updater: (hole: Hole) => Hole) => {
     const next = holes.map((hole, index) => {
       if (index !== safeHoleIndex) {
-        return {
-          ...hole,
-          hazards: cloneHazards(hole.hazards),
-        };
+        return { ...hole, hazards: cloneHazards(hole.hazards) };
       }
-
-      return updater({
-        ...hole,
-        hazards: cloneHazards(hole.hazards),
-      });
+      return updater({ ...hole, hazards: cloneHazards(hole.hazards) });
     });
-
     onChange(next);
   };
 
@@ -209,9 +154,38 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     updateHole((hole) => ({ ...hole, hazards }));
   };
 
-  const addHazard = () => {
+  const updateSelectedHazard = (updater: (hazard: Hazard) => Hazard) => {
+    if (!selectedHole || !selectedHazardId) return;
+    const next = cloneHazards(selectedHole.hazards).map((hazard) =>
+      hazard.id !== selectedHazardId ? hazard : updater(hazard),
+    );
+    updateSelectedHoleHazards(next);
+  };
+
+  const updateGroundCondition = (updater: (condition: GroundCondition) => GroundCondition) => {
     if (!selectedHole) return;
 
+    const normalizeAndSave = (condition: GroundCondition) => {
+      const next = updater(condition);
+      return { ...next, ...toCanonicalSlopeSettings(next.slopeAngle, next.slopeDirection) };
+    };
+
+    if (selectedHazard) {
+      updateSelectedHazard((hazard) => ({
+        ...hazard,
+        groundCondition: normalizeAndSave(hazard.groundCondition ?? DEFAULT_GROUND_CONDITION),
+      }));
+      return;
+    }
+
+    updateHole((hole) => ({
+      ...hole,
+      groundCondition: normalizeAndSave(hole.groundCondition ?? DEFAULT_GROUND_CONDITION),
+    }));
+  };
+
+  const addHazard = () => {
+    if (!selectedHole) return;
     const newHazard = buildEmptyHazard(selectedHole);
     updateHole((hole) => ({
       ...hole,
@@ -222,23 +196,11 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
   const deleteSelectedHazard = () => {
     if (!selectedHole || !selectedHazardId) return;
-
     updateHole((hole) => ({
       ...hole,
       hazards: cloneHazards(hole.hazards).filter((hazard) => hazard.id !== selectedHazardId),
     }));
     setSelectedHazardId(null);
-  };
-
-  const updateSelectedHazard = (updater: (hazard: Hazard) => Hazard) => {
-    if (!selectedHole || !selectedHazardId) return;
-
-    const nextHazards = cloneHazards(selectedHole.hazards).map((hazard) => {
-      if (hazard.id !== selectedHazardId) return hazard;
-      return updater(hazard);
-    });
-
-    updateSelectedHoleHazards(nextHazards);
   };
 
   const randomizeAll = () => {
@@ -255,7 +217,10 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   return (
     <section className="mx-auto mt-4 w-full max-w-2xl rounded-2xl border border-emerald-300 bg-white/80 p-4 shadow-sm shadow-emerald-300/30">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-black tracking-[0.08em] text-emerald-900">コースエディタ</h2>
+        <div>
+          <h2 className="text-sm font-black tracking-[0.08em] text-emerald-900">コースエディタ</h2>
+          <p className="text-xs text-emerald-700">ホールとハザードを直感的に編集できます。</p>
+        </div>
         <button
           type="button"
           onClick={randomizeAll}
@@ -268,7 +233,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       <div className="mt-3 flex flex-wrap gap-2">
         {holes.map((hole, index) => (
           <button
-            key={`edit-hole-${hole.number}`}
+            key={`hole-tab-${hole.number}`}
             type="button"
             onClick={() => {
               setSelectedHoleIndex(index);
@@ -304,7 +269,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         </label>
 
         <label className="space-y-1 text-xs font-semibold text-emerald-800">
-          距離(yd)
+          距離 (yd)
           <input
             type="number"
             min={30}
@@ -312,18 +277,14 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
             value={selectedHole.distanceFromTee}
             onChange={(event) => {
               const distance = Math.max(30, Math.min(700, Number(event.target.value) || 30));
-              updateHole((hole) => ({
-                ...hole,
-                distanceFromTee: distance,
-                targetDistance: distance,
-              }));
+              updateHole((hole) => ({ ...hole, distanceFromTee: distance, targetDistance: distance }));
             }}
             className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
           />
         </label>
 
         <label className="space-y-1 text-xs font-semibold text-emerald-800">
-          グリーン半径 (ヤード)
+          グリーン半径 (yd)
           <input
             type="number"
             min={6}
@@ -356,12 +317,10 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-emerald-900">地面条件</h3>
-            <p className="text-xs text-emerald-700">
-              {selectedHazardId ? "選択中: ハザード領域" : "選択中: フェアウェイ領域"}
-            </p>
+            <p className="text-xs text-emerald-700">選択中: {selectedHazard ? 'ハザード' : 'フェアウェイ'}</p>
           </div>
           <span className="rounded-full border border-emerald-300 bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-800">
-            背景クリックでフェアウェイ選択
+            背景をクリックするとフェアウェイを選択
           </span>
         </div>
 
@@ -371,7 +330,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
             <select
               value={selectedGroundCondition.hardness}
               onChange={(event) => {
-                const hardness = event.target.value as GroundCondition["hardness"];
+                const hardness = event.target.value as GroundCondition['hardness'];
                 updateGroundCondition((condition) => ({ ...condition, hardness }));
               }}
               className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
@@ -384,90 +343,12 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
           <label className="space-y-1 text-xs font-semibold text-emerald-800">
             上り方向
-            <div className="grid grid-cols-3 gap-1 text-center place-items-center">
-              <div />
-              <button
-                type="button"
-                onClick={() => {
-                  updateGroundCondition((condition) => ({
-                    ...condition,
-                    slopeDirection: toStoredSlopeDirection(condition.slopeAngle, 0),
-                  }));
-                }}
-                className={[
-                  'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
-                  normalizedSelectedSlope.slopeDirection === 0
-                    ? 'border-emerald-700 bg-emerald-700 text-white'
-                    : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                ].join(' ')}
-              >
-                前
-              </button>
-              <div />
-              <button
-                type="button"
-                onClick={() => {
-                  updateGroundCondition((condition) => ({
-                    ...condition,
-                    slopeDirection: toStoredSlopeDirection(condition.slopeAngle, 270),
-                  }));
-                }}
-                className={[
-                  'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
-                  normalizedSelectedSlope.slopeDirection === 270
-                    ? 'border-emerald-700 bg-emerald-700 text-white'
-                    : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                ].join(' ')}
-              >
-                左
-              </button>
-              <div className="h-10 w-10" />
-              <button
-                type="button"
-                onClick={() => {
-                  updateGroundCondition((condition) => ({
-                    ...condition,
-                    slopeDirection: toStoredSlopeDirection(condition.slopeAngle, 90),
-                  }));
-                }}
-                className={[
-                  'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
-                  normalizedSelectedSlope.slopeDirection === 90
-                    ? 'border-emerald-700 bg-emerald-700 text-white'
-                    : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                ].join(' ')}
-              >
-                右
-              </button>
-              <div />
-              <button
-                type="button"
-                onClick={() => {
-                  updateGroundCondition((condition) => ({
-                    ...condition,
-                    slopeDirection: toStoredSlopeDirection(condition.slopeAngle, 180),
-                  }));
-                }}
-                className={[
-                  'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
-                  normalizedSelectedSlope.slopeDirection === 180
-                    ? 'border-emerald-700 bg-emerald-700 text-white'
-                    : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                ].join(' ')}
-              >
-                後
-              </button>
-              <div />
-            </div>
-            <div className="text-right text-[11px] text-emerald-700">
-              {normalizedSelectedSlope.slopeDirection}°
-            </div>
             <input
               type="range"
               min={0}
               max={359}
               step={1}
-              value={normalizedSelectedSlope.slopeDirection}
+              value={normalizedSlope.slopeDirection}
               onChange={(event) => {
                 const slopeDirection = Number(event.target.value);
                 updateGroundCondition((condition) => ({
@@ -477,6 +358,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
               }}
               className="w-full cursor-pointer"
             />
+            <div className="text-right text-[11px] text-emerald-700">{normalizedSlope.slopeDirection}°</div>
           </label>
 
           <label className="space-y-1 text-xs font-semibold text-emerald-800">
@@ -486,24 +368,20 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
               min={0}
               max={45}
               step={1}
-              value={normalizedSelectedSlope.slopeAngle}
+              value={normalizedSlope.slopeAngle}
               onChange={(event) => {
                 const slopeAngle = Number(event.target.value);
-                updateGroundCondition((condition) => ({
-                  ...condition,
-                  slopeAngle,
-                }));
+                updateGroundCondition((condition) => ({ ...condition, slopeAngle }));
               }}
               className="w-full cursor-pointer"
             />
             <div className="text-right text-[11px] text-emerald-700">
-              {normalizedSelectedSlope.slopeAngle === 0 ? 'フラット' : `傾斜量 ${normalizedSelectedSlope.slopeAngle}°`}
+              {normalizedSlope.slopeAngle === 0 ? 'フラット' : `${normalizedSlope.slopeAngle}°`}
             </div>
           </label>
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-emerald-800">
-          {formatSlopeGuide(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection)}
-        </p>
+
+        <p className="mt-3 text-xs leading-relaxed text-emerald-800">{formatSlopeGuide(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection)}</p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -526,8 +404,8 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       </div>
 
       {selectedHazard && (
-        <>
-          <div className="mt-3 grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:grid-cols-4">
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
+          <div className="grid gap-3 sm:grid-cols-4">
             <label className="space-y-1 text-xs font-semibold text-emerald-800">
               種別
               <select
@@ -538,15 +416,13 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
                     ...hazard,
                     type,
                     penaltyStrokes: getPenaltyStrokesByType(type),
-                    name: buildHazardNameFromPosition(hazard.xCenter, hazard.width, type),
+                    name: buildHazardName(type, hazard.xCenter, hazard.width),
                   }));
                 }}
                 className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
               >
-                {Object.keys(HAZARD_TYPE_LABEL).map((hazardType) => (
-                  <option key={hazardType} value={hazardType}>
-                    {HAZARD_TYPE_LABEL[hazardType as HazardType]}
-                  </option>
+                {Object.entries(HAZARD_TYPE_LABEL).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
                 ))}
               </select>
             </label>
@@ -557,11 +433,11 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
                 type="number"
                 value={Math.round(selectedHazard.xCenter)}
                 onChange={(event) => {
-                  const value = Number(event.target.value) || 0;
+                  const next = Number(event.target.value) || 0;
                   updateSelectedHazard((hazard) => ({
                     ...hazard,
-                    xCenter: value,
-                    name: buildHazardNameFromPosition(value, hazard.width, hazard.type),
+                    xCenter: next,
+                    name: buildHazardName(hazard.type, next, hazard.width),
                   }));
                 }}
                 className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
@@ -575,11 +451,11 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
                 min={6}
                 value={Math.max(6, Math.round(selectedHazard.width))}
                 onChange={(event) => {
-                  const value = Math.max(6, Number(event.target.value) || 6);
+                  const next = Math.max(6, Number(event.target.value) || 6);
                   updateSelectedHazard((hazard) => ({
                     ...hazard,
-                    width: value,
-                    name: buildHazardNameFromPosition(hazard.xCenter, value, hazard.type),
+                    width: next,
+                    name: buildHazardName(hazard.type, hazard.xCenter, next),
                   }));
                 }}
                 className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
@@ -590,131 +466,20 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
               奥行き
               <input
                 type="number"
-                min={5}
-                value={Math.max(5, Math.round(selectedHazard.yBack - selectedHazard.yFront))}
+                min={6}
+                value={Math.max(6, Math.round(selectedHazard.yBack - selectedHazard.yFront))}
                 onChange={(event) => {
-                  const depth = Math.max(5, Number(event.target.value) || 5);
-                  updateSelectedHazard((hazard) => ({ ...hazard, yBack: hazard.yFront + depth }));
+                  const next = Math.max(6, Number(event.target.value) || 6);
+                  updateSelectedHazard((hazard) => ({
+                    ...hazard,
+                    yBack: hazard.yFront + next,
+                  }));
                 }}
                 className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
               />
             </label>
           </div>
-
-          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
-            <div className="mb-3 text-sm font-bold text-emerald-900">liePenalty</div>
-            <div className="grid gap-3 sm:grid-cols-4">
-              <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                距離係数
-                <input
-                  type="number"
-                  step={0.01}
-                  min={0.5}
-                  max={1.5}
-                  value={selectedHazard.liePenalty?.distanceMultiplier ?? 1}
-                  onChange={(event) => {
-                    const value = Number(event.target.value) || 1;
-                    updateSelectedHazard((hazard) => ({
-                      ...hazard,
-                      liePenalty: {
-                        ...(hazard.liePenalty ?? {
-                          distanceMultiplier: 1,
-                          dispersionMultiplier: 1,
-                          mishitRateBonus: 0,
-                          sideSpinBonus: 0,
-                        }),
-                        distanceMultiplier: value,
-                      },
-                    }));
-                  }}
-                  className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-                />
-              </label>
-
-              <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                分散係数
-                <input
-                  type="number"
-                  step={0.05}
-                  min={0.5}
-                  max={3}
-                  value={selectedHazard.liePenalty?.dispersionMultiplier ?? 1}
-                  onChange={(event) => {
-                    const value = Number(event.target.value) || 1;
-                    updateSelectedHazard((hazard) => ({
-                      ...hazard,
-                      liePenalty: {
-                        ...(hazard.liePenalty ?? {
-                          distanceMultiplier: 1,
-                          dispersionMultiplier: 1,
-                          mishitRateBonus: 0,
-                          sideSpinBonus: 0,
-                        }),
-                        dispersionMultiplier: value,
-                      },
-                    }));
-                  }}
-                  className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-                />
-              </label>
-
-              <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                ミス率ボーナス
-                <input
-                  type="number"
-                  step={0.01}
-                  min={0}
-                  max={0.5}
-                  value={selectedHazard.liePenalty?.mishitRateBonus ?? 0}
-                  onChange={(event) => {
-                    const value = Number(event.target.value) || 0;
-                    updateSelectedHazard((hazard) => ({
-                      ...hazard,
-                      liePenalty: {
-                        ...(hazard.liePenalty ?? {
-                          distanceMultiplier: 1,
-                          dispersionMultiplier: 1,
-                          mishitRateBonus: 0,
-                          sideSpinBonus: 0,
-                        }),
-                        mishitRateBonus: value,
-                      },
-                    }));
-                  }}
-                  className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-                />
-              </label>
-
-              <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                サイドスピン補正
-                <input
-                  type="number"
-                  step={1}
-                  min={0}
-                  max={200}
-                  value={selectedHazard.liePenalty?.sideSpinBonus ?? 0}
-                  onChange={(event) => {
-                    const value = Number(event.target.value) || 0;
-                    updateSelectedHazard((hazard) => ({
-                      ...hazard,
-                      liePenalty: {
-                        ...(hazard.liePenalty ?? {
-                          distanceMultiplier: 1,
-                          dispersionMultiplier: 1,
-                          mishitRateBonus: 0,
-                          sideSpinBonus: 0,
-                        }),
-                        sideSpinBonus: value,
-                      },
-                    }));
-                  }}
-                  className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-                />
-              </label>
-            </div>
-            <p className="mt-2 text-[11px] text-emerald-700">該当ハザードでの次ショット対象の飛距離・分散・ミス確率を調整します。</p>
-          </div>
-        </>
+        </div>
       )}
     </section>
   );
