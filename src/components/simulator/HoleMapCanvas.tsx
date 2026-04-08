@@ -105,14 +105,14 @@ function getHazardStyle(type: Hazard["type"]): { fill: string; stroke: string } 
   if (type === "bunker") {
     return {
       fill: "rgba(250, 204, 21, 0.45)",
-      stroke: "rgba(161, 98, 7, 0.95)",
+      stroke: "rgba(161, 98, 7, 0.65)",
     };
   }
 
   if (type === "water") {
     return {
       fill: "rgba(59, 130, 246, 0.38)",
-      stroke: "rgba(30, 64, 175, 0.95)",
+      stroke: "rgba(220, 38, 38, 0.95)",
     };
   }
 
@@ -134,6 +134,46 @@ function getHazardStyle(type: Hazard["type"]): { fill: string; stroke: string } 
     fill: "rgba(74, 222, 128, 0.22)",
     stroke: "rgba(22, 101, 52, 0.85)",
   };
+}
+
+function drawObBoundaryMarkers(
+  context: CanvasRenderingContext2D,
+  hazard: Hazard,
+  yardToPxX: (yardX: number) => number,
+  yardToPxY: (yardY: number) => number,
+) {
+  if (hazard.type !== "ob") {
+    return;
+  }
+
+  const leftYard = hazard.xCenter - hazard.width / 2;
+  const rightYard = hazard.xCenter + hazard.width / 2;
+  const innerBoundaryYard = Math.abs(leftYard) < Math.abs(rightYard) ? leftYard : rightYard;
+  const markerSize = 5;
+  const markerXBoundary = yardToPxX(innerBoundaryYard);
+  const markerInset = 1;
+  const markerLeftPx = hazard.xCenter < 0
+    ? markerXBoundary - markerSize - markerInset
+    : markerXBoundary + markerInset;
+  const startYard = Math.ceil(hazard.yFront / 50) * 50;
+  const endYard = hazard.yBack;
+
+  if (startYard > endYard) {
+    return;
+  }
+
+  context.save();
+  context.fillStyle = "#ffffff";
+  context.strokeStyle = "rgba(0, 0, 0, 0.35)";
+  context.lineWidth = 1;
+
+  for (let yard = startYard; yard <= endYard + 1e-6; yard += 50) {
+    const markerY = yardToPxY(yard);
+    context.fillRect(markerLeftPx, markerY - markerSize / 2, markerSize, markerSize);
+    context.strokeRect(markerLeftPx, markerY - markerSize / 2, markerSize, markerSize);
+  }
+
+  context.restore();
 }
 
 /**
@@ -757,7 +797,18 @@ export function HoleMapCanvas({
       context.strokeStyle = style.stroke;
       context.lineWidth = 1.5;
       context.fillRect(leftPx, topPx, widthPx, heightPx);
-      context.strokeRect(leftPx, topPx, widthPx, heightPx);
+
+      if (hazard.type === "water") {
+        context.save();
+        context.setLineDash([6, 4]);
+        context.strokeRect(leftPx, topPx, widthPx, heightPx);
+        context.restore();
+      } else {
+        context.setLineDash([]);
+        context.strokeRect(leftPx, topPx, widthPx, heightPx);
+      }
+
+      drawObBoundaryMarkers(context, hazard, yardToPxX, yardToPxY);
 
       const label = buildHazardDisplayName(hazard);
       context.save();

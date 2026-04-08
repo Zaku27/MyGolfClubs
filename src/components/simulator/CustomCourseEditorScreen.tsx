@@ -439,7 +439,7 @@ export function CustomCourseEditorScreen() {
               <p className="text-emerald-700 mt-1 text-sm">カスタムコースを独立して編集・保存できます。</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 justify-end">
             <Link
               to="/"
               state={{ openSimulator: true }}
