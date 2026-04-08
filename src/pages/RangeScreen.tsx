@@ -118,6 +118,7 @@ type RangeConditionSettings = {
   groundHardness: GroundHardness;
   slopeAngle: number;
   slopeDirection: number;
+  isCourseConditionOpen: boolean;
 };
 
 type AnalysisPenalty = {
@@ -154,6 +155,7 @@ function loadRangeConditionSettings(): RangeConditionSettings {
       groundHardness: 'medium',
       slopeAngle: 0,
       slopeDirection: 0,
+      isCourseConditionOpen: false,
     };
   }
 
@@ -167,6 +169,7 @@ function loadRangeConditionSettings(): RangeConditionSettings {
         groundHardness: 'medium',
         slopeAngle: 0,
         slopeDirection: 0,
+        isCourseConditionOpen: false,
       };
     }
 
@@ -188,6 +191,7 @@ function loadRangeConditionSettings(): RangeConditionSettings {
       groundHardness: safeGroundHardness,
       slopeAngle: canonicalSlope.slopeAngle,
       slopeDirection: canonicalSlope.slopeDirection,
+      isCourseConditionOpen: parsed.isCourseConditionOpen === true,
     };
   } catch {
     return {
@@ -197,6 +201,7 @@ function loadRangeConditionSettings(): RangeConditionSettings {
       groundHardness: 'medium',
       slopeAngle: 0,
       slopeDirection: 0,
+      isCourseConditionOpen: false,
     };
   }
 }
@@ -213,6 +218,7 @@ function saveRangeConditionSettings(settings: RangeConditionSettings) {
       groundHardness: settings.groundHardness,
       slopeAngle: canonicalSlope.slopeAngle,
       slopeDirection: canonicalSlope.slopeDirection,
+      isCourseConditionOpen: settings.isCourseConditionOpen,
     }),
   );
 }
@@ -445,6 +451,8 @@ export default function RangeScreen() {
   const [groundHardness, setGroundHardness] = useState<GroundHardness>(initialRangeConditionSettings.groundHardness);
   const [slopeAngle, setSlopeAngle] = useState<number>(initialRangeConditionSettings.slopeAngle);
   const [slopeDirection, setSlopeDirection] = useState<number>(initialRangeConditionSettings.slopeDirection);
+  // コースコンディション設定は上級者向けなので、通常は閉じておく。
+  const [isCourseConditionOpen, setIsCourseConditionOpen] = useState<boolean>(initialRangeConditionSettings.isCourseConditionOpen);
   // 風ダイアルは通常閉じ、必要な時だけ開いて調整できるようにする。
   const [isWindControlOpen, setIsWindControlOpen] = useState<boolean>(false);
   const [numShots, setNumShots] = useState<number>(10);
@@ -554,8 +562,9 @@ export default function RangeScreen() {
       groundHardness,
       slopeAngle,
       slopeDirection,
+      isCourseConditionOpen,
     });
-  }, [lie, windDirection, windSpeed, groundHardness, slopeAngle, slopeDirection]);
+  }, [lie, windDirection, windSpeed, groundHardness, slopeAngle, slopeDirection, isCourseConditionOpen]);
 
   useEffect(() => {
     if (!showRobotHint) return;
@@ -1144,176 +1153,213 @@ export default function RangeScreen() {
               </div>
             </div>
 
-          <div className="w-full bg-white rounded shadow p-4 flex flex-col gap-3">
-            <div>
-              <label className="block text-lg font-semibold mb-2">コースコンディション</label>
-            </div>
-            <div className="rounded border border-green-200 bg-green-50 p-3">
-              <label className="block font-semibold mb-1 text-green-900">ライ</label>
-              <select
-                className="w-full border rounded p-2"
-                value={lie}
-                onChange={(e) => setLie(e.target.value)}
+          <div className="w-full bg-white rounded shadow p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <label className="block text-lg font-semibold mb-2">コースコンディション</label>
+                <p className="text-xs text-gray-600">上級者向けの設定です。通常は閉じておき、必要なときに詳細を開いてください。</p>
+              </div>
+              <button
+                type="button"
+                className="min-w-[118px] rounded border border-green-300 bg-green-50 px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-100"
+                onClick={() => setIsCourseConditionOpen((prev) => !prev)}
+                aria-expanded={isCourseConditionOpen}
               >
-                {LIE_OPTIONS.map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-green-900">
-                ライペナルティ: {getLiePenaltyInfo(lie, simClub?.type ?? 'Iron')}
-              </p>
+                詳細
+              </button>
             </div>
-            <div className="rounded border border-green-200 bg-green-50 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <label className="font-semibold">風向・風速</label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-100"
-                    onClick={handleResetWind}
-                  >
-                    風をリセット
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded border border-green-300 bg-green-50 px-2 py-1 text-xs font-semibold text-green-800 hover:bg-green-100"
-                    onClick={() => setIsWindControlOpen((prev) => !prev)}
-                    aria-expanded={isWindControlOpen}
-                    aria-controls="wind-direction-dial-panel"
-                  >
-                    {isWindControlOpen ? '設定を閉じる' : '設定を開く'}
-                  </button>
+
+            <div className="mt-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="font-semibold">ライ</p>
+                  <p className="text-gray-700">{lie}</p>
+                </div>
+                <div>
+                  <p className="font-semibold">風</p>
+                  <p className="text-gray-700">{windDirectionSummary} / {windSpeed.toFixed(1)} m/s</p>
+                </div>
+                <div>
+                  <p className="font-semibold">地面硬さ</p>
+                  <p className="text-gray-700">{groundHardness === 'soft' ? 'Soft' : groundHardness === 'firm' ? 'Firm' : 'Medium'}</p>
+                </div>
+                <div>
+                  <p className="font-semibold">傾斜</p>
+                  <p className="text-gray-700">{slopeAngle === 0 ? 'フラット' : `傾斜量 ${slopeAngle}° (${normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection}°)`}</p>
                 </div>
               </div>
-              <div className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
-                <span className="mr-3 font-semibold">風向: {windDirectionSummary}</span>
-                <span className="font-semibold">風速: {windSpeed.toFixed(1)} m/s</span>
-              </div>
-              {isWindControlOpen && (
-                <div id="wind-direction-dial-panel" className="mt-2">
-                  <WindDirectionDial
-                    windDirection={windDirection}
-                    windSpeed={windSpeed}
-                    onDirectionChange={(newDirection) => setWindDirection(normalizeWindDirection(newDirection))}
-                    onSpeedChange={(newSpeed) => setWindSpeed(normalizeWindSpeedMps(newSpeed))}
-                  />
-                </div>
-              )}
             </div>
-            <div className="mt-4 rounded border border-green-200 bg-green-50 p-3">
-              <div className="mb-2">
-                <label className="font-semibold">地面条件</label>
-              </div>
-              <div className="grid gap-3">
-                <div className="rounded border border-emerald-200 bg-white p-3">
-                  <p className="text-xs font-semibold text-emerald-900 mb-2">地面硬さ</p>
-                  <label className="space-y-1 text-xs text-emerald-800">
-                    <select
-                      value={groundHardness}
-                      onChange={(event) => setGroundHardness(event.target.value as GroundHardness)}
-                      className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-                    >
-                      <option value="soft">Soft</option>
-                      <option value="medium">Medium</option>
-                      <option value="firm">Firm</option>
-                    </select>
-                  </label>
+
+            {isCourseConditionOpen && (
+              <>
+                <div className="mt-4 rounded border border-green-200 bg-green-50 p-3">
+                  <label className="block font-semibold mb-1 text-green-900">ライ</label>
+                  <select
+                    className="w-full border rounded p-2"
+                    value={lie}
+                    onChange={(e) => setLie(e.target.value)}
+                  >
+                    {LIE_OPTIONS.map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-green-900">
+                    ライペナルティ: {getLiePenaltyInfo(lie, simClub?.type ?? 'Iron')}
+                  </p>
                 </div>
-                <div className="rounded border border-emerald-200 bg-white p-3">
-                  <p className="text-xs font-semibold text-emerald-900 mb-2">傾斜</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                      上り方向
-                      <div className="grid grid-cols-3 gap-1 text-center place-items-center">
-                        <div />
-                        <button
-                          type="button"
-                          onClick={() => setSlopeDirection(normalizeWindDirection(0))}
-                          className={[
-                            'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
-                            normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === 0
-                              ? 'border-emerald-700 bg-emerald-700 text-white'
-                              : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                          ].join(' ')}
-                        >
-                          前
-                        </button>
-                        <div />
-                        <button
-                          type="button"
-                          onClick={() => setSlopeDirection(normalizeWindDirection(270))}
-                          className={[
-                            'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
-                            normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === 270
-                              ? 'border-emerald-700 bg-emerald-700 text-white'
-                              : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                          ].join(' ')}
-                        >
-                          左
-                        </button>
-                        <div className="h-10 w-10" />
-                        <button
-                          type="button"
-                          onClick={() => setSlopeDirection(normalizeWindDirection(90))}
-                          className={[
-                            'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
-                            normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === 90
-                              ? 'border-emerald-700 bg-emerald-700 text-white'
-                              : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                          ].join(' ')}
-                        >
-                          右
-                        </button>
-                        <div />
-                        <button
-                          type="button"
-                          onClick={() => setSlopeDirection(normalizeWindDirection(180))}
-                          className={[
-                            'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
-                            normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === 180
-                              ? 'border-emerald-700 bg-emerald-700 text-white'
-                              : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                          ].join(' ')}
-                        >
-                          後
-                        </button>
-                        <div />
-                      </div>
-                      <div className="text-right text-[11px] text-emerald-700">
-                        {normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection}°
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={359}
-                        step={1}
-                        value={slopeDirection}
-                        onChange={(event) => setSlopeDirection(normalizeWindDirection(Number(event.target.value)))}
-                        className="w-full cursor-pointer"
-                      />
-                    </label>
-                    <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                      傾斜角度
-                      <input
-                        type="range"
-                        min={0}
-                        max={45}
-                        step={1}
-                        value={slopeAngle}
-                        onChange={(event) => setSlopeAngle(Math.max(0, Number(event.target.value)))}
-                        className="w-full cursor-pointer"
-                      />
-                      <div className="text-right text-[11px] text-emerald-700">
-                        {slopeAngle === 0 ? 'フラット' : `傾斜量 ${slopeAngle}°`}
-                      </div>
-                    </label>
+                <div className="mt-4 rounded border border-green-200 bg-green-50 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label className="font-semibold">風向・風速</label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+                        onClick={handleResetWind}
+                      >
+                        風をリセット
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-green-300 bg-green-50 px-2 py-1 text-xs font-semibold text-green-800 hover:bg-green-100"
+                        onClick={() => setIsWindControlOpen((prev) => !prev)}
+                        aria-expanded={isWindControlOpen}
+                        aria-controls="wind-direction-dial-panel"
+                      >
+                        {isWindControlOpen ? '設定を閉じる' : '設定を開く'}
+                      </button>
+                    </div>
                   </div>
+                  <div className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
+                    <span className="mr-3 font-semibold">風向: {windDirectionSummary}</span>
+                    <span className="font-semibold">風速: {windSpeed.toFixed(1)} m/s</span>
+                  </div>
+                  {isWindControlOpen && (
+                    <div id="wind-direction-dial-panel" className="mt-2">
+                      <WindDirectionDial
+                        windDirection={windDirection}
+                        windSpeed={windSpeed}
+                        onDirectionChange={(newDirection) => setWindDirection(normalizeWindDirection(newDirection))}
+                        onSpeedChange={(newSpeed) => setWindSpeed(normalizeWindSpeedMps(newSpeed))}
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
-              <p className="mt-3 text-xs leading-relaxed text-emerald-800">
-                {formatSlopeEffectGuide(slopeAngle, slopeDirection)}
-              </p>
-            </div>
+                <div className="mt-4 rounded border border-green-200 bg-green-50 p-3">
+                  <div className="mb-2">
+                    <label className="font-semibold">地面条件</label>
+                  </div>
+                  <div className="grid gap-3">
+                    <div className="rounded border border-emerald-200 bg-white p-3">
+                      <p className="text-xs font-semibold text-emerald-900 mb-2">地面硬さ</p>
+                      <label className="space-y-1 text-xs text-emerald-800">
+                        <select
+                          value={groundHardness}
+                          onChange={(event) => setGroundHardness(event.target.value as GroundHardness)}
+                          className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                        >
+                          <option value="soft">Soft</option>
+                          <option value="medium">Medium</option>
+                          <option value="firm">Firm</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="rounded border border-emerald-200 bg-white p-3">
+                      <p className="text-xs font-semibold text-emerald-900 mb-2">傾斜</p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                          上り方向
+                          <div className="grid grid-cols-3 gap-1 text-center place-items-center">
+                            <div />
+                            <button
+                              type="button"
+                              onClick={() => setSlopeDirection(normalizeWindDirection(0))}
+                              className={[
+                                'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
+                                normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === 0
+                                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                                  : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                              ].join(' ')}
+                            >
+                              前
+                            </button>
+                            <div />
+                            <button
+                              type="button"
+                              onClick={() => setSlopeDirection(normalizeWindDirection(270))}
+                              className={[
+                                'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
+                                normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === 270
+                                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                                  : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                              ].join(' ')}
+                            >
+                              左
+                            </button>
+                            <div className="h-10 w-10" />
+                            <button
+                              type="button"
+                              onClick={() => setSlopeDirection(normalizeWindDirection(90))}
+                              className={[
+                                'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
+                                normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === 90
+                                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                                  : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                              ].join(' ')}
+                            >
+                              右
+                            </button>
+                            <div />
+                            <button
+                              type="button"
+                              onClick={() => setSlopeDirection(normalizeWindDirection(180))}
+                              className={[
+                                'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
+                                normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection === 180
+                                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                                  : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                              ].join(' ')}
+                            >
+                              後
+                            </button>
+                            <div />
+                          </div>
+                          <div className="text-right text-[11px] text-emerald-700">
+                            {normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection}°
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={359}
+                            step={1}
+                            value={slopeDirection}
+                            onChange={(event) => setSlopeDirection(normalizeWindDirection(Number(event.target.value)))}
+                            className="w-full cursor-pointer"
+                          />
+                        </label>
+                        <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                          傾斜角度
+                          <input
+                            type="range"
+                            min={0}
+                            max={45}
+                            step={1}
+                            value={slopeAngle}
+                            onChange={(event) => setSlopeAngle(Math.max(0, Number(event.target.value)))}
+                            className="w-full cursor-pointer"
+                          />
+                          <div className="text-right text-[11px] text-emerald-700">
+                            {slopeAngle === 0 ? 'フラット' : `傾斜量 ${slopeAngle}°`}
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-emerald-800">
+                    {formatSlopeEffectGuide(slopeAngle, slopeDirection)}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </aside>
       </div>

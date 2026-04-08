@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyGroundCondition, normalizeGroundSlope, type ClubData, type LandingResult, type SkillLevel } from './landingPosition';
 import { getWaterHazardDropOrigin } from './shotSimulation';
-import { buildNextShotAdvice } from './shotOutcome';
+import { assessLanding, buildNextShotAdvice, buildOutcomeMessage, determineLieFromFinalOutcome } from './shotOutcome';
 import type { GroundCondition, Hazard } from '../types/game';
 
 const BASE_LANDING: LandingResult = {
@@ -95,6 +95,52 @@ describe('applyGroundCondition side slope behavior with fixed seed', () => {
     it('returns a bunker recovery advice message when bunker is encountered', () => {
       const advice = buildNextShotAdvice('bunker', 'bunker');
       expect(advice).toContain('バンカーからの脱出');
+    });
+  });
+
+  describe('semirough and bareground hazard handling', () => {
+    const semiroughHazard: Hazard = {
+      id: 'hazard-semirough',
+      type: 'semirough',
+      shape: 'rectangle',
+      yFront: 80,
+      yBack: 100,
+      xCenter: 0,
+      width: 12,
+      penaltyStrokes: 0,
+    };
+
+    const baregroundHazard: Hazard = {
+      id: 'hazard-bareground',
+      type: 'bareground',
+      shape: 'rectangle',
+      yFront: 80,
+      yBack: 100,
+      xCenter: 0,
+      width: 12,
+      penaltyStrokes: 0,
+    };
+
+    it('treats semirough as a rough outcome and maps the lie correctly', () => {
+      const assessment = assessLanding(0, 90, 120, [semiroughHazard]);
+      expect(assessment.finalOutcome).toBe('rough');
+      expect(determineLieFromFinalOutcome('rough', semiroughHazard)).toBe('semirough');
+    });
+
+    it('treats bareground as a rough outcome and maps the lie correctly', () => {
+      const assessment = assessLanding(0, 90, 120, [baregroundHazard]);
+      expect(assessment.finalOutcome).toBe('rough');
+      expect(determineLieFromFinalOutcome('rough', baregroundHazard)).toBe('bareground');
+    });
+
+    it('returns a bareground-specific outcome message', () => {
+      const message = buildOutcomeMessage('rough', 30, 'bareground');
+      expect(message).toContain('ベアグラウンドに入りました');
+    });
+
+    it('returns a bareground-specific next shot advice', () => {
+      const advice = buildNextShotAdvice('rough', 'bareground');
+      expect(advice).toContain('ベアグラウンドからのショットです');
     });
   });
 

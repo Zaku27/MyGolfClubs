@@ -160,6 +160,40 @@
   box-shadow: 0 6px 18px rgba(107, 88, 199, 0.18) !important;
 }
 
+.btn-range {
+  background: linear-gradient(135deg, #b8d54d, #ebf6a5) !important;
+  color: #23320a;
+  border-color: #9ec339 !important;
+  box-shadow: 0 6px 18px rgba(184, 213, 77, 0.18) !important;
+}
+
+.btn-range:hover:not(:disabled) {
+  background: linear-gradient(135deg, #a3c93c, #e2f37a) !important;
+  border-color: #8fb82f !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(184, 213, 77, 0.22) !important;
+}
+
+.btn-range:active:not(:disabled) {
+  transform: translateY(-1px);
+}
+.btn-simulator {
+  background: linear-gradient(135deg, #2e8d44, #6ddf9a) !important;
+  color: #ffffff;
+  border-color: #2e8d44 !important;
+  box-shadow: 0 6px 18px rgba(46, 141, 68, 0.18) !important;
+}
+.btn-simulator:hover:not(:disabled) {
+  background: linear-gradient(135deg, #26723b, #56c57b) !important;
+  border-color: #26723b !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(46, 141, 68, 0.22) !important;
+}
+
+.btn-simulator:active:not(:disabled) {
+  transform: translateY(-1px);
+}
+
 .btn-analysis + .btn-personal-data,
 .btn-analysis + .btn-simulator {
   margin-left: 12px;

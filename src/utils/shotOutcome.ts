@@ -208,6 +208,8 @@ export function determineLieFromFinalOutcome(
   finalOutcome: ShotResult["finalOutcome"],
   hazard: Hazard | null,
 ): LieType {
+  if (hazard?.type === "semirough") return "semirough";
+  if (hazard?.type === "bareground") return "bareground";
   if (finalOutcome === "green") return "green";
   if (finalOutcome === "bunker") return "bunker";
   if (finalOutcome === "rough") return "rough";
@@ -220,18 +222,35 @@ export function buildOutcomeMessage(
   newRemainingDistance: number,
   lie: LieType,
 ): string {
+  const lieLabelMap: Record<LieType, string> = {
+    tee: "ティー",
+    fairway: "フェアウェイ",
+    semirough: "セミラフ",
+    rough: "ラフ",
+    bareground: "ベアグラウンド",
+    bunker: "バンカー",
+    green: "グリーン",
+  };
+  const lieLabel = lieLabelMap[lie] ?? lie;
+
   if (finalOutcome === "green") {
     return newRemainingDistance === 0
       ? `グリーンオン！カップインの可能性があります。`
-      : `グリーンに近いです。残り${newRemainingDistance}y（${lie}）。`;
+      : `グリーンに近いです。残り${newRemainingDistance}y（${lieLabel}）。`;
   }
 
   if (finalOutcome === "bunker") {
-    return `バンカーに入った可能性があります。残り${newRemainingDistance}y（${lie}）。`;
+    return `バンカーに入った可能性があります。残り${newRemainingDistance}y（${lieLabel}）。`;
   }
 
   if (finalOutcome === "rough") {
-    return `ラフに入りました。残り${newRemainingDistance}y（${lie}）。`;
+    if (lie === "semirough") {
+      return `セミラフに入りました。残り${newRemainingDistance}y（${lieLabel}）。`;
+    }
+    if (lie === "bareground") {
+      return `ベアグラウンドに入りました。残り${newRemainingDistance}y（${lieLabel}）。`;
+    }
+    return `ラフに入りました。残り${newRemainingDistance}y（${lieLabel}）。`;
   }
 
   if (finalOutcome === "water") {
@@ -269,6 +288,12 @@ export function buildNextShotAdvice(
   }
 
   if (finalOutcome === "rough") {
+    if (lie === "semirough") {
+      return `セミラフからのショットです。飛距離は通常より少し落ち、方向の安定性もやや低下します。`;
+    }
+    if (lie === "bareground") {
+      return `ベアグラウンドからのショットです。飛距離は大幅に落ち、方向も安定しません。`;
+    }
     return `ラフからのショットです。飛距離が通常よりも落ちて、難易度も若干上がることを考慮してください。`;
   }
 
@@ -363,7 +388,7 @@ export function assessLanding(
     if (hazard.type === "bunker") {
       return { hazard, geometricRemainingDistance, isOnGreen: false, finalOutcome: "bunker" };
     }
-    if (hazard.type === "rough") {
+    if (hazard.type === "rough" || hazard.type === "semirough" || hazard.type === "bareground") {
       return { hazard, geometricRemainingDistance, isOnGreen: false, finalOutcome: "rough" };
     }
     return { hazard, geometricRemainingDistance, isOnGreen: false, finalOutcome: "fairway" };

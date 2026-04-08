@@ -950,6 +950,12 @@ export function simulateShot(
   } else if (landedHazard?.type === "rough") {
     newLie = "rough";
     finalOutcome = "rough";
+  } else if (landedHazard?.type === "semirough") {
+    newLie = "semirough";
+    finalOutcome = "rough";
+  } else if (landedHazard?.type === "bareground") {
+    newLie = "bareground";
+    finalOutcome = "rough";
   } else {
     newLie = resolveNewLie(newRemaining, isGoodShot, random, isOnGreen);
     finalOutcome = newLie === "bunker"
