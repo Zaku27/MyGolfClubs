@@ -17,6 +17,7 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { Scatter } from 'react-chartjs-2';
 import type { MonteCarloResult } from '../utils/landingPosition';
 import { calculateConfidenceEllipse } from '../utils/confidenceEllipse';
+import { normalizeWindDirection } from '../utils/windDirection';
 
 ChartJS.register(LinearScale, PointElement, LineElement, ScatterController, Title, Tooltip, Legend, annotationPlugin);
 
@@ -32,6 +33,7 @@ type ShotDispersionChartProps = {
   showMeanPoint?: boolean;
   groundHardness?: GroundHardness;
   slopeAngle?: number;
+  slopeDirection?: number;
 };
 
 type DispersionPoint = ScatterDataPoint & {
@@ -90,6 +92,7 @@ export function ShotDispersionChart({
   showMeanPoint = true,
   groundHardness,
   slopeAngle,
+  slopeDirection,
 }: ShotDispersionChartProps) {
   const [confidenceLevel, setConfidenceLevel] = useState<ConfidenceLevelOption['value']>(DEFAULT_CONFIDENCE_LEVEL);
 
@@ -155,6 +158,24 @@ export function ShotDispersionChart({
       },
     };
   }, [aim?.x, aim?.y, confidenceEllipse.height, confidenceEllipse.width, confidenceEllipse.x, confidenceEllipse.y, meanPoint.x, meanPoint.y, shotPoints, target.x, target.y]);
+
+  function formatSlopeDirectionLabel(direction: number): string {
+    if (direction === 0) return 'ピン方向上り';
+    if (direction === 90) return '右側上り';
+    if (direction === 180) return 'ピン反対方向上り';
+    if (direction === 270) return '左側上り';
+    if (direction > 0 && direction < 90) return '右前上り';
+    if (direction > 90 && direction < 180) return '右後上り';
+    if (direction > 180 && direction < 270) return '左後上り';
+    return '左前上り';
+  }
+
+  const groundLegendText = useMemo(() => {
+    if (groundHardness == null || slopeAngle == null || slopeDirection == null) return null;
+    const normalizedDirection = normalizeWindDirection(slopeDirection);
+    const angleLabel = slopeAngle === 0 ? 'フラット' : `${Math.abs(slopeAngle)}° (${formatSlopeDirectionLabel(normalizedDirection)})`;
+    return `地面硬さ: ${groundHardness.charAt(0).toUpperCase() + groundHardness.slice(1)} / 傾斜: ${angleLabel}`;
+  }, [groundHardness, slopeAngle, slopeDirection]);
 
   const confidenceEllipseAnnotation = useMemo(() => {
     // chartjs-plugin-annotation v3 では label.enabled ではなく label.display を使う。
@@ -277,15 +298,6 @@ export function ShotDispersionChart({
     }),
     [aim?.x, aim?.y, meanPoint, shotPoints, showMeanPoint, target.x, target.y],
   );
-
-  const groundLegendText = useMemo(() => {
-    if (groundHardness == null || slopeAngle == null) return null;
-    const slopeLabel = slopeAngle === 0
-      ? 'flat'
-      : `${Math.abs(slopeAngle)}° slope`;
-
-    return `地面硬さ：${groundHardness.charAt(0).toUpperCase() + groundHardness.slice(1)} / 傾斜：${slopeLabel}`;
-  }, [groundHardness, slopeAngle]);
 
   const options = useMemo<ChartOptions<'scatter'>>(
     () => ({

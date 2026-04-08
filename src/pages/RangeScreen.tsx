@@ -947,6 +947,7 @@ export default function RangeScreen() {
                   numShots={numShots}
                   groundHardness={groundHardness}
                   slopeAngle={slopeAngle}
+                  slopeDirection={slopeDirection}
                 />
               </div>
               {summary.estimatedDist && (
