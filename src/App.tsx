@@ -18,13 +18,8 @@ import {
   writeStoredJson,
   writeStoredValue,
 } from './utils/storage';
-import { ClubList } from './components/ClubList';
-import { ClubForm } from './components/ClubForm';
-import { AnalysisScreen } from './components/AnalysisScreen';
-import { GolfBagPanel } from './components/GolfBagPanel';
-import { SimulatorApp } from './components/simulator/SimulatorApp';
-import { ConfirmationDialog } from './components/ConfirmationDialog';
-import { BagNameDialog } from './components/BagNameDialog';
+import { AppDialogs } from './components/AppDialogs';
+import { AppMainContent } from './components/AppMainContent';
 import {
   selectActiveGolfBag,
   selectSortedActiveBagClubs,
@@ -155,7 +150,6 @@ function App() {
   const activeBag = useClubStore(selectActiveGolfBag);
   const bags = useClubStore((state) => state.bags);
   const activeBagClubCount = activeBag?.clubIds.length ?? 0;
-  const clubsForDisplay = clubListScope === 'bag' ? activeBagClubs : sortedClubs;
   const {
     loading,
     error,
@@ -445,10 +439,6 @@ function App() {
     setShowAnalysis(true);
   };
 
-  const handleBackToList = () => {
-    setShowAnalysis(false);
-  };
-
   const handleDeleteClub = async (id: number) => {
     const targetClub = sortedClubs.find((club) => club.id === id);
     const deleteMessage = targetClub?.name
@@ -544,29 +534,11 @@ function App() {
     setEditingClub(undefined);
   };
 
-  const analysisHiddenKeys = useMemo(() => {
-    return hiddenAnalysisClubKeys.filter((clubKey) =>
-      activeBagClubs.some((club) => getAnalysisClubKey(club) === clubKey),
-    );
-  }, [activeBagClubs, hiddenAnalysisClubKeys]);
-
   useEffect(() => {
     if (location.state?.openSimulator) {
       setShowSimulator(true);
     }
   }, [location.state]);
-
-  if (showSimulator) {
-    return (
-      <SimulatorApp
-        onBack={() => setShowSimulator(false)}
-        selectedClubs={activeBagClubs}
-        allClubs={sortedClubs}
-        activeBagName={activeBag?.name}
-        bagId={activeBag?.id ?? null}
-      />
-    );
-  }
 
   const handleConfirmPropagation = async (propagate: boolean) => {
     if (!pendingClubData) {
@@ -576,161 +548,105 @@ function App() {
     await submitClubData(pendingClubData, propagate);
   };
 
+  const analysisHiddenKeys = useMemo(() => {
+    return hiddenAnalysisClubKeys.filter((clubKey) =>
+      activeBagClubs.some((club) => getAnalysisClubKey(club) === clubKey),
+    );
+  }, [activeBagClubs, hiddenAnalysisClubKeys]);
+
   return (
-    <div className="app-container">
-      {error && <div className="error-message">{error}</div>}
-      {showImagePropagationConfirm && pendingClubData && (
-        <div className="image-propagation-modal" role="dialog" aria-modal="true">
-          <div
-            className="image-propagation-backdrop"
-            onClick={() => {
-              setShowImagePropagationConfirm(false);
-              setPendingClubData(null);
-            }}
-          />
-          <div className="image-propagation-card">
-            <h3>同じクラブ名称の他のクラブにも画像を反映しますか？</h3>
-            <p>
-              同じクラブ名を持つ他のクラブにも、今回アップロードした画像を適用します。
-              反映したくない場合は「いいえ」を選択してください。
-            </p>
-            <div className="image-propagation-actions">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => void handleConfirmPropagation(false)}
-              >
-                いいえ
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void handleConfirmPropagation(true)}
-              >
-                はい
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ConfirmationDialog
-        open={confirmDialog !== null}
-        title={confirmDialog?.title}
-        message={confirmDialog?.message ?? ''}
-        confirmLabel={confirmDialog?.confirmLabel}
-        cancelLabel={confirmDialog?.cancelLabel}
-        onCancel={closeConfirmDialog}
-        onConfirm={handleConfirmDialogConfirm}
-      />
-
-      <BagNameDialog
-        open={showCreateBagDialog}
-        title="新しいバッグを追加"
-        message="新しいゴルフバッグ名を入力してください。"
-        defaultValue={`バッグ ${bags.length + 1}`}
-        confirmLabel="追加する"
-        cancelLabel="キャンセル"
-        isSubmitting={loading}
-        onCancel={() => setShowCreateBagDialog(false)}
-        onConfirm={handleCreateBagConfirm}
-      />
-
-      <BagNameDialog
-        open={showRenameBagDialog}
-        title="バッグ名を変更"
-        message="新しいバッグ名を入力してください。"
-        defaultValue={renameBagDefaultName}
-        confirmLabel="保存する"
-        cancelLabel="キャンセル"
-        isSubmitting={loading}
-        onCancel={() => {
+    <>
+      <AppDialogs
+        error={error}
+        showImagePropagationConfirm={showImagePropagationConfirm}
+        pendingClubData={pendingClubData}
+        onCancelImagePropagation={() => {
+          setShowImagePropagationConfirm(false);
+          setPendingClubData(null);
+        }}
+        onConfirmPropagation={handleConfirmPropagation}
+        confirmDialog={confirmDialog}
+        onCloseConfirmDialog={closeConfirmDialog}
+        onConfirmDialogConfirm={handleConfirmDialogConfirm}
+        showCreateBagDialog={showCreateBagDialog}
+        showRenameBagDialog={showRenameBagDialog}
+        renameBagDefaultName={renameBagDefaultName}
+        bags={bags}
+        loading={loading}
+        onCreateBagConfirm={handleCreateBagConfirm}
+        onCancelCreateBag={() => setShowCreateBagDialog(false)}
+        onRenameBagConfirm={handleRenameBagConfirm}
+        onCancelRenameBag={() => {
           setShowRenameBagDialog(false);
           setRenameBagTargetId(null);
           setRenameBagDefaultName('');
         }}
-        onConfirm={handleRenameBagConfirm}
       />
 
-      {showForm ? (
-        <ClubForm
-          club={editingClub}
-          onSubmit={handleFormSubmit}
-          onCancel={handleFormCancel}
-          isLoading={loading}
-        />
-      ) : showAnalysis ? (
-        <AnalysisScreen
-          clubs={activeBagClubs}
-          onBack={handleBackToList}
-          onUpdateActualDistance={handleActualDistanceChange}
-          headSpeed={headSpeed}
-          onHeadSpeedChange={setHeadSpeed}
-          hiddenAnalysisClubKeys={analysisHiddenKeys}
-          onSetAnalysisClubVisible={handleSetAnalysisClubVisible}
-          swingWeightTarget={swingWeightTarget}
-          swingGoodTolerance={swingGoodTolerance}
-          swingAdjustThreshold={swingAdjustThreshold}
-          onSetSwingWeightTarget={handleSetSwingWeightTarget}
-          onSetSwingGoodTolerance={handleSetSwingGoodTolerance}
-          onSetSwingAdjustThreshold={handleSetSwingAdjustThreshold}
-          onResetSwingWeightTarget={handleResetSwingWeightTarget}
-          onResetSwingThresholds={handleResetSwingThresholds}
-          userLieAngleStandards={userLieAngleStandards}
-          onSetLieTypeStandard={handleSetLieTypeStandard}
-          onSetLieClubStandard={handleSetLieClubStandard}
-          onClearLieTypeStandard={handleClearLieTypeStandard}
-          onClearLieClubStandard={handleClearLieClubStandard}
-          onResetLieStandards={handleResetLieStandards}
-        />
-      ) : (
-        <>
-          <GolfBagPanel
-            bags={bags}
-            activeBagId={activeBag?.id ?? null}
-            activeBagClubCount={activeBagClubCount}
-            onSelectBag={(bagId) => void setActiveBag(bagId)}
-            onCreateBag={() => void handleCreateBag()}
-            onRenameActiveBag={() => void handleRenameActiveBag()}
-            onDeleteActiveBag={() => void handleDeleteActiveBag()}
-            onShiftSelectedBagLeft={() => {
-              if (activeBag?.id != null) {
-                void moveBagLeft(activeBag.id);
-              }
-            }}
-            listScope={clubListScope}
-            onChangeListScope={setClubListScope}
-            compact
-          />
-
-          <ClubList
-            clubs={clubsForDisplay}
-            searchText={clubNameSearchText}
-            selectedClubType={clubTypeFilter}
-            onSearchTextChange={setClubNameSearchText}
-            onSelectedClubTypeChange={setClubTypeFilter}
-            onEdit={handleEditClub}
-            onDelete={handleDeleteClub}
-            onAdd={handleAddClub}
-            onReset={handleResetClubs}
-            onClearAll={handleClearAllClubs}
-            onExport={handleExportJSON}
-            onImport={handleImportJSON}
-            onShowAnalysis={handleShowAnalysis}
-            onShowSimulator={() => setShowSimulator(true)}
-            activeBagName={activeBag?.name}
-            activeBagId={activeBag?.id}
-            activeBagClubIds={activeBag?.clubIds ?? []}
-            activeBagClubCount={activeBagClubCount}
-            isBagView={clubListScope === 'bag'}
-            allClubsCount={sortedClubs.length}
-            onSwitchToAllClubs={() => setClubListScope('all')}
-            onToggleActiveBagMembership={(club) => void handleToggleActiveBagMembership(club)}
-            loading={loading}
-          />
-        </>
-      )}
-    </div>
+      <AppMainContent
+        showSimulator={showSimulator}
+        showForm={showForm}
+        showAnalysis={showAnalysis}
+        editingClub={editingClub}
+        activeBagClubs={activeBagClubs}
+        sortedClubs={sortedClubs}
+        activeBagName={activeBag?.name}
+        activeBagId={activeBag?.id ?? null}
+        activeBagClubCount={activeBagClubCount}
+        activeBagClubIds={activeBag?.clubIds ?? []}
+        activeBag={activeBag ?? undefined}
+        bags={bags}
+        loading={loading}
+        clubListScope={clubListScope}
+        clubNameSearchText={clubNameSearchText}
+        clubTypeFilter={clubTypeFilter}
+        onSearchTextChange={setClubNameSearchText}
+        onSelectedClubTypeChange={setClubTypeFilter}
+        handleFormSubmit={handleFormSubmit}
+        handleFormCancel={handleFormCancel}
+        handleActualDistanceChange={handleActualDistanceChange}
+        hiddenAnalysisClubKeys={analysisHiddenKeys}
+        handleSetAnalysisClubVisible={handleSetAnalysisClubVisible}
+        swingWeightTarget={swingWeightTarget}
+        swingGoodTolerance={swingGoodTolerance}
+        swingAdjustThreshold={swingAdjustThreshold}
+        handleSetSwingWeightTarget={handleSetSwingWeightTarget}
+        handleSetSwingGoodTolerance={handleSetSwingGoodTolerance}
+        handleSetSwingAdjustThreshold={handleSetSwingAdjustThreshold}
+        handleResetSwingWeightTarget={handleResetSwingWeightTarget}
+        handleResetSwingThresholds={handleResetSwingThresholds}
+        userLieAngleStandards={userLieAngleStandards}
+        handleSetLieTypeStandard={handleSetLieTypeStandard}
+        handleSetLieClubStandard={handleSetLieClubStandard}
+        handleClearLieTypeStandard={handleClearLieTypeStandard}
+        handleClearLieClubStandard={handleClearLieClubStandard}
+        handleResetLieStandards={handleResetLieStandards}
+        onSelectBag={(bagId) => void setActiveBag(bagId)}
+        onCreateBag={() => void handleCreateBag()}
+        onRenameActiveBag={() => void handleRenameActiveBag()}
+        onDeleteActiveBag={() => void handleDeleteActiveBag()}
+        onShiftSelectedBagLeft={() => {
+          if (activeBag?.id != null) {
+            void moveBagLeft(activeBag.id);
+          }
+        }}
+        onToggleActiveBagMembership={(club) => void handleToggleActiveBagMembership(club)}
+        onSwitchToAllClubs={() => setClubListScope('all')}
+        handleEditClub={handleEditClub}
+        handleDeleteClub={handleDeleteClub}
+        handleAddClub={handleAddClub}
+        handleResetClubs={handleResetClubs}
+        handleClearAllClubs={handleClearAllClubs}
+        handleExportJSON={handleExportJSON}
+        handleImportJSON={handleImportJSON}
+        handleShowAnalysis={handleShowAnalysis}
+        handleBackToList={() => setShowAnalysis(false)}
+        handleBackFromSimulator={() => setShowSimulator(false)}
+        handleShowSimulator={() => setShowSimulator(true)}
+        headSpeed={headSpeed}
+        onHeadSpeedChange={setHeadSpeed}
+      />
+    </>
   );
 }
 

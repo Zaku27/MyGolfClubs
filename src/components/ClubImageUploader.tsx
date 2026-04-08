@@ -527,21 +527,6 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
           </label>
           <button
             type="button"
-            className="btn-secondary"
-            onClick={() => {
-              if (imageData.length > 0) {
-                setPendingImageSrc(imageData[selectedImageIndex]);
-                setPendingCropIndex(selectedImageIndex);
-                setCropRotation(0);
-                setCropModalOpen(true);
-              }
-            }}
-            disabled={imageData.length === 0}
-          >
-            編集/トリミング
-          </button>
-          <button
-            type="button"
             className="btn-secondary btn-move-image"
             onClick={() => moveSelectedImage(-1)}
             disabled={selectedImageIndex <= 0}
@@ -566,7 +551,7 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
             </button>
           )}
         </div>
-        <span className="form-help-text">アップロード後にトリミングできます。正方形に切り抜かれます。</span>
+        <span className="form-help-text">画像は追加時にトリミングできます。正方形に切り抜かれます。</span>
       </div>
 
       {cropModalOpen && (

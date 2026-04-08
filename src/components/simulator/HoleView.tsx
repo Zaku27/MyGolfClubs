@@ -21,8 +21,6 @@ type LandingHistoryItem = {
   landing: LandingResult;
 };
 import { ConfirmationDialog } from "../ConfirmationDialog";
-import { ShotControlPanel } from "../ShotControlPanel";
-import { buildHazardDisplayName } from "../../utils/shotOutcome";
 
 interface Props {
   onBack: () => void;
@@ -69,6 +67,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     scores,
     bag,
     roundShots,
+    confidenceBoost,
     shotPowerPercent,
     setShotPowerPercent,
     aimXOffset,
@@ -113,20 +112,23 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const currentHole = course[currentHoleIndex];
   if (!currentHole) return null;
 
-  const { remainingDistance, lie, windStrength = 0, windDirectionDegrees = 0, hazards = [] } = shotContext;
-  const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettings();
+  const courseCondition = currentHole.groundCondition ?? {
+    hardness: "medium" as const,
+    slopeAngle: 0,
+    slopeDirection: 0,
+  };
+  const formatGroundHardnessLabel = (hardness: typeof courseCondition.hardness) =>
+    hardness === "soft" ? "柔らかい" : hardness === "firm" ? "硬い" : "普通";
+  const formatSlopeLabel = (angle: number, direction: number) =>
+    angle === 0 ? "フラット" : `${Math.abs(angle)}° / ${direction}°`;
+  const formatWindDetail = (strength: number, direction?: number) => {
+    if (!strength) return "風なし";
+    const directionLabel = typeof direction === "number" ? formatWindDirectionLabel(direction) : "不明";
+    return `${strength} mph ${directionLabel}`;
+  };
 
-  const groundCondition = currentHole.groundCondition ?? { hardness: "medium", slopeAngle: 0, slopeDirection: 0 };
-  const groundHardnessLabel = groundCondition.hardness === "firm" ? "硬い" : groundCondition.hardness === "soft" ? "柔らかい" : "普通";
-  const slopeLabel = groundCondition.slopeAngle === 0
-    ? "フラット"
-    : `${Math.abs(groundCondition.slopeAngle)}° ${groundCondition.slopeAngle > 0 ? "上り" : "下り"}`;
-  const windLabel = `${formatWindDirectionLabel(windDirectionDegrees)} ${windStrength}m/s`;
-  const courseConditionBadges = [
-    { label: "風", value: windLabel },
-    { label: "地面", value: groundHardnessLabel },
-    { label: "傾斜", value: slopeLabel },
-  ];
+  const { remainingDistance, lie, windStrength = 0, windDirectionDegrees } = shotContext;
+  const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettings();
   const seatType = playMode === "robot" ? "robot" : "personal";
   const displayedSkillLevel = playMode === "robot" ? robotSkillLevel : playerSkillLevel;
   const displayedSkillLabel = getSkillLabel(displayedSkillLevel);
@@ -276,11 +278,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       : lastShotResult.finalOutcome === "bunker"
         ? "バンカーに入りました。落ち着いて次の1打を狙いましょう。"
         : lastShotResult.finalOutcome === "rough"
-          ? lastShotResult.lie === "semirough"
-            ? "セミラフにつかまりました。次は脱出を意識しましょう。"
-            : lastShotResult.lie === "bareground"
-              ? "ベアグラウンドにつかまりました。次は脱出を意識しましょう。"
-              : "ラフにつかまりました。次は脱出を意識しましょう。"
+          ? "ラフにつかまりました。次は脱出を意識しましょう。"
           : "OB でした。仕切り直して次のショットを打ちましょう。"
     : null;
   const resultDistanceLabel = lastShotResult?.finalOutcome === "green"
@@ -295,11 +293,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     : lastShotResult?.finalOutcome === "fairway"
       ? "フェアウェイ"
       : lastShotResult?.finalOutcome === "rough"
-        ? lastShotResult.lie === "semirough"
-          ? "セミラフ"
-          : lastShotResult.lie === "bareground"
-            ? "ベアグラウンド"
-            : "ラフ"
+        ? "ラフ"
         : lastShotResult?.finalOutcome === "bunker"
           ? "バンカー"
           : lastShotResult?.finalOutcome === "water"
@@ -309,7 +303,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const selectedClubEstimatedDistance = selectedClub
     ? estimatedDistanceByClub.get(selectedClub.id) ?? null
     : null;
-  const selectedAimPoint = selectedClub && selectedClub.type !== "Putter" && selectedClubEstimatedDistance !== null
+  const selectedAimPoint = selectedClubEstimatedDistance !== null
     ? { x: aimXOffset, y: selectedClubEstimatedDistance }
     : null;
 
@@ -399,41 +393,46 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 transientLandingResult={transientLandingResult}
                 aimPoint={selectedAimPoint}
                 shotOrigin={{ x: shotContext.originX, y: shotContext.originY }}
-                highlightPoint={lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null}
+                highlightPoint={shotContext.penaltyDropOrigin ?? (lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null)}
                 showTrajectories
-                holeComplete={phase === "hole_complete" || phase === "round_complete"}
               />
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              {courseConditionBadges.map((badge) => (
-                <span
-                  key={badge.label}
-                  className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm"
-                >
-                  {badge.label}: {badge.value}
-                </span>
-              ))}
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
+                地面: {formatGroundHardnessLabel(courseCondition.hardness)}
+              </span>
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
+                傾斜: {formatSlopeLabel(courseCondition.slopeAngle, courseCondition.slopeDirection)}
+              </span>
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
+                風: {formatWindDetail(windStrength, windDirectionDegrees)}
+              </span>
             </div>
           </section>
         </div>
 
-        <div className="flex flex-1 flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
+        <div className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
           <div>
+        {confidenceBoost > 0 && (
+          <section className="mb-4 rounded-2xl border border-lime-300/70 bg-lime-100 px-5 py-4 text-lime-900 shadow-sm shadow-lime-200/50 sm:mb-6">
+            <p className="text-xs font-bold tracking-[0.25em] text-lime-700">勢いボーナス発動中</p>
+            <p className="mt-2 text-sm sm:text-base">良いショットが3連続したので、次の1打に成功率 +{confidenceBoost}% が付きます。</p>
+          </section>
+        )}
 
 
 
 
-        <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-7 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-10">
+        <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-10 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-14">
           <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
           <h1 className="mt-4 text-3xl font-extrabold leading-tight text-emerald-900 sm:text-4xl">
             ピンまで {remainingDistance}ヤード
           </h1>
           <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStatusLabel}</p>
           <p className="mt-1 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStrokeLabel}</p>
-          {lastShotResult?.nextShotAdvice && (
-            <p className="mt-3 text-sm text-sky-900 sm:text-base">{lastShotResult.nextShotAdvice}</p>
-          )}
+
+
 
         {/* ショット結果表示（インライン） */}
         {lastShotResult && (
@@ -454,6 +453,11 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               )}
               {hazardFeedbackMessage && (
                 <p className="mt-3 text-sm text-emerald-700">{hazardFeedbackMessage}</p>
+              )}
+              {lastShotResult.nextShotAdvice && (
+                <p className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                  {lastShotResult.nextShotAdvice}
+                </p>
               )}
             </div>
 
@@ -477,6 +481,16 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 )}
               </div>
             )}
+              {lastShotResult.confidenceBoostApplied && (
+                <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
+                  勢いボーナス適用
+                </span>
+              )}
+              {!lastShotResult.confidenceBoostApplied && confidenceBoost > 0 && (
+                <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
+                  次の1打 +{confidenceBoost}%
+                </span>
+              )}
 
             {/* 続ける/次のホールへ/スコアカードを見るボタン */}
             <div className="mt-4">
@@ -503,24 +517,82 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         {/* おすすめクラブセクション ...existing code... */}
 
         {/* ショット操作グループ */}
-        <section className="mt-8 w-full max-w-5xl mx-auto">
-          <ShotControlPanel
-            aimXOffset={aimXOffset}
-            onAimXOffsetChange={setAimXOffset}
-            shotPowerPercent={shotPowerPercent}
-            onShotPowerPercentChange={setShotPowerPercent}
-            onShot={() => {
+        <section className="mt-8 w-full max-w-md mx-auto flex flex-col gap-5 items-stretch lg:max-w-none lg:flex-row lg:items-center">
+          {/* 狙い調整スライダー */}
+          {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
+            <div className="w-full rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-3 lg:flex-1">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
+                <span>方向</span>
+                <span>
+                  {aimXOffset > 0 ? `右 ${aimXOffset}y` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}y` : "中央"}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-50}
+                max={50}
+                step={1}
+                value={aimXOffset}
+                onChange={e => setAimXOffset(Number(e.target.value))}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-sky-200 accent-sky-600"
+                aria-label="方向"
+                disabled={!selectedClub || isResultActionVisible}
+              />
+              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-sky-700">
+                <span>左 50y</span>
+                <span>中央</span>
+                <span>右 50y</span>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ショットボタン */}
+          <button
+            type="button"
+            disabled={!selectedClub || shotInProgress || isResultActionVisible}
+            onClick={() => {
               if (selectedClub && !isResultActionVisible) {
                 selectClub(selectedClub.id);
                 takeShot();
               }
             }}
-            shotButtonLabel={shotInProgress ? 'シミュレーション中...' : 'ショット'}
-            buttonDisabled={!selectedClub || shotInProgress || isResultActionVisible}
-            inputsDisabled={!selectedClub || isResultActionVisible}
-            showAim={!isGreenLie && (!selectedClub?.type || selectedClub.type !== 'Putter')}
-            showPower={!isGreenLie && (!selectedClub?.type || selectedClub.type !== 'Putter')}
-          />
+            className={[
+              "w-full lg:flex-1 rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
+              "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
+              selectedClub && !shotInProgress && !isResultActionVisible
+                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500"
+                : "cursor-not-allowed bg-emerald-200 text-emerald-500"
+            ].join(" ")}
+          >
+            ショット
+          </button>
+
+          {/* パワー調整スライダー */}
+          {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
+            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-3 py-3 lg:flex-1">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-emerald-800">
+                <span>パワー</span>
+                <span>{shotPowerPercent}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={110}
+                step={1}
+                value={shotPowerPercent}
+                onChange={e => setShotPowerPercent(Number(e.target.value))}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
+                aria-label="ショットパワー"
+                disabled={!selectedClub || isResultActionVisible}
+              />
+              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
+                <span>0%</span>
+
+                <span>110%</span>
+              </div>
+            </div>
+          ) : null}
+
         </section>
 
 
@@ -620,21 +692,21 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 transientLandingResult={transientLandingResult}
                 aimPoint={selectedAimPoint}
                 shotOrigin={{ x: shotContext.originX, y: shotContext.originY }}
-                highlightPoint={lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null}
+                highlightPoint={shotContext.penaltyDropOrigin ?? (lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null)}
                 showTrajectories
-                holeComplete={phase === "hole_complete" || phase === "round_complete"}
               />
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              {courseConditionBadges.map((badge) => (
-                <span
-                  key={badge.label}
-                  className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm"
-                >
-                  {badge.label}: {badge.value}
-                </span>
-              ))}
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
+                地面: {formatGroundHardnessLabel(courseCondition.hardness)}
+              </span>
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
+                傾斜: {formatSlopeLabel(courseCondition.slopeAngle, courseCondition.slopeDirection)}
+              </span>
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
+                風: {formatWindDetail(windStrength, windDirectionDegrees)}
+              </span>
             </div>
           </section>
         </aside>

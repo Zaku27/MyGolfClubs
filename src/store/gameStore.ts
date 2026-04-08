@@ -376,6 +376,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             lie: result.lie,
             originX: nextOrigin.x,
             originY: nextOrigin.y,
+            penaltyDropOrigin: result.penalty && result.finalOutcome === "water" ? nextOrigin : undefined,
             // Keep wind and hazards from current hole
           },
           selectedClubId: null,

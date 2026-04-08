@@ -64,6 +64,7 @@ export interface ShotContext {
   targetDistance: number; // absolute pin distance from tee or hole origin
   originX: number; // absolute shot origin X coordinate in hole space
   originY: number; // absolute shot origin Y coordinate in hole space
+  penaltyDropOrigin?: { x: number; y: number };
   windStrength?: number; // mph
   windDirectionDegrees?: number; // 0=北へ吹く, 時計回り
   greenRadius?: number; // ヤード。ピン中心の捕捉半径

@@ -461,21 +461,6 @@ function getEffectiveSuccessRate(
   return Math.max(15, Math.min(95, rate));
 }
 
-function resolveNewLie(
-  remaining: number,
-  isGoodShot: boolean,
-  random: () => number,
-  isOnGreen: boolean,
-): LieType {
-  if (remaining === 0) return "green";
-  if (isOnGreen) return "green";
-  if (!isGoodShot) {
-    return random() < 0.28 ? "bunker" : "rough";
-  }
-  const roughChance = 0.12;
-  return random() < roughChance ? "rough" : "fairway";
-}
-
 function getNonPutterHoleOutChance(remainingDistance: number, shotQuality: ShotQuality): number {
   if (remainingDistance <= 20) {
     if (shotQuality === "excellent") return 0.08;
@@ -956,15 +941,12 @@ export function simulateShot(
   } else if (landedHazard?.type === "bareground") {
     newLie = "bareground";
     finalOutcome = "rough";
+  } else if (isOnGreen || newRemaining === 0) {
+    newLie = "green";
+    finalOutcome = "green";
   } else {
-    newLie = resolveNewLie(newRemaining, isGoodShot, random, isOnGreen);
-    finalOutcome = newLie === "bunker"
-      ? "bunker"
-      : newLie === "rough"
-        ? "rough"
-      : newLie === "green" || newRemaining === 0
-        ? "green"
-        : "fairway";
+    newLie = "fairway";
+    finalOutcome = "fairway";
   }
 
   // ── Message ────────────────────────────────────────────────────────────────

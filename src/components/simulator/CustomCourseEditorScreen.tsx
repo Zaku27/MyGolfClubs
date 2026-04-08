@@ -65,6 +65,29 @@ function normalizeHoleCount(value: unknown): 1 | 3 | 9 | 18 {
   return 9;
 }
 
+function normalizeGroundCondition(value: unknown): Hole['groundCondition'] | undefined {
+  if (!value || typeof value !== "object") return undefined;
+
+  const raw = value as Record<string, unknown>;
+  const hardness = raw.hardness === "soft" || raw.hardness === "medium" || raw.hardness === "firm"
+    ? (raw.hardness as Hole['groundCondition']['hardness'])
+    : undefined;
+  const slopeAngle = Number(raw.slopeAngle);
+  const slopeDirection = Number(raw.slopeDirection);
+
+  if (hardness === undefined && !Number.isFinite(slopeAngle) && !Number.isFinite(slopeDirection)) {
+    return undefined;
+  }
+
+  return {
+    hardness: hardness ?? "medium",
+    slopeAngle: Number.isFinite(slopeAngle) ? slopeAngle : 0,
+    slopeDirection: Number.isFinite(slopeDirection)
+      ? ((slopeDirection % 360) + 360) % 360
+      : 0,
+  };
+}
+
 function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: string): CustomCoursePreset | null {
   const holeCount = normalizeHoleCount(preset.holeCount);
 
@@ -106,9 +129,10 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
               width,
               penaltyStrokes,
               name: typeof h.name === "string" && h.name.length > 0 ? h.name : undefined,
+              groundCondition: normalizeGroundCondition(h.groundCondition),
             };
           })
-      : [];
+        : [];
 
     acc.push({
       number: index + 1,
@@ -117,6 +141,7 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
       targetDistance: distance,
       greenRadius,
       hazards,
+      groundCondition: normalizeGroundCondition(raw.groundCondition),
     });
 
     return acc;
@@ -126,12 +151,50 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
     return null;
   }
 
+  const courseId = typeof preset.id === "string" && preset.id.length > 0
+    ? preset.id
+    : createCourseId();
+
   return {
-    id: typeof preset.id === "string" && preset.id.length > 0 ? preset.id : createCourseId(),
-    name: sanitizeCourseName(typeof preset.name === "string" ? preset.name : fallbackName),
+    id: courseId,
+    name: typeof preset.name === "string" && preset.name.length > 0 ? preset.name : fallbackName,
     holeCount,
     course: normalizedCourse,
   };
+}
+
+function parseImportedCustomCourses(value: unknown): CustomCoursePreset[] {
+  const payload = value as Record<string, unknown>;
+
+  if (payload.format === "custom-course-library-v1" && Array.isArray(payload.courses)) {
+    return payload.courses
+      .map((course, index) => normalizePreset(course, `インポートコース ${index + 1}`))
+      .filter((course): course is CustomCoursePreset => course !== null);
+  }
+
+  if (payload.format === "custom-course-v1" && payload.course) {
+    const course = normalizePreset(payload.course, "インポートコース");
+    return course ? [course] : [];
+  }
+
+  if (Array.isArray(payload)) {
+    return payload
+      .map((item, index) => normalizePreset(item, `インポートコース ${index + 1}`))
+      .filter((course): course is CustomCoursePreset => course !== null);
+  }
+
+  if ("courses" in payload && Array.isArray(payload.courses)) {
+    return payload.courses
+      .map((course, index) => normalizePreset(course, `インポートコース ${index + 1}`))
+      .filter((course): course is CustomCoursePreset => course !== null);
+  }
+
+  if ("course" in payload) {
+    const course = normalizePreset(payload, "インポートコース");
+    return course ? [course] : [];
+  }
+
+  throw new Error("インポートできるコースデータが見つかりません");
 }
 
 function buildDefaultPreset(): CustomCoursePreset {
@@ -139,49 +202,8 @@ function buildDefaultPreset(): CustomCoursePreset {
     id: createCourseId(),
     name: "マイコース 1",
     holeCount: 9,
-    course: cloneCourse(generateRandomCourse(9)),
+    course: generateRandomCourse(9),
   };
-}
-
-function parseImportedCustomCourses(value: unknown): CustomCoursePreset[] {
-  const normalizedPreset = (preset: unknown, fallbackName: string) =>
-    normalizePreset(preset as Partial<CustomCoursePreset>, fallbackName);
-
-  if (!value || typeof value !== "object") {
-    throw new Error("JSON形式が不正です");
-  }
-
-  const payload = value as Record<string, unknown>;
-
-  if (payload.format === "custom-course-library-v1" && Array.isArray(payload.courses)) {
-    return payload.courses
-      .map((course, index) => normalizedPreset(course, `インポートコース ${index + 1}`))
-      .filter((course): course is CustomCoursePreset => course !== null);
-  }
-
-  if (payload.format === "custom-course-v1" && payload.course) {
-    const course = normalizedPreset(payload.course, "インポートコース");
-    return course ? [course] : [];
-  }
-
-  if (Array.isArray(payload)) {
-    return payload
-      .map((item, index) => normalizedPreset(item, `インポートコース ${index + 1}`))
-      .filter((course): course is CustomCoursePreset => course !== null);
-  }
-
-  if ("courses" in payload && Array.isArray(payload.courses)) {
-    return payload.courses
-      .map((course, index) => normalizedPreset(course, `インポートコース ${index + 1}`))
-      .filter((course): course is CustomCoursePreset => course !== null);
-  }
-
-  if ("course" in payload) {
-    const course = normalizedPreset(payload, "インポートコース");
-    return course ? [course] : [];
-  }
-
-  throw new Error("インポートできるコースデータが見つかりません");
 }
 
 function parseStoredCustomCourse(value: unknown): CustomCourseStorage {
