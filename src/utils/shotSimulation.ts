@@ -120,41 +120,124 @@ export function projectAlongLineToPin(
   };
 }
 
+function getHazardRectangleBounds(hazard: Hazard) {
+  const halfWidth = hazard.width / 2;
+  return {
+    left: hazard.xCenter - halfWidth,
+    right: hazard.xCenter + halfWidth,
+    front: Math.min(hazard.yFront, hazard.yBack),
+    back: Math.max(hazard.yFront, hazard.yBack),
+  };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function calculateSegmentHazardBoundaryIntersection(
+  hazard: Hazard,
+  previousPoint: { x: number; y: number },
+  entryPoint: { x: number; y: number },
+): { x: number; y: number } | null {
+  const bounds = getHazardRectangleBounds(hazard);
+  const dx = entryPoint.x - previousPoint.x;
+  const dy = entryPoint.y - previousPoint.y;
+  const candidates: Array<{ t: number; x: number; y: number }> = [];
+
+  if (Math.abs(dx) > 1e-6) {
+    const txLeft = (bounds.left - previousPoint.x) / dx;
+    const yAtLeft = previousPoint.y + dy * txLeft;
+    if (txLeft >= 0 && txLeft <= 1 && yAtLeft >= bounds.front && yAtLeft <= bounds.back) {
+      candidates.push({ t: txLeft, x: bounds.left, y: yAtLeft });
+    }
+
+    const txRight = (bounds.right - previousPoint.x) / dx;
+    const yAtRight = previousPoint.y + dy * txRight;
+    if (txRight >= 0 && txRight <= 1 && yAtRight >= bounds.front && yAtRight <= bounds.back) {
+      candidates.push({ t: txRight, x: bounds.right, y: yAtRight });
+    }
+  }
+
+  if (Math.abs(dy) > 1e-6) {
+    const tyFront = (bounds.front - previousPoint.y) / dy;
+    const xAtFront = previousPoint.x + dx * tyFront;
+    if (tyFront >= 0 && tyFront <= 1 && xAtFront >= bounds.left && xAtFront <= bounds.right) {
+      candidates.push({ t: tyFront, x: xAtFront, y: bounds.front });
+    }
+
+    const tyBack = (bounds.back - previousPoint.y) / dy;
+    const xAtBack = previousPoint.x + dx * tyBack;
+    if (tyBack >= 0 && tyBack <= 1 && xAtBack >= bounds.left && xAtBack <= bounds.right) {
+      candidates.push({ t: tyBack, x: xAtBack, y: bounds.back });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((a, b) => a.t - b.t);
+  return { x: candidates[0].x, y: candidates[0].y };
+}
+
+function findWaterHazardEntryPoint(
+  hazard: Hazard,
+  trajectoryPoints: Array<{ x: number; y: number }>,
+): { x: number; y: number } | null {
+  let previousPoint = trajectoryPoints[0];
+  if (checkLandingInHazard(previousPoint.x, previousPoint.y, [hazard])) {
+    return previousPoint;
+  }
+
+  for (let i = 1; i < trajectoryPoints.length; i++) {
+    const point = trajectoryPoints[i];
+    if (checkLandingInHazard(point.x, point.y, [hazard])) {
+      const intersection = calculateSegmentHazardBoundaryIntersection(hazard, previousPoint, point);
+      return intersection ?? point;
+    }
+    previousPoint = point;
+  }
+
+  return null;
+}
+
 export function getWaterHazardDropOrigin(
   hazard: Hazard,
   absoluteLanding: { x: number; y: number },
+  trajectoryPoints?: Array<{ x: number; y: number }>,
 ): { x: number; y: number } {
-  const halfWidth = hazard.width / 2;
-  const leftEdge = hazard.xCenter - halfWidth;
-  const rightEdge = hazard.xCenter + halfWidth;
-  const frontEdge = Math.min(hazard.yFront, hazard.yBack);
-  const backEdge = Math.max(hazard.yFront, hazard.yBack);
-  const dropOffset = 5;
+  if (trajectoryPoints?.length) {
+    const entryPoint = findWaterHazardEntryPoint(hazard, trajectoryPoints);
+    if (entryPoint) {
+      return entryPoint;
+    }
+  }
 
+  const bounds = getHazardRectangleBounds(hazard);
   const entryX = absoluteLanding.x;
   const entryY = absoluteLanding.y;
-  const frontDistance = entryY - frontEdge;
-  const leftDistance = Math.abs(entryX - leftEdge);
-  const rightDistance = Math.abs(entryX - rightEdge);
+  const frontDistance = entryY - bounds.front;
+  const leftDistance = Math.abs(entryX - bounds.left);
+  const rightDistance = Math.abs(entryX - bounds.right);
 
   if (frontDistance <= Math.min(leftDistance, rightDistance)) {
-    const dropX = Math.min(Math.max(entryX, leftEdge), rightEdge);
+    const dropX = clamp(entryX, bounds.left, bounds.right);
     return {
       x: dropX,
-      y: Math.max(frontEdge - dropOffset, 0),
+      y: bounds.front,
     };
   }
 
-  const dropY = Math.min(Math.max(entryY, frontEdge), backEdge);
+  const dropY = clamp(entryY, bounds.front, bounds.back);
   if (leftDistance <= rightDistance) {
     return {
-      x: leftEdge - dropOffset,
+      x: bounds.left,
       y: dropY,
     };
   }
 
   return {
-    x: rightEdge + dropOffset,
+    x: bounds.right,
     y: dropY,
   };
 }
@@ -860,7 +943,7 @@ export function simulateShot(
 
   if (landedHazard?.type === "water") {
     const relief = resolvePenaltyRelief("water", lie, remainingDistance, newRemaining, landedHazard.penaltyStrokes ?? 3);
-    penaltyDropOrigin = getWaterHazardDropOrigin(landedHazard, absoluteLanding);
+    penaltyDropOrigin = getWaterHazardDropOrigin(landedHazard, absoluteLanding, absoluteTrajectoryPoints);
     newRemaining = Math.round(distanceToPinFromLanding(context.targetDistance, penaltyDropOrigin.x, penaltyDropOrigin.y));
     newLie = relief.newLie;
     finalOutcome = "water";

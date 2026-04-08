@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyGroundCondition, normalizeGroundSlope, type ClubData, type LandingResult, type SkillLevel } from './landingPosition';
-import type { GroundCondition } from '../types/game';
+import { getWaterHazardDropOrigin } from './shotSimulation';
+import type { GroundCondition, Hazard } from '../types/game';
 
 const BASE_LANDING: LandingResult = {
   carry: 100,
@@ -81,5 +82,31 @@ describe('applyGroundCondition side slope behavior with fixed seed', () => {
 
     // Expect opposite signs
     expect(Math.sign(leftMean)).not.toBe(Math.sign(rightMean));
+  });
+
+  describe('getWaterHazardDropOrigin', () => {
+    const waterHazard: Hazard = {
+      id: 'water-1',
+      type: 'water',
+      shape: 'rectangle',
+      yFront: 80,
+      yBack: 100,
+      xCenter: 0,
+      width: 10,
+      penaltyStrokes: 1,
+    };
+
+    it('returns the tee-nearest hazard entry intersection for red-stake water', () => {
+      const absoluteLanding = { x: 0, y: 90 };
+      const trajectoryPoints = [
+        { x: 0, y: 70 },
+        { x: 0, y: 80 },
+        { x: 0, y: 90 },
+      ];
+
+      const dropOrigin = getWaterHazardDropOrigin(waterHazard, absoluteLanding, trajectoryPoints);
+
+      expect(dropOrigin).toEqual({ x: 0, y: 80 });
+    });
   });
 });
