@@ -3,6 +3,7 @@ import type { ClubData, SkillLevel } from "./landingPosition";
 import type { GroundCondition, Hole, ShotResult } from "../types/game";
 import {
   assessLanding,
+  buildNextShotAdvice,
   buildOutcomeMessage,
   DEFAULT_GREEN_RADIUS,
   determineLieFromFinalOutcome,
@@ -98,6 +99,7 @@ export function simulateShotWithCourse(
   return {
     newRemainingDistance,
     outcomeMessage: buildOutcomeMessage(finalOutcome, newRemainingDistance, lie),
+    nextShotAdvice: buildNextShotAdvice(finalOutcome, lie),
     strokesAdded: 1,
     lie,
     penalty: penaltyStrokes > 0,
@@ -105,7 +107,7 @@ export function simulateShotWithCourse(
     shotQuality: landingOutcome.shotQuality,
     wasSuccessful,
     effectiveSuccessRate,
-    confidenceBoostApplied: false,
+
     landing,
     finalOutcome,
     penaltyStrokes,

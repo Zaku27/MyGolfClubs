@@ -108,9 +108,9 @@ export interface ShotResult {
   shotQuality: ShotQuality;
   wasSuccessful: boolean;
   effectiveSuccessRate: number;
-  confidenceBoostApplied?: boolean;
   landing?: ShotLanding;
   finalOutcome: "fairway" | "rough" | "bunker" | "water" | "ob" | "green";
+  nextShotAdvice?: string;
   penaltyStrokes: number;
   penaltyDropOrigin?: { x: number; y: number };
   origin?: { x: number; y: number };
@@ -129,7 +129,6 @@ export interface ShotLog {
   lieAfter: LieType;
   shotQuality: ShotQuality;
   wasWeakClub: boolean;
-  confidenceBoostApplied: boolean;
 }
 
 export interface ClubUsageStat {

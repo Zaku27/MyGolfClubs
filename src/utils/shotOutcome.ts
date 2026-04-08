@@ -245,6 +245,44 @@ export function buildOutcomeMessage(
   return `フェアウェイに着地しました。残り${newRemainingDistance}y（${lie}）。`;
 }
 
+export function buildNextShotAdvice(
+  finalOutcome: ShotResult["finalOutcome"],
+  lie: LieType,
+): string {
+  const lieLabelMap: Record<LieType, string> = {
+    tee: "ティー",
+    fairway: "フェアウェイ",
+    semirough: "セミラフ",
+    rough: "ラフ",
+    bareground: "ベアグラウンド",
+    bunker: "バンカー",
+    green: "グリーン",
+  };
+  const lieLabel = lieLabelMap[lie] ?? lie;
+
+  if (finalOutcome === "water") {
+    return `ウォーター救済後は${lieLabel}ライです。まずはフェアウェイ復帰を優先し、方向の安定を意識してクラブを選びましょう。`;
+  }
+
+  if (finalOutcome === "bunker") {
+    return `バンカーからの脱出を狙います。飛距離が大幅に落ちる事と難易度が大幅に上昇することに注意してください。`;
+  }
+
+  if (finalOutcome === "rough") {
+    return `ラフからのショットです。飛距離が通常よりも落ちて、難易度も若干上がることを考慮してください。`;
+  }
+
+  if (finalOutcome === "ob") {
+    return `OB 後は打ち直しです。次の1打は方向重視で刻むことをおすすめします。`;
+  }
+
+  if (finalOutcome === "green") {
+    return `グリーン上です。残り距離による成功率とスキルレベルで、カップインが自動的に判定されます。`;
+  }
+
+  return `フェアウェイからのショットです。残り距離と風を見てクラブを選びましょう。`;
+}
+
 type DetailedShotMessageInput = {
   qualityLabel: string;
   clubLabel: string;

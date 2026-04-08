@@ -9,16 +9,60 @@ interface CourseEditorProps {
   onChange: (holes: Hole[]) => void;
 }
 
-function formatSlopeGuide(slopeAngle: number, slopeDirection: number): string {
+function formatSlopeDirectionLabel(direction: number): string {
+  if (direction === 0) return 'ピン方向上り';
+  if (direction === 90) return '右側上り';
+  if (direction === 180) return 'ピン反対方向上り';
+  if (direction === 270) return '左側上り';
+  if (direction > 0 && direction < 90) return '右前上り';
+  if (direction > 90 && direction < 180) return '右後上り';
+  if (direction > 180 && direction < 270) return '左後上り';
+  return '左前上り';
+}
+
+function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
   const normalizedDirection = ((slopeDirection % 360) + 360) % 360;
-  const normalized = slopeAngle < 0
-    ? { slopeAngle: Math.abs(slopeAngle), slopeDirection: (normalizedDirection + 180) % 360 }
-    : { slopeAngle, slopeDirection: normalizedDirection };
+  if (slopeAngle < 0) {
+    return {
+      slopeAngle: Math.abs(slopeAngle),
+      slopeDirection: (normalizedDirection + 180) % 360,
+    };
+  }
+
+  return {
+    slopeAngle,
+    slopeDirection: normalizedDirection,
+  };
+}
+
+function toCanonicalSlopeSettings(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
+  const safeAngle = Number.isFinite(slopeAngle) ? slopeAngle : 0;
+  const clampedAngle = Math.min(45, Math.abs(safeAngle));
+  const normalizedDirection = Number.isFinite(slopeDirection)
+    ? ((slopeDirection % 360) + 360) % 360
+    : 0;
+
+  if (safeAngle < 0) {
+    return {
+      slopeAngle: clampedAngle,
+      slopeDirection: (normalizedDirection + 180) % 360,
+    };
+  }
+
+  return {
+    slopeAngle: clampedAngle,
+    slopeDirection: normalizedDirection,
+  };
+}
+
+function formatSlopeGuide(slopeAngle: number, slopeDirection: number): string {
+  const normalized = normalizeSlopeForDisplay(slopeAngle, slopeDirection);
 
   if (normalized.slopeAngle === 0) {
     return 'フラット: キャリー・ラン・横ブレの傾斜補正は入りません。';
   }
 
+  const directionLabel = formatSlopeDirectionLabel(normalized.slopeDirection);
   let effect = '前後と左右の補正が混在します。';
   if (normalized.slopeDirection === 0) effect = 'ピン方向が上りになり、キャリーとランは減りやすくなります。';
   else if (normalized.slopeDirection === 180) effect = 'ピン方向が下りになり、キャリーとランは伸びやすくなります。';
@@ -29,7 +73,7 @@ function formatSlopeGuide(slopeAngle: number, slopeDirection: number): string {
   else if (normalized.slopeDirection > 180 && normalized.slopeDirection < 270) effect = '左後上りで、キャリーとランが伸びつつ右へ流れやすくなります。';
   else if (normalized.slopeDirection > 270 && normalized.slopeDirection < 360) effect = '左前上りで、キャリーとランが減りつつ右へ流れやすくなります。';
 
-  return `${normalized.slopeAngle}° / uphill ${normalized.slopeDirection}°: ${effect}`;
+  return `${normalized.slopeAngle}° / ${directionLabel}: ${effect}`;
 }
 
 function toStoredSlopeDirection(slopeAngle: number, displayedDirection: number): number {
@@ -47,13 +91,6 @@ const HAZARD_TYPE_LABEL: Record<HazardType, string> = {
   semirough: "セミラフ",
   bareground: "ベアグラウンド",
 };
-
-const SLOPE_DIRECTION_PRESETS = [
-  { label: '前', value: 0 },
-  { label: '右', value: 90 },
-  { label: '後', value: 180 },
-  { label: '左', value: 270 },
-];
 
 function cloneHazards(hazards: Hazard[] | undefined): Hazard[] {
   return (hazards ?? []).map((hazard) => ({ ...hazard }));
@@ -111,35 +148,32 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   );
 
   const selectedGroundCondition = selectedHazard?.groundCondition ?? selectedHole?.groundCondition ?? defaultGroundCondition;
-  const normalizedSelectedSlope = (() => {
-    const normalizedDirection = ((selectedGroundCondition.slopeDirection % 360) + 360) % 360;
-    if (selectedGroundCondition.slopeAngle < 0) {
-      return {
-        slopeAngle: Math.abs(selectedGroundCondition.slopeAngle),
-        slopeDirection: (normalizedDirection + 180) % 360,
-      };
-    }
-
-    return {
-      slopeAngle: selectedGroundCondition.slopeAngle,
-      slopeDirection: normalizedDirection,
-    };
-  })();
+  const normalizedSelectedSlope = normalizeSlopeForDisplay(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection);
 
   const updateGroundCondition = (updater: (condition: GroundCondition) => GroundCondition) => {
     if (!selectedHole) return;
 
+    const normalizeAndSave = (condition: GroundCondition) => {
+      const updated = updater(condition);
+      const canonical = toCanonicalSlopeSettings(updated.slopeAngle, updated.slopeDirection);
+      return {
+        ...updated,
+        slopeAngle: canonical.slopeAngle,
+        slopeDirection: canonical.slopeDirection,
+      };
+    };
+
     if (selectedHazard) {
       updateSelectedHazard((hazard) => ({
         ...hazard,
-        groundCondition: updater(hazard.groundCondition ?? defaultGroundCondition),
+        groundCondition: normalizeAndSave(hazard.groundCondition ?? defaultGroundCondition),
       }));
       return;
     }
 
     updateHole((hole) => ({
       ...hole,
-      groundCondition: updater(hole.groundCondition ?? defaultGroundCondition),
+      groundCondition: normalizeAndSave(hole.groundCondition ?? defaultGroundCondition),
     }));
   };
 
@@ -219,7 +253,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   }
 
   return (
-    <section className="mx-auto mt-4 w-full max-w-3xl rounded-2xl border border-emerald-300 bg-white/80 p-4 shadow-sm shadow-emerald-300/30">
+    <section className="mx-auto mt-4 w-full max-w-2xl rounded-2xl border border-emerald-300 bg-white/80 p-4 shadow-sm shadow-emerald-300/30">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-black tracking-[0.08em] text-emerald-900">コースエディタ</h2>
         <button
@@ -349,62 +383,121 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
           </label>
 
           <label className="space-y-1 text-xs font-semibold text-emerald-800">
-            傾斜角度 (度)
-            <input
-              type="range"
-              min={-20}
-              max={20}
-              step={1}
-              value={selectedGroundCondition.slopeAngle}
-              onChange={(event) => {
-                const slopeAngle = Number(event.target.value);
-                updateGroundCondition((condition) => ({ ...condition, slopeAngle }));
-              }}
-              className="w-full cursor-pointer"
-            />
-            <div className="text-right text-[11px] text-emerald-700">
-              {selectedGroundCondition.slopeAngle === 0 ? "フラット" : `傾斜量 ${Math.abs(selectedGroundCondition.slopeAngle)}°`}
+            上り方向
+            <div className="grid grid-cols-3 gap-1 text-center place-items-center">
+              <div />
+              <button
+                type="button"
+                onClick={() => {
+                  updateGroundCondition((condition) => ({
+                    ...condition,
+                    slopeDirection: toStoredSlopeDirection(condition.slopeAngle, 0),
+                  }));
+                }}
+                className={[
+                  'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
+                  normalizedSelectedSlope.slopeDirection === 0
+                    ? 'border-emerald-700 bg-emerald-700 text-white'
+                    : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                ].join(' ')}
+              >
+                前
+              </button>
+              <div />
+              <button
+                type="button"
+                onClick={() => {
+                  updateGroundCondition((condition) => ({
+                    ...condition,
+                    slopeDirection: toStoredSlopeDirection(condition.slopeAngle, 270),
+                  }));
+                }}
+                className={[
+                  'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
+                  normalizedSelectedSlope.slopeDirection === 270
+                    ? 'border-emerald-700 bg-emerald-700 text-white'
+                    : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                ].join(' ')}
+              >
+                左
+              </button>
+              <div className="h-10 w-10" />
+              <button
+                type="button"
+                onClick={() => {
+                  updateGroundCondition((condition) => ({
+                    ...condition,
+                    slopeDirection: toStoredSlopeDirection(condition.slopeAngle, 90),
+                  }));
+                }}
+                className={[
+                  'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
+                  normalizedSelectedSlope.slopeDirection === 90
+                    ? 'border-emerald-700 bg-emerald-700 text-white'
+                    : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                ].join(' ')}
+              >
+                右
+              </button>
+              <div />
+              <button
+                type="button"
+                onClick={() => {
+                  updateGroundCondition((condition) => ({
+                    ...condition,
+                    slopeDirection: toStoredSlopeDirection(condition.slopeAngle, 180),
+                  }));
+                }}
+                className={[
+                  'h-10 w-10 rounded border px-2 py-1 text-[11px] font-bold transition flex items-center justify-center',
+                  normalizedSelectedSlope.slopeDirection === 180
+                    ? 'border-emerald-700 bg-emerald-700 text-white'
+                    : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
+                ].join(' ')}
+              >
+                後
+              </button>
+              <div />
             </div>
-          </label>
-
-          <label className="space-y-1 text-xs font-semibold text-emerald-800">
-            uphill方向 (0–359)
+            <div className="text-right text-[11px] text-emerald-700">
+              {normalizedSelectedSlope.slopeDirection}°
+            </div>
             <input
               type="range"
               min={0}
               max={359}
               step={1}
-              value={selectedGroundCondition.slopeDirection}
+              value={normalizedSelectedSlope.slopeDirection}
               onChange={(event) => {
                 const slopeDirection = Number(event.target.value);
-                updateGroundCondition((condition) => ({ ...condition, slopeDirection }));
+                updateGroundCondition((condition) => ({
+                  ...condition,
+                  slopeDirection: toStoredSlopeDirection(condition.slopeAngle, slopeDirection),
+                }));
+              }}
+              className="w-full cursor-pointer"
+            />
+          </label>
+
+          <label className="space-y-1 text-xs font-semibold text-emerald-800">
+            傾斜角度
+            <input
+              type="range"
+              min={0}
+              max={45}
+              step={1}
+              value={normalizedSelectedSlope.slopeAngle}
+              onChange={(event) => {
+                const slopeAngle = Number(event.target.value);
+                updateGroundCondition((condition) => ({
+                  ...condition,
+                  slopeAngle,
+                }));
               }}
               className="w-full cursor-pointer"
             />
             <div className="text-right text-[11px] text-emerald-700">
-              {normalizedSelectedSlope.slopeDirection}°
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {SLOPE_DIRECTION_PRESETS.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  onClick={() => {
-                    updateGroundCondition((condition) => ({
-                      ...condition,
-                      slopeDirection: toStoredSlopeDirection(condition.slopeAngle, preset.value),
-                    }));
-                  }}
-                  className={[
-                    'min-w-10 rounded border px-2 py-1 text-[11px] font-bold transition',
-                    normalizedSelectedSlope.slopeDirection === preset.value
-                      ? 'border-emerald-700 bg-emerald-700 text-white'
-                      : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100',
-                  ].join(' ')}
-                >
-                  {preset.label}
-                </button>
-              ))}
+              {normalizedSelectedSlope.slopeAngle === 0 ? 'フラット' : `傾斜量 ${normalizedSelectedSlope.slopeAngle}°`}
             </div>
           </label>
         </div>

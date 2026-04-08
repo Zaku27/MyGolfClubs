@@ -430,7 +430,7 @@ export function CustomCourseEditorScreen() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex flex-col items-center justify-center p-6 gap-6">
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-3xl">
         <div className="flex flex-col gap-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-5 shadow-sm shadow-emerald-300/40 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3 text-emerald-900">
             <div className="text-6xl">🛠️</div>
@@ -457,7 +457,7 @@ export function CustomCourseEditorScreen() {
         </div>
       </div>
 
-      <div className="w-full max-w-4xl rounded-2xl border border-emerald-300 bg-emerald-50/90 p-5 shadow-sm shadow-emerald-300/40">
+      <div className="w-full max-w-3xl rounded-2xl border border-emerald-300 bg-emerald-50/90 p-5 shadow-sm shadow-emerald-300/40">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-black text-emerald-900 tracking-tight">保存済みコース</h2>

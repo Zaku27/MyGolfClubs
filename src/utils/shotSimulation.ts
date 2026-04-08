@@ -15,6 +15,7 @@ import { calculateLandingOutcome, applyGroundCondition } from "./landingPosition
 import {
   assessLanding,
   buildDetailedShotMessage,
+  buildNextShotAdvice,
   checkLandingInHazard,
   DEFAULT_GREEN_RADIUS,
   determinePenaltyStrokes,
@@ -35,7 +36,6 @@ export async function fetchPlayerSkillLevelFromPersonalData(): Promise<number> {
 }
 
 interface SimulationOptions {
-  confidenceBoost?: number;
   personalData?: ClubPersonalData;
   playerSkillLevel?: number;
   forceEffectiveSuccessRate?: number;
@@ -440,7 +440,6 @@ export function estimateShotDistance(
 function getEffectiveSuccessRate(
   club: SimClub,
   lie: LieType,
-  confidenceBoost: number,
   playerSkillLevel: number,
   personalData?: ClubPersonalData,
 ): number {
@@ -459,7 +458,6 @@ function getEffectiveSuccessRate(
     const weakPenaltyBase = club.successRate < 60 ? 16 : 14;
     rate -= weakPenaltyBase * WEAK_CLUB_EFFECT_SCALE;
   }
-  rate += confidenceBoost;
   return Math.max(15, Math.min(95, rate));
 }
 
@@ -614,7 +612,6 @@ const QUALITY_LABELS: Record<ShotQuality, string> = {
 
 function simulatePutt(
   remaining: number,
-  confidenceBoost: number,
   playerSkillLevel: number = 0.5,
   random: () => number = Math.random,
 ): {
@@ -646,8 +643,7 @@ function simulatePutt(
 
   // スキルレベルを反映（最低50%保証）
   let makeChance = baseChance * (0.5 + 0.5 * playerSkillLevel);
-  // 信頼度ブーストも加味
-  makeChance = Math.min(0.98, makeChance + confidenceBoost / 100);
+  makeChance = Math.min(0.98, makeChance);
 
   if (random() < makeChance) {
     return {
@@ -692,12 +688,10 @@ export function simulateShot(
     greenRadius = DEFAULT_GREEN_RADIUS,
     hazards = [],
   } = context;
-  const confidenceBoost = options.confidenceBoost ?? 0;
   const playerSkillLevel = options.playerSkillLevel ?? 0.5;
   const shotPowerPercent = Math.max(0, Math.min(110, options.shotPowerPercent ?? 100));
   const powerMultiplier = shotPowerPercent / 100;
   const { personalData } = options;
-  const confidenceBoostApplied = confidenceBoost > 0;
   const simulationSeedBase = [
     club.id,
     club.avgDistance,
@@ -713,7 +707,7 @@ export function simulateShot(
 
   // ── Putter path ────────────────────────────────────────────────────────────
   if (club.type === "Putter") {
-    const putt = simulatePutt(remainingDistance, confidenceBoost, playerSkillLevel, random);
+    const putt = simulatePutt(remainingDistance, playerSkillLevel, random);
     const puttDistance = Math.max(0, remainingDistance - putt.newRemaining);
     return {
       newRemainingDistance: putt.newRemaining,
@@ -725,7 +719,6 @@ export function simulateShot(
       shotQuality: putt.made ? "good" : "poor",
       wasSuccessful: putt.made || putt.newRemaining <= 3,
       effectiveSuccessRate: putt.effectiveSuccessRate,
-      confidenceBoostApplied,
       landing: {
         carry: puttDistance,
         roll: 0,
@@ -751,7 +744,6 @@ export function simulateShot(
     : getEffectiveSuccessRate(
         club,
         lie,
-        confidenceBoost,
         playerSkillLevel,
         personalData,
       );
@@ -971,6 +963,7 @@ export function simulateShot(
 
   // ── Message ────────────────────────────────────────────────────────────────
   const clubLabel = `${club.name}${club.number ? " " + club.number : ""}`;
+  const nextShotAdvice = buildNextShotAdvice(finalOutcome, newLie);
   const message = buildDetailedShotMessage({
     qualityLabel: QUALITY_LABELS[shotQuality],
     clubLabel,
@@ -985,6 +978,7 @@ export function simulateShot(
   return {
     newRemainingDistance: newRemaining,
     outcomeMessage: message,
+    nextShotAdvice,
     strokesAdded: 1 + penaltyStrokes,
     lie: newLie,
     penalty,
@@ -992,7 +986,6 @@ export function simulateShot(
     shotQuality,
     wasSuccessful: landedHazard ? false : isGoodShot,
     effectiveSuccessRate: effectiveRate,
-    confidenceBoostApplied,
     landing,
     finalOutcome,
     penaltyStrokes,
@@ -1004,14 +997,12 @@ export function simulateShot(
 export function estimateEffectiveSuccessRate(
   club: SimClub,
   context: Pick<ShotContext, "lie">,
-  options: Pick<SimulationOptions, "confidenceBoost" | "personalData" | "playerSkillLevel"> = {},
+  options: Pick<SimulationOptions, "personalData" | "playerSkillLevel"> = {},
 ): number {
-  const confidenceBoost = options.confidenceBoost ?? 0;
   const playerSkillLevel = options.playerSkillLevel ?? 0.5;
   return getEffectiveSuccessRate(
     club,
     context.lie,
-    confidenceBoost,
     playerSkillLevel,
     options.personalData,
   );

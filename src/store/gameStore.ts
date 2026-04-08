@@ -83,7 +83,6 @@ interface GameStoreState {
   lastHoleSummary: HoleSummary | null;
   holeSummaries: HoleSummary[];
   goodShotStreak: number;
-  confidenceBoost: number;
   roundSeedNonce: string;
   /** DBから取得したプレイヤースキルレベル (0-1)。パット確率に使用。 */
   playerSkillLevel: number;
@@ -132,7 +131,6 @@ const INITIAL_STATE: GameStoreState = {
   lastHoleSummary: null,
   holeSummaries: [],
   goodShotStreak: 0,
-  confidenceBoost: 0,
   roundSeedNonce: "default",
   playerSkillLevel: 0.5,
   playMode: "bag",
@@ -185,9 +183,6 @@ function buildHoleInsight(hole: Hole, holeShots: ShotLog[], roundShots: ShotLog[
     return `今日は ${strugglingClub.clubLabel} がやや苦戦しています`;
   }
 
-  if (holeShots.some((shot) => shot.confidenceBoostApplied && shot.success)) {
-    return "良い流れが次のショットにもつながりました";
-  }
 
   const holeSuccessRate = holeShots.length > 0 ? Math.round((successfulShots.length / holeShots.length) * 100) : 0;
   if (holeSuccessRate >= 70) {
@@ -257,7 +252,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentHoleShots,
       roundShots,
       goodShotStreak,
-      confidenceBoost,
       holeSummaries,
       playerSkillLevel,
       playMode,
@@ -292,7 +286,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
       const isPutter = club.type === "Putter";
       const result = simulateShot(clubForSimulation, shotContext, {
-        confidenceBoost,
         personalData: isRobotMode ? undefined : clubPersonalData,
         playerSkillLevel: isRobotMode
           ? (isPutter ? playerSkillLevel : 1)
@@ -305,11 +298,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
       });
       const newHoleStrokes = holeStrokes + result.strokesAdded;
-      const confidenceBoostApplied = result.confidenceBoostApplied === true;
-      const streakAfterShot = confidenceBoostApplied
-        ? (result.wasSuccessful ? 1 : 0)
-        : (result.wasSuccessful ? goodShotStreak + 1 : 0);
-      const nextConfidenceBoost = !confidenceBoostApplied && streakAfterShot === 3 ? 6 : 0;
+      const streakAfterShot = result.wasSuccessful ? goodShotStreak + 1 : 0;
       const shotLog: ShotLog = {
         holeNumber: course[currentHoleIndex].number,
         clubId: club.id,
@@ -323,7 +312,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         lieAfter: result.lie,
         shotQuality: result.shotQuality,
         wasWeakClub: isRobotMode ? false : treatedAsWeakClub,
-        confidenceBoostApplied: result.confidenceBoostApplied === true,
       };
       const nextHoleShots = [...currentHoleShots, shotLog];
       const nextRoundShots = [...roundShots, shotLog];
@@ -358,7 +346,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
           lastHoleSummary: holeSummary,
           holeSummaries: [...holeSummaries, holeSummary],
           goodShotStreak: streakAfterShot,
-          confidenceBoost: nextConfidenceBoost,
           shotInProgress: false,
         });
       } else {
@@ -397,7 +384,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
           currentHoleShots: nextHoleShots,
           roundShots: nextRoundShots,
           goodShotStreak: streakAfterShot,
-          confidenceBoost: nextConfidenceBoost,
           shotInProgress: false,
         });
       }

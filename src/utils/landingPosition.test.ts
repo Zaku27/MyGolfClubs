@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyGroundCondition, normalizeGroundSlope, type ClubData, type LandingResult, type SkillLevel } from './landingPosition';
 import { getWaterHazardDropOrigin } from './shotSimulation';
+import { buildNextShotAdvice } from './shotOutcome';
 import type { GroundCondition, Hazard } from '../types/game';
 
 const BASE_LANDING: LandingResult = {
@@ -82,6 +83,19 @@ describe('applyGroundCondition side slope behavior with fixed seed', () => {
 
     // Expect opposite signs
     expect(Math.sign(leftMean)).not.toBe(Math.sign(rightMean));
+  });
+
+  describe('buildNextShotAdvice', () => {
+    it('returns a water recovery advice message when water is encountered', () => {
+      const advice = buildNextShotAdvice('water', 'rough');
+      expect(advice).toContain('ウォーター救済後');
+      expect(advice).toContain('ラフライ');
+    });
+
+    it('returns a bunker recovery advice message when bunker is encountered', () => {
+      const advice = buildNextShotAdvice('bunker', 'bunker');
+      expect(advice).toContain('バンカーからの脱出');
+    });
   });
 
   describe('getWaterHazardDropOrigin', () => {

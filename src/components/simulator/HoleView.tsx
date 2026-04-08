@@ -67,7 +67,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     scores,
     bag,
     roundShots,
-    confidenceBoost,
     shotPowerPercent,
     setShotPowerPercent,
     aimXOffset,
@@ -288,7 +287,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const selectedClubEstimatedDistance = selectedClub
     ? estimatedDistanceByClub.get(selectedClub.id) ?? null
     : null;
-  const selectedAimPoint = selectedClubEstimatedDistance !== null
+  const selectedAimPoint = selectedClub && selectedClub.type !== "Putter" && selectedClubEstimatedDistance !== null
     ? { x: aimXOffset, y: selectedClubEstimatedDistance }
     : null;
 
@@ -305,6 +304,11 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-sky-800">
               {playMode === "robot" ? "ロボットプレイ中" : "ゴルフバッグプレイ中"}
             </span>
+            {playMode === "robot" && (
+              <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-sky-800">
+                ヘッドスピード {robotHeadSpeed.toFixed(1)} m/s
+              </span>
+            )}
             <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-emerald-900">
               適用スキルレベル {(displayedSkillLevel * 100).toFixed(0)}% ({displayedSkillLabel})
             </span>
@@ -397,32 +401,22 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           </section>
         </div>
 
-        <div className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
+        <div className="flex flex-1 flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
           <div>
-        {confidenceBoost > 0 && (
-          <section className="mb-4 rounded-2xl border border-lime-300/70 bg-lime-100 px-5 py-4 text-lime-900 shadow-sm shadow-lime-200/50 sm:mb-6">
-            <p className="text-xs font-bold tracking-[0.25em] text-lime-700">勢いボーナス発動中</p>
-            <p className="mt-2 text-sm sm:text-base">良いショットが3連続したので、次の1打に成功率 +{confidenceBoost}% が付きます。</p>
-          </section>
-        )}
 
 
 
 
-        <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-10 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-14">
+        <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-7 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-10">
           <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
-          <div className="mt-3 text-xs font-semibold text-sky-800 sm:text-sm">
-            {playMode === "robot"
-              ? `ヘッドスピード: ${robotHeadSpeed.toFixed(1)} m/s`
-              : ""}
-          </div>
           <h1 className="mt-4 text-3xl font-extrabold leading-tight text-emerald-900 sm:text-4xl">
             ピンまで {remainingDistance}ヤード
           </h1>
           <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStatusLabel}</p>
           <p className="mt-1 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStrokeLabel}</p>
-
-
+          {lastShotResult?.nextShotAdvice && (
+            <p className="mt-3 text-sm text-sky-900 sm:text-base">{lastShotResult.nextShotAdvice}</p>
+          )}
 
         {/* ショット結果表示（インライン） */}
         {lastShotResult && (
@@ -466,16 +460,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 )}
               </div>
             )}
-              {lastShotResult.confidenceBoostApplied && (
-                <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
-                  勢いボーナス適用
-                </span>
-              )}
-              {!lastShotResult.confidenceBoostApplied && confidenceBoost > 0 && (
-                <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
-                  次の1打 +{confidenceBoost}%
-                </span>
-              )}
 
             {/* 続ける/次のホールへ/スコアカードを見るボタン */}
             <div className="mt-4">
@@ -502,10 +486,10 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         {/* おすすめクラブセクション ...existing code... */}
 
         {/* ショット操作グループ */}
-        <section className="mt-8 w-full max-w-md mx-auto flex flex-col gap-5 items-stretch">
+        <section className="mt-8 w-full max-w-5xl mx-auto flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-center lg:gap-4">
           {/* 狙い調整スライダー */}
           {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
-            <div className="w-full rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-3">
+            <div className="w-full rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-3 lg:w-72">
               <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
                 <span>狙い</span>
                 <span>
@@ -532,29 +516,31 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           ) : null}
 
           {/* ショットボタン */}
-          <button
-            type="button"
-            disabled={!selectedClub || shotInProgress || isResultActionVisible}
-            onClick={() => {
-              if (selectedClub && !isResultActionVisible) {
-                selectClub(selectedClub.id);
-                takeShot();
-              }
-            }}
-            className={[
-              "w-full rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
-              "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
-              selectedClub && !shotInProgress && !isResultActionVisible
-                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500"
-                : "cursor-not-allowed bg-emerald-200 text-emerald-500"
-            ].join(" ")}
-          >
-            ショット
-          </button>
+          <div className="w-full lg:w-72">
+            <button
+              type="button"
+              disabled={!selectedClub || shotInProgress || isResultActionVisible}
+              onClick={() => {
+                if (selectedClub && !isResultActionVisible) {
+                  selectClub(selectedClub.id);
+                  takeShot();
+                }
+              }}
+              className={[
+                "w-full rounded-2xl px-4 py-6 text-2xl font-black tracking-[0.08em] transition",
+                "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
+                selectedClub && !shotInProgress && !isResultActionVisible
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500"
+                  : "cursor-not-allowed bg-emerald-200 text-emerald-500"
+              ].join(" ")}
+            >
+              ショット
+            </button>
+          </div>
 
           {/* パワー調整スライダー */}
           {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
-            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-3 py-3">
+            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-3 py-3 lg:w-72">
               <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-emerald-800">
                 <span>パワー</span>
                 <span>{shotPowerPercent}%</span>
