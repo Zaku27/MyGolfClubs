@@ -53,8 +53,8 @@ import ShotDispersionChart from '../components/ShotDispersionChart';
 import { ShotControlPanel } from '../components/ShotControlPanel';
 import WindDirectionDial from '../components/WindDirectionDial';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
-import type { LieType, ShotResult } from '../types/game';
-import type { GolfClub } from '../types/golf';
+import type { LieType, ShotResult, SimClub } from '../types/game';
+import type { GolfClub, ClubPersonalData } from '../types/golf';
 import {
   convertMpsToMph,
   formatWindDirectionLabel,
@@ -420,6 +420,192 @@ function getSelectableRangeClubs(
   });
 }
 
+type RangeClubSelectionPanelProps = {
+  clubs: GolfClub[];
+  selectableClubs: GolfClub[];
+  selectedClubId: string;
+  onSelectedClubIdChange: (value: string) => void;
+  selectedClub?: GolfClub | null;
+  simClub?: SimClub;
+  estimatedClubDistance: number;
+  seatType: RangeSeatType;
+  clubPersonal?: ClubPersonalData | undefined;
+  effectiveSuccess: number | null;
+};
+
+function RangeClubSelectionPanel({
+  clubs,
+  selectableClubs,
+  selectedClubId,
+  onSelectedClubIdChange,
+  selectedClub,
+  simClub,
+  estimatedClubDistance,
+  seatType,
+  clubPersonal,
+  effectiveSuccess,
+}: RangeClubSelectionPanelProps) {
+  return (
+    <div className="w-full bg-white rounded shadow p-4">
+      <label className="block font-semibold mb-2">クラブ選択</label>
+      {clubs.length === 0 ? (
+        <div className="text-red-600 font-bold py-2">
+          クラブが登録されていません。<br />クラブ管理画面でクラブを追加してください。
+        </div>
+      ) : (
+        <>
+          <select
+            className="w-full border rounded p-2 mb-2"
+            value={selectedClubId}
+            onChange={(e) => onSelectedClubIdChange(e.target.value)}
+          >
+            <option value="">-- クラブを選択 --</option>
+            {selectableClubs.map((club) => (
+              <option key={club.id} value={club.id}>
+                {formatGolfClubDisplayName(club)}
+              </option>
+            ))}
+          </select>
+          {selectedClub && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
+              <span className="font-bold">{selectedClub.name}</span>
+              <span>
+                {seatType === 'personal'
+                  ? `実測飛距離: ${selectedClub?.distance ?? '-'} y`
+                  : `推定飛距離: ${simClub ? estimatedClubDistance : '-'} y`}
+              </span>
+              <div className="relative inline-flex items-center gap-2 whitespace-nowrap">
+                <span>
+                  クラブ成功率: {
+                    simClub ? (
+                      seatType === 'robot'
+                        ? '100% (ロボット固定)'
+                        : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
+                    ) : '--'
+                  }
+                </span>
+                {seatType === 'robot' && (
+                  <button
+                    type="button"
+                    aria-label="ロボット打席のクラブ成功率ヒント"
+                    className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-300 bg-blue-100 text-xs font-bold text-blue-700"
+                  >
+                    ?
+                    <span className="help-tooltip-text whitespace-normal">
+                      ロボット打席はクラブの個体差や個人データの影響を受けないため、クラブ成功率は常に100%で固定されます。
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+type RangeSimulationResultsProps = {
+  results: ShotResult[];
+  summary: RangeSummary | null;
+  flatBaselineResults: ShotResult[];
+  chartTarget: { x: number; y: number };
+  chartAim: { x: number; y: number };
+  monteCarloResult: MonteCarloResult;
+  clubName: string;
+  skillLevelName: string;
+  numShots: number;
+  groundHardness: GroundHardness;
+  slopeAngle: number;
+  slopeDirection: number;
+};
+
+function RangeSimulationResults({
+  results,
+  summary,
+  flatBaselineResults,
+  chartTarget,
+  chartAim,
+  monteCarloResult,
+  clubName,
+  skillLevelName,
+  numShots,
+  groundHardness,
+  slopeAngle,
+  slopeDirection,
+}: RangeSimulationResultsProps) {
+  return (
+    <>
+      {results.length > 0 && summary && (
+        <div className="w-full bg-white rounded shadow p-4 mb-4">
+          <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="font-bold text-green-900">セッション結果：</span>
+            <span>平均: {summary.avg.toFixed(1)} y</span>
+            <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
+            <span>目標まで平均距離: {(summary.avgToTargetDistance ?? 0).toFixed(1)} y</span>
+          </div>
+          <div className="mb-4 rounded border border-green-200 bg-green-50/40 p-2">
+            <ShotDispersionChart
+              monteCarloResult={monteCarloResult}
+              target={chartTarget}
+              aim={chartAim}
+              clubName={clubName}
+              skillLevelName={skillLevelName}
+              numShots={numShots}
+              groundHardness={groundHardness}
+              slopeAngle={slopeAngle}
+              slopeDirection={slopeDirection}
+            />
+          </div>
+          {summary.estimatedDist && (
+            <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+              <span className="font-semibold">目安との比較：</span>
+              <span>目安: {summary.estimatedDist} y / 実績平均: {summary.avg.toFixed(1)} y</span>
+              <span className={summary.diff > 0 ? 'text-red-600 font-bold' : summary.diff < 0 ? 'text-blue-600 font-bold' : ''}>
+                {summary.diff > 0 ? ` (+${summary.diff}y)` : summary.diff < 0 ? ` (${summary.diff}y)` : ' (一致)'}
+              </span>
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="bg-green-100">
+                  <th className="px-1 py-0.5">#</th>
+                  <th className="px-1 py-0.5">飛距離</th>
+                  <th className="px-1 py-0.5">キャリー</th>
+                  <th className="px-1 py-0.5">ラン</th>
+                  <th className="px-1 py-0.5">横ブレ</th>
+                  <th className="px-1 py-0.5">地面影響</th>
+                  <th className="px-1 py-0.5">傾斜影響</th>
+                  <th className="px-1 py-0.5">着地X</th>
+                  <th className="px-1 py-0.5">着地Y</th>
+                  <th className="px-1 py-0.5">ショット品質</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((r, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="px-1 py-0.5 text-center">{i + 1}</td>
+                    <td className="px-1 py-0.5 text-center">{(r.landing?.totalDistance ?? r.distanceHit).toFixed(1)}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.carry?.toFixed(1) ?? '-'}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
+                    <td className="px-1 py-0.5 text-center">{formatGroundHardnessImpact(summary.appliedGroundHardness, r.landing?.roll)}</td>
+                    <td className="px-1 py-0.5 text-center">{formatSlopeImpact(r.landing, flatBaselineResults[i]?.landing)}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
+                    <td className="px-1 py-0.5 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
+                    <td className={`px-1 py-0.5 text-center font-bold ${qualityStatusColor(r.shotQuality)}`}>{qualityLabel(r.shotQuality)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function RangeScreen() {
   const allClubs = useClubStore(selectSortedClubsForDisplay);
   const activeBagClubs = useClubStore(selectSortedActiveBagClubs);
@@ -575,7 +761,7 @@ export default function RangeScreen() {
   const targetDistance = summary?.estimatedDist ?? (seatType === 'personal' ? selectedClub?.distance ?? 0 : estimatedClubDistance);
   const chartTarget = { x: 0, y: targetDistance };
   const chartAim = { x: aimXOffset, y: Math.round(targetDistance * shotPowerPercent / 100) };
-  const showRangeAimControls = !selectedClub?.type || selectedClub.type !== 'Putter';
+  const showRangeAimControls = !selectedClub?.clubType || selectedClub.clubType !== 'Putter';
   const analysisPenaltyByClubId = (() => {
     const penaltyMap: Record<string, AnalysisPenalty> = {};
 
@@ -817,60 +1003,18 @@ export default function RangeScreen() {
 
       <div className="w-full max-w-7xl flex flex-col gap-4 lg:flex-row lg:items-start">
         <main className="w-full lg:flex-1 flex flex-col gap-4">
-          <div className="w-full bg-white rounded shadow p-4">
-            <label className="block font-semibold mb-2">クラブ選択</label>
-            {clubs.length === 0 ? (
-              <div className="text-red-600 font-bold py-2">クラブが登録されていません。<br/>クラブ管理画面でクラブを追加してください。</div>
-            ) : (
-              <>
-                <select
-                  className="w-full border rounded p-2 mb-2"
-                  value={selectedClubId}
-                  onChange={(e) => setSelectedClubId(e.target.value)}
-                >
-                  <option value="">-- クラブを選択 --</option>
-                  {selectableClubs.map((club) => (
-                    <option key={club.id} value={club.id}>
-                      {formatGolfClubDisplayName(club)}
-                    </option>
-                  ))}
-                </select>
-                {selectedClub && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
-                    <span className="font-bold">{selectedClub.name}</span>
-                    <span>
-                      {seatType === 'personal'
-                        ? `実測飛距離: ${selectedClub?.distance ?? '-'} y`
-                        : `推定飛距離: ${simClub ? estimatedClubDistance : '-'} y`}
-                    </span>
-                    <div className="relative inline-flex items-center gap-2 whitespace-nowrap">
-                      <span>
-                        クラブ成功率: {
-                          simClub ? (
-                            seatType === 'robot'
-                              ? '100% (ロボット固定)'
-                              : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
-                          ) : '--'
-                        }
-                      </span>
-                      {seatType === 'robot' && (
-                        <button
-                          type="button"
-                          aria-label="ロボット打席のクラブ成功率ヒント"
-                          className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-300 bg-blue-100 text-xs font-bold text-blue-700"
-                        >
-                          ?
-                          <span className="help-tooltip-text whitespace-normal">
-                            ロボット打席はクラブの個体差や個人データの影響を受けないため、クラブ成功率は常に100%で固定されます。
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          <RangeClubSelectionPanel
+            clubs={clubs}
+            selectableClubs={selectableClubs}
+            selectedClubId={selectedClubId}
+            onSelectedClubIdChange={setSelectedClubId}
+            selectedClub={selectedClub}
+            simClub={simClub}
+            estimatedClubDistance={estimatedClubDistance}
+            seatType={seatType}
+            clubPersonal={clubPersonal}
+            effectiveSuccess={effectiveSuccess}
+          />
 
           <ShotControlPanel
             aimXOffset={aimXOffset}
@@ -885,93 +1029,20 @@ export default function RangeScreen() {
             showPower={showRangeAimControls}
           />
 
-          {/* Results Section */}
-          {results.length > 0 && summary && (
-            <div className="w-full bg-white rounded shadow p-4 mb-4">
-              <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
-                <span className="font-bold text-green-900">セッション結果：</span>
-                <span>平均: {summary.avg.toFixed(1)} y</span>
-                <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
-                <span>目標まで平均距離: {(summary.avgToTargetDistance ?? 0).toFixed(1)} y</span>
-              </div>
-              <div className="mb-4 rounded border border-green-200 bg-green-50/40 p-2">
-                <ShotDispersionChart
-                  monteCarloResult={monteCarloResult}
-                  target={chartTarget}
-                  aim={chartAim}
-                  clubName={selectedClub?.name ?? 'Club'}
-                  skillLevelName={skillLevelName}
-                  numShots={numShots}
-                  groundHardness={groundHardness}
-                  slopeAngle={slopeAngle}
-                  slopeDirection={slopeDirection}
-                />
-              </div>
-              {summary.estimatedDist && (
-                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-                  <span className="font-semibold">目安との比較：</span>
-                  <span>目安: {summary.estimatedDist} y / 実績平均: {summary.avg.toFixed(1)} y</span>
-                  <span className={summary.diff > 0 ? 'text-red-600 font-bold' : summary.diff < 0 ? 'text-blue-600 font-bold' : ''}>
-                    {summary.diff > 0 ? ` (+${summary.diff}y)` : summary.diff < 0 ? ` (${summary.diff}y)` : ' (一致)'}
-                  </span>
-                </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-xs">
-                  <thead>
-                    <tr className="bg-green-100">
-                      <th className="px-1 py-0.5">#</th>
-                      <th className="px-1 py-0.5">飛距離</th>
-                      <th className="px-1 py-0.5">キャリー</th>
-                      <th className="px-1 py-0.5">ラン</th>
-                      <th className="px-1 py-0.5">横ブレ</th>
-                      <th className="px-1 py-0.5">地面影響</th>
-                      <th className="px-1 py-0.5">傾斜影響</th>
-                      {/* <th className="px-1 py-0.5">判定値</th>
-                      <th className="px-1 py-0.5">判定内訳(C/L)</th> */}
-                      <th className="px-1 py-0.5">着地X</th>
-                      <th className="px-1 py-0.5">着地Y</th>
-                      <th className="px-1 py-0.5">ショット品質</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((r, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="px-1 py-0.5 text-center">{i + 1}</td>
-                        <td className="px-1 py-0.5 text-center">{(r.landing?.totalDistance ?? r.distanceHit).toFixed(1)}</td>
-                        <td className="px-1 py-0.5 text-center">{r.landing?.carry?.toFixed(1) ?? '-'}</td>
-                        <td className="px-1 py-0.5 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
-                        <td className="px-1 py-0.5 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
-                        <td className="px-1 py-0.5 text-center">{formatGroundHardnessImpact(summary.appliedGroundHardness, r.landing?.roll)}</td>
-                        <td className="px-1 py-0.5 text-center">
-                          {formatSlopeImpact(r.landing, flatBaselineResults[i]?.landing)}
-                        </td>
-                        {/* <td className={`px-1 py-0.5 text-center ${r.landing?.qualityMetrics && r.landing.qualityMetrics.score >= r.landing.qualityMetrics.poorThreshold ? 'text-red-600 font-bold' : ''}`}>
-                          {r.landing?.qualityMetrics ? `${r.landing.qualityMetrics.score.toFixed(2)} / ${r.landing.qualityMetrics.poorThreshold.toFixed(2)}` : '-'}
-                        </td>
-                        <td className="px-1 py-0.5 text-center">
-                          {r.landing?.qualityMetrics ? (
-                            <>
-                              <span className={r.landing.qualityMetrics.decisiveAxis === 'carry' ? 'text-red-600 font-bold' : ''}>
-                                {r.landing.qualityMetrics.weightedCarry.toFixed(2)}
-                              </span>
-                              {' / '}
-                              <span className={r.landing.qualityMetrics.decisiveAxis === 'lateral' ? 'text-red-600 font-bold' : ''}>
-                                {r.landing.qualityMetrics.weightedLateral.toFixed(2)}
-                              </span>
-                            </>
-                          ) : '-'}
-                        </td> */}
-                        <td className="px-1 py-0.5 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
-                        <td className="px-1 py-0.5 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
-                        <td className={`px-1 py-0.5 text-center font-bold ${qualityStatusColor(r.shotQuality)}`}>{qualityLabel(r.shotQuality)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          <RangeSimulationResults
+            results={results}
+            summary={summary}
+            flatBaselineResults={flatBaselineResults}
+            chartTarget={chartTarget}
+            chartAim={chartAim}
+            monteCarloResult={monteCarloResult}
+            clubName={selectedClub?.name ?? 'Club'}
+            skillLevelName={skillLevelName}
+            numShots={numShots}
+            groundHardness={groundHardness}
+            slopeAngle={slopeAngle}
+            slopeDirection={slopeDirection}
+          />
         </main>
 
         <aside className="w-full lg:w-[340px] flex-shrink-0 flex flex-col gap-4">
