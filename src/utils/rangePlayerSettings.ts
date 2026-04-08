@@ -4,6 +4,7 @@ export type RangePlayerSettings = {
   seatType: RangeSeatType;
   robotHeadSpeed: number;
   robotSkillLevel: number;
+  reuseLastSeed: boolean;
 };
 
 export const RANGE_PLAYER_SETTINGS_KEY = "rangePlayerSettings";
@@ -21,6 +22,7 @@ export function loadRangePlayerSettings(): RangePlayerSettings {
       seatType: "personal",
       robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
       robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
+      reuseLastSeed: false,
     };
   }
 
@@ -40,6 +42,7 @@ export function loadRangePlayerSettings(): RangePlayerSettings {
       seatType: parsed.seatType === "robot" ? "robot" : "personal",
       robotHeadSpeed: clampNumber(Number(parsed.robotHeadSpeed), 20, 60),
       robotSkillLevel: clampNumber(Number(parsed.robotSkillLevel), 0, 1),
+      reuseLastSeed: parsed.reuseLastSeed === true,
     };
   } catch {
     return {

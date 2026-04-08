@@ -127,7 +127,7 @@ type AnalysisPenalty = {
 
 function toCanonicalSlopeSettings(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
   const safeAngle = Number.isFinite(slopeAngle) ? slopeAngle : 0;
-  const clampedAngle = Math.min(20, Math.abs(safeAngle));
+  const clampedAngle = Math.min(45, Math.abs(safeAngle));
   const normalizedDirection = Number.isFinite(slopeDirection)
     ? normalizeWindDirection(slopeDirection)
     : 0;
@@ -310,10 +310,10 @@ function formatSlopeImpact(
 
   const carryDiff = (landing.carry ?? 0) - (baselineLanding.carry ?? 0);
   const rollDiff = (landing.roll ?? 0) - (baselineLanding.roll ?? 0);
-  const lateralDiff = (landing.lateralDeviation ?? 0) - (baselineLanding.lateralDeviation ?? 0);
+  const finalXDiff = (landing.finalX ?? 0) - (baselineLanding.finalX ?? 0);
   const fmt = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}y`;
 
-  return `C ${fmt(carryDiff)} / R ${fmt(rollDiff)} / X ${fmt(lateralDiff)}`;
+  return `C ${fmt(carryDiff)} / R ${fmt(rollDiff)} / X ${fmt(finalXDiff)}`;
 }
 
 function mapLieUiToGameLie(lie: string): LieType {
@@ -454,7 +454,7 @@ export default function RangeScreen() {
   const [summary, setSummary] = useState<RangeSummary | null>(null);
   const [, setCalibrated] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [reuseLastSeed, setReuseLastSeed] = useState(false);
+  const [reuseLastSeed, setReuseLastSeed] = useState(initialRangePlayerSettings.reuseLastSeed);
   const [lastSimulationSeedNonce, setLastSimulationSeedNonce] = useState<string | null>(null);
   const [showRobotHint, setShowRobotHint] = useState(false);
   const robotHintRef = useRef<HTMLDivElement | null>(null);
@@ -542,8 +542,9 @@ export default function RangeScreen() {
       seatType,
       robotHeadSpeed,
       robotSkillLevel,
+      reuseLastSeed,
     });
-  }, [seatType, robotHeadSpeed, robotSkillLevel]);
+  }, [seatType, robotHeadSpeed, robotSkillLevel, reuseLastSeed]);
 
   useEffect(() => {
     saveRangeConditionSettings({
@@ -746,7 +747,11 @@ export default function RangeScreen() {
 
     const meanRoll = shotResults.reduce((sum, r) => sum + (r.landing?.roll ?? 0), 0) / Math.max(1, shotResults.length);
     const meanLateral = shotResults.reduce((sum, r) => sum + Math.abs(r.landing?.lateralDeviation ?? 0), 0) / Math.max(1, shotResults.length);
-    const meanFinalX = shotResults.reduce((sum, r) => sum + (r.landing?.finalX ?? 0), 0) / Math.max(1, shotResults.length);
+    const meanSlopeXShift = shotResults.reduce((sum, r, index) => {
+      const slopeX = r.landing?.finalX ?? 0;
+      const flatX = baselineResults[index]?.landing?.finalX ?? 0;
+      return sum + (slopeX - flatX);
+    }, 0) / Math.max(1, shotResults.length);
 
     const hardnessFactor = groundHardness === 'firm' ? 1.35 : groundHardness === 'soft' ? 0.65 : 1;
     const rollBaseline = meanRoll / hardnessFactor;
@@ -763,7 +768,7 @@ export default function RangeScreen() {
       : `${normalizedSlope.slopeAngle}° (${slopeDirectionLabel})`;
     const slopeEffectLabel = normalizedSlope.slopeAngle === 0
       ? 'フラットなので横ブレ影響は標準です。'
-      : `傾斜 ${slopeLabel} のため横ブレ平均は ${meanLateral.toFixed(1)}y、${meanFinalX >= 0 ? '右' : '左'}方向へやや影響しています。`;
+      : `傾斜 ${slopeLabel} により、フラット比の横方向シフトは ${meanSlopeXShift >= 0 ? '+' : ''}${meanSlopeXShift.toFixed(1)}y（${meanSlopeXShift >= 0 ? '右' : '左'}）です。`;
 
     // 目安値との差分を計算
     // プレイヤーがpersonalの場合は実測飛距離を目安値とする
@@ -1218,18 +1223,6 @@ export default function RangeScreen() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="space-y-1 text-xs font-semibold text-emerald-800">
                       上り方向
-                      <input
-                        type="range"
-                        min={0}
-                        max={359}
-                        step={1}
-                        value={slopeDirection}
-                        onChange={(event) => setSlopeDirection(normalizeWindDirection(Number(event.target.value)))}
-                        className="w-full cursor-pointer"
-                      />
-                      <div className="text-right text-[11px] text-emerald-700">
-                        {normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection}°
-                      </div>
                       <div className="grid grid-cols-3 gap-1 text-center place-items-center">
                         <div />
                         <button
@@ -1285,13 +1278,25 @@ export default function RangeScreen() {
                         </button>
                         <div />
                       </div>
+                      <div className="text-right text-[11px] text-emerald-700">
+                        {normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection}°
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={359}
+                        step={1}
+                        value={slopeDirection}
+                        onChange={(event) => setSlopeDirection(normalizeWindDirection(Number(event.target.value)))}
+                        className="w-full cursor-pointer"
+                      />
                     </label>
                     <label className="space-y-1 text-xs font-semibold text-emerald-800">
                       傾斜角度
                       <input
                         type="range"
                         min={0}
-                        max={20}
+                        max={45}
                         step={1}
                         value={slopeAngle}
                         onChange={(event) => setSlopeAngle(Math.max(0, Number(event.target.value)))}

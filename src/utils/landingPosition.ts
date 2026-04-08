@@ -181,7 +181,7 @@ function clampGroundSlopeAngle(angle: number): number {
   return clamp(angle, -MAX_GROUND_SLOPE_ANGLE, MAX_GROUND_SLOPE_ANGLE);
 }
 
-function normalizeGroundSlope(ground: GroundCondition): { slopeAngle: number; slopeDirection: number } {
+export function normalizeGroundSlope(ground: GroundCondition): { slopeAngle: number; slopeDirection: number } {
   const slopeAngle = clampGroundSlopeAngle(ground.slopeAngle);
   const normalizedDirection = ((ground.slopeDirection % 360) + 360) % 360;
 
@@ -231,7 +231,11 @@ export function applyGroundCondition(
     (adjustedSlopeAngle > 0 ? Math.min(0.12, adjustedSlopeAngle * UPHILL_MISHIT_BONUS_PER_DEGREE) : 0);
 
   const adjustedLateralDeviation = landingResult.lateralDeviation * dispersionMultiplier;
-  const slopeShift = sampleTruncatedNormal(rng, slopeStrength * (0.2 + Math.abs(crossSlopeComponent) * 0.25), 1.0) * 2 * crossSlopeComponent;
+  // 横傾斜は常に「高い側から低い側」へ流れるよう、符号は方向からのみ決める。
+  const slopeShiftMagnitude = Math.abs(
+    sampleTruncatedNormal(rng, slopeStrength * (0.2 + Math.abs(crossSlopeComponent) * 0.25), 1.0),
+  );
+  const slopeShift = slopeShiftMagnitude * -2 * crossSlopeComponent;
   const finalX = landingResult.finalX + (adjustedLateralDeviation - landingResult.lateralDeviation) + slopeShift;
   const finalY = Math.max(0, adjustedCarry + adjustedRoll);
   const totalDistance = finalY;
