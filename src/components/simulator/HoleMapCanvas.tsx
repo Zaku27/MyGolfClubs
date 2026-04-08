@@ -63,6 +63,9 @@ type CanvasMetrics = {
   drawHeight: number;
   maxYardY: number;
   halfYardX: number;
+  yardScale: number;
+  offsetX: number;
+  offsetY: number;
 };
 
 type AbsoluteShot = {
@@ -417,6 +420,9 @@ export function HoleMapCanvas({
     const drawWidth = size.width - padding.left - padding.right;
     const drawHeight = size.height - padding.top - padding.bottom;
     const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
+    const yardScale = Math.min(drawWidth / (halfYardX * 2), drawHeight / maxYardY);
+    const offsetX = padding.left + (drawWidth - halfYardX * 2 * yardScale) / 2;
+    const offsetY = padding.top + (drawHeight - maxYardY * yardScale);
 
     return {
       padding,
@@ -424,6 +430,9 @@ export function HoleMapCanvas({
       drawHeight,
       maxYardY,
       halfYardX,
+      yardScale,
+      offsetX,
+      offsetY,
     };
   }, [editable, greenRadius, hazards, size.height, size.width, targetDistance, absoluteShots]);
   const currentOrigin = shotOrigin ?? (absoluteShots.length > 0 ? absoluteShots[absoluteShots.length - 1].landing : { x: 0, y: 0 });
@@ -500,7 +509,7 @@ export function HoleMapCanvas({
 
   const getAutoZoomScale = (distance: number) => {
     const clampedDistance = clamp(distance, 0, 100);
-    return 2.0 + (100 - clampedDistance) / 100 * 1.0;
+    return 2.5 + (100 - clampedDistance) / 100 * 1.5;
   };
 
   const handleCanvasWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
@@ -585,14 +594,14 @@ export function HoleMapCanvas({
 
   const yardToPxX = (yardX: number) => {
     if (!metrics) return 0;
-    const { padding, drawWidth, halfYardX } = metrics;
-    return padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
+    const { halfYardX, yardScale, offsetX } = metrics;
+    return offsetX + (yardX + halfYardX) * yardScale;
   };
 
   const yardToPxY = (yardY: number) => {
     if (!metrics) return 0;
-    const { padding, drawHeight, maxYardY } = metrics;
-    return padding.top + drawHeight * (1 - yardY / maxYardY);
+    const { maxYardY, yardScale, offsetY } = metrics;
+    return offsetY + (maxYardY - yardY) * yardScale;
   };
 
   const slopeArrow = useMemo(() => {
@@ -655,7 +664,7 @@ export function HoleMapCanvas({
 
     metricsRef.current = metrics;
 
-    const { padding, drawWidth, drawHeight, halfYardX, maxYardY } = metrics;
+    const { padding, drawWidth, drawHeight, halfYardX, maxYardY, yardScale, offsetX, offsetY } = metrics;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.round(size.width * dpr);
     canvas.height = Math.round(size.height * dpr);
@@ -674,15 +683,14 @@ export function HoleMapCanvas({
     context.translate(viewport.offsetX, viewport.offsetY);
     context.scale(viewport.scale, viewport.scale);
 
-    const yardToPxX = (yardX: number) => padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
-    const yardToPxY = (yardY: number) => padding.top + drawHeight * (1 - yardY / maxYardY);
+    const yardToPxX = (yardX: number) => offsetX + (yardX + halfYardX) * yardScale;
+    const yardToPxY = (yardY: number) => offsetY + (maxYardY - yardY) * yardScale;
 
     const teeX = yardToPxX(0);
     const teeY = yardToPxY(0);
     const pinX = yardToPxX(0);
     const pinY = yardToPxY(targetDistance);
-    const greenRadiusPxX = Math.max(1, Math.abs(greenRadius * (drawWidth / (halfYardX * 2))));
-    const greenRadiusPxY = Math.max(1, Math.abs(greenRadius * (drawHeight / maxYardY)));
+    const greenRadiusPx = Math.max(1, Math.abs(greenRadius * yardScale));
 
     // 背景グラデーションを引いて、地形の奥行きを視覚化する。
     const bg = context.createLinearGradient(0, padding.top, 0, size.height - padding.bottom);
@@ -745,12 +753,12 @@ export function HoleMapCanvas({
 
     context.restore();
 
-    // ピン周囲にグリーン領域を楕円として描画し、X/Y スケールが異なる図面でも正しい範囲を視覚化する。
+    // ピン周囲にグリーン領域を円として描画し、同一スケールで正しい範囲を視覚化する。
     context.fillStyle = "rgba(187, 247, 208, 0.72)";
     context.strokeStyle = "rgba(21, 128, 61, 0.9)";
     context.lineWidth = 2;
     context.beginPath();
-    context.ellipse(pinX, pinY, greenRadiusPxX, greenRadiusPxY, 0, 0, Math.PI * 2);
+    context.ellipse(pinX, pinY, greenRadiusPx, greenRadiusPx, 0, 0, Math.PI * 2);
     context.fill();
     context.stroke();
 
@@ -1017,12 +1025,7 @@ export function HoleMapCanvas({
         onPointerUp={handleCanvasPointerUp}
         onPointerLeave={handleCanvasPointerUp}
       />
-      <div className="pointer-events-none absolute inset-0 flex items-start justify-between gap-2 p-3">
-        {distanceToPin <= 100 && (
-          <div className="pointer-events-none rounded-full bg-emerald-900/90 px-3 py-1 text-xs font-semibold text-white">
-            100yd以内: グリーンを拡大表示
-          </div>
-        )}
+      <div className="pointer-events-none absolute inset-0 flex items-start justify-end gap-2 p-3">
         {!isViewportDefault && (
           <button
             type="button"
