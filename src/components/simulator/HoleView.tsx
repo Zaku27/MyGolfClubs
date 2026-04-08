@@ -5,6 +5,7 @@ import { useClubStore } from "../../store/clubStore";
 import { estimateBaseDistance } from "../../utils/shotSimulation";
 import { getSkillLabel } from "../../utils/playerSkill";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
+import { formatWindDirectionLabel } from "../../utils/windDirection";
 import { CompactScorecard } from "./Scorecard";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 import { loadRangePlayerSettings } from "../../utils/rangePlayerSettings";
@@ -111,8 +112,20 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const currentHole = course[currentHoleIndex];
   if (!currentHole) return null;
 
-  const { remainingDistance, lie, windStrength = 0, hazards = [] } = shotContext;
+  const { remainingDistance, lie, windStrength = 0, windDirectionDegrees = 0, hazards = [] } = shotContext;
   const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettings();
+
+  const groundCondition = currentHole.groundCondition ?? { hardness: "medium", slopeAngle: 0, slopeDirection: 0 };
+  const groundHardnessLabel = groundCondition.hardness === "firm" ? "硬い" : groundCondition.hardness === "soft" ? "柔らかい" : "普通";
+  const slopeLabel = groundCondition.slopeAngle === 0
+    ? "フラット"
+    : `${Math.abs(groundCondition.slopeAngle)}° ${groundCondition.slopeAngle > 0 ? "上り" : "下り"}`;
+  const windLabel = `${formatWindDirectionLabel(windDirectionDegrees)} ${windStrength}m/s`;
+  const courseConditionBadges = [
+    { label: "風", value: windLabel },
+    { label: "地面", value: groundHardnessLabel },
+    { label: "傾斜", value: slopeLabel },
+  ];
   const seatType = playMode === "robot" ? "robot" : "personal";
   const displayedSkillLevel = playMode === "robot" ? robotSkillLevel : playerSkillLevel;
   const displayedSkillLabel = getSkillLabel(displayedSkillLevel);
@@ -392,20 +405,14 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              {hazards.length > 0 ? (
-                hazards.map((hazard, index) => (
-                  <span
-                    key={`${hazard.id ?? index}`}
-                    className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 sm:px-4 sm:text-sm"
-                  >
-                    {buildHazardDisplayName(hazard)}
-                  </span>
-                ))
-              ) : (
-                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
-                  大きなハザードなし
+              {courseConditionBadges.map((badge) => (
+                <span
+                  key={badge.label}
+                  className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm"
+                >
+                  {badge.label}: {badge.value}
                 </span>
-              )}
+              ))}
             </div>
           </section>
         </div>
@@ -678,21 +685,15 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               />
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              {hazards.length > 0 ? (
-                hazards.map((hazard, index) => (
-                  <span
-                    key={`${hazard.id ?? index}`}
-                    className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800"
-                  >
-                    {buildHazardDisplayName(hazard)}
-                  </span>
-                ))
-              ) : (
-                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
-                  大きなハザードなし
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {courseConditionBadges.map((badge) => (
+                <span
+                  key={badge.label}
+                  className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm"
+                >
+                  {badge.label}: {badge.value}
                 </span>
-              )}
+              ))}
             </div>
           </section>
         </aside>
