@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { Stage, Layer, Arrow, Text } from "react-konva";
 import type { Hole, Hazard } from "../../types/game";
 import type { LandingResult } from "../../utils/landingPosition";
@@ -16,6 +17,7 @@ interface HoleMapCanvasProps {
   editable?: boolean;
   selectedHazardId?: string | null;
   currentHoleKey?: string | number;
+  holeComplete?: boolean;
   onSelectHazardId?: (hazardId: string | null) => void;
   onSelectHoleArea?: () => void;
   onHazardsChange?: (hazards: Hazard[]) => void;
@@ -29,6 +31,18 @@ type Size = {
 type Point2D = {
   x: number;
   y: number;
+};
+
+type Viewport = {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+const DEFAULT_VIEWPORT: Viewport = {
+  scale: 1,
+  offsetX: 0,
+  offsetY: 0,
 };
 
 type DragMode = "move" | "resize";
@@ -266,6 +280,14 @@ function buildAbsolutePointFromOrigin(
   };
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function easeInOut(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
 function drawShot(
   context: CanvasRenderingContext2D,
   shot: AbsoluteShot,
@@ -348,6 +370,7 @@ export function HoleMapCanvas({
   editable = false,
   selectedHazardId = null,
   currentHoleKey,
+  holeComplete = false,
   onSelectHazardId,
   onSelectHoleArea,
   onHazardsChange,
@@ -357,6 +380,12 @@ export function HoleMapCanvas({
   const [size, setSize] = useState<Size>({ width: 0, height: MIN_CANVAS_HEIGHT });
   const [dragState, setDragState] = useState<DragState | null>(null);
   const metricsRef = useRef<CanvasMetrics | null>(null);
+  const [viewport, setViewport] = useState<Viewport>(DEFAULT_VIEWPORT);
+  const viewportRef = useRef<Viewport>(DEFAULT_VIEWPORT);
+  const animationFrameRef = useRef<number | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef<Point2D | null>(null);
+  const initialOffsetRef = useRef<Point2D>({ x: 0, y: 0 });
 
   const targetDistance = hole.targetDistance ?? hole.distanceFromTee;
   const greenRadius = hole.greenRadius ?? DEFAULT_GREEN_RADIUS;
@@ -406,6 +435,153 @@ export function HoleMapCanvas({
     if (!aimPoint) return null;
     return buildAbsolutePointFromOrigin(currentOrigin, targetDistance, aimPoint.x, aimPoint.y);
   }, [aimPoint, currentOrigin, targetDistance]);
+
+  const pinPoint = useMemo<Point2D>(() => ({ x: 0, y: targetDistance }), [targetDistance]);
+
+  const distanceToPin = useMemo(() => Math.hypot(currentOrigin.x - pinPoint.x, currentOrigin.y - pinPoint.y), [currentOrigin, pinPoint]);
+
+  const screenToWorld = (screenX: number, screenY: number, overrideViewport: Viewport = viewport): Point2D => ({
+    x: (screenX - overrideViewport.offsetX) / overrideViewport.scale,
+    y: (screenY - overrideViewport.offsetY) / overrideViewport.scale,
+  });
+
+  const worldToScreen = (worldX: number, worldY: number, overrideViewport: Viewport = viewport): Point2D => ({
+    x: worldX * overrideViewport.scale + overrideViewport.offsetX,
+    y: worldY * overrideViewport.scale + overrideViewport.offsetY,
+  });
+
+  const animateViewportTo = useCallback((target: Viewport, duration = 450) => {
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    const start = viewportRef.current;
+    const startTime = performance.now();
+
+    const step = (now: number) => {
+      const elapsed = Math.min(1, (now - startTime) / duration);
+      const eased = easeInOut(elapsed);
+      const nextViewport = {
+        scale: start.scale + (target.scale - start.scale) * eased,
+        offsetX: start.offsetX + (target.offsetX - start.offsetX) * eased,
+        offsetY: start.offsetY + (target.offsetY - start.offsetY) * eased,
+      };
+
+      viewportRef.current = nextViewport;
+      setViewport(nextViewport);
+
+      if (elapsed < 1) {
+        animationFrameRef.current = requestAnimationFrame(step);
+      } else {
+        animationFrameRef.current = null;
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
+  const resetViewport = () => {
+    animateViewportTo(DEFAULT_VIEWPORT);
+  };
+
+  const buildCenteredViewport = (scale: number, centerPoint: Point2D): Viewport => {
+    const centerScreen = {
+      x: yardToPxX(centerPoint.x),
+      y: yardToPxY(centerPoint.y),
+    };
+
+    return {
+      scale,
+      offsetX: size.width / 2 - scale * centerScreen.x,
+      offsetY: size.height / 2 - scale * centerScreen.y,
+    };
+  };
+
+  const getAutoZoomScale = (distance: number) => {
+    const clampedDistance = clamp(distance, 0, 100);
+    return 2.0 + (100 - clampedDistance) / 100 * 1.0;
+  };
+
+  const handleCanvasWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
+    if (!metrics) return;
+    event.preventDefault();
+
+    const delta = -event.deltaY * 0.0015;
+    const nextScale = clamp(viewport.scale * (1 + delta), 0.8, 5);
+    const rect = event.currentTarget.getBoundingClientRect();
+    const cursorX = event.clientX - rect.left;
+    const cursorY = event.clientY - rect.top;
+    const worldAtCursor = screenToWorld(cursorX, cursorY);
+
+    const nextViewport = {
+      scale: nextScale,
+      offsetX: cursorX - worldAtCursor.x * nextScale,
+      offsetY: cursorY - worldAtCursor.y * nextScale,
+    };
+
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    viewportRef.current = nextViewport;
+    setViewport(nextViewport);
+  };
+
+  const handleCanvasPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (editable) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsPanning(true);
+    panStartRef.current = { x: event.clientX, y: event.clientY };
+    initialOffsetRef.current = { x: viewport.offsetX, y: viewport.offsetY };
+  };
+
+  const handleCanvasPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (!isPanning || !panStartRef.current) return;
+    const deltaX = event.clientX - panStartRef.current.x;
+    const deltaY = event.clientY - panStartRef.current.y;
+    const nextViewport = {
+      ...viewport,
+      offsetX: initialOffsetRef.current.x + deltaX,
+      offsetY: initialOffsetRef.current.y + deltaY,
+    };
+
+    viewportRef.current = nextViewport;
+    setViewport(nextViewport);
+  };
+
+  const handleCanvasPointerUp = () => {
+    if (isPanning) {
+      setIsPanning(false);
+      panStartRef.current = null;
+    }
+  };
+
+  const isViewportDefault = viewport.scale === 1 && viewport.offsetX === 0 && viewport.offsetY === 0;
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!metrics || holeComplete) return;
+    if (distanceToPin <= 100) {
+      const targetScale = getAutoZoomScale(distanceToPin);
+      const targetViewport = buildCenteredViewport(targetScale, pinPoint);
+      animateViewportTo(targetViewport);
+    }
+  }, [distanceToPin, metrics, size.width, size.height, targetDistance, pinPoint, animateViewportTo, holeComplete]);
+
+  useEffect(() => {
+    if (holeComplete) {
+      resetViewport();
+    }
+  }, [holeComplete, resetViewport]);
 
   const yardToPxX = (yardX: number) => {
     if (!metrics) return 0;
@@ -493,6 +669,10 @@ export function HoleMapCanvas({
 
     // 再描画時は必ずクリアして、ゴースト描画が残らないようにする。
     context.clearRect(0, 0, size.width, size.height);
+
+    context.save();
+    context.translate(viewport.offsetX, viewport.offsetY);
+    context.scale(viewport.scale, viewport.scale);
 
     const yardToPxX = (yardX: number) => padding.left + drawWidth * ((yardX + halfYardX) / (halfYardX * 2));
     const yardToPxY = (yardY: number) => padding.top + drawHeight * (1 - yardY / maxYardY);
@@ -678,12 +858,8 @@ export function HoleMapCanvas({
       drawHighlightPoint(context, highlightPoint, yardToPxX, yardToPxY);
     }
 
-    // 右上に縮尺の目安を表示。
-    context.fillStyle = "rgba(6, 95, 70, 0.78)";
-    context.font = "12px sans-serif";
-    context.textAlign = "right";
-    context.fillText(`Scale: 1px = ${(maxYardY / drawHeight).toFixed(2)} yd`, size.width - 12, 18);
-  }, [absoluteAimPoint, absoluteShots, editable, greenRadius, hazards, showTrajectories, size.height, size.width, targetDistance, transientShot]);
+    context.restore();
+  }, [absoluteAimPoint, absoluteShots, editable, greenRadius, hazards, metrics, showTrajectories, size.height, size.width, targetDistance, transientShot, viewport]);
 
   const metricToPx = (hazard: Hazard) => {
     const currentMetrics = metrics ?? metricsRef.current;
@@ -831,7 +1007,32 @@ export function HoleMapCanvas({
       className={className ?? "relative w-full overflow-hidden rounded-2xl border border-emerald-300 bg-emerald-50/70"}
       onClick={() => onSelectHoleArea?.()}
     >
-      <canvas ref={canvasRef} className="block w-full" aria-label="ホールマップ" />
+      <canvas
+        ref={canvasRef}
+        className="block w-full"
+        aria-label="ホールマップ"
+        onWheel={handleCanvasWheel}
+        onPointerDown={handleCanvasPointerDown}
+        onPointerMove={handleCanvasPointerMove}
+        onPointerUp={handleCanvasPointerUp}
+        onPointerLeave={handleCanvasPointerUp}
+      />
+      <div className="pointer-events-none absolute inset-0 flex items-start justify-between gap-2 p-3">
+        {distanceToPin <= 100 && (
+          <div className="pointer-events-none rounded-full bg-emerald-900/90 px-3 py-1 text-xs font-semibold text-white">
+            100yd以内: グリーンを拡大表示
+          </div>
+        )}
+        {!isViewportDefault && (
+          <button
+            type="button"
+            onClick={resetViewport}
+            className="pointer-events-auto rounded-full bg-emerald-900/90 px-3 py-1 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-700"
+          >
+            全体表示に戻す
+          </button>
+        )}
+      </div>
       {metrics && slopeArrow && (
         <Stage
           width={size.width}
