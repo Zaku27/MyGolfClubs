@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { GolfBagPanel } from '../components/GolfBagPanel';
 
@@ -447,6 +447,7 @@ export default function RangeScreen() {
   const [slopeDirection, setSlopeDirection] = useState<number>(initialRangeConditionSettings.slopeDirection);
   // 風ダイアルは通常閉じ、必要な時だけ開いて調整できるようにする。
   const [isWindControlOpen, setIsWindControlOpen] = useState<boolean>(false);
+  const [isCourseConditionOpen, setIsCourseConditionOpen] = useState<boolean>(false);
   const [numShots, setNumShots] = useState<number>(10);
   const [aimXOffset, setAimXOffset] = useState<number>(0);
   const [results, setResults] = useState<ShotResult[]>([]);
@@ -456,8 +457,6 @@ export default function RangeScreen() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [reuseLastSeed, setReuseLastSeed] = useState(initialRangePlayerSettings.reuseLastSeed);
   const [lastSimulationSeedNonce, setLastSimulationSeedNonce] = useState<string | null>(null);
-  const [showRobotHint, setShowRobotHint] = useState(false);
-  const robotHintRef = useRef<HTMLDivElement | null>(null);
   const monteCarloResult = buildMonteCarloResult(results);
   const chartTarget = { x: 0, y: summary?.estimatedDist ?? 0 };
   const chartAim = { x: aimXOffset, y: summary?.estimatedDist ?? 0 };
@@ -557,24 +556,6 @@ export default function RangeScreen() {
     });
   }, [lie, windDirection, windSpeed, groundHardness, slopeAngle, slopeDirection]);
 
-  useEffect(() => {
-    if (!showRobotHint) return;
-
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const targetNode = event.target as Node | null;
-      if (!targetNode) return;
-      if (robotHintRef.current && !robotHintRef.current.contains(targetNode)) {
-        setShowRobotHint(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
-    };
-  }, [showRobotHint]);
 
   // avgDistanceが無い場合はdistanceをavgDistanceとして使う
   let selectedClub = clubs.find((c) => String(c.id) === String(selectedClubId));
@@ -854,33 +835,27 @@ export default function RangeScreen() {
                         ? `実測飛距離: ${selectedClub?.distance ?? '-'} y`
                         : `推定飛距離: ${simClub ? estimatedClubDistance : '-'} y`}
                     </span>
-                    <div ref={robotHintRef} className="relative">
-                      <span className="inline-flex items-center gap-2">
-                        <span>
-                          クラブ成功率: {
-                            simClub ? (
-                              seatType === 'robot'
-                                ? '100% (ロボット固定)'
-                                : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
-                            ) : '--'
-                          }
-                        </span>
-                        {seatType === 'robot' && (
-                          <button
-                            type="button"
-                            aria-label="ロボット打席のクラブ成功率ヒント"
-                            aria-expanded={showRobotHint}
-                            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-300 bg-blue-100 text-xs font-bold text-blue-700"
-                            onClick={() => setShowRobotHint((prev) => !prev)}
-                          >
-                            ?
-                          </button>
-                        )}
+                    <div className="relative inline-flex items-center gap-2 whitespace-nowrap">
+                      <span>
+                        クラブ成功率: {
+                          simClub ? (
+                            seatType === 'robot'
+                              ? '100% (ロボット固定)'
+                              : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
+                          ) : '--'
+                        }
                       </span>
-                      {seatType === 'robot' && showRobotHint && (
-                        <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-md border border-blue-300 bg-white p-2 text-xs leading-relaxed text-blue-900 shadow-lg">
-                          ロボット打席はクラブの個体差や個人データの影響を受けないため、クラブ成功率は常に100%で固定されます。
-                        </div>
+                      {seatType === 'robot' && (
+                        <button
+                          type="button"
+                          aria-label="ロボット打席のクラブ成功率ヒント"
+                          className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-300 bg-blue-100 text-xs font-bold text-blue-700"
+                        >
+                          ?
+                          <span className="help-tooltip-text whitespace-normal">
+                            ロボット打席はクラブの個体差や個人データの影響を受けないため、クラブ成功率は常に100%で固定されます。
+                          </span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1110,15 +1085,22 @@ export default function RangeScreen() {
                 </div>
                 <div className="rounded border border-green-200 bg-green-50 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <div>
+                    <div className="flex items-center gap-2">
                       <label htmlFor="reuse-last-seed" className="block font-semibold text-green-900">
                         再実行時の乱数
                       </label>
-                      <p className="text-xs text-gray-600">
-                        {reuseLastSeed
-                          ? '前回と同じ乱数で再実行します。条件が同じなら結果も再現されます。'
-                          : '毎回新しい乱数で再実行します。'}
-                      </p>
+                      <button
+                        type="button"
+                        className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-semibold text-gray-700"
+                        aria-label="再実行時の乱数の説明"
+                      >
+                        i
+                        <span className="help-tooltip-text whitespace-normal">
+                          {reuseLastSeed
+                            ? '前回と同じ乱数で再実行します。条件が同じなら結果も再現されます。'
+                            : '毎回新しい乱数で再実行します。'}
+                        </span>
+                      </button>
                     </div>
                     <label htmlFor="reuse-last-seed" className="inline-flex cursor-pointer items-center gap-2">
                       <span className={`text-sm font-medium ${reuseLastSeed ? 'text-green-900' : 'text-gray-500'}`}>
@@ -1145,16 +1127,60 @@ export default function RangeScreen() {
             </div>
 
           <div className="w-full bg-white rounded shadow p-4 flex flex-col gap-3">
-            <div>
-              <label className="block text-lg font-semibold mb-2">コースコンディション</label>
-            </div>
-            <div className="rounded border border-green-200 bg-green-50 p-3">
-              <label className="block font-semibold mb-1 text-green-900">ライ</label>
-              <select
-                className="w-full border rounded p-2"
-                value={lie}
-                onChange={(e) => setLie(e.target.value)}
+            <div className="flex flex-nowrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <label className="text-lg font-semibold">コースコンディション</label>
+                <button
+                  type="button"
+                  className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-semibold text-gray-700"
+                  aria-label="コースコンディションの説明"
+                >
+                  i
+                  <span className="help-tooltip-text whitespace-normal">
+                    上級者向けの設定です。通常は閉じておき、必要なときに詳細を開いてください。
+                  </span>
+                </button>
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-8 items-center whitespace-nowrap rounded border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-800 hover:bg-green-100"
+                onClick={() => setIsCourseConditionOpen((prev) => !prev)}
+                aria-expanded={isCourseConditionOpen}
               >
+                {isCourseConditionOpen ? '閉じる' : '設定'}
+              </button>
+            </div>
+            {!isCourseConditionOpen && (
+              <div className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="font-semibold">ライ</p>
+                    <p>{lie}</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold">風</p>
+                    <p>{windDirectionSummary} / {windSpeed.toFixed(1)} m/s</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold">地面硬さ</p>
+                    <p>{groundHardness === 'soft' ? 'Soft' : groundHardness === 'firm' ? 'Firm' : 'Medium'}</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold">傾斜</p>
+                    <p>{slopeAngle === 0 ? 'フラット' : `傾斜 ${slopeAngle}° (${normalizeSlopeForDisplay(slopeAngle, slopeDirection).slopeDirection}°)`}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {isCourseConditionOpen && (
+              <>
+                <div className="rounded border border-green-200 bg-green-50 p-3">
+                  <label className="block font-semibold mb-1 text-green-900">ライ</label>
+                  <select
+                    className="w-full border rounded p-2"
+                    value={lie}
+                    onChange={(e) => setLie(e.target.value)}
+                  >
                 {LIE_OPTIONS.map((l) => (
                   <option key={l} value={l}>{l}</option>
                 ))}
@@ -1314,6 +1340,8 @@ export default function RangeScreen() {
                 {formatSlopeEffectGuide(slopeAngle, slopeDirection)}
               </p>
             </div>
+          </>
+        )}
           </div>
         </aside>
       </div>

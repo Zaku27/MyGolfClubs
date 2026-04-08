@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
-import { Stage, Layer, Arrow, Text } from "react-konva";
 import type { Hole, Hazard } from "../../types/game";
 import type { LandingResult } from "../../utils/landingPosition";
 import { buildAutoHazardName, buildHazardDisplayName } from "../../utils/shotOutcome";
@@ -398,17 +397,6 @@ export function HoleMapCanvas({
     [landingResults, targetDistance],
   );
 
-  const selectedHazard = useMemo(
-    () => hazards.find((hazard) => hazard.id === selectedHazardId) ?? null,
-    [hazards, selectedHazardId],
-  );
-
-  const slopeCondition = selectedHazard?.groundCondition ?? hole.groundCondition ?? {
-    hardness: "medium",
-    slopeAngle: 0,
-    slopeDirection: 0,
-  };
-
   const metrics = useMemo(() => {
     if (size.width <= 0 || size.height <= 0) {
       return null;
@@ -452,11 +440,6 @@ export function HoleMapCanvas({
   const screenToWorld = (screenX: number, screenY: number, overrideViewport: Viewport = viewport): Point2D => ({
     x: (screenX - overrideViewport.offsetX) / overrideViewport.scale,
     y: (screenY - overrideViewport.offsetY) / overrideViewport.scale,
-  });
-
-  const worldToScreen = (worldX: number, worldY: number, overrideViewport: Viewport = viewport): Point2D => ({
-    x: worldX * overrideViewport.scale + overrideViewport.offsetX,
-    y: worldY * overrideViewport.scale + overrideViewport.offsetY,
   });
 
   const animateViewportTo = useCallback((target: Viewport, duration = 450) => {
@@ -603,25 +586,6 @@ export function HoleMapCanvas({
     const { maxYardY, yardScale, offsetY } = metrics;
     return offsetY + (maxYardY - yardY) * yardScale;
   };
-
-  const slopeArrow = useMemo(() => {
-    if (!metrics) return null;
-    const centerYard = Math.max(0, targetDistance * 0.35);
-    const startX = yardToPxX(0);
-    const startY = yardToPxY(centerYard);
-    const length = Math.max(40, Math.min(100, 40 + Math.abs(slopeCondition.slopeAngle) * 2.5));
-    const rad = ((270 + slopeCondition.slopeDirection) % 360) * (Math.PI / 180);
-    const endX = startX + Math.cos(rad) * length;
-    const endY = startY + Math.sin(rad) * length;
-
-    return {
-      points: [startX, startY, endX, endY],
-      angleLabel: slopeCondition.slopeAngle,
-      directionLabel: slopeCondition.slopeDirection,
-      textX: startX + Math.cos(rad) * 6 + 4,
-      textY: startY + Math.sin(rad) * 6 - 18,
-    };
-  }, [metrics, targetDistance, slopeCondition]);
 
   useEffect(() => {
     if (currentHoleKey == null) {
@@ -1045,38 +1009,6 @@ export function HoleMapCanvas({
           </button>
         )}
       </div>
-      {metrics && slopeArrow && (
-        <Stage
-          width={size.width}
-          height={size.height}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            pointerEvents: "none",
-          }}
-        >
-          <Layer>
-            <Arrow
-              points={slopeArrow.points}
-              pointerLength={12}
-              pointerWidth={10}
-              fill="#f97316"
-              stroke="#ea580c"
-              strokeWidth={4}
-              tension={0}
-            />
-            <Text
-              x={slopeArrow.textX}
-              y={slopeArrow.textY}
-              text={`Slope ${slopeArrow.angleLabel}°, ${slopeArrow.directionLabel}°`}
-              fill="#065f46"
-              fontSize={12}
-              fontStyle="bold"
-            />
-          </Layer>
-        </Stage>
-      )}
       {editable && (
         <div className="pointer-events-none absolute inset-0">
           {hazards.map((hazard) => {
