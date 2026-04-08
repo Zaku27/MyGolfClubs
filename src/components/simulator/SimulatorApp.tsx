@@ -184,7 +184,7 @@ function SetupScreen({
           </div>
           <div className="flex items-start gap-2">
             <span className="text-emerald-600 font-bold flex-shrink-0">2.</span>
-            <span>バッグのクラブを選択し、パワーを決定してショット</span>
+            <span>クラブを選択し、方向とパワーを決定してショット</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-emerald-600 font-bold flex-shrink-0">3.</span>

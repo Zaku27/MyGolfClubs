@@ -170,11 +170,15 @@ export function ShotDispersionChart({
     return '左前上り';
   }
 
+  function formatGroundHardnessLabel(groundHardness: GroundHardness): string {
+    return groundHardness === 'soft' ? '柔らかい' : groundHardness === 'firm' ? '硬い' : '普通';
+  }
+
   const groundLegendText = useMemo(() => {
     if (groundHardness == null || slopeAngle == null || slopeDirection == null) return null;
     const normalizedDirection = normalizeWindDirection(slopeDirection);
     const angleLabel = slopeAngle === 0 ? 'フラット' : `${Math.abs(slopeAngle)}° (${formatSlopeDirectionLabel(normalizedDirection)})`;
-    return `地面硬さ: ${groundHardness.charAt(0).toUpperCase() + groundHardness.slice(1)} / 傾斜: ${angleLabel}`;
+    return `地面硬さ: ${formatGroundHardnessLabel(groundHardness)} / 傾斜: ${angleLabel}`;
   }, [groundHardness, slopeAngle, slopeDirection]);
 
   const confidenceEllipseAnnotation = useMemo(() => {

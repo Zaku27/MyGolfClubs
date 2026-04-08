@@ -335,9 +335,9 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
               }}
               className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
             >
-              <option value="soft">Soft</option>
-              <option value="medium">Medium</option>
-              <option value="firm">Firm</option>
+              <option value="soft">柔らかい</option>
+              <option value="medium">普通</option>
+              <option value="firm">硬い</option>
             </select>
           </label>
 

@@ -111,6 +111,10 @@ const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
 
 type GroundHardness = "soft" | "medium" | "firm";
 
+function formatGroundHardnessLabel(groundHardness: GroundHardness): string {
+  return groundHardness === 'soft' ? '柔らかい' : groundHardness === 'firm' ? '硬い' : '普通';
+}
+
 type RangeConditionSettings = {
   lie: string;
   windDirection: number;
@@ -739,7 +743,7 @@ export default function RangeScreen() {
     const rollContribution = meanRoll - rollBaseline;
     const rollContributionLabel = groundHardness === 'medium'
       ? '地面硬さは標準です。'
-      : `${rollContribution >= 0 ? '+' : ''}${rollContribution.toFixed(1)}yd（${groundHardness}の影響）`;
+      : `${rollContribution >= 0 ? '+' : ''}${rollContribution.toFixed(1)}yd（${formatGroundHardnessLabel(groundHardness)}の影響）`;
 
     const normalizedSlope = normalizeSlopeForDisplay(slopeAngle, slopeDirection);
     const slopeDirectionLabel = formatSlopeDirectionLabel(normalizedSlope.slopeDirection);
@@ -1163,7 +1167,7 @@ export default function RangeScreen() {
                   </div>
                   <div>
                     <p className="font-semibold">地面硬さ</p>
-                    <p>{groundHardness === 'soft' ? 'Soft' : groundHardness === 'firm' ? 'Firm' : 'Medium'}</p>
+                    <p>{groundHardness === 'soft' ? '柔らかい' : groundHardness === 'firm' ? '硬い' : '普通'}</p>
                   </div>
                   <div>
                     <p className="font-semibold">傾斜</p>
@@ -1239,9 +1243,9 @@ export default function RangeScreen() {
                       onChange={(event) => setGroundHardness(event.target.value as GroundHardness)}
                       className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
                     >
-                      <option value="soft">Soft</option>
-                      <option value="medium">Medium</option>
-                      <option value="firm">Firm</option>
+                      <option value="soft">柔らかい</option>
+                      <option value="medium">普通</option>
+                      <option value="firm">硬い</option>
                     </select>
                   </label>
                 </div>

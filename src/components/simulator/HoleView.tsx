@@ -507,7 +507,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
             <div className="w-full rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-3 lg:w-72">
               <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
-                <span>狙い</span>
+                <span>方向</span>
                 <span>
                   {aimXOffset > 0 ? `右 ${aimXOffset}y` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}y` : "中央"}
                 </span>
