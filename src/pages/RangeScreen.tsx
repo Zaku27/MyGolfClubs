@@ -50,6 +50,7 @@ import {
   type RangeSeatType,
 } from '../utils/rangePlayerSettings';
 import ShotDispersionChart from '../components/ShotDispersionChart';
+import { ShotControlPanel } from '../components/ShotControlPanel';
 import WindDirectionDial from '../components/WindDirectionDial';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
 import type { LieType, ShotResult } from '../types/game';
@@ -574,6 +575,7 @@ export default function RangeScreen() {
   const targetDistance = summary?.estimatedDist ?? (seatType === 'personal' ? selectedClub?.distance ?? 0 : estimatedClubDistance);
   const chartTarget = { x: 0, y: targetDistance };
   const chartAim = { x: aimXOffset, y: Math.round(targetDistance * shotPowerPercent / 100) };
+  const showRangeAimControls = !selectedClub?.type || selectedClub.type !== 'Putter';
   const analysisPenaltyByClubId = (() => {
     const penaltyMap: Record<string, AnalysisPenalty> = {};
 
@@ -870,64 +872,18 @@ export default function RangeScreen() {
             )}
           </div>
 
-          <div className="w-full flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-center">
-            <div className="w-full rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-3 lg:w-72">
-            <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
-              <span>方向</span>
-              <span>
-                {aimXOffset > 0 ? `右 ${aimXOffset}y` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}y` : "中央"}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={-50}
-              max={50}
-              step={1}
-              value={aimXOffset}
-              onChange={(e) => setAimXOffset(clampAimXOffset(Number(e.target.value)))}
-              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-sky-200 accent-sky-600"
-              aria-label="狙い"
-              disabled={!selectedClub || isSimulating}
-            />
-            <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-sky-700">
-              <span>左 50y</span>
-              <span>中央</span>
-              <span>右 50y</span>
-            </div>
-          </div>
-
-            <div className="w-full lg:w-72">
-              <button
-                className={`w-full rounded-2xl px-4 py-6 text-2xl font-black tracking-[0.08em] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70 ${selectedClub ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500' : 'cursor-not-allowed bg-emerald-200 text-emerald-500'}`}
-                disabled={!selectedClub || isSimulating}
-                onClick={handleSimulate}
-              >
-                {isSimulating ? 'シミュレーション中...' : `ショット実行（${numShots}回）`}
-              </button>
-            </div>
-
-            <div className="w-full lg:w-72 rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-3 py-3">
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-emerald-800">
-                <span>パワー</span>
-                <span>{shotPowerPercent}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={110}
-                step={1}
-                value={shotPowerPercent}
-                onChange={(e) => setShotPowerPercent(Number(e.target.value))}
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
-                aria-label="ショットパワー"
-                disabled={!selectedClub || isSimulating}
-              />
-              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
-                <span>0%</span>
-                <span>110%</span>
-              </div>
-            </div>
-          </div>
+          <ShotControlPanel
+            aimXOffset={aimXOffset}
+            onAimXOffsetChange={(value) => setAimXOffset(clampAimXOffset(value))}
+            shotPowerPercent={shotPowerPercent}
+            onShotPowerPercentChange={setShotPowerPercent}
+            onShot={handleSimulate}
+            shotButtonLabel={isSimulating ? `シミュレーション中...` : `ショット実行（${numShots}回）`}
+            buttonDisabled={!selectedClub || isSimulating}
+            inputsDisabled={!selectedClub || isSimulating}
+            showAim={showRangeAimControls}
+            showPower={showRangeAimControls}
+          />
 
           {/* Results Section */}
           {results.length > 0 && summary && (

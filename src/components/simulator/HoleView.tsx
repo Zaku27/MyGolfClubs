@@ -21,6 +21,7 @@ type LandingHistoryItem = {
   landing: LandingResult;
 };
 import { ConfirmationDialog } from "../ConfirmationDialog";
+import { ShotControlPanel } from "../ShotControlPanel";
 import { buildHazardDisplayName } from "../../utils/shotOutcome";
 
 interface Props {
@@ -502,84 +503,24 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         {/* おすすめクラブセクション ...existing code... */}
 
         {/* ショット操作グループ */}
-        <section className="mt-8 w-full max-w-5xl mx-auto flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-center lg:gap-4">
-          {/* 狙い調整スライダー */}
-          {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
-            <div className="w-full rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-3 lg:w-72">
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
-                <span>方向</span>
-                <span>
-                  {aimXOffset > 0 ? `右 ${aimXOffset}y` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}y` : "中央"}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={-50}
-                max={50}
-                step={1}
-                value={aimXOffset}
-                onChange={e => setAimXOffset(Number(e.target.value))}
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-sky-200 accent-sky-600"
-                aria-label="狙い"
-                disabled={!selectedClub || isResultActionVisible}
-              />
-              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-sky-700">
-                <span>左 50y</span>
-                <span>中央</span>
-                <span>右 50y</span>
-              </div>
-            </div>
-          ) : null}
-
-          {/* ショットボタン */}
-          <div className="w-full lg:w-72">
-            <button
-              type="button"
-              disabled={!selectedClub || shotInProgress || isResultActionVisible}
-              onClick={() => {
-                if (selectedClub && !isResultActionVisible) {
-                  selectClub(selectedClub.id);
-                  takeShot();
-                }
-              }}
-              className={[
-                "w-full rounded-2xl px-4 py-6 text-2xl font-black tracking-[0.08em] transition",
-                "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
-                selectedClub && !shotInProgress && !isResultActionVisible
-                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500"
-                  : "cursor-not-allowed bg-emerald-200 text-emerald-500"
-              ].join(" ")}
-            >
-              ショット
-            </button>
-          </div>
-
-          {/* パワー調整スライダー */}
-          {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
-            <div className="w-full rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-3 py-3 lg:w-72">
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-emerald-800">
-                <span>パワー</span>
-                <span>{shotPowerPercent}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={110}
-                step={1}
-                value={shotPowerPercent}
-                onChange={e => setShotPowerPercent(Number(e.target.value))}
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
-                aria-label="ショットパワー"
-                disabled={!selectedClub || isResultActionVisible}
-              />
-              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
-                <span>0%</span>
-
-                <span>110%</span>
-              </div>
-            </div>
-          ) : null}
-
+        <section className="mt-8 w-full max-w-5xl mx-auto">
+          <ShotControlPanel
+            aimXOffset={aimXOffset}
+            onAimXOffsetChange={setAimXOffset}
+            shotPowerPercent={shotPowerPercent}
+            onShotPowerPercentChange={setShotPowerPercent}
+            onShot={() => {
+              if (selectedClub && !isResultActionVisible) {
+                selectClub(selectedClub.id);
+                takeShot();
+              }
+            }}
+            shotButtonLabel={shotInProgress ? 'シミュレーション中...' : 'ショット'}
+            buttonDisabled={!selectedClub || shotInProgress || isResultActionVisible}
+            inputsDisabled={!selectedClub || isResultActionVisible}
+            showAim={!isGreenLie && (!selectedClub?.type || selectedClub.type !== 'Putter')}
+            showPower={!isGreenLie && (!selectedClub?.type || selectedClub.type !== 'Putter')}
+          />
         </section>
 
 
