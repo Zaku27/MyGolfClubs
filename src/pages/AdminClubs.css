@@ -142,8 +142,7 @@
 }
 
 .admin-upload-card h2,
-.admin-preview-header h3,
-.admin-pdf-preview h3 {
+.admin-preview-header h3 {
   margin-bottom: 6px;
   color: #193c30;
 }
@@ -271,80 +270,8 @@
   background: #feecec;
 }
 
-.admin-pdf-preview {
-  margin-bottom: 14px;
-  border: 1px solid #d4e5da;
-  border-radius: 12px;
-  background: #ffffff;
-  padding: 12px;
-}
-
-.admin-pdf-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-
-.admin-pdf-actions p {
-  margin: 0;
-  color: #4f675d;
-  font-size: 12px;
-}
-
-.admin-pdf-parse-controls {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 10px;
-  margin-bottom: 10px;
-  align-items: end;
-}
-
-.admin-pdf-control-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.admin-pdf-control-actions .btn-secondary {
-  width: 100%;
-}
-
-.admin-selected-row {
-  background: #ecf8f1;
-}
-
-.admin-skipped-row {
-  opacity: 0.52;
-  background: #f9f4f4;
-}
-
-.admin-pdf-parse-controls label {
-  display: grid;
-  gap: 6px;
-  color: #2d4f40;
-  font-size: 13px;
-}
-
-.admin-pdf-parse-controls small {
-  color: #5f756a;
-  font-size: 11px;
-}
-
 .admin-structured-preview {
   margin-bottom: 14px;
-}
-
-.admin-pdf-preview pre {
-  white-space: pre-wrap;
-  background: #f3faf5;
-  border: 1px solid #dbeadf;
-  border-radius: 10px;
-  padding: 12px;
-  max-height: 220px;
-  overflow: auto;
-  color: #1f3f32;
 }
 
 .admin-modal-overlay {
@@ -457,19 +384,6 @@
     grid-template-columns: repeat(3, minmax(150px, 1fr));
   }
 
-  .admin-pdf-parse-controls {
-    grid-template-columns: repeat(2, minmax(160px, 1fr));
-  }
-
-  .admin-pdf-control-actions {
-    grid-column: span 2;
-    flex-direction: row;
-    justify-content: flex-end;
-  }
-
-  .admin-pdf-control-actions .btn-secondary {
-    width: auto;
-  }
 
   .admin-clear-all {
     position: static;
@@ -496,16 +410,4 @@
     grid-template-columns: 1fr;
   }
 
-  .admin-pdf-parse-controls {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-pdf-control-actions {
-    grid-column: auto;
-    flex-direction: column;
-  }
-
-  .admin-pdf-control-actions .btn-secondary {
-    width: 100%;
-  }
 }

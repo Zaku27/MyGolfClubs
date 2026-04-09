@@ -44,7 +44,7 @@ type CatalogSpecParseResult = {
   reason?: string;
 };
 
-type PdfLineCandidate = {
+type ImportCandidate = {
   rowId: string;
   spec: CatalogSpec | null;
   reason?: string;
@@ -56,7 +56,6 @@ type StructuredTextParseResult = {
   usedHeaderRow: boolean;
 };
 
-type PdfDelimiterMode = 'auto' | 'csv' | 'tsv' | 'spaces';
 type RowNumberSet = Set<number>;
 
 const defaultSortState: { key: SortKey; direction: SortDirection } = {
@@ -65,7 +64,6 @@ const defaultSortState: { key: SortKey; direction: SortDirection } = {
 };
 
 const CSV_MAPPING_STORAGE_KEY = 'mygolfbag-admin-csv-mapping-v1';
-const PDF_MAPPING_STORAGE_KEY = 'mygolfbag-admin-pdf-mapping-v1';
 const REQUIRED_MAPPING_FIELDS: CanonicalHeader[] = ['model', 'type', 'year'];
 
 const HEADER_ALIASES: Record<CanonicalHeader, string[]> = {
@@ -438,110 +436,9 @@ const parseCsvRowToCatalogSpec = (
   return { spec: parsed.data };
 };
 
-const splitStructuredLine = (line: string, delimiterMode: PdfDelimiterMode = 'auto'): string[] | null => {
-  const cleanedLine = line.replace(/^\[page\s+\d+\]\s*/i, '').trim();
-  if (!cleanedLine) {
-    return null;
-  }
-
-  const hasStructuredDelimiter =
-    delimiterMode === 'csv'
-      ? cleanedLine.includes(',')
-      : delimiterMode === 'tsv'
-        ? cleanedLine.includes('\t')
-        : delimiterMode === 'spaces'
-          ? /\s{2,}/.test(cleanedLine)
-          : cleanedLine.includes(',') || cleanedLine.includes('\t') || /\s{2,}/.test(cleanedLine);
-  if (!hasStructuredDelimiter) {
-    return null;
-  }
-
-  const tokens = (
-    delimiterMode === 'csv'
-      ? cleanedLine.split(',')
-      : delimiterMode === 'tsv'
-        ? cleanedLine.split('\t')
-        : delimiterMode === 'spaces'
-          ? cleanedLine.split(/\s{2,}/)
-          : cleanedLine.includes(',')
-            ? cleanedLine.split(',')
-            : cleanedLine.includes('\t')
-              ? cleanedLine.split('\t')
-              : cleanedLine.split(/\s{2,}/)
-  )
-    .map((token) => token.trim())
-    .filter(Boolean);
-
-  return tokens.length > 0 ? tokens : null;
-};
-
-const looksLikeHeader = (token: string): boolean => {
-  const normalized = normalizeHeaderKey(token);
-  const hasAliasMatch = (Object.keys(HEADER_ALIASES) as CanonicalHeader[]).some((canonical) => {
-    return HEADER_ALIASES[canonical].some((alias) => normalizeHeaderKey(alias) === normalized);
-  });
-  if (hasAliasMatch) {
-    return true;
-  }
-
-  return /[a-zA-Z\u3040-\u30ff\u4e00-\u9faf]/.test(token) && !/\d/.test(token);
-};
-
-const getTokenizedStructuredLines = (
-  text: string,
-  delimiterMode: PdfDelimiterMode,
-): string[][] => {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => splitStructuredLine(line, delimiterMode))
-    .filter((tokens): tokens is string[] => tokens != null);
-};
-
-const buildStructuredRowsFromText = (
-  text: string,
-  options?: { delimiterMode?: PdfDelimiterMode; headerRowIndex?: number | null },
-): StructuredTextParseResult => {
-  const delimiterMode = options?.delimiterMode ?? 'auto';
-  const tokenizedLines = getTokenizedStructuredLines(text, delimiterMode);
-
-  if (tokenizedLines.length === 0) {
-    return { headers: [], rows: [], usedHeaderRow: false };
-  }
-
-  const maxColumns = Math.max(...tokenizedLines.map((tokens) => tokens.length));
-  const headerIndex = options?.headerRowIndex ?? null;
-  const explicitHeaderLine = headerIndex != null && headerIndex > 0 ? tokenizedLines[headerIndex - 1] : undefined;
-  const firstLine = tokenizedLines[0];
-  const headerLikeCount = firstLine.filter((token) => looksLikeHeader(token)).length;
-  const useFirstLineAsHeader = headerLikeCount >= Math.max(2, Math.floor(firstLine.length / 2));
-  const headerLine = explicitHeaderLine ?? (useFirstLineAsHeader ? firstLine : undefined);
-
-  const headers = headerLine
-    ? Array.from({ length: maxColumns }, (_, index) => headerLine[index] ?? `column_${index + 1}`)
-    : Array.from({ length: maxColumns }, (_, index) => `column_${index + 1}`);
-
-  const dataLines = headerLine
-    ? tokenizedLines.filter((_, index) => tokenizedLines[index] !== headerLine)
-    : tokenizedLines;
-  const rows: CsvRow[] = dataLines.map((tokens) => {
-    const row: CsvRow = {};
-    headers.forEach((header, index) => {
-      row[header] = tokens[index] ?? '';
-    });
-    return row;
-  });
-
-  return {
-    headers,
-    rows,
-    usedHeaderRow: Boolean(headerLine),
-  };
-};
 
 const buildPreviewRows = (
-  candidates: PdfLineCandidate[],
+  candidates: ImportCandidate[],
   existingKeys: Set<string>,
 ): ImportPreviewRow[] => {
   const seenInPreview = new Set<string>();
@@ -619,31 +516,15 @@ export default function AdminClubs() {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvColumnMapping, setCsvColumnMapping] = useState<CsvColumnMapping>({});
   const [csvSourceFileName, setCsvSourceFileName] = useState<string | undefined>(undefined);
-  const [pdfRawRows, setPdfRawRows] = useState<CsvRow[]>([]);
-  const [pdfHeaders, setPdfHeaders] = useState<string[]>([]);
-  const [pdfColumnMapping, setPdfColumnMapping] = useState<CsvColumnMapping>({});
-  const [pdfSourceFileName, setPdfSourceFileName] = useState<string | undefined>(undefined);
-  const [pdfDelimiterMode, setPdfDelimiterMode] = useState<PdfDelimiterMode>('auto');
-  const [pdfHeaderRowIndex, setPdfHeaderRowIndex] = useState<number>(0);
-  const [pdfSkipRowSpec, setPdfSkipRowSpec] = useState('');
-  const [pdfSkippedRows, setPdfSkippedRows] = useState<RowNumberSet>(new Set<number>());
-  const [pdfTokenizedLines, setPdfTokenizedLines] = useState<string[][]>([]);
   const [importMessage, setImportMessage] = useState<string>('');
   const [importError, setImportError] = useState<string>('');
   const [csvLoading, setCsvLoading] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfExtractedText, setPdfExtractedText] = useState('');
 
   useEffect(() => {
     try {
       const rawCsvMapping = localStorage.getItem(CSV_MAPPING_STORAGE_KEY);
       if (rawCsvMapping) {
         setCsvColumnMapping(parseStoredMapping(JSON.parse(rawCsvMapping)));
-      }
-
-      const rawPdfMapping = localStorage.getItem(PDF_MAPPING_STORAGE_KEY);
-      if (rawPdfMapping) {
-        setPdfColumnMapping(parseStoredMapping(JSON.parse(rawPdfMapping)));
       }
     } catch {
       // Ignore localStorage parse issues and keep defaults.
@@ -653,10 +534,6 @@ export default function AdminClubs() {
   useEffect(() => {
     localStorage.setItem(CSV_MAPPING_STORAGE_KEY, JSON.stringify(csvColumnMapping));
   }, [csvColumnMapping]);
-
-  useEffect(() => {
-    localStorage.setItem(PDF_MAPPING_STORAGE_KEY, JSON.stringify(pdfColumnMapping));
-  }, [pdfColumnMapping]);
 
   const existingKeys = useMemo(() => new Set(specs.map(buildCatalogSpecKey)), [specs]);
 
@@ -715,20 +592,6 @@ export default function AdminClubs() {
     return REQUIRED_MAPPING_FIELDS.filter((field) => !hasResolvableHeader(csvHeaders, field, csvColumnMapping));
   }, [csvHeaders, csvColumnMapping]);
 
-  const pdfMissingRequiredFields = useMemo(() => {
-    if (pdfHeaders.length === 0) {
-      return [] as CanonicalHeader[];
-    }
-    return REQUIRED_MAPPING_FIELDS.filter((field) => !hasResolvableHeader(pdfHeaders, field, pdfColumnMapping));
-  }, [pdfHeaders, pdfColumnMapping]);
-
-  const pdfStructuredPreviewRows = useMemo(() => {
-    return pdfRawRows.slice(0, 8);
-  }, [pdfRawRows]);
-
-  const pdfTokenizedPreviewLines = useMemo(() => {
-    return pdfTokenizedLines.slice(0, 8);
-  }, [pdfTokenizedLines]);
 
   const toggleSort = (key: SortKey) => {
     setSortState((prev) => {
@@ -750,7 +613,7 @@ export default function AdminClubs() {
     mapping: CsvColumnMapping,
     sourceHint?: string,
   ): ImportPreviewRow[] => {
-    const candidates: PdfLineCandidate[] = rows.map((row, index) => {
+    const candidates: ImportCandidate[] = rows.map((row, index) => {
       const parsed = parseCsvRowToCatalogSpec(row, mapping, sourceHint);
       return {
         rowId: `csv-${index + 1}`,
@@ -758,23 +621,7 @@ export default function AdminClubs() {
         reason: parsed.spec ? undefined : parsed.reason ?? '必須項目または型が不正です（model/type/year など）',
       };
     });
-    return buildPreviewRows(candidates, existingKeys);
-  };
 
-  const buildPdfPreviewRows = (
-    rows: CsvRow[],
-    mapping: CsvColumnMapping,
-    sourceHint?: string,
-  ): ImportPreviewRow[] => {
-    const filteredRows = rows.filter((_, index) => !pdfSkippedRows.has(index + 1));
-    const candidates: PdfLineCandidate[] = filteredRows.map((row, index) => {
-      const parsed = parseCsvRowToCatalogSpec(row, mapping, sourceHint);
-      return {
-        rowId: `pdf-${index + 1}`,
-        spec: parsed.spec,
-        reason: parsed.spec ? undefined : parsed.reason ?? 'PDF行をCatalogSpec形式に変換できませんでした',
-      };
-    });
     return buildPreviewRows(candidates, existingKeys);
   };
 
@@ -827,131 +674,6 @@ export default function AdminClubs() {
     setPreviewRows(rows);
     setImportError('');
     setImportMessage(`列マッピングを適用して再プレビューしました: ${rows.length}行`);
-  };
-
-  const handlePdfUpload = async (file: File) => {
-    setPdfLoading(true);
-    setImportError('');
-    setImportMessage('');
-    setPdfExtractedText('');
-
-    try {
-      const pdfjs = await import('pdfjs-dist');
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-
-      const textChunks: string[] = [];
-      for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
-        const page = await pdf.getPage(pageIndex);
-        const text = await page.getTextContent();
-        const pageLines = text.items
-          .map((item) => ('str' in item ? String(item.str) : ''))
-          .filter(Boolean)
-          .join(' ');
-        textChunks.push(`[page ${pageIndex}] ${pageLines}`);
-      }
-
-      const extracted = textChunks.join('\n');
-      setPdfExtractedText(extracted);
-      const tokenized = getTokenizedStructuredLines(extracted, pdfDelimiterMode);
-      setPdfTokenizedLines(tokenized);
-      const parsed = buildStructuredRowsFromText(extracted, {
-        delimiterMode: pdfDelimiterMode,
-        headerRowIndex: pdfHeaderRowIndex > 0 ? pdfHeaderRowIndex : null,
-      });
-      const resolvedMapping = buildMappingForHeaders(parsed.headers, pdfColumnMapping);
-      setPdfRawRows(parsed.rows);
-      setPdfHeaders(parsed.headers);
-      setPdfColumnMapping(resolvedMapping);
-      setPdfSkippedRows(new Set<number>());
-      setPdfSkipRowSpec('');
-      setImportMessage(
-        `PDFテキスト抽出完了: ${pdf.numPages}ページ / 構造化行 ${parsed.rows.length}件${parsed.usedHeaderRow ? '（ヘッダー行あり）' : ''}`,
-      );
-      console.log('[Catalog PDF Extracted Text]', extracted);
-    } catch (error) {
-      setImportError(`PDF解析に失敗しました: ${(error as Error).message}`);
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
-  const handlePreparePdfStructuredRows = () => {
-    if (!pdfExtractedText.trim()) {
-      setImportError('PDF抽出テキストが空です。先にPDFをアップロードしてください。');
-      return;
-    }
-
-    const tokenized = getTokenizedStructuredLines(pdfExtractedText, pdfDelimiterMode);
-    setPdfTokenizedLines(tokenized);
-
-    const parsed = buildStructuredRowsFromText(pdfExtractedText, {
-      delimiterMode: pdfDelimiterMode,
-      headerRowIndex: pdfHeaderRowIndex > 0 ? pdfHeaderRowIndex : null,
-    });
-    if (parsed.rows.length === 0) {
-      setImportError('手動設定で構造化行を検出できませんでした。区切り文字やヘッダー行を見直してください。');
-      return;
-    }
-
-    const resolvedMapping = buildMappingForHeaders(parsed.headers, pdfColumnMapping);
-    setPdfRawRows(parsed.rows);
-    setPdfHeaders(parsed.headers);
-    setPdfColumnMapping(resolvedMapping);
-    setPdfSkippedRows(new Set<number>());
-    setPdfSkipRowSpec('');
-    setImportError('');
-    setImportMessage(`PDF構造化データを更新: ${parsed.rows.length}行 / ヘッダー ${parsed.headers.length}列`);
-  };
-
-  const handleApplyPdfSkipRows = () => {
-    if (pdfRawRows.length === 0) {
-      setImportError('スキップ対象のPDF構造化データがありません。先に構造化してください。');
-      return;
-    }
-
-    const parsedSet = parseRowNumberSpec(pdfSkipRowSpec, pdfRawRows.length);
-    setPdfSkippedRows(parsedSet);
-    setImportError('');
-    setImportMessage(`PDF行スキップ設定を更新: ${parsedSet.size}行を除外`);
-  };
-
-  const handleSelectPdfHeaderRow = (rowNumber: number) => {
-    setPdfHeaderRowIndex(rowNumber);
-    setImportMessage(`ヘッダー行を ${rowNumber} 行目に設定しました。設定を適用して構造化を実行してください。`);
-    setImportError('');
-  };
-
-  const handleBuildPreviewFromPdfText = () => {
-    const sourceRows = pdfRawRows.length > 0
-      ? pdfRawRows
-      : buildStructuredRowsFromText(pdfExtractedText, {
-        delimiterMode: pdfDelimiterMode,
-        headerRowIndex: pdfHeaderRowIndex > 0 ? pdfHeaderRowIndex : null,
-      }).rows;
-    if (sourceRows.length === 0) {
-      setImportError('PDF内で構造化行（カンマ/タブ/複数スペース区切り）を検出できませんでした。');
-      return;
-    }
-
-    const rows = buildPdfPreviewRows(sourceRows, pdfColumnMapping, pdfSourceFileName);
-    setPreviewRows(rows);
-    setImportError('');
-    setImportMessage(`PDF抽出テキストからプレビューを生成しました: ${rows.length}行`);
-  };
-
-  const handleRebuildPdfPreviewWithMapping = () => {
-    if (pdfRawRows.length === 0) {
-      setImportError('再プレビュー対象のPDF構造化データがありません。先にPDFを読み込んでください。');
-      return;
-    }
-
-    const rows = buildPdfPreviewRows(pdfRawRows, pdfColumnMapping, pdfSourceFileName);
-    setPreviewRows(rows);
-    setImportError('');
-    setImportMessage(`PDF列マッピングを適用して再プレビューしました: ${rows.length}行`);
   };
 
   const registerAllPreviewRows = () => {
@@ -1036,7 +758,7 @@ export default function AdminClubs() {
           className={`admin-tab ${activeTab === 'import' ? 'active' : ''}`}
           onClick={() => setActiveTab('import')}
         >
-          インポート（CSV / PDF）
+          インポート（CSV）
         </button>
       </div>
 
@@ -1146,25 +868,6 @@ export default function AdminClubs() {
               {csvLoading && <p className="admin-status">CSVを解析中...</p>}
             </div>
 
-            <div className="admin-upload-card">
-              <h2>PDFアップロード</h2>
-              <p>まずはテキスト抽出のみ実装しています。抽出結果は画面表示とコンソール出力を行います。</p>
-              <label className="btn-primary file-label">
-                PDFファイルを選択
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void handlePdfUpload(file);
-                    }
-                    event.currentTarget.value = '';
-                  }}
-                />
-              </label>
-              {pdfLoading && <p className="admin-status">PDFからテキスト抽出中...</p>}
-            </div>
           </div>
 
           {csvHeaders.length > 0 && (
@@ -1216,181 +919,6 @@ export default function AdminClubs() {
           {importMessage && <p className="admin-message success">{importMessage}</p>}
           {(importError || storeError) && <p className="admin-message error">{importError || storeError}</p>}
 
-          {pdfExtractedText && (
-            <div className="admin-pdf-preview">
-              <h3>PDF抽出テキスト（先頭プレビュー）</h3>
-              <div className="admin-pdf-parse-controls">
-                <label>
-                  区切り文字
-                  <select
-                    value={pdfDelimiterMode}
-                    onChange={(event) => setPdfDelimiterMode(event.target.value as PdfDelimiterMode)}
-                  >
-                    <option value="auto">自動</option>
-                    <option value="csv">カンマ(,)</option>
-                    <option value="tsv">タブ</option>
-                    <option value="spaces">複数スペース</option>
-                  </select>
-                </label>
-                <label>
-                  ヘッダー行番号
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={pdfHeaderRowIndex}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      setPdfHeaderRowIndex(Number.isFinite(value) && value >= 0 ? value : 0);
-                    }}
-                  />
-                  <small>0は自動判定。1以上でその行をヘッダーとして使用。</small>
-                </label>
-                <label>
-                  スキップ行番号
-                  <input
-                    type="text"
-                    placeholder="例: 2,4-6"
-                    value={pdfSkipRowSpec}
-                    onChange={(event) => setPdfSkipRowSpec(event.target.value)}
-                  />
-                  <small>構造化後の行番号を指定して除外。</small>
-                </label>
-                <div className="admin-pdf-control-actions">
-                  <button type="button" className="btn-secondary" onClick={handlePreparePdfStructuredRows}>
-                    設定を適用して構造化
-                  </button>
-                  <button type="button" className="btn-secondary" onClick={handleApplyPdfSkipRows}>
-                    スキップ設定を適用
-                  </button>
-                </div>
-              </div>
-              <div className="admin-pdf-actions">
-                <button type="button" className="btn-secondary" onClick={handleBuildPreviewFromPdfText}>
-                  抽出テキストからプレビュー生成
-                </button>
-                <p>区切り形式: CSV, TSV, または複数スペース区切りの行を対象に半自動変換します。</p>
-              </div>
-              <pre>{pdfExtractedText.slice(0, 3000)}</pre>
-            </div>
-          )}
-
-          {pdfTokenizedPreviewLines.length > 0 && (
-            <div className="admin-table-wrap admin-structured-preview">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>行</th>
-                    <th>トークン</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pdfTokenizedPreviewLines.map((tokens, index) => {
-                    const rowNumber = index + 1;
-                    const isSelectedHeader = pdfHeaderRowIndex === rowNumber;
-                    return (
-                      <tr key={`pdf-tokenized-row-${rowNumber}`} className={isSelectedHeader ? 'admin-selected-row' : ''}>
-                        <td>{rowNumber}</td>
-                        <td>{tokens.join(' | ')}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn-edit-mini"
-                            onClick={() => handleSelectPdfHeaderRow(rowNumber)}
-                          >
-                            この行をヘッダー
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {pdfHeaders.length > 0 && (
-            <div className="admin-table-wrap admin-structured-preview">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    {pdfHeaders.map((header) => (
-                      <th key={`pdf-structured-head-${header}`}>{header}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pdfStructuredPreviewRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={pdfHeaders.length + 1} className="admin-empty">構造化済みのPDF行がありません。</td>
-                    </tr>
-                  ) : (
-                    pdfStructuredPreviewRows.map((row, index) => {
-                      const rowNumber = index + 1;
-                      const isSkipped = pdfSkippedRows.has(rowNumber);
-                      return (
-                        <tr key={`pdf-structured-row-${rowNumber}`} className={isSkipped ? 'admin-skipped-row' : ''}>
-                          <td>{rowNumber}</td>
-                          {pdfHeaders.map((header) => (
-                            <td key={`pdf-structured-${rowNumber}-${header}`}>{row[header] || '-'}</td>
-                          ))}
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {pdfHeaders.length > 0 && (
-            <div className="admin-mapping-card">
-              <h3>PDF列マッピング（手動上書き）</h3>
-              <p>PDFから抽出した構造化行に対して、model/type/year などを手動指定して再プレビューできます。</p>
-              {pdfMissingRequiredFields.length > 0 && (
-                <p className="admin-mapping-warning">
-                  必須列の解決候補が不足: {pdfMissingRequiredFields.map((field) => MAPPING_FIELD_LABELS[field]).join(', ')}
-                </p>
-              )}
-              <div className="admin-mapping-grid">
-                {MAPPING_FIELDS.map((field) => (
-                  <label key={`pdf-${field}`}>
-                    {MAPPING_FIELD_LABELS[field]}
-                    <select
-                      value={pdfColumnMapping[field] ?? ''}
-                      onChange={(event) => {
-                        const selectedHeader = event.target.value;
-                        setPdfColumnMapping((prev) => ({
-                          ...prev,
-                          [field]: selectedHeader || undefined,
-                        }));
-                      }}
-                    >
-                      <option value="">自動判定</option>
-                      {pdfHeaders.map((header) => (
-                        <option key={`pdf-${field}-${header}`} value={header}>{header}</option>
-                      ))}
-                    </select>
-                  </label>
-                ))}
-              </div>
-              <div className="admin-mapping-actions">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setPdfColumnMapping(buildMappingForHeaders(pdfHeaders, {}))}
-                >
-                  自動判定に戻す
-                </button>
-                <button type="button" className="btn-secondary" onClick={handleRebuildPdfPreviewWithMapping}>
-                  PDFマッピングで再プレビュー
-                </button>
-              </div>
-            </div>
-          )}
-
           <div className="admin-preview-header">
             <h3>登録予定プレビュー</h3>
             <p>
@@ -1429,7 +957,7 @@ export default function AdminClubs() {
               <tbody>
                 {previewRows.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="admin-empty">CSVまたはPDFを取り込むとプレビューを表示します。</td>
+                    <td colSpan={14} className="admin-empty">CSVを取り込むとプレビューを表示します。</td>
                   </tr>
                 ) : (
                   previewRows.map((row) => (
