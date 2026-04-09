@@ -632,6 +632,7 @@ function App() {
         }}
         onToggleActiveBagMembership={(club) => void handleToggleActiveBagMembership(club)}
         onSwitchToAllClubs={() => setClubListScope('all')}
+        onChangeClubListScope={(scope) => setClubListScope(scope)}
         handleEditClub={handleEditClub}
         handleDeleteClub={handleDeleteClub}
         handleAddClub={handleAddClub}

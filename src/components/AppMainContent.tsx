@@ -51,6 +51,7 @@ export type AppMainContentProps = {
   onShiftSelectedBagLeft: () => void;
   onToggleActiveBagMembership: (club: GolfClub) => void;
   onSwitchToAllClubs: () => void;
+  onChangeClubListScope: (scope: 'bag' | 'all') => void;
   handleEditClub: (club: GolfClub) => void;
   handleDeleteClub: (id: number) => void;
   handleAddClub: () => void;
@@ -111,6 +112,7 @@ export function AppMainContent({
   onShiftSelectedBagLeft,
   onToggleActiveBagMembership,
   onSwitchToAllClubs,
+  onChangeClubListScope,
   handleEditClub,
   handleDeleteClub,
   handleAddClub,
@@ -182,7 +184,7 @@ export function AppMainContent({
             onDeleteActiveBag={onDeleteActiveBag}
             onShiftSelectedBagLeft={onShiftSelectedBagLeft}
             listScope={clubListScope}
-            onChangeListScope={onSwitchToAllClubs}
+            onChangeListScope={onChangeClubListScope}
             compact
           />
 

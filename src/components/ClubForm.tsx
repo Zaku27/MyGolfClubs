@@ -569,8 +569,8 @@ export const ClubForm: React.FC<ClubFormProps> = ({
                   name="lengthAdjustment"
                   value={formData.lengthAdjustment || ''}
                   onChange={handleChange}
-                  step="0.25"
-                  placeholder="例: 0.5"
+                  step="0.01"
+                  placeholder="例: 0.01"
                 />
               </div>
               <span className="length-op">=</span>
@@ -628,8 +628,8 @@ export const ClubForm: React.FC<ClubFormProps> = ({
                   name="lieAdjustment"
                   value={formData.lieAdjustment || ''}
                   onChange={handleChange}
-                  step="0.5"
-                  placeholder="例: 1.0"
+                  step="0.01"
+                  placeholder="例: 0.01"
                 />
               </div>
               <span className="lie-op">=</span>
