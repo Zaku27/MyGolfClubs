@@ -309,7 +309,7 @@ export function PersonalDataInput() {
               to={appLink}
               className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
-              クラブ管理に戻る
+              ホームに戻る
             </Link>
           </div>
         </div>

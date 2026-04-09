@@ -27,7 +27,7 @@ const ANALYSIS_TAB_TITLE: Record<AnalysisTab, string> = {
 const ANALYSIS_TAB_SUBTITLE: Record<AnalysisTab, string> = {
   weightLength: '回帰トレンドからの偏差で、重すぎるクラブと軽すぎるクラブをすぐに判別できます。',
   loftDistance:
-    '各クラブの実測飛距離を確認してください。実測値が分からない場合は、推定飛距離を参考にしてください。',
+    '各クラブの実測飛距離を入力してください。実測値が分からない場合は、推定飛距離を参考にしてください。',
   swingWeight:
     'スイングウェイトのばらつきを可視化し、調整が必要なクラブを特定できます。',
   lieAngle:
@@ -89,7 +89,7 @@ export const AnalysisHeader = ({
         </button>
       )}
       <button className="btn-secondary" onClick={onBack}>
-        クラブ管理に戻る
+        ホームに戻る
       </button>
     </div>
   </div>

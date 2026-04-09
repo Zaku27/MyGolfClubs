@@ -14,7 +14,7 @@ import './AdminClubs.css';
 
 type TabKey = 'catalog' | 'import';
 type SortDirection = 'asc' | 'desc';
-type SortKey = 'brand' | 'model' | 'variant' | 'type' | 'year' | 'loft' | 'length' | 'swingWeight';
+type SortKey = 'brand' | 'model' | 'variant' | 'type' | 'year' | 'loft' | 'length' | 'lie' | 'swingWeight';
 type CanonicalHeader =
   | 'brand'
   | 'model'
@@ -480,6 +480,11 @@ const toComparable = (spec: CatalogSpec, key: SortKey): string | number => {
       return spec.loft ?? Number.NEGATIVE_INFINITY;
     case 'length':
       return spec.length ?? Number.NEGATIVE_INFINITY;
+    case 'lie':
+      if (typeof spec.lie === 'number') {
+        return spec.lie;
+      }
+      return spec.lie ? normalizedString(spec.lie) : '';
     case 'brand':
       return normalizedString(spec.brand);
     case 'model':
@@ -805,6 +810,7 @@ export default function AdminClubs() {
                   <th><button type="button" onClick={() => toggleSort('year')}>Year</button></th>
                   <th><button type="button" onClick={() => toggleSort('loft')}>Loft</button></th>
                   <th><button type="button" onClick={() => toggleSort('length')}>Length</button></th>
+                  <th><button type="button" onClick={() => toggleSort('lie')}>Lie</button></th>
                   <th><button type="button" onClick={() => toggleSort('swingWeight')}>SW</button></th>
                   <th>編集</th>
                 </tr>
@@ -812,7 +818,7 @@ export default function AdminClubs() {
               <tbody>
                 {sortedSpecs.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="admin-empty">条件に一致するCatalog Specがありません。</td>
+                    <td colSpan={10} className="admin-empty">条件に一致するCatalog Specがありません。</td>
                   </tr>
                 ) : (
                   sortedSpecs.map((spec) => (
@@ -824,6 +830,7 @@ export default function AdminClubs() {
                       <td>{spec.year}</td>
                       <td>{spec.loft ?? '-'}</td>
                       <td>{spec.length ?? '-'}</td>
+                      <td>{spec.lie ?? '-'}</td>
                       <td>{spec.swingWeight ?? '-'}</td>
                       <td>
                         <button

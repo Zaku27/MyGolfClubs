@@ -473,7 +473,7 @@ export function CustomCourseEditorScreen() {
               to="/"
               className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-white px-5 py-3 text-sm font-semibold text-emerald-900 shadow-sm shadow-emerald-200 transition hover:bg-emerald-50"
             >
-              クラブ管理に戻る
+              ホームに戻る
             </Link>
           </div>
         </div>

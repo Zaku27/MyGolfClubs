@@ -271,7 +271,7 @@ export function Scorecard({ onPlayAgain, onBack }: Props) {
           onClick={onBack}
           className="w-full py-2.5 bg-transparent border border-emerald-400 text-emerald-700 hover:text-white hover:bg-emerald-700 hover:border-emerald-700 rounded-xl transition-colors text-sm"
         >
-          クラブ管理に戻る
+          ホームに戻る
         </button>
       </div>
     </div>

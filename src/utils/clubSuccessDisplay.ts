@@ -24,7 +24,7 @@ const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
 const WEAK_CLUB_THRESHOLD = 65;
 
 /** 分析ペナルティポイントに掛ける倍率。ここを変えると全箇所に反映される */
-export const ANALYSIS_PENALTY_MULTIPLIER = 2;
+export const ANALYSIS_PENALTY_MULTIPLIER = 1.5;
 
 function parseUserLieAngleStandards(value: unknown): UserLieAngleStandards {
   if (!value || typeof value !== 'object') {

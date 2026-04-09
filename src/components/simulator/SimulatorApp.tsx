@@ -206,7 +206,7 @@ function SetupScreen({
         onClick={onBack}
         className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
       >
-        ← クラブ管理に戻る
+        ← ホームに戻る
       </button>
       <Link
         to={`/range${bagQuery}`}
