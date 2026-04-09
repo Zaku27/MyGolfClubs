@@ -293,6 +293,49 @@
   font-size: 12px;
 }
 
+.admin-pdf-parse-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: end;
+}
+
+.admin-pdf-control-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-pdf-control-actions .btn-secondary {
+  width: 100%;
+}
+
+.admin-selected-row {
+  background: #ecf8f1;
+}
+
+.admin-skipped-row {
+  opacity: 0.52;
+  background: #f9f4f4;
+}
+
+.admin-pdf-parse-controls label {
+  display: grid;
+  gap: 6px;
+  color: #2d4f40;
+  font-size: 13px;
+}
+
+.admin-pdf-parse-controls small {
+  color: #5f756a;
+  font-size: 11px;
+}
+
+.admin-structured-preview {
+  margin-bottom: 14px;
+}
+
 .admin-pdf-preview pre {
   white-space: pre-wrap;
   background: #f3faf5;
@@ -414,6 +457,20 @@
     grid-template-columns: repeat(3, minmax(150px, 1fr));
   }
 
+  .admin-pdf-parse-controls {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+
+  .admin-pdf-control-actions {
+    grid-column: span 2;
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .admin-pdf-control-actions .btn-secondary {
+    width: auto;
+  }
+
   .admin-clear-all {
     position: static;
     text-align: right;
@@ -437,5 +494,18 @@
 
   .admin-mapping-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-pdf-parse-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-pdf-control-actions {
+    grid-column: auto;
+    flex-direction: column;
+  }
+
+  .admin-pdf-control-actions .btn-secondary {
+    width: 100%;
   }
 }

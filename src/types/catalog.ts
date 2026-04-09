@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const CATALOG_CLUB_TYPES = [
   'driver',
+  'wood',
   'fairway',
   'hybrid',
   'iron',
