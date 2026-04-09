@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Papa from 'papaparse';
 import type { ParseError, ParseResult } from 'papaparse';
 import { Link } from 'react-router-dom';
@@ -28,6 +28,7 @@ type CanonicalHeader =
   | 'volume'
   | 'hand'
   | 'source';
+type CsvColumnMapping = Partial<Record<CanonicalHeader, string>>;
 
 type CsvRow = Record<string, string>;
 
@@ -44,10 +45,20 @@ type PdfLineCandidate = {
   reason?: string;
 };
 
+type StructuredTextParseResult = {
+  headers: string[];
+  rows: CsvRow[];
+  usedHeaderRow: boolean;
+};
+
 const defaultSortState: { key: SortKey; direction: SortDirection } = {
   key: 'year',
   direction: 'desc',
 };
+
+const CSV_MAPPING_STORAGE_KEY = 'mygolfbag-admin-csv-mapping-v1';
+const PDF_MAPPING_STORAGE_KEY = 'mygolfbag-admin-pdf-mapping-v1';
+const REQUIRED_MAPPING_FIELDS: CanonicalHeader[] = ['model', 'type', 'year'];
 
 const HEADER_ALIASES: Record<CanonicalHeader, string[]> = {
   brand: ['brand', 'maker', 'manufacturer', 'ブランド', 'メーカー', 'ブランド名', 'メーカ名'],
@@ -62,6 +73,34 @@ const HEADER_ALIASES: Record<CanonicalHeader, string[]> = {
   volume: ['volume', 'cc', 'headvolume', '容積', '体積', 'ヘッド容積', 'ヘッド体積'],
   hand: ['hand', 'dexterity', '利き手', 'ハンド', '左右'],
   source: ['source', 'ref', 'reference', '出典', '参照元', 'ソース'],
+};
+
+const MAPPING_FIELDS: CanonicalHeader[] = [
+  'brand',
+  'model',
+  'variant',
+  'type',
+  'year',
+  'loft',
+  'length',
+  'swingWeight',
+  'hand',
+  'source',
+];
+
+const MAPPING_FIELD_LABELS: Record<CanonicalHeader, string> = {
+  brand: 'ブランド',
+  model: 'モデル',
+  variant: 'バリアント',
+  type: 'タイプ',
+  year: '年',
+  loft: 'ロフト',
+  length: '長さ',
+  lie: 'ライ角',
+  swingWeight: 'SW',
+  volume: '容積(cc)',
+  hand: '利き手',
+  source: '出典',
 };
 
 const sortSign = (direction: SortDirection): 1 | -1 => (direction === 'asc' ? 1 : -1);
@@ -188,6 +227,74 @@ const buildCsvLookup = (row: CsvRow): Record<string, string> => {
   return lookup;
 };
 
+const guessColumnMapping = (headers: string[]): CsvColumnMapping => {
+  const mapping: CsvColumnMapping = {};
+  for (const canonical of Object.keys(HEADER_ALIASES) as CanonicalHeader[]) {
+    const aliases = HEADER_ALIASES[canonical];
+    for (const header of headers) {
+      const normalizedHeader = normalizeHeaderKey(header);
+      const matched = aliases.some((alias) => normalizeHeaderKey(alias) === normalizedHeader);
+      if (matched) {
+        mapping[canonical] = header;
+        break;
+      }
+    }
+  }
+  return mapping;
+};
+
+const parseStoredMapping = (value: unknown): CsvColumnMapping => {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const result: CsvColumnMapping = {};
+  for (const key of Object.keys(value)) {
+    if (!(key in HEADER_ALIASES)) {
+      continue;
+    }
+    const mapped = (value as Record<string, unknown>)[key];
+    if (typeof mapped === 'string' && mapped.trim()) {
+      result[key as CanonicalHeader] = mapped;
+    }
+  }
+  return result;
+};
+
+const buildMappingForHeaders = (
+  headers: string[],
+  preferredMapping: CsvColumnMapping,
+): CsvColumnMapping => {
+  const guessed = guessColumnMapping(headers);
+  const nextMapping: CsvColumnMapping = { ...guessed };
+  for (const [canonical, mappedHeader] of Object.entries(preferredMapping)) {
+    if (!mappedHeader) {
+      continue;
+    }
+    if (headers.includes(mappedHeader)) {
+      nextMapping[canonical as CanonicalHeader] = mappedHeader;
+    }
+  }
+  return nextMapping;
+};
+
+const hasResolvableHeader = (
+  headers: string[],
+  canonical: CanonicalHeader,
+  mapping: CsvColumnMapping,
+): boolean => {
+  const mappedHeader = mapping[canonical];
+  if (mappedHeader && headers.includes(mappedHeader)) {
+    return true;
+  }
+
+  const aliases = HEADER_ALIASES[canonical];
+  return headers.some((header) => {
+    const normalizedHeader = normalizeHeaderKey(header);
+    return aliases.some((alias) => normalizeHeaderKey(alias) === normalizedHeader);
+  });
+};
+
 const pickCell = (lookup: Record<string, string>, canonicalHeader: CanonicalHeader): string => {
   const aliases = HEADER_ALIASES[canonicalHeader];
   for (const alias of aliases) {
@@ -200,27 +307,43 @@ const pickCell = (lookup: Record<string, string>, canonicalHeader: CanonicalHead
   return '';
 };
 
-const parseCsvRowToCatalogSpec = (row: CsvRow): CatalogSpec | null => {
+const pickCellFromRow = (
+  row: CsvRow,
+  canonicalHeader: CanonicalHeader,
+  mapping?: CsvColumnMapping,
+): string => {
+  const mappedHeader = mapping?.[canonicalHeader];
+  if (mappedHeader) {
+    const mappedValue = String(row[mappedHeader] ?? '').trim();
+    if (mappedValue) {
+      return mappedValue;
+    }
+  }
+
   const lookup = buildCsvLookup(row);
-  const normalizedType = normalizeTypeValue(pickCell(lookup, 'type'));
+  return pickCell(lookup, canonicalHeader);
+};
+
+const parseCsvRowToCatalogSpec = (row: CsvRow, mapping?: CsvColumnMapping): CatalogSpec | null => {
+  const normalizedType = normalizeTypeValue(pickCellFromRow(row, 'type', mapping));
   if (!normalizedType || !isTypeValue(normalizedType)) {
     return null;
   }
 
   const candidate = {
     id: crypto.randomUUID(),
-    brand: pickCell(lookup, 'brand') || 'TaylorMade',
-    model: pickCell(lookup, 'model'),
-    variant: pickCell(lookup, 'variant') || undefined,
+    brand: pickCellFromRow(row, 'brand', mapping) || 'TaylorMade',
+    model: pickCellFromRow(row, 'model', mapping),
+    variant: pickCellFromRow(row, 'variant', mapping) || undefined,
     type: normalizedType,
-    year: toYearNumber(pickCell(lookup, 'year')),
-    loft: toNullableNumber(pickCell(lookup, 'loft')),
-    length: toNullableNumber(pickCell(lookup, 'length')),
-    lie: pickCell(lookup, 'lie') || undefined,
-    swingWeight: pickCell(lookup, 'swingWeight') || undefined,
-    volume: toOptionalNumber(pickCell(lookup, 'volume')),
-    hand: normalizeHandValue(pickCell(lookup, 'hand')),
-    source: pickCell(lookup, 'source') || 'CSV Import',
+    year: toYearNumber(pickCellFromRow(row, 'year', mapping)),
+    loft: toNullableNumber(pickCellFromRow(row, 'loft', mapping)),
+    length: toNullableNumber(pickCellFromRow(row, 'length', mapping)),
+    lie: pickCellFromRow(row, 'lie', mapping) || undefined,
+    swingWeight: pickCellFromRow(row, 'swingWeight', mapping) || undefined,
+    volume: toOptionalNumber(pickCellFromRow(row, 'volume', mapping)),
+    hand: normalizeHandValue(pickCellFromRow(row, 'hand', mapping)),
+    source: pickCellFromRow(row, 'source', mapping) || 'CSV Import',
     importedAt: new Date().toISOString(),
   };
 
@@ -228,7 +351,7 @@ const parseCsvRowToCatalogSpec = (row: CsvRow): CatalogSpec | null => {
   return parsed.success ? parsed.data : null;
 };
 
-const parsePdfLineToCatalogSpec = (line: string): CatalogSpec | null => {
+const splitStructuredLine = (line: string): string[] | null => {
   const cleanedLine = line.replace(/^\[page\s+\d+\]\s*/i, '').trim();
   if (!cleanedLine) {
     return null;
@@ -248,39 +371,56 @@ const parsePdfLineToCatalogSpec = (line: string): CatalogSpec | null => {
     .map((token) => token.trim())
     .filter(Boolean);
 
-  if (tokens.length < 5) {
-    return null;
+  return tokens.length > 0 ? tokens : null;
+};
+
+const looksLikeHeader = (token: string): boolean => {
+  const normalized = normalizeHeaderKey(token);
+  const hasAliasMatch = (Object.keys(HEADER_ALIASES) as CanonicalHeader[]).some((canonical) => {
+    return HEADER_ALIASES[canonical].some((alias) => normalizeHeaderKey(alias) === normalized);
+  });
+  if (hasAliasMatch) {
+    return true;
   }
 
-  const tryBuild = (withBrand: boolean): CatalogSpec | null => {
-    const base = withBrand ? 0 : -1;
-    const normalizedType = normalizeTypeValue(tokens[base + 3] ?? '');
-    if (!normalizedType || !isTypeValue(normalizedType)) {
-      return null;
-    }
+  return /[a-zA-Z\u3040-\u30ff\u4e00-\u9faf]/.test(token) && !/\d/.test(token);
+};
 
-    const candidate = {
-      id: crypto.randomUUID(),
-      brand: withBrand ? tokens[0] : 'TaylorMade',
-      model: tokens[base + 1] ?? '',
-      variant: tokens[base + 2] || undefined,
-      type: normalizedType,
-      year: toYearNumber(tokens[base + 4]),
-      loft: toNullableNumber(tokens[base + 5]),
-      length: toNullableNumber(tokens[base + 6]),
-      lie: tokens[base + 7] || undefined,
-      swingWeight: tokens[base + 8] || undefined,
-      volume: toOptionalNumber(tokens[base + 9]),
-      hand: normalizeHandValue(tokens[base + 10]),
-      source: tokens[base + 11] || 'PDF Import',
-      importedAt: new Date().toISOString(),
-    };
+const buildStructuredRowsFromText = (text: string): StructuredTextParseResult => {
+  const tokenizedLines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => splitStructuredLine(line))
+    .filter((tokens): tokens is string[] => tokens != null);
 
-    const parsed = catalogSpecSchema.safeParse(candidate);
-    return parsed.success ? parsed.data : null;
+  if (tokenizedLines.length === 0) {
+    return { headers: [], rows: [], usedHeaderRow: false };
+  }
+
+  const maxColumns = Math.max(...tokenizedLines.map((tokens) => tokens.length));
+  const firstLine = tokenizedLines[0];
+  const headerLikeCount = firstLine.filter((token) => looksLikeHeader(token)).length;
+  const useFirstLineAsHeader = headerLikeCount >= Math.max(2, Math.floor(firstLine.length / 2));
+
+  const headers = useFirstLineAsHeader
+    ? Array.from({ length: maxColumns }, (_, index) => firstLine[index] ?? `column_${index + 1}`)
+    : Array.from({ length: maxColumns }, (_, index) => `column_${index + 1}`);
+
+  const dataLines = useFirstLineAsHeader ? tokenizedLines.slice(1) : tokenizedLines;
+  const rows: CsvRow[] = dataLines.map((tokens) => {
+    const row: CsvRow = {};
+    headers.forEach((header, index) => {
+      row[header] = tokens[index] ?? '';
+    });
+    return row;
+  });
+
+  return {
+    headers,
+    rows,
+    usedHeaderRow: useFirstLineAsHeader,
   };
-
-  return tryBuild(true) ?? tryBuild(false);
 };
 
 const buildPreviewRows = (
@@ -358,11 +498,41 @@ export default function AdminClubs() {
   const [editingSpec, setEditingSpec] = useState<CatalogSpec | null>(null);
 
   const [previewRows, setPreviewRows] = useState<ImportPreviewRow[]>([]);
+  const [csvRawRows, setCsvRawRows] = useState<CsvRow[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvColumnMapping, setCsvColumnMapping] = useState<CsvColumnMapping>({});
+  const [pdfRawRows, setPdfRawRows] = useState<CsvRow[]>([]);
+  const [pdfHeaders, setPdfHeaders] = useState<string[]>([]);
+  const [pdfColumnMapping, setPdfColumnMapping] = useState<CsvColumnMapping>({});
   const [importMessage, setImportMessage] = useState<string>('');
   const [importError, setImportError] = useState<string>('');
   const [csvLoading, setCsvLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfExtractedText, setPdfExtractedText] = useState('');
+
+  useEffect(() => {
+    try {
+      const rawCsvMapping = localStorage.getItem(CSV_MAPPING_STORAGE_KEY);
+      if (rawCsvMapping) {
+        setCsvColumnMapping(parseStoredMapping(JSON.parse(rawCsvMapping)));
+      }
+
+      const rawPdfMapping = localStorage.getItem(PDF_MAPPING_STORAGE_KEY);
+      if (rawPdfMapping) {
+        setPdfColumnMapping(parseStoredMapping(JSON.parse(rawPdfMapping)));
+      }
+    } catch {
+      // Ignore localStorage parse issues and keep defaults.
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(CSV_MAPPING_STORAGE_KEY, JSON.stringify(csvColumnMapping));
+  }, [csvColumnMapping]);
+
+  useEffect(() => {
+    localStorage.setItem(PDF_MAPPING_STORAGE_KEY, JSON.stringify(pdfColumnMapping));
+  }, [pdfColumnMapping]);
 
   const existingKeys = useMemo(() => new Set(specs.map(buildCatalogSpecKey)), [specs]);
 
@@ -414,6 +584,20 @@ export default function AdminClubs() {
     return { ready, duplicate, invalid };
   }, [previewRows]);
 
+  const csvMissingRequiredFields = useMemo(() => {
+    if (csvHeaders.length === 0) {
+      return [] as CanonicalHeader[];
+    }
+    return REQUIRED_MAPPING_FIELDS.filter((field) => !hasResolvableHeader(csvHeaders, field, csvColumnMapping));
+  }, [csvHeaders, csvColumnMapping]);
+
+  const pdfMissingRequiredFields = useMemo(() => {
+    if (pdfHeaders.length === 0) {
+      return [] as CanonicalHeader[];
+    }
+    return REQUIRED_MAPPING_FIELDS.filter((field) => !hasResolvableHeader(pdfHeaders, field, pdfColumnMapping));
+  }, [pdfHeaders, pdfColumnMapping]);
+
   const toggleSort = (key: SortKey) => {
     setSortState((prev) => {
       if (prev.key === key) {
@@ -429,6 +613,28 @@ export default function AdminClubs() {
     });
   };
 
+  const buildCsvPreviewRows = (rows: CsvRow[], mapping: CsvColumnMapping): ImportPreviewRow[] => {
+    const candidates: PdfLineCandidate[] = rows.map((row, index) => {
+      return {
+        rowId: `csv-${index + 1}`,
+        spec: parseCsvRowToCatalogSpec(row, mapping),
+        reason: '必須項目または型が不正です（model/type/year など）',
+      };
+    });
+    return buildPreviewRows(candidates, existingKeys);
+  };
+
+  const buildPdfPreviewRows = (rows: CsvRow[], mapping: CsvColumnMapping): ImportPreviewRow[] => {
+    const candidates: PdfLineCandidate[] = rows.map((row, index) => {
+      return {
+        rowId: `pdf-${index + 1}`,
+        spec: parseCsvRowToCatalogSpec(row, mapping),
+        reason: 'PDF行をCatalogSpec形式に変換できませんでした',
+      };
+    });
+    return buildPreviewRows(candidates, existingKeys);
+  };
+
   const handleCsvUpload = (file: File) => {
     setCsvLoading(true);
     setImportError('');
@@ -439,15 +645,13 @@ export default function AdminClubs() {
       skipEmptyLines: true,
       complete: (results: ParseResult<CsvRow>) => {
         try {
-          const candidates: PdfLineCandidate[] = results.data.map((row, index) => {
-            return {
-              rowId: `csv-${index + 1}`,
-              spec: parseCsvRowToCatalogSpec(row),
-              reason: '必須項目または型が不正です（model/type/year など）',
-            };
-          });
-          const rows = buildPreviewRows(candidates, existingKeys);
+          const headers = results.meta.fields ?? Object.keys(results.data[0] ?? {});
+          const resolvedMapping = buildMappingForHeaders(headers, csvColumnMapping);
+          const rows = buildCsvPreviewRows(results.data, resolvedMapping);
 
+          setCsvRawRows(results.data);
+          setCsvHeaders(headers);
+          setCsvColumnMapping(resolvedMapping);
           setPreviewRows(rows);
           setImportMessage(`CSVを解析しました: ${rows.length}行`);
         } catch (error) {
@@ -461,6 +665,18 @@ export default function AdminClubs() {
         setCsvLoading(false);
       },
     });
+  };
+
+  const handleRebuildPreviewWithMapping = () => {
+    if (csvRawRows.length === 0) {
+      setImportError('再プレビュー対象のCSVデータがありません。先にCSVを読み込んでください。');
+      return;
+    }
+
+    const rows = buildCsvPreviewRows(csvRawRows, csvColumnMapping);
+    setPreviewRows(rows);
+    setImportError('');
+    setImportMessage(`列マッピングを適用して再プレビューしました: ${rows.length}行`);
   };
 
   const handlePdfUpload = async (file: File) => {
@@ -489,7 +705,14 @@ export default function AdminClubs() {
 
       const extracted = textChunks.join('\n');
       setPdfExtractedText(extracted);
-      setImportMessage(`PDFテキスト抽出完了: ${pdf.numPages}ページ`);
+      const parsed = buildStructuredRowsFromText(extracted);
+      const resolvedMapping = buildMappingForHeaders(parsed.headers, pdfColumnMapping);
+      setPdfRawRows(parsed.rows);
+      setPdfHeaders(parsed.headers);
+      setPdfColumnMapping(resolvedMapping);
+      setImportMessage(
+        `PDFテキスト抽出完了: ${pdf.numPages}ページ / 構造化行 ${parsed.rows.length}件${parsed.usedHeaderRow ? '（ヘッダー行あり）' : ''}`,
+      );
       console.log('[Catalog PDF Extracted Text]', extracted);
     } catch (error) {
       setImportError(`PDF解析に失敗しました: ${(error as Error).message}`);
@@ -499,38 +722,28 @@ export default function AdminClubs() {
   };
 
   const handleBuildPreviewFromPdfText = () => {
-    if (!pdfExtractedText.trim()) {
-      setImportError('PDF抽出テキストが空です。先にPDFをアップロードしてください。');
-      return;
-    }
-
-    const candidates: PdfLineCandidate[] = pdfExtractedText
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line, index) => {
-        const hasDelimiter = line.includes(',') || line.includes('\t') || /\s{2,}/.test(line);
-        if (!hasDelimiter) {
-          return null;
-        }
-
-        return {
-          rowId: `pdf-${index + 1}`,
-          spec: parsePdfLineToCatalogSpec(line),
-          reason: 'PDF行をCatalogSpec形式に変換できませんでした',
-        } satisfies PdfLineCandidate;
-      })
-      .filter((candidate): candidate is PdfLineCandidate => candidate != null);
-
-    if (candidates.length === 0) {
+    const sourceRows = pdfRawRows.length > 0 ? pdfRawRows : buildStructuredRowsFromText(pdfExtractedText).rows;
+    if (sourceRows.length === 0) {
       setImportError('PDF内で構造化行（カンマ/タブ/複数スペース区切り）を検出できませんでした。');
       return;
     }
 
-    const rows = buildPreviewRows(candidates, existingKeys);
+    const rows = buildPdfPreviewRows(sourceRows, pdfColumnMapping);
     setPreviewRows(rows);
     setImportError('');
     setImportMessage(`PDF抽出テキストからプレビューを生成しました: ${rows.length}行`);
+  };
+
+  const handleRebuildPdfPreviewWithMapping = () => {
+    if (pdfRawRows.length === 0) {
+      setImportError('再プレビュー対象のPDF構造化データがありません。先にPDFを読み込んでください。');
+      return;
+    }
+
+    const rows = buildPdfPreviewRows(pdfRawRows, pdfColumnMapping);
+    setPreviewRows(rows);
+    setImportError('');
+    setImportMessage(`PDF列マッピングを適用して再プレビューしました: ${rows.length}行`);
   };
 
   const registerAllPreviewRows = () => {
@@ -746,6 +959,52 @@ export default function AdminClubs() {
             </div>
           </div>
 
+          {csvHeaders.length > 0 && (
+            <div className="admin-mapping-card">
+              <h3>CSV列マッピング（手動上書き）</h3>
+              <p>自動判定が外れる場合、model/type/year などを手動指定して再プレビューできます。</p>
+              {csvMissingRequiredFields.length > 0 && (
+                <p className="admin-mapping-warning">
+                  必須列の解決候補が不足: {csvMissingRequiredFields.map((field) => MAPPING_FIELD_LABELS[field]).join(', ')}
+                </p>
+              )}
+              <div className="admin-mapping-grid">
+                {MAPPING_FIELDS.map((field) => (
+                  <label key={field}>
+                    {MAPPING_FIELD_LABELS[field]}
+                    <select
+                      value={csvColumnMapping[field] ?? ''}
+                      onChange={(event) => {
+                        const selectedHeader = event.target.value;
+                        setCsvColumnMapping((prev) => ({
+                          ...prev,
+                          [field]: selectedHeader || undefined,
+                        }));
+                      }}
+                    >
+                      <option value="">自動判定</option>
+                      {csvHeaders.map((header) => (
+                        <option key={`${field}-${header}`} value={header}>{header}</option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+              <div className="admin-mapping-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setCsvColumnMapping(buildMappingForHeaders(csvHeaders, {}))}
+                >
+                  自動判定に戻す
+                </button>
+                <button type="button" className="btn-secondary" onClick={handleRebuildPreviewWithMapping}>
+                  マッピングで再プレビュー
+                </button>
+              </div>
+            </div>
+          )}
+
           {importMessage && <p className="admin-message success">{importMessage}</p>}
           {(importError || storeError) && <p className="admin-message error">{importError || storeError}</p>}
 
@@ -759,6 +1018,52 @@ export default function AdminClubs() {
                 <p>区切り形式: CSV, TSV, または複数スペース区切りの行を対象に半自動変換します。</p>
               </div>
               <pre>{pdfExtractedText.slice(0, 3000)}</pre>
+            </div>
+          )}
+
+          {pdfHeaders.length > 0 && (
+            <div className="admin-mapping-card">
+              <h3>PDF列マッピング（手動上書き）</h3>
+              <p>PDFから抽出した構造化行に対して、model/type/year などを手動指定して再プレビューできます。</p>
+              {pdfMissingRequiredFields.length > 0 && (
+                <p className="admin-mapping-warning">
+                  必須列の解決候補が不足: {pdfMissingRequiredFields.map((field) => MAPPING_FIELD_LABELS[field]).join(', ')}
+                </p>
+              )}
+              <div className="admin-mapping-grid">
+                {MAPPING_FIELDS.map((field) => (
+                  <label key={`pdf-${field}`}>
+                    {MAPPING_FIELD_LABELS[field]}
+                    <select
+                      value={pdfColumnMapping[field] ?? ''}
+                      onChange={(event) => {
+                        const selectedHeader = event.target.value;
+                        setPdfColumnMapping((prev) => ({
+                          ...prev,
+                          [field]: selectedHeader || undefined,
+                        }));
+                      }}
+                    >
+                      <option value="">自動判定</option>
+                      {pdfHeaders.map((header) => (
+                        <option key={`pdf-${field}-${header}`} value={header}>{header}</option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+              <div className="admin-mapping-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setPdfColumnMapping(buildMappingForHeaders(pdfHeaders, {}))}
+                >
+                  自動判定に戻す
+                </button>
+                <button type="button" className="btn-secondary" onClick={handleRebuildPdfPreviewWithMapping}>
+                  PDFマッピングで再プレビュー
+                </button>
+              </div>
             </div>
           )}
 
@@ -796,7 +1101,7 @@ export default function AdminClubs() {
               <tbody>
                 {previewRows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="admin-empty">CSVアップロード後にプレビューを表示します。</td>
+                    <td colSpan={10} className="admin-empty">CSVまたはPDFを取り込むとプレビューを表示します。</td>
                   </tr>
                 ) : (
                   previewRows.map((row) => (
