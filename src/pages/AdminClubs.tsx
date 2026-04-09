@@ -325,6 +325,19 @@ const buildMappingForHeaders = (
   return nextMapping;
 };
 
+const decodeCsvFileText = async (file: File): Promise<string> => {
+  const buffer = await file.arrayBuffer();
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    try {
+      return new TextDecoder('shift_jis').decode(buffer);
+    } catch {
+      return new TextDecoder('utf-8').decode(buffer);
+    }
+  }
+};
+
 const hasResolvableHeader = (
   headers: string[],
   canonical: CanonicalHeader,
@@ -371,7 +384,11 @@ const pickCellFromRow = (
   return pickCell(lookup, canonicalHeader);
 };
 
-const parseCsvRowToCatalogSpec = (row: CsvRow, mapping?: CsvColumnMapping): CatalogSpecParseResult => {
+const parseCsvRowToCatalogSpec = (
+  row: CsvRow,
+  mapping?: CsvColumnMapping,
+  sourceHint?: string,
+): CatalogSpecParseResult => {
   const rawModel = pickCellFromRow(row, 'model', mapping);
   if (!rawModel) {
     return { spec: null, reason: 'モデル(model)列が見つかりません' };
@@ -390,11 +407,14 @@ const parseCsvRowToCatalogSpec = (row: CsvRow, mapping?: CsvColumnMapping): Cata
     return { spec: null, reason: `年(year)列の値が不正です: "${rawYear}"` };
   }
 
+  const rawVariant = pickCellFromRow(row, 'variant', mapping);
+  const variant = isDriverModel ? '1' : rawVariant || undefined;
+
   const candidate = {
     id: crypto.randomUUID(),
     brand: pickCellFromRow(row, 'brand', mapping) || 'TaylorMade',
     model: rawModel,
-    variant: pickCellFromRow(row, 'variant', mapping) || undefined,
+    variant,
     type: normalizedType,
     year,
     loft: toNullableNumber(pickCellFromRow(row, 'loft', mapping)),
@@ -403,7 +423,7 @@ const parseCsvRowToCatalogSpec = (row: CsvRow, mapping?: CsvColumnMapping): Cata
     swingWeight: pickCellFromRow(row, 'swingWeight', mapping) || undefined,
     volume: toOptionalNumber(pickCellFromRow(row, 'volume', mapping)),
     hand: normalizeHandValue(pickCellFromRow(row, 'hand', mapping)),
-    source: pickCellFromRow(row, 'source', mapping) || 'CSV Import',
+    source: sourceHint || 'CSV Import',
     importedAt: new Date().toISOString(),
   };
 
@@ -598,9 +618,11 @@ export default function AdminClubs() {
   const [csvRawRows, setCsvRawRows] = useState<CsvRow[]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvColumnMapping, setCsvColumnMapping] = useState<CsvColumnMapping>({});
+  const [csvSourceFileName, setCsvSourceFileName] = useState<string | undefined>(undefined);
   const [pdfRawRows, setPdfRawRows] = useState<CsvRow[]>([]);
   const [pdfHeaders, setPdfHeaders] = useState<string[]>([]);
   const [pdfColumnMapping, setPdfColumnMapping] = useState<CsvColumnMapping>({});
+  const [pdfSourceFileName, setPdfSourceFileName] = useState<string | undefined>(undefined);
   const [pdfDelimiterMode, setPdfDelimiterMode] = useState<PdfDelimiterMode>('auto');
   const [pdfHeaderRowIndex, setPdfHeaderRowIndex] = useState<number>(0);
   const [pdfSkipRowSpec, setPdfSkipRowSpec] = useState('');
@@ -723,9 +745,13 @@ export default function AdminClubs() {
     });
   };
 
-  const buildCsvPreviewRows = (rows: CsvRow[], mapping: CsvColumnMapping): ImportPreviewRow[] => {
+  const buildCsvPreviewRows = (
+    rows: CsvRow[],
+    mapping: CsvColumnMapping,
+    sourceHint?: string,
+  ): ImportPreviewRow[] => {
     const candidates: PdfLineCandidate[] = rows.map((row, index) => {
-      const parsed = parseCsvRowToCatalogSpec(row, mapping);
+      const parsed = parseCsvRowToCatalogSpec(row, mapping, sourceHint);
       return {
         rowId: `csv-${index + 1}`,
         spec: parsed.spec,
@@ -735,10 +761,14 @@ export default function AdminClubs() {
     return buildPreviewRows(candidates, existingKeys);
   };
 
-  const buildPdfPreviewRows = (rows: CsvRow[], mapping: CsvColumnMapping): ImportPreviewRow[] => {
+  const buildPdfPreviewRows = (
+    rows: CsvRow[],
+    mapping: CsvColumnMapping,
+    sourceHint?: string,
+  ): ImportPreviewRow[] => {
     const filteredRows = rows.filter((_, index) => !pdfSkippedRows.has(index + 1));
     const candidates: PdfLineCandidate[] = filteredRows.map((row, index) => {
-      const parsed = parseCsvRowToCatalogSpec(row, mapping);
+      const parsed = parseCsvRowToCatalogSpec(row, mapping, sourceHint);
       return {
         rowId: `pdf-${index + 1}`,
         spec: parsed.spec,
@@ -748,36 +778,43 @@ export default function AdminClubs() {
     return buildPreviewRows(candidates, existingKeys);
   };
 
-  const handleCsvUpload = (file: File) => {
+  const handleCsvUpload = async (file: File) => {
     setCsvLoading(true);
     setImportError('');
     setImportMessage('');
 
-    Papa.parse<CsvRow>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results: ParseResult<CsvRow>) => {
-        try {
-          const headers = results.meta.fields ?? Object.keys(results.data[0] ?? {});
-          const resolvedMapping = buildMappingForHeaders(headers, csvColumnMapping);
-          const rows = buildCsvPreviewRows(results.data, resolvedMapping);
+    try {
+      const text = await decodeCsvFileText(file);
+      Papa.parse<CsvRow>(text, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results: ParseResult<CsvRow>) => {
+          try {
+            const headers = results.meta.fields ?? Object.keys(results.data[0] ?? {});
+            const resolvedMapping = buildMappingForHeaders(headers, csvColumnMapping);
+            const rows = buildCsvPreviewRows(results.data, resolvedMapping, file.name);
 
-          setCsvRawRows(results.data);
-          setCsvHeaders(headers);
-          setCsvColumnMapping(resolvedMapping);
-          setPreviewRows(rows);
-          setImportMessage(`CSVを解析しました: ${rows.length}行`);
-        } catch (error) {
-          setImportError(`CSV解析でエラーが発生しました: ${(error as Error).message}`);
-        } finally {
+            setCsvRawRows(results.data);
+            setCsvHeaders(headers);
+            setCsvColumnMapping(resolvedMapping);
+            setCsvSourceFileName(file.name);
+            setPreviewRows(rows);
+            setImportMessage(`CSVを解析しました: ${rows.length}行`);
+          } catch (error) {
+            setImportError(`CSV解析でエラーが発生しました: ${(error as Error).message}`);
+          } finally {
+            setCsvLoading(false);
+          }
+        },
+        error: (error: ParseError) => {
+          setImportError(`CSVアップロードに失敗しました: ${error.message}`);
           setCsvLoading(false);
-        }
-      },
-      error: (error: ParseError) => {
-        setImportError(`CSVアップロードに失敗しました: ${error.message}`);
-        setCsvLoading(false);
-      },
-    });
+        },
+      });
+    } catch (error) {
+      setImportError(`CSVの読み込みに失敗しました: ${(error as Error).message}`);
+      setCsvLoading(false);
+    }
   };
 
   const handleRebuildPreviewWithMapping = () => {
@@ -786,7 +823,7 @@ export default function AdminClubs() {
       return;
     }
 
-    const rows = buildCsvPreviewRows(csvRawRows, csvColumnMapping);
+    const rows = buildCsvPreviewRows(csvRawRows, csvColumnMapping, csvSourceFileName);
     setPreviewRows(rows);
     setImportError('');
     setImportMessage(`列マッピングを適用して再プレビューしました: ${rows.length}行`);
@@ -899,7 +936,7 @@ export default function AdminClubs() {
       return;
     }
 
-    const rows = buildPdfPreviewRows(sourceRows, pdfColumnMapping);
+    const rows = buildPdfPreviewRows(sourceRows, pdfColumnMapping, pdfSourceFileName);
     setPreviewRows(rows);
     setImportError('');
     setImportMessage(`PDF抽出テキストからプレビューを生成しました: ${rows.length}行`);
@@ -911,7 +948,7 @@ export default function AdminClubs() {
       return;
     }
 
-    const rows = buildPdfPreviewRows(pdfRawRows, pdfColumnMapping);
+    const rows = buildPdfPreviewRows(pdfRawRows, pdfColumnMapping, pdfSourceFileName);
     setPreviewRows(rows);
     setImportError('');
     setImportMessage(`PDF列マッピングを適用して再プレビューしました: ${rows.length}行`);
