@@ -1,0 +1,339 @@
+.admin-clubs-page {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+}
+
+.admin-clubs-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.admin-clubs-header h1 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 40px);
+  color: #0f2f23;
+}
+
+.admin-clubs-header p {
+  margin: 0;
+  color: #395246;
+  line-height: 1.7;
+}
+
+.admin-clubs-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-tab {
+  border: 1px solid #bfd8cb;
+  background: #f7fcf8;
+  color: #19372c;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-tab.active {
+  background: linear-gradient(135deg, #19844f, #3ca06d);
+  color: #ffffff;
+  border-color: #19844f;
+}
+
+.admin-panel {
+  background: #f6fbf7;
+  border: 1px solid #cfdfd4;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.admin-filters {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-filters input,
+.admin-filters select,
+.admin-modal-grid input,
+.admin-modal-grid select {
+  width: 100%;
+  border: 1px solid #bdd2c5;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px;
+  color: #173126;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #d7e6dc;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.admin-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 920px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf4ef;
+  text-align: left;
+  font-size: 14px;
+}
+
+.admin-table th {
+  background: #f4faf6;
+  color: #345145;
+  font-weight: 700;
+}
+
+.admin-table th button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-empty {
+  text-align: center;
+  color: #5a6f63;
+  padding: 18px !important;
+}
+
+.btn-edit-mini {
+  border: 1px solid #b8cfbf;
+  background: #f6fcf7;
+  color: #154c35;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.admin-import-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.admin-upload-card {
+  border: 1px solid #d7e7dc;
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.admin-upload-card h2,
+.admin-preview-header h3,
+.admin-pdf-preview h3 {
+  margin-bottom: 6px;
+  color: #193c30;
+}
+
+.admin-upload-card p,
+.admin-preview-header p {
+  color: #476156;
+  margin-bottom: 10px;
+}
+
+.file-label {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.file-label input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.admin-status {
+  margin-top: 10px;
+  color: #2d6d53;
+  font-weight: 600;
+}
+
+.admin-message {
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.admin-message.success {
+  border: 1px solid #9bd0af;
+  background: #edfaf1;
+  color: #1c683f;
+}
+
+.admin-message.error {
+  border: 1px solid #e6b3b3;
+  background: #fff1f1;
+  color: #9f2f2f;
+}
+
+.admin-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.status-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-pill.ready {
+  color: #17663f;
+  background: #e6f6ec;
+}
+
+.status-pill.duplicate {
+  color: #7c5416;
+  background: #fff1d9;
+}
+
+.status-pill.invalid {
+  color: #912d2d;
+  background: #feecec;
+}
+
+.admin-pdf-preview {
+  margin-bottom: 14px;
+  border: 1px solid #d4e5da;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.admin-pdf-preview pre {
+  white-space: pre-wrap;
+  background: #f3faf5;
+  border: 1px solid #dbeadf;
+  border-radius: 10px;
+  padding: 12px;
+  max-height: 220px;
+  overflow: auto;
+  color: #1f3f32;
+}
+
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 26, 20, 0.52);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.admin-modal {
+  width: min(740px, 100%);
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #d4e6da;
+  padding: 18px;
+}
+
+.admin-modal h2 {
+  margin-bottom: 8px;
+}
+
+.admin-modal-title {
+  color: #4a665a;
+  margin-bottom: 10px;
+}
+
+.admin-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.admin-modal-grid label {
+  display: grid;
+  gap: 6px;
+  color: #2d4f40;
+  font-size: 13px;
+}
+
+.admin-modal-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-secondary {
+  border: 1px solid #b8cdc1;
+  background: #ffffff;
+  color: #2c4d40;
+  border-radius: 14px;
+  font-weight: 700;
+  padding: 12px 18px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 0;
+  background: #0f5f39;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #0b4c2d;
+}
+
+@media (max-width: 900px) {
+  .admin-filters {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .admin-import-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-clubs-page {
+    padding: 24px 14px 56px;
+  }
+
+  .admin-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}

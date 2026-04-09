@@ -145,6 +145,9 @@ export const ClubList: React.FC<ClubListProps> = ({
         <button className="btn-icon btn-analysis" onClick={onShowAnalysis} disabled={loading} title="分析画面" aria-label="分析画面">
           <AnalysisIcon size={20} />
         </button>
+        <Link className="btn-admin-link" to="/admin/clubs" title="管理画面" aria-label="管理画面">
+          管理
+        </Link>
         {SHOW_HOME_RELEASE_LIMITED_ACTIONS && (
           <>
             <Link className="btn-icon btn-personal-data" to={`/personal-data${bagQuery}`} title="パーソナルデータ" aria-label="パーソナルデータ">

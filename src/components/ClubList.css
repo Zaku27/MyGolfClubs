@@ -112,6 +112,29 @@
   text-decoration: none;
 }
 
+.club-list-actions .btn-admin-link {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1.5px solid #3f8e61;
+  background: linear-gradient(135deg, #1e774a, #2e9f62);
+  color: #ffffff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  box-shadow: 0 6px 16px rgba(31, 128, 78, 0.18);
+}
+
+.club-list-actions .btn-admin-link:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #17623d, #238a54);
+  box-shadow: 0 8px 18px rgba(31, 128, 78, 0.22);
+}
+
 .club-list-actions .btn-icon svg,
 .club-list-actions .btn-import-json svg {
   color: currentColor;
