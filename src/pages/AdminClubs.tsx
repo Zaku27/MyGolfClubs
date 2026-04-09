@@ -15,6 +15,19 @@ import './AdminClubs.css';
 type TabKey = 'catalog' | 'import';
 type SortDirection = 'asc' | 'desc';
 type SortKey = 'brand' | 'model' | 'variant' | 'type' | 'year' | 'loft' | 'length' | 'swingWeight';
+type CanonicalHeader =
+  | 'brand'
+  | 'model'
+  | 'variant'
+  | 'type'
+  | 'year'
+  | 'loft'
+  | 'length'
+  | 'lie'
+  | 'swingWeight'
+  | 'volume'
+  | 'hand'
+  | 'source';
 
 type CsvRow = Record<string, string>;
 
@@ -25,70 +38,284 @@ type ImportPreviewRow = {
   reason?: string;
 };
 
+type PdfLineCandidate = {
+  rowId: string;
+  spec: CatalogSpec | null;
+  reason?: string;
+};
+
 const defaultSortState: { key: SortKey; direction: SortDirection } = {
   key: 'year',
   direction: 'desc',
+};
+
+const HEADER_ALIASES: Record<CanonicalHeader, string[]> = {
+  brand: ['brand', 'maker', 'manufacturer', 'ブランド', 'メーカー', 'ブランド名', 'メーカ名'],
+  model: ['model', 'modelname', 'clubmodel', 'モデル', 'モデル名', '品名', '商品名'],
+  variant: ['variant', 'spec', 'option', 'バリアント', '仕様', 'スペック', 'オプション', '番手'],
+  type: ['type', 'clubtype', 'category', 'タイプ', '種別', 'クラブタイプ', 'クラブ種別', 'カテゴリ'],
+  year: ['year', 'releaseyear', 'modelyear', '年', '年式', '発売年', 'モデル年'],
+  loft: ['loft', 'loftangle', 'ロフト', 'ロフト角', 'ロフト角度'],
+  length: ['length', 'lengthin', 'lengthinches', 'length_in', 'レングス', '長さ', '長さinch', '長さin'],
+  lie: ['lie', 'lieangle', 'ライ', 'ライ角', 'ライ角度'],
+  swingWeight: ['swingweight', 'swing_weight', 'sw', 'balance', 'スイングウェイト', 'スウィングウェイト'],
+  volume: ['volume', 'cc', 'headvolume', '容積', '体積', 'ヘッド容積', 'ヘッド体積'],
+  hand: ['hand', 'dexterity', '利き手', 'ハンド', '左右'],
+  source: ['source', 'ref', 'reference', '出典', '参照元', 'ソース'],
 };
 
 const sortSign = (direction: SortDirection): 1 | -1 => (direction === 'asc' ? 1 : -1);
 
 const normalizedString = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
 
+const normalizeHeaderKey = (value: string): string => {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_/\\]/g, '')
+    .replace(/[()\[\]{}]/g, '')
+    .replace(/[（）。・]/g, '')
+    .replace(/\./g, '')
+    .replace(/インチ|inch|inches/g, 'in')
+    .replace(/角度/g, 'angle');
+};
+
+const normalizeTypeValue = (value: string): CatalogClubType | undefined => {
+  const normalized = normalizedString(value)
+    .replace(/[\s\-_]/g, '')
+    .replace(/ー/g, '');
+
+  const dictionary: Record<string, CatalogClubType> = {
+    driver: 'driver',
+    dr: 'driver',
+    ドライバー: 'driver',
+    fairway: 'fairway',
+    fairwaywood: 'fairway',
+    fw: 'fairway',
+    wood: 'fairway',
+    フェアウェイ: 'fairway',
+    フェアウェイウッド: 'fairway',
+    hybrid: 'hybrid',
+    utility: 'hybrid',
+    ut: 'hybrid',
+    rescue: 'hybrid',
+    ユーティリティ: 'hybrid',
+    ハイブリッド: 'hybrid',
+    iron: 'iron',
+    アイアン: 'iron',
+    wedge: 'wedge',
+    wg: 'wedge',
+    ウェッジ: 'wedge',
+    putter: 'putter',
+    pt: 'putter',
+    パター: 'putter',
+  };
+
+  return dictionary[normalized];
+};
+
+const normalizeHandValue = (value: string | undefined): CatalogSpec['hand'] | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = normalizedString(value).replace(/[\s]/g, '').replace(/右利き|右/g, 'rh').replace(/左利き|左/g, 'lh');
+  if (normalized === 'rh' || normalized === 'right') {
+    return 'RH';
+  }
+  if (normalized === 'lh' || normalized === 'left') {
+    return 'LH';
+  }
+  if (normalized.includes('rh/lh') || normalized.includes('rh・lh') || normalized.includes('rh&lh') || normalized.includes('both')) {
+    return 'RH/LH';
+  }
+  if (normalized.includes('rh') && normalized.includes('lh')) {
+    return 'RH/LH';
+  }
+  return undefined;
+};
+
 const isTypeValue = (value: string): value is CatalogClubType => {
   return CATALOG_CLUB_TYPES.includes(value as CatalogClubType);
 };
 
-const toNullableNumber = (value: string | undefined): number | null => {
-  if (!value) {
-    return null;
-  }
-  const parsed = Number(value.trim());
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const toOptionalNumber = (value: string | undefined): number | undefined => {
+const extractNumericValue = (value: string | undefined): number | undefined => {
   if (!value) {
     return undefined;
   }
-  const parsed = Number(value.trim());
+
+  const matched = value.replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+  if (!matched) {
+    return undefined;
+  }
+
+  const parsed = Number(matched[0]);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-const pickCell = (row: CsvRow, aliases: string[]): string => {
+const toYearNumber = (value: string | undefined): number => {
+  if (!value) {
+    return Number.NaN;
+  }
+
+  const matched = value.match(/(?:19|20)\d{2}/);
+  if (!matched) {
+    return Number.NaN;
+  }
+
+  return Number(matched[0]);
+};
+
+const toNullableNumber = (value: string | undefined): number | null => {
+  const parsed = extractNumericValue(value);
+  return parsed ?? null;
+};
+
+const toOptionalNumber = (value: string | undefined): number | undefined => {
+  return extractNumericValue(value);
+};
+
+const buildCsvLookup = (row: CsvRow): Record<string, string> => {
+  const lookup: Record<string, string> = {};
+  for (const [rawKey, rawValue] of Object.entries(row)) {
+    const key = normalizeHeaderKey(rawKey);
+    const value = String(rawValue ?? '').trim();
+    if (!key || !value) {
+      continue;
+    }
+    lookup[key] = value;
+  }
+  return lookup;
+};
+
+const pickCell = (lookup: Record<string, string>, canonicalHeader: CanonicalHeader): string => {
+  const aliases = HEADER_ALIASES[canonicalHeader];
   for (const alias of aliases) {
-    const found = Object.entries(row).find(([key]) => normalizedString(key) === normalizedString(alias));
-    if (found && found[1]?.trim()) {
-      return found[1].trim();
+    const key = normalizeHeaderKey(alias);
+    const found = lookup[key];
+    if (found) {
+      return found;
     }
   }
   return '';
 };
 
 const parseCsvRowToCatalogSpec = (row: CsvRow): CatalogSpec | null => {
-  const rawType = normalizedString(pickCell(row, ['type', 'clubType']));
-  if (!isTypeValue(rawType)) {
+  const lookup = buildCsvLookup(row);
+  const normalizedType = normalizeTypeValue(pickCell(lookup, 'type'));
+  if (!normalizedType || !isTypeValue(normalizedType)) {
     return null;
   }
 
   const candidate = {
     id: crypto.randomUUID(),
-    brand: pickCell(row, ['brand', 'maker']) || 'TaylorMade',
-    model: pickCell(row, ['model']),
-    variant: pickCell(row, ['variant', 'spec', 'option']) || undefined,
-    type: rawType,
-    year: Number(pickCell(row, ['year'])),
-    loft: toNullableNumber(pickCell(row, ['loft'])),
-    length: toNullableNumber(pickCell(row, ['length', 'lengthInches', 'length_in'])),
-    lie: pickCell(row, ['lie']) || undefined,
-    swingWeight: pickCell(row, ['swingWeight', 'swing_weight']) || undefined,
-    volume: toOptionalNumber(pickCell(row, ['volume', 'cc'])),
-    hand: (pickCell(row, ['hand']) as CatalogSpec['hand']) || undefined,
-    source: pickCell(row, ['source']) || 'CSV Import',
+    brand: pickCell(lookup, 'brand') || 'TaylorMade',
+    model: pickCell(lookup, 'model'),
+    variant: pickCell(lookup, 'variant') || undefined,
+    type: normalizedType,
+    year: toYearNumber(pickCell(lookup, 'year')),
+    loft: toNullableNumber(pickCell(lookup, 'loft')),
+    length: toNullableNumber(pickCell(lookup, 'length')),
+    lie: pickCell(lookup, 'lie') || undefined,
+    swingWeight: pickCell(lookup, 'swingWeight') || undefined,
+    volume: toOptionalNumber(pickCell(lookup, 'volume')),
+    hand: normalizeHandValue(pickCell(lookup, 'hand')),
+    source: pickCell(lookup, 'source') || 'CSV Import',
     importedAt: new Date().toISOString(),
   };
 
   const parsed = catalogSpecSchema.safeParse(candidate);
   return parsed.success ? parsed.data : null;
+};
+
+const parsePdfLineToCatalogSpec = (line: string): CatalogSpec | null => {
+  const cleanedLine = line.replace(/^\[page\s+\d+\]\s*/i, '').trim();
+  if (!cleanedLine) {
+    return null;
+  }
+
+  const hasStructuredDelimiter =
+    cleanedLine.includes(',') || cleanedLine.includes('\t') || /\s{2,}/.test(cleanedLine);
+  if (!hasStructuredDelimiter) {
+    return null;
+  }
+
+  const tokens = (cleanedLine.includes(',')
+    ? cleanedLine.split(',')
+    : cleanedLine.includes('\t')
+      ? cleanedLine.split('\t')
+      : cleanedLine.split(/\s{2,}/))
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  if (tokens.length < 5) {
+    return null;
+  }
+
+  const tryBuild = (withBrand: boolean): CatalogSpec | null => {
+    const base = withBrand ? 0 : -1;
+    const normalizedType = normalizeTypeValue(tokens[base + 3] ?? '');
+    if (!normalizedType || !isTypeValue(normalizedType)) {
+      return null;
+    }
+
+    const candidate = {
+      id: crypto.randomUUID(),
+      brand: withBrand ? tokens[0] : 'TaylorMade',
+      model: tokens[base + 1] ?? '',
+      variant: tokens[base + 2] || undefined,
+      type: normalizedType,
+      year: toYearNumber(tokens[base + 4]),
+      loft: toNullableNumber(tokens[base + 5]),
+      length: toNullableNumber(tokens[base + 6]),
+      lie: tokens[base + 7] || undefined,
+      swingWeight: tokens[base + 8] || undefined,
+      volume: toOptionalNumber(tokens[base + 9]),
+      hand: normalizeHandValue(tokens[base + 10]),
+      source: tokens[base + 11] || 'PDF Import',
+      importedAt: new Date().toISOString(),
+    };
+
+    const parsed = catalogSpecSchema.safeParse(candidate);
+    return parsed.success ? parsed.data : null;
+  };
+
+  return tryBuild(true) ?? tryBuild(false);
+};
+
+const buildPreviewRows = (
+  candidates: PdfLineCandidate[],
+  existingKeys: Set<string>,
+): ImportPreviewRow[] => {
+  const seenInPreview = new Set<string>();
+
+  return candidates.map((candidate) => {
+    if (!candidate.spec) {
+      return {
+        rowId: candidate.rowId,
+        spec: null,
+        status: 'invalid',
+        reason: candidate.reason ?? '行の構造を解釈できませんでした',
+      };
+    }
+
+    const key = buildCatalogSpecKey(candidate.spec);
+    if (existingKeys.has(key) || seenInPreview.has(key)) {
+      return {
+        rowId: candidate.rowId,
+        spec: candidate.spec,
+        status: 'duplicate',
+        reason: '既存Catalogまたはプレビュー内で重複',
+      };
+    }
+
+    seenInPreview.add(key);
+    return {
+      rowId: candidate.rowId,
+      spec: candidate.spec,
+      status: 'ready',
+    };
+  });
 };
 
 const toComparable = (spec: CatalogSpec, key: SortKey): string | number => {
@@ -120,6 +347,7 @@ export default function AdminClubs() {
   const addMany = useCatalogSpecsStore((state) => state.addMany);
   const updateOne = useCatalogSpecsStore((state) => state.updateOne);
   const clearError = useCatalogSpecsStore((state) => state.clearError);
+  const clearAll = useCatalogSpecsStore((state) => state.clearAll);
 
   const [activeTab, setActiveTab] = useState<TabKey>('catalog');
   const [searchModel, setSearchModel] = useState('');
@@ -211,36 +439,14 @@ export default function AdminClubs() {
       skipEmptyLines: true,
       complete: (results: ParseResult<CsvRow>) => {
         try {
-          const seenInPreview = new Set<string>();
-          const rows: ImportPreviewRow[] = results.data.map((row, index) => {
-            const parsed = parseCsvRowToCatalogSpec(row);
-
-            if (!parsed) {
-              return {
-                rowId: `csv-${index + 1}`,
-                spec: null,
-                status: 'invalid',
-                reason: '必須項目または型が不正です（model/type/year など）',
-              };
-            }
-
-            const key = buildCatalogSpecKey(parsed);
-            if (existingKeys.has(key) || seenInPreview.has(key)) {
-              return {
-                rowId: `csv-${index + 1}`,
-                spec: parsed,
-                status: 'duplicate',
-                reason: '既存Catalogまたはプレビュー内で重複',
-              };
-            }
-
-            seenInPreview.add(key);
+          const candidates: PdfLineCandidate[] = results.data.map((row, index) => {
             return {
               rowId: `csv-${index + 1}`,
-              spec: parsed,
-              status: 'ready',
+              spec: parseCsvRowToCatalogSpec(row),
+              reason: '必須項目または型が不正です（model/type/year など）',
             };
           });
+          const rows = buildPreviewRows(candidates, existingKeys);
 
           setPreviewRows(rows);
           setImportMessage(`CSVを解析しました: ${rows.length}行`);
@@ -292,6 +498,41 @@ export default function AdminClubs() {
     }
   };
 
+  const handleBuildPreviewFromPdfText = () => {
+    if (!pdfExtractedText.trim()) {
+      setImportError('PDF抽出テキストが空です。先にPDFをアップロードしてください。');
+      return;
+    }
+
+    const candidates: PdfLineCandidate[] = pdfExtractedText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line, index) => {
+        const hasDelimiter = line.includes(',') || line.includes('\t') || /\s{2,}/.test(line);
+        if (!hasDelimiter) {
+          return null;
+        }
+
+        return {
+          rowId: `pdf-${index + 1}`,
+          spec: parsePdfLineToCatalogSpec(line),
+          reason: 'PDF行をCatalogSpec形式に変換できませんでした',
+        } satisfies PdfLineCandidate;
+      })
+      .filter((candidate): candidate is PdfLineCandidate => candidate != null);
+
+    if (candidates.length === 0) {
+      setImportError('PDF内で構造化行（カンマ/タブ/複数スペース区切り）を検出できませんでした。');
+      return;
+    }
+
+    const rows = buildPreviewRows(candidates, existingKeys);
+    setPreviewRows(rows);
+    setImportError('');
+    setImportMessage(`PDF抽出テキストからプレビューを生成しました: ${rows.length}行`);
+  };
+
   const registerAllPreviewRows = () => {
     const readySpecs = previewRows
       .filter((row): row is ImportPreviewRow & { spec: CatalogSpec } => row.status === 'ready' && row.spec != null)
@@ -333,6 +574,16 @@ export default function AdminClubs() {
       setEditingSpec(null);
       clearError();
     }
+  };
+
+  const handleClearAllData = () => {
+    if (!window.confirm('すべてのCatalog Specデータを削除します。よろしいですか？')) {
+      return;
+    }
+    clearAll();
+    setImportMessage('');
+    setImportError('');
+    setEditingSpec(null);
   };
 
   return (
@@ -501,6 +752,12 @@ export default function AdminClubs() {
           {pdfExtractedText && (
             <div className="admin-pdf-preview">
               <h3>PDF抽出テキスト（先頭プレビュー）</h3>
+              <div className="admin-pdf-actions">
+                <button type="button" className="btn-secondary" onClick={handleBuildPreviewFromPdfText}>
+                  抽出テキストからプレビュー生成
+                </button>
+                <p>区切り形式: CSV, TSV, または複数スペース区切りの行を対象に半自動変換します。</p>
+              </div>
               <pre>{pdfExtractedText.slice(0, 3000)}</pre>
             </div>
           )}
@@ -564,6 +821,12 @@ export default function AdminClubs() {
           </div>
         </section>
       )}
+
+      <div className="admin-clear-all">
+        <button type="button" className="btn-danger" onClick={handleClearAllData}>
+          すべてのデータを削除
+        </button>
+      </div>
 
       {editingSpec && (
         <div className="admin-modal-overlay" role="dialog" aria-modal="true">

@@ -1,4 +1,5 @@
 .admin-clubs-page {
+  position: relative;
   max-width: 1240px;
   margin: 0 auto;
   padding: 40px 24px 72px;
@@ -229,6 +230,20 @@
   padding: 12px;
 }
 
+.admin-pdf-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-pdf-actions p {
+  margin: 0;
+  color: #4f675d;
+  font-size: 12px;
+}
+
 .admin-pdf-preview pre {
   white-space: pre-wrap;
   background: #f3faf5;
@@ -314,6 +329,29 @@
   background: #0b4c2d;
 }
 
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 0;
+  background: linear-gradient(135deg, #b22020, #8a1b1b);
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: #7a1616;
+}
+
+.admin-clear-all {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+}
+
 @media (max-width: 900px) {
   .admin-filters {
     grid-template-columns: repeat(2, minmax(180px, 1fr));
@@ -321,6 +359,13 @@
 
   .admin-import-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-clear-all {
+    position: static;
+    text-align: right;
+    width: 100%;
+    margin-top: 16px;
   }
 }
 

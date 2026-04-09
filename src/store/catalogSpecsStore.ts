@@ -16,6 +16,7 @@ type CatalogSpecsState = {
 type CatalogSpecsActions = {
   addMany: (items: CatalogSpec[]) => { added: number; skipped: number };
   updateOne: (id: string, patch: Partial<CatalogSpec>) => boolean;
+  clearAll: () => void;
   clearError: () => void;
 };
 
@@ -129,6 +130,10 @@ export const useCatalogSpecsStore = create<CatalogSpecsStore>()(
           error: null,
         }));
         return true;
+      },
+
+      clearAll: () => {
+        set({ specs: [], error: null });
       },
 
       clearError: () => {
