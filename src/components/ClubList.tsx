@@ -44,6 +44,8 @@ interface ClubListProps {
   activeBagLimit?: number;
   isBagView?: boolean;
   allClubsCount?: number;
+  listScope?: 'bag' | 'all';
+  onChangeListScope?: (scope: 'bag' | 'all') => void;
   onSwitchToAllClubs?: () => void;
   onToggleActiveBagMembership?: (club: GolfClub) => void;
   loading?: boolean;
@@ -72,6 +74,8 @@ export const ClubList: React.FC<ClubListProps> = ({
   activeBagLimit = 14,
   isBagView = false,
   allClubsCount = clubs.length,
+  listScope,
+  onChangeListScope,
   onSwitchToAllClubs,
   onToggleActiveBagMembership,
   loading = false,
@@ -104,11 +108,9 @@ export const ClubList: React.FC<ClubListProps> = ({
   const bagQuery = typeof activeBagId === 'number' ? `?bagId=${activeBagId}` : '';
   const activeBagClubIdSet = new Set(activeBagClubIds);
   const isFilteredResult = hasFilter && filteredClubs.length !== clubs.length;
-  const clubCountLabel = isBagView && activeBagName
-    ? `${activeBagName} ${activeBagClubCount} 本`
-    : isFilteredResult
-      ? `${filteredClubs.length}/${clubs.length} clubs`
-      : undefined;
+  const filteredCountLabel = isFilteredResult
+    ? `${filteredClubs.length}/${clubs.length} clubs`
+    : undefined;
 
   const totalRegisteredClubsLabel = typeof allClubsCount === 'number'
     ? `総クラブ数 ${allClubsCount} 本`
@@ -122,8 +124,26 @@ export const ClubList: React.FC<ClubListProps> = ({
           <span className="title-sub">- マイクラブを簡単管理＆上達サポート -</span>
         </h1>
         <div className="club-list-header-meta">
-          {clubCountLabel && (
-            <div className="club-count">{clubCountLabel}</div>
+          {filteredCountLabel && (
+            <div className="club-count">{filteredCountLabel}</div>
+          )}
+          {listScope && onChangeListScope && (
+            <div className="club-list-scope-toggle" aria-label="クラブ一覧の表示範囲">
+              <button
+                type="button"
+                className={listScope === 'bag' ? 'active' : ''}
+                onClick={() => onChangeListScope('bag')}
+              >
+                バッグの14本
+              </button>
+              <button
+                type="button"
+                className={listScope === 'all' ? 'active' : ''}
+                onClick={() => onChangeListScope('all')}
+              >
+                全クラブ一覧
+              </button>
+            </div>
           )}
           {totalRegisteredClubsLabel && (
             <div className="club-total-count">{totalRegisteredClubsLabel}</div>

@@ -48,11 +48,6 @@ export const GolfBagPanel = ({
           <p className="golf-bag-panel-description">
             {description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。'}
           </p>
-          {activeBag && (
-            <p className="golf-bag-panel-description">
-              選択中: {activeBagClubCount}/{maxClubs} 本
-            </p>
-          )}
         </div>
 
       </div>
@@ -81,25 +76,6 @@ export const GolfBagPanel = ({
       ) : activeBag ? (
         <div className="golf-bag-single-name">{activeBag.name}</div>
       ) : null}
-
-      {listScope && onChangeListScope && (
-        <div className="golf-bag-scope-toggle" aria-label="クラブ一覧の表示範囲">
-          <button
-            type="button"
-            className={listScope === 'bag' ? 'active' : ''}
-            onClick={() => onChangeListScope('bag')}
-          >
-            バッグの14本
-          </button>
-          <button
-            type="button"
-            className={listScope === 'all' ? 'active' : ''}
-            onClick={() => onChangeListScope('all')}
-          >
-            全クラブ一覧
-          </button>
-        </div>
-      )}
 
       {showManagement && (
         <div className="golf-bag-panel-actions">

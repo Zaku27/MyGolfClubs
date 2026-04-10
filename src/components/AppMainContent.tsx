@@ -209,6 +209,8 @@ export function AppMainContent({
             activeBagClubCount={activeBagClubCount}
             isBagView={clubListScope === 'bag'}
             allClubsCount={sortedClubs.length}
+            listScope={clubListScope}
+            onChangeListScope={onChangeClubListScope}
             onSwitchToAllClubs={onSwitchToAllClubs}
             onToggleActiveBagMembership={onToggleActiveBagMembership}
             loading={loading}

@@ -71,6 +71,37 @@
   box-shadow: 0 4px 12px rgba(46, 85, 127, 0.08);
 }
 
+.club-list-scope-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(24, 121, 78, 0.08);
+}
+
+.club-list-scope-toggle button {
+  border: 0;
+  background: transparent;
+  color: #4d7b62;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.club-list-scope-toggle button.active {
+  background: linear-gradient(135deg, #1f8f54, #62c78e);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(31, 143, 84, 0.2);
+}
+
+.club-list-scope-toggle button:not(.active) {
+  color: #4d7b62;
+}
+
 .club-total-count-inline {
   display: inline-flex;
   align-items: center;
