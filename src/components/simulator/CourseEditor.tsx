@@ -93,7 +93,11 @@ function cloneHazards(hazards: Hazard[] | undefined) {
 }
 
 function buildHazardName(type: HazardType, xCenter: number, width: number) {
-  return `${type.toUpperCase()} ${Math.round(xCenter)} ${Math.round(width)}`;
+  const label = HAZARD_TYPE_LABEL[type] ?? type.toUpperCase();
+  if (type === "semirough") {
+    return label;
+  }
+  return `${label} ${Math.round(xCenter)} ${Math.round(width)}`;
 }
 
 function buildEmptyHazard(hole: Hole): Hazard {

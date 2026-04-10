@@ -464,11 +464,6 @@ export function HoleMapCanvas({
     };
   };
 
-  const getAutoZoomScale = (distance: number) => {
-    const clampedDistance = clamp(distance, 0, 50);
-    return 2.5 + (50 - clampedDistance) / 50 * 1.5;
-  };
-
   const handleCanvasWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
     if (editable || !metrics) return;
     event.preventDefault();
@@ -533,15 +528,6 @@ export function HoleMapCanvas({
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!metrics || holeComplete || editable) return;
-    if (distanceToPin <= 50) {
-      const targetScale = getAutoZoomScale(distanceToPin);
-      const targetViewport = buildCenteredViewport(targetScale, pinPoint);
-      animateViewportTo(targetViewport);
-    }
-  }, [distanceToPin, metrics, size.width, size.height, targetDistance, pinPoint, animateViewportTo, holeComplete, editable]);
 
   useEffect(() => {
     if (holeComplete) {
