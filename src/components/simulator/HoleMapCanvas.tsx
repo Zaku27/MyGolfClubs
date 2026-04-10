@@ -777,62 +777,79 @@ export function HoleMapCanvas({
     context.stroke();
     context.restore();
 
-    // ハザードを矩形で描画。種別に応じて色を変える。
+    // ハザード描画: rectangleは矩形、多角形はpointsでパス描画
     for (const hazard of hazards) {
       const style = getHazardStyle(hazard.type);
-      const leftYard = hazard.xCenter - hazard.width / 2;
-      const rightYard = hazard.xCenter + hazard.width / 2;
-      const topYard = hazard.yBack;
-      const bottomYard = hazard.yFront;
-
-      const leftPx = yardToPxX(leftYard);
-      const rightPx = yardToPxX(rightYard);
-      const topPx = yardToPxY(topYard);
-      const bottomPx = yardToPxY(bottomYard);
-
-      const widthPx = Math.max(2, rightPx - leftPx);
-      const heightPx = Math.max(2, bottomPx - topPx);
-
       context.fillStyle = style.fill;
       context.strokeStyle = style.stroke;
       context.lineWidth = 1.5;
-      context.fillRect(leftPx, topPx, widthPx, heightPx);
 
-      if (hazard.type === "water") {
-        context.save();
-        context.setLineDash([6, 4]);
-        context.strokeRect(leftPx, topPx, widthPx, heightPx);
-        context.restore();
+      if (hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3) {
+        // 多角形描画
+        context.beginPath();
+        const first = hazard.points[0];
+        context.moveTo(yardToPxX(first.x), yardToPxY(first.y));
+        for (let i = 1; i < hazard.points.length; i++) {
+          const pt = hazard.points[i];
+          context.lineTo(yardToPxX(pt.x), yardToPxY(pt.y));
+        }
+        context.closePath();
+        context.fill();
+        context.stroke();
       } else {
-        context.setLineDash([]);
-        context.strokeRect(leftPx, topPx, widthPx, heightPx);
+        // 矩形描画（従来通り）
+        const leftYard = hazard.xCenter - hazard.width / 2;
+        const rightYard = hazard.xCenter + hazard.width / 2;
+        const topYard = hazard.yBack;
+        const bottomYard = hazard.yFront;
+
+        const leftPx = yardToPxX(leftYard);
+        const rightPx = yardToPxX(rightYard);
+        const topPx = yardToPxY(topYard);
+        const bottomPx = yardToPxY(bottomYard);
+
+        const widthPx = Math.max(2, rightPx - leftPx);
+        const heightPx = Math.max(2, bottomPx - topPx);
+
+        context.fillRect(leftPx, topPx, widthPx, heightPx);
+
+        if (hazard.type === "water") {
+          context.save();
+          context.setLineDash([6, 4]);
+          context.strokeRect(leftPx, topPx, widthPx, heightPx);
+          context.restore();
+        } else {
+          context.setLineDash([]);
+          context.strokeRect(leftPx, topPx, widthPx, heightPx);
+        }
+
+        // ラベル描画（矩形のみ）
+        const label = buildHazardDisplayName(hazard);
+        context.save();
+        context.font = "bold 10px sans-serif";
+        context.textAlign = "center";
+        context.lineWidth = 2;
+        context.strokeStyle = "rgba(0, 0, 0, 0.6)";
+        context.fillStyle = "#ffffff";
+
+        if (widthPx >= 26 && heightPx >= 16) {
+          const labelX = leftPx + widthPx / 2;
+          const labelY = topPx + heightPx / 2;
+          context.textBaseline = "middle";
+          context.strokeText(label, labelX, labelY);
+          context.fillText(label, labelX, labelY);
+        } else if (widthPx >= 14 && heightPx >= 10) {
+          const labelX = leftPx + widthPx / 2;
+          const labelY = topPx - 4;
+          context.textBaseline = "bottom";
+          context.strokeText(label, labelX, labelY);
+          context.fillText(label, labelX, labelY);
+        }
+
+        context.restore();
       }
 
       drawObBoundaryMarkers(context, hazard, yardToPxX, yardToPxY);
-
-      const label = buildHazardDisplayName(hazard);
-      context.save();
-      context.font = "bold 10px sans-serif";
-      context.textAlign = "center";
-      context.lineWidth = 2;
-      context.strokeStyle = "rgba(0, 0, 0, 0.6)";
-      context.fillStyle = "#ffffff";
-
-      if (widthPx >= 26 && heightPx >= 16) {
-        const labelX = leftPx + widthPx / 2;
-        const labelY = topPx + heightPx / 2;
-        context.textBaseline = "middle";
-        context.strokeText(label, labelX, labelY);
-        context.fillText(label, labelX, labelY);
-      } else if (widthPx >= 14 && heightPx >= 10) {
-        const labelX = leftPx + widthPx / 2;
-        const labelY = topPx - 4;
-        context.textBaseline = "bottom";
-        context.strokeText(label, labelX, labelY);
-        context.fillText(label, labelX, labelY);
-      }
-
-      context.restore();
     }
 
     // ティー位置を描画。
@@ -899,50 +916,85 @@ export function HoleMapCanvas({
     if (!currentMetrics) {
       return null;
     }
-
     const { offsetX, offsetY, yardScale, maxYardY } = currentMetrics;
     const yardToPxX = (yardX: number) => offsetX + (yardX + currentMetrics.halfYardX) * yardScale;
     const yardToPxY = (yardY: number) => offsetY + (maxYardY - yardY) * yardScale;
 
-    const leftYard = hazard.xCenter - hazard.width / 2;
-    const rightYard = hazard.xCenter + hazard.width / 2;
-    const topYard = hazard.yBack;
-    const bottomYard = hazard.yFront;
+    if (hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3) {
+      const xs = hazard.points.map((p) => p.x);
+      const ys = hazard.points.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const left = yardToPxX(minX);
+      const right = yardToPxX(maxX);
+      const top = yardToPxY(maxY);
+      const bottom = yardToPxY(minY);
+      return {
+        left,
+        top,
+        width: Math.max(2, right - left),
+        height: Math.max(2, bottom - top),
+      };
+    } else {
+      const leftYard = hazard.xCenter - hazard.width / 2;
+      const rightYard = hazard.xCenter + hazard.width / 2;
+      const topYard = hazard.yBack;
+      const bottomYard = hazard.yFront;
 
-    const left = yardToPxX(leftYard);
-    const right = yardToPxX(rightYard);
-    const top = yardToPxY(topYard);
-    const bottom = yardToPxY(bottomYard);
+      const left = yardToPxX(leftYard);
+      const right = yardToPxX(rightYard);
+      const top = yardToPxY(topYard);
+      const bottom = yardToPxY(bottomYard);
 
-    return {
-      left,
-      top,
-      width: Math.max(2, right - left),
-      height: Math.max(2, bottom - top),
-    };
+      return {
+        left,
+        top,
+        width: Math.max(2, right - left),
+        height: Math.max(2, bottom - top),
+      };
+    }
   };
 
   const updateHazardByDrag = (state: DragState, clientX: number, clientY: number) => {
-    if (!onHazardsChange) {
-      return;
-    }
-
+    if (!onHazardsChange) return;
     const metrics = metricsRef.current;
-    if (!metrics) {
-      return;
-    }
-
+    if (!metrics) return;
     const yardPerPx = 1 / metrics.yardScale;
     const deltaX = (clientX - state.startClientX) * yardPerPx;
     const deltaY = -(clientY - state.startClientY) * yardPerPx;
 
     const next = hazards.map((hazard) => {
-      if (hazard.id !== state.hazardId) {
-        return hazard;
-      }
-
+      if (hazard.id !== state.hazardId) return hazard;
       const original = state.initialHazard;
 
+      // 頂点ドラッグ
+      if (state.mode === "vertex" && typeof state.vertexIndex === "number" && Array.isArray(hazard.points)) {
+        const newPoints = hazard.points.map((pt, idx) => {
+          if (idx !== state.vertexIndex) return pt;
+          return {
+            x: pt.x + deltaX,
+            y: pt.y + deltaY,
+          };
+        });
+        // bounds再計算
+        const xs = newPoints.map((p) => p.x);
+        const ys = newPoints.map((p) => p.y);
+        return {
+          ...hazard,
+          points: newPoints,
+          x: Math.min(...xs),
+          y: Math.min(...ys),
+          width: Math.max(...xs) - Math.min(...xs),
+          height: Math.max(...ys) - Math.min(...ys),
+          xCenter: (Math.max(...xs) + Math.min(...xs)) / 2,
+          yFront: Math.min(...ys),
+          yBack: Math.max(...ys),
+        };
+      }
+
+      // 矩形 move/resize
       let left = original.xCenter - original.width / 2;
       let right = original.xCenter + original.width / 2;
       let front = original.yFront;
@@ -1007,7 +1059,6 @@ export function HoleMapCanvas({
         name: buildAutoHazardName(hazard.type, clampedCenter, width),
       };
     });
-
     onHazardsChange(next);
   };
 
@@ -1033,6 +1084,20 @@ export function HoleMapCanvas({
     };
   }, [dragState, hazards]);
 
+  // --- ポリゴン作成用canvasクリックイベント ---
+  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!onCanvasClick) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left - viewport.offsetX) / viewport.scale;
+    const y = (event.clientY - rect.top - viewport.offsetY) / viewport.scale;
+    onCanvasClick({ x, y });
+  };
+
+  const handleCanvasDoubleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!onCanvasDoubleClick) return;
+    onCanvasDoubleClick();
+  };
+
   return (
     <div
       ref={wrapperRef}
@@ -1048,6 +1113,8 @@ export function HoleMapCanvas({
         onPointerMove={handleCanvasPointerMove}
         onPointerUp={handleCanvasPointerUp}
         onPointerLeave={handleCanvasPointerUp}
+        onClick={handleCanvasClick}
+        onDoubleClick={handleCanvasDoubleClick}
       />
       <div className="pointer-events-none absolute inset-0 flex items-start justify-end gap-2 p-3">
         {!editable && !isViewportDefault && (
@@ -1114,22 +1181,40 @@ export function HoleMapCanvas({
                     <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
                       {buildHazardDisplayName(hazard)}
                     </div>
-                    {(["nw", "ne", "sw", "se"] as ResizeHandle[]).map((handle) => {
-                      const styleByHandle: Record<ResizeHandle, string> = {
-                        nw: "-left-1.5 -top-1.5 cursor-nwse-resize",
-                        ne: "-right-1.5 -top-1.5 cursor-nesw-resize",
-                        sw: "-left-1.5 -bottom-1.5 cursor-nesw-resize",
-                        se: "-right-1.5 -bottom-1.5 cursor-nwse-resize",
-                      };
-
-                      return (
-                        <span
-                          key={`${hazard.id}-${handle}`}
-                          className={`absolute h-3 w-3 rounded-full border border-white bg-emerald-700 ${styleByHandle[handle]}`}
-                          onPointerDown={(event) => startDrag(event, "resize", handle)}
-                        />
-                      );
-                    })}
+                    {hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3 ? (
+                      hazard.points.map((pt, idx) => {
+                        // 頂点座標をcanvas座標に変換
+                        const px = yardToPxX(pt.x);
+                        const py = yardToPxY(pt.y);
+                        return (
+                          <span
+                            key={`${hazard.id}-pt-${idx}`}
+                            className="absolute h-3 w-3 rounded-full border border-white bg-emerald-700 cursor-pointer"
+                            style={{
+                              left: `${px - box.left - 6}px`,
+                              top: `${py - box.top - 6}px`,
+                            }}
+                            onPointerDown={(event) => startDrag(event, "vertex", idx)}
+                          />
+                        );
+                      })
+                    ) : (
+                      (["nw", "ne", "sw", "se"] as ResizeHandle[]).map((handle) => {
+                        const styleByHandle: Record<ResizeHandle, string> = {
+                          nw: "-left-1.5 -top-1.5 cursor-nwse-resize",
+                          ne: "-right-1.5 -top-1.5 cursor-nesw-resize",
+                          sw: "-left-1.5 -bottom-1.5 cursor-nesw-resize",
+                          se: "-right-1.5 -bottom-1.5 cursor-nwse-resize",
+                        };
+                        return (
+                          <span
+                            key={`${hazard.id}-${handle}`}
+                            className={`absolute h-3 w-3 rounded-full border border-white bg-emerald-700 ${styleByHandle[handle]}`}
+                            onPointerDown={(event) => startDrag(event, "resize", handle)}
+                          />
+                        );
+                      })
+                    )}
                   </>
                 )}
               </div>

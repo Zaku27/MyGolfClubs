@@ -116,8 +116,11 @@ function getPenaltyStrokesByType(type: HazardType): 0 | 1 | 2 {
 }
 
 export function CourseEditor({ holes, onChange }: CourseEditorProps) {
+
   const [selectedHoleIndex, setSelectedHoleIndex] = useState(0);
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
+  const [polygonCreationMode, setPolygonCreationMode] = useState(false);
+  const [polygonDraftPoints, setPolygonDraftPoints] = useState<any[]>([]);
 
   const safeHoleIndex = Math.max(0, Math.min(selectedHoleIndex, holes.length - 1));
   const selectedHole = holes[safeHoleIndex];
@@ -130,6 +133,70 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const selectedGroundCondition = selectedHazard?.groundCondition ?? selectedHole?.groundCondition ?? DEFAULT_GROUND_CONDITION;
   const normalizedSlope = normalizeSlopeForDisplay(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection);
 
+
+  // 五角形のデフォルト多角形を生成
+  function buildDefaultPolygonPoints(centerX: number, centerY: number, radius: number, sides: number = 5) {
+    const points = [];
+    for (let i = 0; i < sides; i++) {
+      const angle = (2 * Math.PI * i) / sides - Math.PI / 2;
+      points.push({
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle),
+      });
+    }
+    return points;
+  }
+
+  const addPolygonHazard = () => {
+    if (!selectedHole) return;
+    const holeLength = selectedHole.targetDistance ?? selectedHole.distanceFromTee;
+    const centerY = Math.max(10, Math.round(holeLength * 0.35)) + 9;
+    const centerX = 0;
+    const radius = 12;
+    const points = buildDefaultPolygonPoints(centerX, centerY, radius, 5);
+    const bounds = {
+      x: Math.min(...points.map((p) => p.x)),
+      y: Math.min(...points.map((p) => p.y)),
+      width: Math.max(...points.map((p) => p.x)) - Math.min(...points.map((p) => p.x)),
+      height: Math.max(...points.map((p) => p.y)) - Math.min(...points.map((p) => p.y)),
+      xCenter: centerX,
+      yFront: Math.min(...points.map((p) => p.y)),
+      yBack: Math.max(...points.map((p) => p.y)),
+    };
+    const newHazard = {
+      id: `hazard-${selectedHole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: "bunker",
+      shape: "polygon",
+      shapeType: "polygon",
+      points,
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      yFront: bounds.yFront,
+      yBack: bounds.yBack,
+      xCenter: bounds.xCenter,
+      penaltyStrokes: 0,
+      groundCondition: { ...DEFAULT_GROUND_CONDITION },
+      name: buildHazardName("bunker", centerX, radius * 2),
+    };
+    updateHole((hole) => ({
+      ...hole,
+      hazards: [...cloneHazards(hole.hazards), newHazard],
+    }));
+    setSelectedHazardId(newHazard.id);
+  };
+
+  const handleCanvasClick = (point: any) => {
+    if (!polygonCreationMode || !selectedHole) return;
+    setPolygonDraftPoints((points) => [...points, point]);
+  };
+
+  const handleCanvasDoubleClick = () => {
+    if (!polygonCreationMode || !selectedHole || polygonDraftPoints.length < 3) return;
+    finishPolygonDraft(selectedHole, polygonDraftPoints);
+  };
+
   useEffect(() => {
     if (selectedHoleIndex >= holes.length) {
       setSelectedHoleIndex(Math.max(0, holes.length - 1));
@@ -138,6 +205,8 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
   useEffect(() => {
     setSelectedHazardId(null);
+    setPolygonCreationMode(false);
+    setPolygonDraftPoints([]);
   }, [safeHoleIndex]);
 
   const updateHole = (updater: (hole: Hole) => Hole) => {
@@ -392,6 +461,13 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         >
           ハザード追加
         </button>
+          <button
+            type="button"
+            onClick={addPolygonHazard}
+            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
+          >
+            フリーポリゴン追加
+          </button>
         <button
           type="button"
           onClick={deleteSelectedHazard}
