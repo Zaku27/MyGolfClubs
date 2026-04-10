@@ -156,13 +156,12 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     return points;
   }
 
-  const addPolygonHazard = () => {
+  const addPolygonHazard = (radius: number, sides: number) => {
     if (!selectedHole) return;
     const holeLength = selectedHole.targetDistance ?? selectedHole.distanceFromTee;
     const centerY = Math.max(10, Math.round(holeLength * 0.35)) + 9;
     const centerX = 0;
-    const radius = 12;
-    const points = buildDefaultPolygonPoints(centerX, centerY, radius, 10);
+    const points = buildDefaultPolygonPoints(centerX, centerY, radius, sides);
     const bounds = {
       x: Math.min(...points.map((p) => p.x)),
       y: Math.min(...points.map((p) => p.y)),
@@ -194,6 +193,9 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     }));
     setSelectedHazardId(newHazard.id);
   };
+
+  const addDefaultPolygonHazard = () => addPolygonHazard(16, 10);
+  const addLargePolygonHazard = () => addPolygonHazard(20, 15);
 
   const handleCanvasClick = (point: Point2D) => {
     if (!polygonCreationMode || !selectedHole) return;
@@ -485,17 +487,6 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         })()}
       </div>
 
-      {/* デバッグ用: 保存時と復元時のhazardsのJSON表示 */}
-      <div className="mt-2 mb-2 p-2 bg-yellow-50 border border-yellow-300 text-xs rounded">
-        <div className="font-bold text-yellow-900 mb-1">[DEBUG] hazards（保存直後データ）</div>
-        <pre style={{ maxHeight: 120, overflow: 'auto', fontSize: 11, background: 'inherit', margin: 0 }}>
-          {JSON.stringify(lastSavedHoles?.[safeHoleIndex]?.hazards, null, 2)}
-        </pre>
-        <div className="font-bold text-yellow-900 mb-1 mt-2">[DEBUG] hazards（復元データ）</div>
-        <pre style={{ maxHeight: 120, overflow: 'auto', fontSize: 11, background: 'inherit', margin: 0 }}>
-          {JSON.stringify(selectedHole.hazards, null, 2)}
-        </pre>
-      </div>
       <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -575,13 +566,20 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         >
           ハザード追加
         </button>
-          <button
-            type="button"
-            onClick={addPolygonHazard}
-            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
-          >
-            フリーポリゴン追加
-          </button>
+        <button
+          type="button"
+          onClick={addDefaultPolygonHazard}
+          className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
+        >
+          ポリゴン10
+        </button>
+        <button
+          type="button"
+          onClick={addLargePolygonHazard}
+          className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
+        >
+          ポリゴン15
+        </button>
         <button
           type="button"
           onClick={deleteSelectedHazard}
