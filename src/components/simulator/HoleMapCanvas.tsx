@@ -3,6 +3,10 @@ import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent }
 import type { Hole, Hazard } from "../../types/game";
 import type { LandingResult } from "../../utils/landingPosition";
 import { buildAutoHazardName, buildHazardDisplayName } from "../../utils/shotOutcome";
+import { getHazardStyle } from "./hazardStyle";
+import { drawPolygon } from "./drawPolygon";
+import { drawRectangle } from "./drawRectangle";
+import { drawObBoundaryMarkers } from "./drawObBoundaryMarkers";
 
 interface HoleMapCanvasProps {
   hole: Hole;
@@ -101,80 +105,7 @@ function chooseYardTickStep(range: number, targetTickCount = 8): number {
  * 要件で指定された bunker / water は固定色にし、
  * その他は識別しやすい補助色を設定している。
  */
-function getHazardStyle(type: Hazard["type"]): { fill: string; stroke: string } {
-  if (type === "bunker") {
-    return {
-      fill: "rgba(250, 204, 21, 0.45)",
-      stroke: "rgba(161, 98, 7, 0.65)",
-    };
-  }
 
-  if (type === "water") {
-    return {
-      fill: "rgba(59, 130, 246, 0.38)",
-      stroke: "rgba(220, 38, 38, 0.95)",
-    };
-  }
-
-  if (type === "ob") {
-    return {
-      fill: "rgba(248, 113, 113, 0.24)",
-      stroke: "rgba(185, 28, 28, 0.9)",
-    };
-  }
-
-  if (type === "bareground") {
-    return {
-      fill: "rgba(168, 162, 158, 0.35)",
-      stroke: "rgba(99, 92, 84, 0.95)",
-    };
-  }
-
-  return {
-    fill: "rgba(74, 222, 128, 0.22)",
-    stroke: "rgba(22, 101, 52, 0.85)",
-  };
-}
-
-function drawObBoundaryMarkers(
-  context: CanvasRenderingContext2D,
-  hazard: Hazard,
-  yardToPxX: (yardX: number) => number,
-  yardToPxY: (yardY: number) => number,
-) {
-  if (hazard.type !== "ob") {
-    return;
-  }
-
-  const leftYard = hazard.xCenter - hazard.width / 2;
-  const rightYard = hazard.xCenter + hazard.width / 2;
-  const innerBoundaryYard = Math.abs(leftYard) < Math.abs(rightYard) ? leftYard : rightYard;
-  const markerSize = 5;
-  const markerXBoundary = yardToPxX(innerBoundaryYard);
-  const markerInset = 1;
-  const markerLeftPx = hazard.xCenter < 0
-    ? markerXBoundary - markerSize - markerInset
-    : markerXBoundary + markerInset;
-  const startYard = Math.ceil(hazard.yFront / 50) * 50;
-  const endYard = hazard.yBack;
-
-  if (startYard > endYard) {
-    return;
-  }
-
-  context.save();
-  context.fillStyle = "#ffffff";
-  context.strokeStyle = "rgba(0, 0, 0, 0.35)";
-  context.lineWidth = 1;
-
-  for (let yard = startYard; yard <= endYard + 1e-6; yard += 50) {
-    const markerY = yardToPxY(yard);
-    context.fillRect(markerLeftPx, markerY - markerSize / 2, markerSize, markerSize);
-    context.strokeRect(markerLeftPx, markerY - markerSize / 2, markerSize, markerSize);
-  }
-
-  context.restore();
-}
 
 /**
  * ホール全体を収めるための距離レンジを算出する。
@@ -777,78 +708,17 @@ export function HoleMapCanvas({
     context.stroke();
     context.restore();
 
-    // ハザード描画: rectangleは矩形、多角形はpointsでパス描画
+    // ハザード描画: util関数で整理
     for (const hazard of hazards) {
       const style = getHazardStyle(hazard.type);
       context.fillStyle = style.fill;
       context.strokeStyle = style.stroke;
       context.lineWidth = 1.5;
-
       if (hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3) {
-        // 多角形描画
-        context.beginPath();
-        const first = hazard.points[0];
-        context.moveTo(yardToPxX(first.x), yardToPxY(first.y));
-        for (let i = 1; i < hazard.points.length; i++) {
-          const pt = hazard.points[i];
-          context.lineTo(yardToPxX(pt.x), yardToPxY(pt.y));
-        }
-        context.closePath();
-        context.fill();
-        context.stroke();
+        drawPolygon(context, hazard, yardToPxX, yardToPxY);
       } else {
-        // 矩形描画（従来通り）
-        const leftYard = hazard.xCenter - hazard.width / 2;
-        const rightYard = hazard.xCenter + hazard.width / 2;
-        const topYard = hazard.yBack;
-        const bottomYard = hazard.yFront;
-
-        const leftPx = yardToPxX(leftYard);
-        const rightPx = yardToPxX(rightYard);
-        const topPx = yardToPxY(topYard);
-        const bottomPx = yardToPxY(bottomYard);
-
-        const widthPx = Math.max(2, rightPx - leftPx);
-        const heightPx = Math.max(2, bottomPx - topPx);
-
-        context.fillRect(leftPx, topPx, widthPx, heightPx);
-
-        if (hazard.type === "water") {
-          context.save();
-          context.setLineDash([6, 4]);
-          context.strokeRect(leftPx, topPx, widthPx, heightPx);
-          context.restore();
-        } else {
-          context.setLineDash([]);
-          context.strokeRect(leftPx, topPx, widthPx, heightPx);
-        }
-
-        // ラベル描画（矩形のみ）
-        const label = buildHazardDisplayName(hazard);
-        context.save();
-        context.font = "bold 10px sans-serif";
-        context.textAlign = "center";
-        context.lineWidth = 2;
-        context.strokeStyle = "rgba(0, 0, 0, 0.6)";
-        context.fillStyle = "#ffffff";
-
-        if (widthPx >= 26 && heightPx >= 16) {
-          const labelX = leftPx + widthPx / 2;
-          const labelY = topPx + heightPx / 2;
-          context.textBaseline = "middle";
-          context.strokeText(label, labelX, labelY);
-          context.fillText(label, labelX, labelY);
-        } else if (widthPx >= 14 && heightPx >= 10) {
-          const labelX = leftPx + widthPx / 2;
-          const labelY = topPx - 4;
-          context.textBaseline = "bottom";
-          context.strokeText(label, labelX, labelY);
-          context.fillText(label, labelX, labelY);
-        }
-
-        context.restore();
+        drawRectangle(context, hazard, yardToPxX, yardToPxY);
       }
-
       drawObBoundaryMarkers(context, hazard, yardToPxX, yardToPxY);
     }
 
