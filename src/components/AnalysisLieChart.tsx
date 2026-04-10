@@ -1,4 +1,5 @@
 import type { CSSProperties, RefObject } from 'react';
+import { LieGoodRangePolygon } from './LieGoodRangePolygon';
 import { getAnalysisClubKey, getClubTypeDisplay } from '../utils/clubUtils';
 import { getLieBarColor } from '../utils/analysisUtils';
 import { lieStatusLabelJa } from '../types/lieStandards';
@@ -89,13 +90,7 @@ export const AnalysisLieChart = ({
                 </text>
               </g>
             ))}
-            {goodRangePolygonPoints && (
-              <polygon
-                points={goodRangePolygonPoints}
-                fill="#2e7d32"
-                fillOpacity="0.16"
-              />
-            )}
+            <LieGoodRangePolygon points={goodRangePolygonPoints} />
             {standardLieLinePoints && (
               <polyline
                 points={standardLieLinePoints}

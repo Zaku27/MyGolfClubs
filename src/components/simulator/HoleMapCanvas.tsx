@@ -24,6 +24,8 @@ interface HoleMapCanvasProps {
   onSelectHazardId?: (hazardId: string | null) => void;
   onSelectHoleArea?: () => void;
   onHazardsChange?: (hazards: Hazard[]) => void;
+  onCanvasClick?: (point: Point2D) => void;
+  onCanvasDoubleClick?: (point: Point2D) => void;
 }
 
 type Size = {
@@ -983,7 +985,10 @@ export function HoleMapCanvas({
 
   const handleCanvasDoubleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onCanvasDoubleClick) return;
-    onCanvasDoubleClick();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left - viewport.offsetX) / viewport.scale;
+    const y = (event.clientY - rect.top - viewport.offsetY) / viewport.scale;
+    onCanvasDoubleClick({ x, y });
   };
 
   return (

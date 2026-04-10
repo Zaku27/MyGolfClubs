@@ -1,7 +1,9 @@
-﻿import { useEffect, useMemo, useState, useRef } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { GroundCondition, Hazard, HazardType, Hole } from "../../types/game";
 import { generateRandomCourse } from "../../utils/courseGenerator";
 import { HoleMapCanvas } from "./HoleMapCanvas";
+
+type Point2D = { x: number; y: number };
 
 interface CourseEditorProps {
   holes: Hole[];
@@ -193,14 +195,71 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     setSelectedHazardId(newHazard.id);
   };
 
-  const handleCanvasClick = (point: any) => {
+  const handleCanvasClick = (point: Point2D) => {
     if (!polygonCreationMode || !selectedHole) return;
     setPolygonDraftPoints((points) => [...points, point]);
   };
 
-  const handleCanvasDoubleClick = () => {
-    if (!polygonCreationMode || !selectedHole || polygonDraftPoints.length < 3) return;
-    finishPolygonDraft(selectedHole, polygonDraftPoints);
+  const addPointToSelectedPolygon = (point: Point2D) => {
+    if (!selectedHole || !selectedHazard || selectedHazard.shape !== "polygon") return;
+    updateSelectedHazard((hazard) => {
+      if (hazard.id !== selectedHazard.id || hazard.shape !== "polygon") {
+        return hazard;
+      }
+      return {
+        ...hazard,
+        points: [...(hazard.points ?? []), point],
+      };
+    });
+  };
+
+  const finishPolygonDraft = (hole: Hole, points: Point2D[]) => {
+    if (points.length < 3) return;
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    const bounds = {
+      x: Math.min(...xs),
+      y: Math.min(...ys),
+      width: Math.max(...xs) - Math.min(...xs),
+      height: Math.max(...ys) - Math.min(...ys),
+      xCenter: (Math.max(...xs) + Math.min(...xs)) / 2,
+      yFront: Math.min(...ys),
+      yBack: Math.max(...ys),
+    };
+    const newHazard: Hazard = {
+      id: `hazard-${hole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: "bunker",
+      shape: "polygon",
+      points,
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      yFront: bounds.yFront,
+      yBack: bounds.yBack,
+      xCenter: bounds.xCenter,
+      penaltyStrokes: 0,
+      groundCondition: { ...DEFAULT_GROUND_CONDITION },
+      name: buildHazardName("bunker", bounds.xCenter, bounds.width),
+    };
+
+    updateHole((currentHole) => ({
+      ...currentHole,
+      hazards: [...cloneHazards(currentHole.hazards), newHazard],
+    }));
+    setSelectedHazardId(newHazard.id);
+    setPolygonCreationMode(false);
+    setPolygonDraftPoints([]);
+  };
+
+  const handleCanvasDoubleClick = (point: Point2D) => {
+    if (polygonCreationMode && selectedHole && polygonDraftPoints.length >= 3) {
+      finishPolygonDraft(selectedHole, polygonDraftPoints);
+      return;
+    }
+    if (selectedHazard?.shape === "polygon") {
+      addPointToSelectedPolygon(point);
+    }
   };
 
   useEffect(() => {
@@ -419,6 +478,8 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
               onSelectHazardId={setSelectedHazardId}
               onSelectHoleArea={() => setSelectedHazardId(null)}
               onHazardsChange={updateSelectedHoleHazards}
+              onCanvasClick={handleCanvasClick}
+              onCanvasDoubleClick={handleCanvasDoubleClick}
             />
           );
         })()}
