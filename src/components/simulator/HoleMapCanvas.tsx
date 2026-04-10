@@ -562,11 +562,12 @@ export function HoleMapCanvas({
   };
 
   useEffect(() => {
-    if (currentHoleKey == null) {
+    if (currentHoleKey == null || editable) {
       return;
     }
     setDragState(null);
-  }, [currentHoleKey]);
+    resetViewport();
+  }, [currentHoleKey, resetViewport, editable]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;

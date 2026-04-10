@@ -395,6 +395,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 shotOrigin={{ x: shotContext.originX, y: shotContext.originY }}
                 highlightPoint={shotContext.penaltyDropOrigin ?? (lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null)}
                 showTrajectories
+                currentHoleKey={currentHoleIndex}
+                holeComplete={isHoleComplete}
               />
             </div>
 
@@ -694,6 +696,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 shotOrigin={{ x: shotContext.originX, y: shotContext.originY }}
                 highlightPoint={shotContext.penaltyDropOrigin ?? (lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null)}
                 showTrajectories
+                currentHoleKey={currentHoleIndex}
+                holeComplete={isHoleComplete}
               />
             </div>
 

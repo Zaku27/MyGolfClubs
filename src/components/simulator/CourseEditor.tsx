@@ -143,8 +143,8 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const normalizedSlope = normalizeSlopeForDisplay(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection);
 
 
-  // 五角形のデフォルト多角形を生成
-  function buildDefaultPolygonPoints(centerX: number, centerY: number, radius: number, sides: number = 5) {
+  // 10角形のデフォルト多角形を生成
+  function buildDefaultPolygonPoints(centerX: number, centerY: number, radius: number, sides: number = 10) {
     const points = [];
     for (let i = 0; i < sides; i++) {
       const angle = (2 * Math.PI * i) / sides - Math.PI / 2;
@@ -162,7 +162,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     const centerY = Math.max(10, Math.round(holeLength * 0.35)) + 9;
     const centerX = 0;
     const radius = 12;
-    const points = buildDefaultPolygonPoints(centerX, centerY, radius, 5);
+    const points = buildDefaultPolygonPoints(centerX, centerY, radius, 10);
     const bounds = {
       x: Math.min(...points.map((p) => p.x)),
       y: Math.min(...points.map((p) => p.y)),
