@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState, useRef } from "react";
 import type { GroundCondition, Hazard, HazardType, Hole } from "../../types/game";
 import { generateRandomCourse } from "../../utils/courseGenerator";
 import { HoleMapCanvas } from "./HoleMapCanvas";
@@ -82,7 +82,12 @@ function toStoredSlopeDirection(slopeAngle: number, displayedDirection: number) 
 }
 
 function cloneHazards(hazards: Hazard[] | undefined) {
-  return (hazards ?? []).map((hazard) => ({ ...hazard }));
+  return (hazards ?? []).map((hazard) => ({
+    ...hazard,
+    points: Array.isArray(hazard.points)
+      ? hazard.points.map((pt) => ({ ...pt }))
+      : undefined,
+  }));
 }
 
 function buildHazardName(type: HazardType, xCenter: number, width: number) {
@@ -116,6 +121,8 @@ function getPenaltyStrokesByType(type: HazardType): 0 | 1 | 2 {
 }
 
 export function CourseEditor({ holes, onChange }: CourseEditorProps) {
+  // 保存時データのデバッグ用
+  const [lastSavedHoles, setLastSavedHoles] = useState<Hole[] | null>(null);
 
   const [selectedHoleIndex, setSelectedHoleIndex] = useState(0);
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
@@ -167,7 +174,6 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       id: `hazard-${selectedHole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type: "bunker",
       shape: "polygon",
-      shapeType: "polygon",
       points,
       x: bounds.x,
       y: bounds.y,
@@ -216,6 +222,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       }
       return updater({ ...hole, hazards: cloneHazards(hole.hazards) });
     });
+    setLastSavedHoles(next); // 保存直後のデータを記録
     onChange(next);
   };
 
@@ -225,9 +232,26 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
   const updateSelectedHazard = (updater: (hazard: Hazard) => Hazard) => {
     if (!selectedHole || !selectedHazardId) return;
-    const next = cloneHazards(selectedHole.hazards).map((hazard) =>
-      hazard.id !== selectedHazardId ? hazard : updater(hazard),
-    );
+    const next = cloneHazards(selectedHole.hazards).map((hazard) => {
+      if (hazard.id !== selectedHazardId) return hazard;
+      const updated = updater(hazard);
+      // polygonの場合、矩形用プロパティをpointsから再計算して上書き
+      if (updated.shape === "polygon" && Array.isArray(updated.points) && updated.points.length >= 3) {
+        const xs = updated.points.map((p) => p.x);
+        const ys = updated.points.map((p) => p.y);
+        return {
+          ...updated,
+          x: Math.min(...xs),
+          y: Math.min(...ys),
+          width: Math.max(...xs) - Math.min(...xs),
+          height: Math.max(...ys) - Math.min(...ys),
+          xCenter: (Math.max(...xs) + Math.min(...xs)) / 2,
+          yFront: Math.min(...ys),
+          yBack: Math.max(...ys),
+        };
+      }
+      return updated;
+    });
     updateSelectedHoleHazards(next);
   };
 
@@ -369,19 +393,48 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       </div>
 
       <div className="mt-4 w-full max-w-screen-md">
-        <HoleMapCanvas
-          hole={selectedHole}
-          landingResults={[]}
-          showTrajectories={false}
-          editable
-          currentHoleKey={selectedHole.number}
-          selectedHazardId={selectedHazardId}
-          onSelectHazardId={setSelectedHazardId}
-          onSelectHoleArea={() => setSelectedHazardId(null)}
-          onHazardsChange={updateSelectedHoleHazards}
-        />
+        {(() => {
+          // hazardsを正規化: polygonはpointsが必ず配列
+          const normalizedHazards = useMemo(() =>
+            (selectedHole.hazards ?? []).map(h => {
+              if (h.shape === "polygon") {
+                return {
+                  ...h,
+                  points: Array.isArray(h.points) ? h.points.map(pt => ({ ...pt })) : [],
+                };
+              }
+              if (h.shape === "rectangle") {
+                return { ...h };
+              }
+              throw new Error(`[CourseEditor] 不正なshape値: ${h.shape}`);
+            }), [selectedHole.hazards]);
+          return (
+            <HoleMapCanvas
+              hole={{ ...selectedHole, hazards: normalizedHazards }}
+              landingResults={[]}
+              showTrajectories={false}
+              editable
+              currentHoleKey={selectedHole.number}
+              selectedHazardId={selectedHazardId}
+              onSelectHazardId={setSelectedHazardId}
+              onSelectHoleArea={() => setSelectedHazardId(null)}
+              onHazardsChange={updateSelectedHoleHazards}
+            />
+          );
+        })()}
       </div>
 
+      {/* デバッグ用: 保存時と復元時のhazardsのJSON表示 */}
+      <div className="mt-2 mb-2 p-2 bg-yellow-50 border border-yellow-300 text-xs rounded">
+        <div className="font-bold text-yellow-900 mb-1">[DEBUG] hazards（保存直後データ）</div>
+        <pre style={{ maxHeight: 120, overflow: 'auto', fontSize: 11, background: 'inherit', margin: 0 }}>
+          {JSON.stringify(lastSavedHoles?.[safeHoleIndex]?.hazards, null, 2)}
+        </pre>
+        <div className="font-bold text-yellow-900 mb-1 mt-2">[DEBUG] hazards（復元データ）</div>
+        <pre style={{ maxHeight: 120, overflow: 'auto', fontSize: 11, background: 'inherit', margin: 0 }}>
+          {JSON.stringify(selectedHole.hazards, null, 2)}
+        </pre>
+      </div>
       <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -502,58 +555,60 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
                 ))}
               </select>
             </label>
-
-            <label className="space-y-1 text-xs font-semibold text-emerald-800">
-              中心X
-              <input
-                type="number"
-                value={Math.round(selectedHazard.xCenter)}
-                onChange={(event) => {
-                  const next = Number(event.target.value) || 0;
-                  updateSelectedHazard((hazard) => ({
-                    ...hazard,
-                    xCenter: next,
-                    name: buildHazardName(hazard.type, next, hazard.width),
-                  }));
-                }}
-                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-              />
-            </label>
-
-            <label className="space-y-1 text-xs font-semibold text-emerald-800">
-              幅
-              <input
-                type="number"
-                min={6}
-                value={Math.max(6, Math.round(selectedHazard.width))}
-                onChange={(event) => {
-                  const next = Math.max(6, Number(event.target.value) || 6);
-                  updateSelectedHazard((hazard) => ({
-                    ...hazard,
-                    width: next,
-                    name: buildHazardName(hazard.type, hazard.xCenter, next),
-                  }));
-                }}
-                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-              />
-            </label>
-
-            <label className="space-y-1 text-xs font-semibold text-emerald-800">
-              奥行き
-              <input
-                type="number"
-                min={6}
-                value={Math.max(6, Math.round(selectedHazard.yBack - selectedHazard.yFront))}
-                onChange={(event) => {
-                  const next = Math.max(6, Number(event.target.value) || 6);
-                  updateSelectedHazard((hazard) => ({
-                    ...hazard,
-                    yBack: hazard.yFront + next,
-                  }));
-                }}
-                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-              />
-            </label>
+            {/* polygon以外のみ編集UIを表示 */}
+            {selectedHazard.shape !== "polygon" && (
+              <>
+                <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                  中心X
+                  <input
+                    type="number"
+                    value={Math.round(selectedHazard.xCenter)}
+                    onChange={(event) => {
+                      const next = Number(event.target.value) || 0;
+                      updateSelectedHazard((hazard) => ({
+                        ...hazard,
+                        xCenter: next,
+                        name: buildHazardName(hazard.type, next, hazard.width),
+                      }));
+                    }}
+                    className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                  幅
+                  <input
+                    type="number"
+                    min={6}
+                    value={Math.max(6, Math.round(selectedHazard.width))}
+                    onChange={(event) => {
+                      const next = Math.max(6, Number(event.target.value) || 6);
+                      updateSelectedHazard((hazard) => ({
+                        ...hazard,
+                        width: next,
+                        name: buildHazardName(hazard.type, hazard.xCenter, next),
+                      }));
+                    }}
+                    className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                  奥行き
+                  <input
+                    type="number"
+                    min={6}
+                    value={Math.max(6, Math.round(selectedHazard.yBack - selectedHazard.yFront))}
+                    onChange={(event) => {
+                      const next = Math.max(6, Number(event.target.value) || 6);
+                      updateSelectedHazard((hazard) => ({
+                        ...hazard,
+                        yBack: hazard.yFront + next,
+                      }));
+                    }}
+                    className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                  />
+                </label>
+              </>
+            )}
           </div>
         </div>
       )}

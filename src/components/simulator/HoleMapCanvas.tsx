@@ -53,8 +53,9 @@ type ResizeHandle = "nw" | "ne" | "sw" | "se";
 
 type DragState = {
   hazardId: string;
-  mode: DragMode;
+  mode: DragMode | "vertex";
   handle?: ResizeHandle;
+  vertexIndex?: number;
   startClientX: number;
   startClientY: number;
   initialHazard: Hazard;
@@ -839,16 +840,33 @@ export function HoleMapCanvas({
       if (hazard.id !== state.hazardId) return hazard;
       const original = state.initialHazard;
 
-      // 頂点ドラッグ
-      if (state.mode === "vertex" && typeof state.vertexIndex === "number" && Array.isArray(hazard.points)) {
-        const newPoints = hazard.points.map((pt, idx) => {
-          if (idx !== state.vertexIndex) return pt;
-          return {
-            x: pt.x + deltaX,
-            y: pt.y + deltaY,
-          };
-        });
+      // 頂点ドラッグ（自由変形: その頂点だけ動かす）
+      if (state.mode === "vertex" && typeof state.vertexIndex === "number" && Array.isArray(hazard.points) && Array.isArray(state.initialHazard.points)) {
+        const idx = state.vertexIndex;
+        const initialPoints = state.initialHazard.points;
+        if (initialPoints.length < 3) return hazard;
+        const newPoints = initialPoints.map((pt, i) =>
+          i === idx ? { x: pt.x + deltaX, y: pt.y + deltaY } : pt
+        );
         // bounds再計算
+        const xs = newPoints.map((p) => p.x);
+        const ys = newPoints.map((p) => p.y);
+        return {
+          ...hazard,
+          points: newPoints,
+          x: Math.min(...xs),
+          y: Math.min(...ys),
+          width: Math.max(...xs) - Math.min(...xs),
+          height: Math.max(...ys) - Math.min(...ys),
+          xCenter: (Math.max(...xs) + Math.min(...xs)) / 2,
+          yFront: Math.min(...ys),
+          yBack: Math.max(...ys),
+        };
+      }
+
+      // polygon全体move
+      if (state.mode === "move" && hazard.shape === "polygon" && Array.isArray(hazard.points) && Array.isArray(state.initialHazard.points)) {
+        const newPoints = state.initialHazard.points.map((pt) => ({ x: pt.x + deltaX, y: pt.y + deltaY }));
         const xs = newPoints.map((p) => p.x);
         const ys = newPoints.map((p) => p.y);
         return {
@@ -1010,7 +1028,7 @@ export function HoleMapCanvas({
               ? "border-emerald-900 bg-emerald-300/20"
               : "border-transparent bg-transparent";
 
-            const startDrag = (event: React.PointerEvent<HTMLElement>, mode: DragMode, handle?: ResizeHandle) => {
+            const startDrag = (event: React.PointerEvent<HTMLElement>, mode: DragMode | "vertex", handleOrIndex?: ResizeHandle | number) => {
               if (dragState) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1023,7 +1041,8 @@ export function HoleMapCanvas({
               setDragState({
                 hazardId: hazard.id,
                 mode,
-                handle,
+                handle: typeof handleOrIndex === "string" ? handleOrIndex : undefined,
+                vertexIndex: typeof handleOrIndex === "number" ? handleOrIndex : undefined,
                 startClientX: event.clientX,
                 startClientY: event.clientY,
                 initialHazard: { ...hazard },

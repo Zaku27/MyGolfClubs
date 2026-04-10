@@ -116,6 +116,47 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
               ? h.type
               : "bunker";
             const penaltyStrokes: 0 | 1 | 2 = type === "ob" ? 2 : type === "water" ? 1 : 0;
+            const points = Array.isArray(h.points)
+              ? h.points
+                  .filter((point) => point && typeof point === "object")
+                  .map((point) => {
+                    const rawPoint = point as Record<string, unknown>;
+                    return {
+                      x: Number(rawPoint.x) || 0,
+                      y: Number(rawPoint.y) || 0,
+                    };
+                  })
+              : [];
+            const isPolygon = h.shape === "polygon" && points.length >= 3;
+
+            if (isPolygon) {
+              const xs = points.map((p) => p.x);
+              const ys = points.map((p) => p.y);
+              const minX = Math.min(...xs);
+              const maxX = Math.max(...xs);
+              const minY = Math.min(...ys);
+              const maxY = Math.max(...ys);
+              const xCenter = Number(h.xCenter) || (minX + maxX) / 2;
+
+              return {
+                id: typeof h.id === "string" && h.id.length > 0
+                  ? h.id
+                  : `restored-${index + 1}-${hazardIndex + 1}`,
+                type,
+                shape: "polygon" as const,
+                points,
+                x: Number(h.x) || minX,
+                y: Number(h.y) || minY,
+                width: Number(h.width) || maxX - minX,
+                height: Number(h.height) || maxY - minY,
+                xCenter,
+                yFront: Number(h.yFront) || minY,
+                yBack: Number(h.yBack) || maxY,
+                penaltyStrokes,
+                name: typeof h.name === "string" && h.name.length > 0 ? h.name : undefined,
+                groundCondition: normalizeGroundCondition(h.groundCondition),
+              };
+            }
 
             return {
               id: typeof h.id === "string" && h.id.length > 0
