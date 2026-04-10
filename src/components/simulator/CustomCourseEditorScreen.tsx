@@ -501,7 +501,6 @@ export function CustomCourseEditorScreen() {
       <div className="w-full max-w-3xl">
         <div className="flex flex-col gap-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-5 shadow-sm shadow-emerald-300/40 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3 text-emerald-900">
-            <div className="text-6xl">🛠️</div>
             <div>
               <h1 className="text-3xl font-black tracking-tight">コースエディタ</h1>
               <p className="text-emerald-700 mt-1 text-sm">カスタムコースを独立して編集・保存できます。</p>
@@ -586,14 +585,14 @@ export function CustomCourseEditorScreen() {
               onClick={handleSaveAsNew}
               className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900 hover:bg-sky-100"
             >
-              名前を付けて新規保存
+              新規保存
             </button>
             <button
               type="button"
               onClick={handleSaveOverwrite}
               className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
             >
-              選択中を上書き保存
+              上書き保存
             </button>
           </div>
         </div>
@@ -604,14 +603,14 @@ export function CustomCourseEditorScreen() {
             onClick={handleExportCustomCourseLibrary}
             className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
           >
-            ライブラリをエクスポート
+            コースをエクスポート
           </button>
           <button
             type="button"
             onClick={handleOpenImportDialog}
             className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
           >
-            ライブラリをインポート
+            コースをインポート
           </button>
           <button
             type="button"
@@ -628,14 +627,6 @@ export function CustomCourseEditorScreen() {
             className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
             順番を上へ
-          </button>
-          <button
-            type="button"
-            onClick={() => handleMoveSelected("down")}
-            disabled={selectedCustomCourseIndex < 0 || selectedCustomCourseIndex >= savedCustomCourses.length - 1}
-            className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            順番を下へ
           </button>
           <span className="text-xs text-emerald-700">保存済み: {savedCustomCourses.length}件</span>
         </div>

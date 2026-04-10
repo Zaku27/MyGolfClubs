@@ -101,23 +101,26 @@ function buildHazardName(type: HazardType, xCenter: number, width: number) {
   return `${label} ${Math.round(xCenter)} ${Math.round(width)}`;
 }
 
-function buildEmptyHazard(hole: Hole): Hazard {
-  const holeLength = hole.targetDistance ?? hole.distanceFromTee;
-  const yFront = Math.max(10, Math.round(holeLength * 0.35));
-  const xCenter = 0;
-  const width = 30;
+function buildEmptyHazard(
+  hole: Hole,
+  type: HazardType = "ob",
+  xCenter: number = 100,
+  width: number = 50,
+  depth: number = 200,
+): Hazard {
+  const yFront = 0;
 
   return {
     id: `hazard-${hole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    type: "bunker",
+    type,
     shape: "rectangle",
     yFront,
-    yBack: yFront + 18,
+    yBack: yFront + depth,
     xCenter,
     width,
-    penaltyStrokes: 0,
+    penaltyStrokes: getPenaltyStrokesByType(type),
     groundCondition: { ...DEFAULT_GROUND_CONDITION },
-    name: buildHazardName("bunker", xCenter, width),
+    name: buildHazardName(type, xCenter, width),
   };
 }
 
@@ -176,11 +179,19 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     return points;
   }
 
-  const addPolygonHazard = (radius: number, sides: number) => {
+  const addPolygonHazard = (
+    radius: number,
+    sides: number,
+    type: HazardType = "bunker",
+    xCenterOverride?: number,
+    yFrontOverride?: number,
+  ) => {
     if (!selectedHole) return;
     const holeLength = selectedHole.targetDistance ?? selectedHole.distanceFromTee;
-    const centerY = Math.max(10, Math.round(holeLength * 0.35)) + 9;
-    const centerX = 0;
+    const centerX = xCenterOverride ?? 0;
+    const centerY = yFrontOverride !== undefined
+      ? yFrontOverride + radius
+      : Math.max(10, Math.round(holeLength * 0.35)) + 9;
     const points = buildDefaultPolygonPoints(centerX, centerY, radius, sides);
     const bounds = {
       x: Math.min(...points.map((p) => p.x)),
@@ -193,7 +204,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     };
     const newHazard = {
       id: `hazard-${selectedHole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      type: "bunker",
+      type,
       shape: "polygon",
       points,
       x: bounds.x,
@@ -203,9 +214,9 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       yFront: bounds.yFront,
       yBack: bounds.yBack,
       xCenter: bounds.xCenter,
-      penaltyStrokes: 0,
+      penaltyStrokes: getPenaltyStrokesByType(type),
       groundCondition: { ...DEFAULT_GROUND_CONDITION },
-      name: buildHazardName("bunker", centerX, radius * 2),
+      name: buildHazardName(type, centerX, radius * 2),
     };
     updateHole((hole) => ({
       ...hole,
@@ -214,8 +225,9 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     setSelectedHazardId(newHazard.id);
   };
 
+  const addSmallBunkerHazard = () => addPolygonHazard(12, 10, "bunker", undefined, 25);
   const addDefaultPolygonHazard = () => addPolygonHazard(16, 10);
-  const addLargePolygonHazard = () => addPolygonHazard(20, 15);
+  const addLargePolygonHazard = () => addPolygonHazard(20, 15, "water", 25, 125);
 
   const handleCanvasClick = (point: Point2D) => {
     if (!polygonCreationMode || !selectedHole) return;
@@ -358,9 +370,29 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     }));
   };
 
+  const addBaregroundHazard = () => {
+    if (!selectedHole) return;
+    const newHazard = buildEmptyHazard(selectedHole, "bareground", -75, 50, 300);
+    updateHole((hole) => ({
+      ...hole,
+      hazards: [...cloneHazards(hole.hazards), newHazard],
+    }));
+    setSelectedHazardId(newHazard.id);
+  };
+
+  const addRoughHazard = () => {
+    if (!selectedHole) return;
+    const newHazard = buildEmptyHazard(selectedHole, "rough", -40, 20, 300);
+    updateHole((hole) => ({
+      ...hole,
+      hazards: [...cloneHazards(hole.hazards), newHazard],
+    }));
+    setSelectedHazardId(newHazard.id);
+  };
+
   const addHazard = () => {
     if (!selectedHole) return;
-    const newHazard = buildEmptyHazard(selectedHole);
+    const newHazard = buildEmptyHazard(selectedHole, "ob", 75, 50, 300);
     updateHole((hole) => ({
       ...hole,
       hazards: [...cloneHazards(hole.hazards), newHazard],
@@ -391,17 +423,6 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   return (
     <section className="mx-auto mt-4 w-full max-w-2xl rounded-2xl border border-emerald-300 bg-white/80 p-4 shadow-sm shadow-emerald-300/30">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-black tracking-[0.08em] text-emerald-900">コースエディタ</h2>
-          <p className="text-xs text-emerald-700">ホールとハザードを直感的に編集できます。</p>
-        </div>
-        <button
-          type="button"
-          onClick={randomizeAll}
-          className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900 transition hover:bg-sky-100"
-        >
-          ランダム生成
-        </button>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -563,24 +584,45 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
+          onClick={addBaregroundHazard}
+          className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+        >
+          ベアグラウンド
+        </button>
+        <button
+          type="button"
           onClick={addHazard}
           className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
         >
-          ハザード追加
+          OB
+        </button>
+        <button
+          type="button"
+          onClick={addRoughHazard}
+          className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+        >
+          ラフ
+        </button>
+        <button
+          type="button"
+          onClick={addSmallBunkerHazard}
+          className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
+        >
+          バンカー小
         </button>
         <button
           type="button"
           onClick={addDefaultPolygonHazard}
           className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
         >
-          ポリゴン10
+          バンカー大
         </button>
         <button
           type="button"
           onClick={addLargePolygonHazard}
           className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
         >
-          ポリゴン15
+          ウォーター
         </button>
         <button
           type="button"
