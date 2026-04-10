@@ -89,6 +89,7 @@ function cloneHazards(hazards: Hazard[] | undefined) {
     points: Array.isArray(hazard.points)
       ? hazard.points.map((pt) => ({ ...pt }))
       : undefined,
+    groundCondition: hazard.groundCondition ? { ...hazard.groundCondition } : undefined,
   }));
 }
 
@@ -146,6 +147,21 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const selectedGroundCondition = selectedHazard?.groundCondition ?? selectedHole?.groundCondition ?? DEFAULT_GROUND_CONDITION;
   const normalizedSlope = normalizeSlopeForDisplay(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection);
 
+  const normalizedHazards = useMemo(() =>
+    (selectedHole?.hazards ?? []).map((h) => {
+      if (h.shape === "polygon") {
+        return {
+          ...h,
+          points: Array.isArray(h.points) ? h.points.map((pt) => ({ ...pt })) : [],
+        };
+      }
+      if (h.shape === "rectangle") {
+        return { ...h };
+      }
+      throw new Error(`[CourseEditor] 不正なshape値: ${h.shape}`);
+    }),
+    [selectedHole?.hazards],
+  );
 
   // 10角形のデフォルト多角形を生成
   function buildDefaultPolygonPoints(centerX: number, centerY: number, radius: number, sides: number = 10) {
@@ -458,37 +474,19 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       </div>
 
       <div className="mt-4 w-full max-w-screen-md">
-        {(() => {
-          // hazardsを正規化: polygonはpointsが必ず配列
-          const normalizedHazards = useMemo(() =>
-            (selectedHole.hazards ?? []).map(h => {
-              if (h.shape === "polygon") {
-                return {
-                  ...h,
-                  points: Array.isArray(h.points) ? h.points.map(pt => ({ ...pt })) : [],
-                };
-              }
-              if (h.shape === "rectangle") {
-                return { ...h };
-              }
-              throw new Error(`[CourseEditor] 不正なshape値: ${h.shape}`);
-            }), [selectedHole.hazards]);
-          return (
-            <HoleMapCanvas
-              hole={{ ...selectedHole, hazards: normalizedHazards }}
-              landingResults={[]}
-              showTrajectories={false}
-              editable
-              currentHoleKey={selectedHole.number}
-              selectedHazardId={selectedHazardId}
-              onSelectHazardId={setSelectedHazardId}
-              onSelectHoleArea={() => setSelectedHazardId(null)}
-              onHazardsChange={updateSelectedHoleHazards}
-              onCanvasClick={handleCanvasClick}
-              onCanvasDoubleClick={handleCanvasDoubleClick}
-            />
-          );
-        })()}
+        <HoleMapCanvas
+          hole={{ ...selectedHole, hazards: normalizedHazards }}
+          landingResults={[]}
+          showTrajectories={false}
+          editable
+          currentHoleKey={selectedHole.number}
+          selectedHazardId={selectedHazardId}
+          onSelectHazardId={setSelectedHazardId}
+          onSelectHoleArea={() => setSelectedHazardId(null)}
+          onHazardsChange={updateSelectedHoleHazards}
+          onCanvasClick={handleCanvasClick}
+          onCanvasDoubleClick={handleCanvasDoubleClick}
+        />
       </div>
 
       <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">

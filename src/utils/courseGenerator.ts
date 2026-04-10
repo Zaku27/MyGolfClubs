@@ -70,7 +70,13 @@ function generateHazard(hole: Hole, hazardIndex: number): Hazard {
 function cloneHole(hole: Hole): Hole {
   return {
     ...hole,
-    hazards: (hole.hazards ?? []).map((hazard) => ({ ...hazard })),
+    hazards: (hole.hazards ?? []).map((hazard) => ({
+      ...hazard,
+      points: Array.isArray(hazard.points)
+        ? hazard.points.map((point) => ({ ...point }))
+        : undefined,
+      groundCondition: hazard.groundCondition ? { ...hazard.groundCondition } : undefined,
+    })),
     groundCondition: hole.groundCondition ? { ...hole.groundCondition } : undefined,
   };
 }

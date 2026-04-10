@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { useGameStore } from "../../store/gameStore";
 import { toSimClub } from "../../utils/clubSimAdapter";
 import { COURSE_1HOLE, COURSE_3HOLES, COURSE_9HOLES, COURSE_18HOLES } from "../../data/defaultCourses";
+import { cloneCourse } from "../../utils/courseGenerator";
 import { loadStoredCustomCourse, type CustomCoursePreset } from "./CustomCourseEditorScreen";
 import { HoleView } from "./HoleView";
 
@@ -46,7 +47,7 @@ function buildSelectableCourses(customCourses: CustomCoursePreset[]): Selectable
   const customSelectable = customCourses.map((course) => ({
     id: course.id,
     name: `${course.name} (${course.holeCount}ホール)`,
-    holes: course.course,
+    holes: cloneCourse(course.course),
     source: "custom" as const,
   }));
 
@@ -243,7 +244,7 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
     const source = mode === "robot" ? robotSource : bagSource;
     const bag = source.map(toSimClub);
     setShowDetailedScorecard(false);
-    startRound(holes, bag, mode);
+    startRound(cloneCourse(holes), bag, mode);
   };
 
   if (phase === "setup") {

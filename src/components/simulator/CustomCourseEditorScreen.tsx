@@ -321,7 +321,12 @@ export function CustomCourseEditorScreen() {
   const initialPreset = initialCustom.courses.find((course) => course.id === initialCustom.selectedCourseId)
     ?? initialCustom.courses[0];
 
-  const [savedCustomCourses, setSavedCustomCourses] = useState<CustomCoursePreset[]>(initialCustom.courses);
+  const [savedCustomCourses, setSavedCustomCourses] = useState<CustomCoursePreset[]>(
+    initialCustom.courses.map((course) => ({
+      ...course,
+      course: cloneCourse(course.course),
+    })),
+  );
   const [selectedCustomCourseId, setSelectedCustomCourseId] = useState(initialPreset.id);
   const [customNameInput, setCustomNameInput] = useState(initialPreset.name);
   const [customHoleCount, setCustomHoleCount] = useState<1 | 3 | 9 | 18>(initialPreset.holeCount);
