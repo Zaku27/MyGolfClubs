@@ -356,6 +356,26 @@ function buildDispersionProfile(club: ClubData, skillLevel: SkillLevel): Dispers
   };
 }
 
+export function classifyShotQualityByTargetError(
+  expectedCarry: number,
+  carry: number,
+  lateralDeviation: number,
+): { quality: ShotQuality; percentError: number; distanceError: number } {
+  const deltaY = carry - expectedCarry;
+  const distanceError = Math.sqrt(deltaY * deltaY + lateralDeviation * lateralDeviation);
+  const percentError = expectedCarry > 0
+    ? (distanceError / expectedCarry) * 100
+    : distanceError === 0
+      ? 0
+      : Number.POSITIVE_INFINITY;
+
+  if (percentError <= 3) return { quality: "excellent", percentError, distanceError };
+  if (percentError <= 7) return { quality: "good", percentError, distanceError };
+  if (percentError <= 13) return { quality: "average", percentError, distanceError };
+  if (percentError <= 25) return { quality: "misshot", percentError, distanceError };
+  return { quality: "poor", percentError, distanceError };
+}
+
 /**
  * 生成したキャリー誤差と横ブレ量から品質ラベルを後判定する。
  */
@@ -365,7 +385,6 @@ function classifyQualityByOutcome(
   clubType: GolfClub["clubType"],
   lateralDeviation: number,
   profile: DispersionProfile,
-  wasMishitSampled: boolean,
 ): { quality: ShotQuality; metrics: ShotQualityMetrics } {
   const carryDelta = carry - expectedCarry;
   const rawCarryZ = Math.abs(carryDelta) / Math.max(1e-6, profile.carrySigma);
@@ -387,6 +406,8 @@ function classifyQualityByOutcome(
         ? "carry"
         : "lateral";
 
+  const qualityResult = classifyShotQualityByTargetError(expectedCarry, carry, lateralDeviation);
+
   const metrics: ShotQualityMetrics = {
     carryZ,
     lateralZ,
@@ -395,13 +416,11 @@ function classifyQualityByOutcome(
     score,
     poorThreshold,
     decisiveAxis,
+    distanceError: qualityResult.distanceError,
+    percentError: qualityResult.percentError,
   };
 
-  if (wasMishitSampled) return { quality: "mishit", metrics };
-  if (score < 0.65) return { quality: "excellent", metrics };
-  if (score < 1.0) return { quality: "good", metrics };
-  if (score < poorThreshold) return { quality: "average", metrics };
-  return { quality: "poor", metrics };
+  return { quality: qualityResult.quality, metrics };
 }
 
 /**
@@ -650,7 +669,6 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
       input.club.clubType,
       lateralDeviation,
       profile,
-      forcedQuality === "mishit"
     );
     resolvedQuality = forcedQuality;
     qualityMetrics = forcedResult.metrics;
@@ -686,7 +704,6 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
         input.club.clubType,
         lateralDeviation,
         profile,
-        true
       );
       resolvedQuality = classified.quality;
       qualityMetrics = classified.metrics;
@@ -711,7 +728,6 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
         input.club.clubType,
         lateralDeviation,
         profile,
-        false
       );
       resolvedQuality = classified.quality;
       qualityMetrics = classified.metrics;

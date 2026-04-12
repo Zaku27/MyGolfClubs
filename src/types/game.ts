@@ -79,7 +79,7 @@ export interface ShotContext {
 }
 
 // ─── Shot result ──────────────────────────────────────────────────────────────
-export type ShotQuality = "excellent" | "good" | "average" | "poor" | "mishit";
+export type ShotQuality = "excellent" | "good" | "average" | "misshot" | "poor";
 
 export interface ShotQualityMetrics {
   carryZ: number;
@@ -89,6 +89,8 @@ export interface ShotQualityMetrics {
   score: number;
   poorThreshold: number;
   decisiveAxis: "carry" | "lateral" | "mixed";
+  distanceError?: number;
+  percentError?: number;
 }
 
 export interface ShotLanding {

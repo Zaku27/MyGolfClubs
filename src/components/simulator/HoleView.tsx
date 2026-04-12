@@ -41,8 +41,8 @@ const SHOT_QUALITY_LABEL: Record<string, string> = {
   excellent: "会心のショット",
   good: "ナイスショット",
   average: "まずまず",
+  misshot: "大きく外した",
   poor: "ミス気味",
-  mishit: "ミスショット",
 };
 
 function estimateBaseDistanceWithMode(

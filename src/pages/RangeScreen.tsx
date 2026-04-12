@@ -1,20 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { classifyShotQualityByTargetError } from '../utils/landingPosition';
 import { GolfBagPanel } from '../components/GolfBagPanel';
-
-const EMPTY_ACTUAL_SHOT_ROWS: Array<Record<string, string>> = [];
-
-// ショット品質の英語ラベル関数
-function qualityLabel(q: string) {
-  switch (q) {
-    case "excellent": return "Excellent";
-    case "good": return "Good";
-    case "average": return "Average";
-    case "poor": return "Poor";
-    case "mishit": return "Mishit";
-    default: return q;
-  }
-}
 import {
   selectActiveGolfBag,
   selectSortedActiveBagClubs,
@@ -64,6 +51,19 @@ import {
   normalizeWindSpeedMps,
 } from '../utils/windDirection';
 
+const EMPTY_ACTUAL_SHOT_ROWS: Array<Record<string, string>> = [];
+
+// ショット品質の英語ラベル関数
+function qualityLabel(q: string) {
+  switch (q) {
+    case "excellent": return "Excellent";
+    case "good": return "Good";
+    case "average": return "Average";
+    case "misshot": return "Misshot";
+    case "poor": return "Poor";
+    default: return q;
+  }
+}
 const LIE_OPTIONS = [
   'ティー',
   'フェアウェイ',
@@ -240,8 +240,8 @@ const qualityStatusColor = (shotQuality: string) => {
   if (shotQuality === 'excellent') return 'text-blue-700';
   if (shotQuality === 'good') return 'text-green-700';
   if (shotQuality === 'average') return 'text-amber-600';
+  if (shotQuality === 'misshot') return 'text-fuchsia-600';
   if (shotQuality === 'poor') return 'text-pink-600';
-  if (shotQuality === 'mishit') return 'text-red-600';
   return 'text-gray-700';
 };
 
@@ -270,80 +270,6 @@ function formatGroundHardnessImpact(groundHardness: GroundHardness, roll: number
   const deltaLabel = delta === 0 ? '0.0y' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}y`;
 
   return `ラン ${deltaLabel}`;
-}
-
-function extractClubNumberFromString(numberText: string | undefined): number | null {
-  if (!numberText) return null;
-  const match = numberText.trim().toUpperCase().match(/^(\d{1,2})/);
-  if (!match) return null;
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function getExpectedRollRate(
-  clubType: string,
-  clubNumber: string | undefined,
-  loftAngle?: number,
-): number {
-  const normalizedClubType = clubType.trim();
-  const clubNumberValue = extractClubNumberFromString(clubNumber);
-
-  if (normalizedClubType === 'Driver') return 0.09;
-
-  if (normalizedClubType === 'Wood') {
-    if (clubNumberValue !== null) {
-      if (clubNumberValue <= 3) return 0.085;
-      if (clubNumberValue <= 5) return 0.075;
-      if (clubNumberValue <= 7) return 0.065;
-      return 0.055;
-    }
-    return (loftAngle ?? 15) <= 16 ? 0.08 : 0.065;
-  }
-
-  if (normalizedClubType === 'Hybrid') {
-    if (clubNumberValue !== null) {
-      if (clubNumberValue <= 3) return 0.075;
-      if (clubNumberValue <= 4) return 0.068;
-      if (clubNumberValue <= 5) return 0.06;
-      return 0.052;
-    }
-    return (loftAngle ?? 22) <= 21 ? 0.07 : 0.058;
-  }
-
-  if (normalizedClubType === 'Iron') {
-    if (clubNumberValue !== null) {
-      if (clubNumberValue <= 4) return 0.06;
-      if (clubNumberValue <= 6) return 0.052;
-      if (clubNumberValue <= 8) return 0.042;
-      return 0.032;
-    }
-    return (loftAngle ?? 30) <= 28 ? 0.052 : 0.038;
-  }
-
-  if (normalizedClubType === 'Wedge') {
-    const token = (clubNumber ?? '').trim().toUpperCase();
-    if (token.includes('LW')) return 0.012;
-    if (token.includes('SW')) return 0.016;
-    if (token.includes('GW') || token.includes('AW')) return 0.02;
-    if (token.includes('PW')) return 0.024;
-    return (loftAngle ?? 50) >= 56 ? 0.014 : 0.022;
-  }
-
-  return 0.01;
-}
-
-function estimateExpectedRoll(
-  expectedCarry: number,
-  clubType: string,
-  clubNumber: string | undefined,
-  loftAngle: number | undefined,
-  groundHardness: GroundHardness,
-): number {
-  const baseRollRate = getExpectedRollRate(clubType, clubNumber, loftAngle);
-  const hardness01 = groundHardness === 'soft' ? 0.6 : groundHardness === 'firm' ? 0.9 : 0.75;
-  const groundFactor = 0.8 + hardness01 * 0.4;
-  const typicalQualityFactor = 0.98;
-  return Math.max(0, expectedCarry * baseRollRate * groundFactor * typicalQualityFactor);
 }
 
 function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
@@ -638,8 +564,8 @@ function RangeSimulationResults({
           </div>
           {summary.estimatedDist && (
             <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-              <span className="font-semibold">目安との比較：</span>
-              <span>目安: {summary.estimatedDist} y / 実績平均: {summary.avg.toFixed(1)} y</span>
+              <span className="font-semibold">推定飛距離との比較：</span>
+              <span>推定: {summary.estimatedDist} y / 実績平均: {summary.avg.toFixed(1)} y</span>
               <span className={summary.diff > 0 ? 'text-red-600 font-bold' : summary.diff < 0 ? 'text-blue-600 font-bold' : ''}>
                 {summary.diff > 0 ? ` (+${summary.diff}y)` : summary.diff < 0 ? ` (${summary.diff}y)` : ' (一致)'}
               </span>
@@ -654,6 +580,7 @@ function RangeSimulationResults({
                   <th className="px-1 py-0.5">キャリー</th>
                   <th className="px-1 py-0.5">ラン</th>
                   <th className="px-1 py-0.5">横ブレ</th>
+                  <th className="px-1 py-0.5">目標までの距離</th>
                   <th className="px-1 py-0.5">地面影響</th>
                   <th className="px-1 py-0.5">傾斜影響</th>
                   <th className="px-1 py-0.5">着地X</th>
@@ -669,6 +596,16 @@ function RangeSimulationResults({
                     <td className="px-1 py-0.5 text-center">{r.landing?.carry?.toFixed(1) ?? '-'}</td>
                     <td className="px-1 py-0.5 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
                     <td className="px-1 py-0.5 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
+                    <td className="px-1 py-0.5 text-center">
+                      {(() => {
+                        const finalX = r.landing?.finalX ?? 0;
+                        const finalY = r.landing?.finalY ?? 0;
+                        const targetY = chartTarget.y;
+                        return targetY > 0
+                          ? Math.sqrt(finalX * finalX + Math.pow(finalY - targetY, 2)).toFixed(1)
+                          : '-';
+                      })()}
+                    </td>
                     <td className="px-1 py-0.5 text-center">{formatGroundHardnessImpact(summary.appliedGroundHardness, r.landing?.roll)}</td>
                     <td className="px-1 py-0.5 text-center">{formatSlopeImpact(r.landing, flatBaselineResults[i]?.landing)}</td>
                     <td className="px-1 py-0.5 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
@@ -872,36 +809,17 @@ export default function RangeScreen() {
       return Number.isFinite(numeric) ? numeric : null;
     };
 
-    const getBaseDispersionByClubType = (clubType: GolfClub['clubType']) => {
-      if (clubType === 'Driver') return { carrySigma: 13, lateralSigma: 22 };
-      if (clubType === 'Wood') return { carrySigma: 11, lateralSigma: 19 };
-      if (clubType === 'Hybrid') return { carrySigma: 9.5, lateralSigma: 17 };
-      if (clubType === 'Iron') return { carrySigma: 8, lateralSigma: 13 };
-      if (clubType === 'Wedge') return { carrySigma: 6, lateralSigma: 8 };
-      return { carrySigma: 5, lateralSigma: 6 };
-    };
-
     const classifyQuality = (
-      carry: number,
-      expectedCarry: number,
+      observedDistance: number,
+      expectedDistance: number,
       lateralDeviation: number,
-      clubType: GolfClub['clubType'],
+      _clubType: GolfClub['clubType'],
       wasMishit: boolean,
     ): ShotQuality => {
       if (wasMishit) {
-        return 'mishit';
+        return 'poor';
       }
-      const profile = getBaseDispersionByClubType(clubType);
-      const carryDelta = carry - expectedCarry;
-      const carryZ = clubType === 'Driver' && carryDelta > 0 ? 0 : Math.abs(carryDelta) / Math.max(1, profile.carrySigma);
-      const lateralZ = Math.abs(lateralDeviation) / Math.max(1, profile.lateralSigma);
-      const weightedCarry = carryZ * 1.1;
-      const weightedLateral = lateralZ * 0.75;
-      const score = Math.max(weightedCarry, weightedLateral);
-      if (score < 0.65) return 'excellent';
-      if (score < 1.0) return 'good';
-      if (score < 1.6) return 'average';
-      return 'poor';
+      return classifyShotQualityByTargetError(expectedDistance, observedDistance, lateralDeviation).quality;
     };
 
     return actualShotRows
@@ -927,8 +845,8 @@ export default function RangeScreen() {
             ? actualTotalDistance - rollValue
             : actualTotalDistance;
 
-        const expectedCarry = selectedClub?.distance ?? simClub?.avgDistance ?? actualCarry;
-        const shotQuality = classifyQuality(actualCarry, expectedCarry, lateral ?? 0, selectedClub.clubType, wasMishit);
+const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
+        const shotQuality = classifyQuality(actualTotalDistance, expectedDistance, lateral ?? 0, selectedClub.clubType, wasMishit);
 
         return {
           newRemainingDistance: 0,
@@ -938,7 +856,7 @@ export default function RangeScreen() {
           penalty: false,
           distanceHit: actualTotalDistance,
           shotQuality,
-          wasSuccessful: shotQuality !== 'mishit',
+          wasSuccessful: shotQuality !== 'poor',
           effectiveSuccessRate: 100,
           landing: {
             carry: actualCarry,
@@ -979,13 +897,7 @@ export default function RangeScreen() {
     const slopeEffectLabel = normalizedSlope.slopeAngle === 0
       ? 'フラットなので横ブレ影響は標準です。'
       : `傾斜 ${normalizedSlope.slopeAngle}° (${formatSlopeDirectionLabel(normalizedSlope.slopeDirection)}) により、横方向シフトは ${meanSlopeXShift >= 0 ? '+' : ''}${meanSlopeXShift.toFixed(1)}y です。`;
-    const expectedCarry = selectedClub?.distance ?? simClub?.avgDistance ?? 0;
-    const expectedRoll = selectedClub
-      ? estimateExpectedRoll(expectedCarry, selectedClub.clubType, selectedClub.number, selectedClub.loftAngle, groundHardness)
-      : simClub
-        ? estimateExpectedRoll(expectedCarry, simClub.type, simClub.number, simClub.loftAngle, groundHardness)
-        : 0;
-    const estimatedDist = Math.round(expectedCarry + expectedRoll);
+    const estimatedDist = estimatedClubDistance;
     const diff = Math.round(avg - estimatedDist);
     const avgToTargetDistance = actualModeResults.reduce((sum, result) => {
       const finalX = result.landing?.finalX ?? 0;
@@ -1016,7 +928,7 @@ export default function RangeScreen() {
     ? buildMonteCarloResult(actualModeResults)
     : monteCarloResult;
 
-  const targetDistance = summary?.estimatedDist ?? (seatType === 'robot'
+  const targetDistance = selectedSummary?.estimatedDist ?? (seatType === 'robot'
     ? estimatedClubDistance
     : selectedClub?.distance ?? 0);
   const chartTarget = { x: 0, y: targetDistance };
@@ -1208,10 +1120,8 @@ export default function RangeScreen() {
       : `傾斜 ${slopeLabel} により、フラット比の横方向シフトは ${meanSlopeXShift >= 0 ? '+' : ''}${meanSlopeXShift.toFixed(1)}y（${meanSlopeXShift >= 0 ? '右' : '左'}）です。`;
 
     // 目安値との差分を計算
-    // プレイヤーがpersonalの場合は実測飛距離を目安値とする
-    const estimatedDist = seatType === 'personal'
-      ? (selectedClub?.distance ?? 0)
-      : estimatedClubDistance;
+    // すべてのモードで共通の推定飛距離を使う
+    const estimatedDist = estimatedClubDistance;
     const diff = Math.round(avg - estimatedDist);
     const avgToTargetDistance =
       shotResults.reduce((sum, result) => {

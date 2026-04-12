@@ -589,8 +589,8 @@ const QUALITY_LABELS: Record<ShotQuality, string> = {
   excellent: "会心の一打！",
   good:      "ナイスショット！",
   average:   "まずまず",
+  misshot:   "大きく外した...",
   poor:      "ミス気味...",
-  mishit:    "ミスショット",
 };
 
 // ─── Putting ──────────────────────────────────────────────────────────────────
