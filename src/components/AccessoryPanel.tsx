@@ -9,6 +9,20 @@ type AccessoryPanelProps = {
   onDeleteAccessory: (id: string) => void;
 };
 
+type AccessoryFormState = {
+  id: string | null;
+  name: string;
+  note: string;
+  imageData: string;
+};
+
+const initialFormState: AccessoryFormState = {
+  id: null,
+  name: '',
+  note: '',
+  imageData: '',
+};
+
 export const AccessoryPanel = ({
   accessories,
   onAddAccessory,
@@ -16,80 +30,70 @@ export const AccessoryPanel = ({
   onDeleteAccessory,
 }: AccessoryPanelProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingAccessoryId, setEditingAccessoryId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [memo, setMemo] = useState('');
-  const [imageData, setImageData] = useState('');
-
-  const resetForm = () => {
-    setEditingAccessoryId(null);
-    setName('');
-    setMemo('');
-    setImageData('');
-  };
-
-  const closeDialog = () => {
-    setIsDialogOpen(false);
-    resetForm();
-  };
+  const [formState, setFormState] = useState<AccessoryFormState>(initialFormState);
 
   const openAddDialog = () => {
-    resetForm();
+    setFormState(initialFormState);
     setIsDialogOpen(true);
   };
 
   const openEditDialog = (accessory: AccessoryItem) => {
-    setEditingAccessoryId(accessory.id);
-    setName(accessory.name);
-    setMemo(accessory.note ?? '');
-    setImageData(accessory.imageData ?? '');
+    setFormState({
+      id: accessory.id,
+      name: accessory.name,
+      note: accessory.note ?? '',
+      imageData: accessory.imageData ?? '',
+    });
     setIsDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setFormState(initialFormState);
   };
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
-      setImageData('');
+      setFormState((prev) => ({ ...prev, imageData: '' }));
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setImageData(reader.result);
+      const result = reader.result;
+      if (typeof result === 'string') {
+        setFormState((prev) => ({ ...prev, imageData: result }));
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleDelete = (id: string) => {
-    onDeleteAccessory(id);
-  };
-
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const trimmedName = name.trim();
+    const trimmedName = formState.name.trim();
     if (!trimmedName) {
       return;
     }
 
-    if (editingAccessoryId) {
-      const existingAccessory = accessories.find((item) => item.id === editingAccessoryId);
-      if (existingAccessory) {
+    if (formState.id) {
+      const accessory = accessories.find((item) => item.id === formState.id);
+      if (accessory) {
         onUpdateAccessory({
-          ...existingAccessory,
+          ...accessory,
           name: trimmedName,
-          note: memo.trim(),
-          imageData: imageData || undefined,
+          note: formState.note.trim(),
+          imageData: formState.imageData || undefined,
         });
       }
     } else {
       onAddAccessory({
         name: trimmedName,
-        note: memo.trim(),
-        imageData: imageData || undefined,
+        note: formState.note.trim(),
+        imageData: formState.imageData || undefined,
       });
     }
+
     closeDialog();
   };
 
@@ -133,7 +137,7 @@ export const AccessoryPanel = ({
                   <button
                     type="button"
                     className="btn-icon btn-delete"
-                    onClick={() => handleDelete(accessory.id)}
+                    onClick={() => onDeleteAccessory(accessory.id)}
                     title="削除"
                     aria-label="削除"
                   >
@@ -148,15 +152,17 @@ export const AccessoryPanel = ({
               </div>
             </div>
           ))}
+        </div>
 
-            <button
-              type="button"
-              className="accessory-add-card accessory-add-button"
-              onClick={openAddDialog}
-              aria-label="新しいアクセサリーを追加"
-            >
-              <span className="accessory-add-label">アイテムを追加</span>
-            </button>
+        <div className="accessory-panel-actions">
+          <button
+            type="button"
+            className="accessory-add-card accessory-add-button"
+            onClick={openAddDialog}
+            aria-label="新しいアクセサリーを追加"
+          >
+            <span className="accessory-add-label">アイテムを追加</span>
+          </button>
         </div>
       </div>
 
@@ -164,15 +170,13 @@ export const AccessoryPanel = ({
         <div className="accessory-modal" role="dialog" aria-modal="true" aria-labelledby="accessory-dialog-title">
           <div className="accessory-modal-backdrop" onClick={closeDialog} />
           <div className="accessory-modal-card">
-            <h3 id="accessory-dialog-title">
-              {editingAccessoryId ? 'アクセサリーを編集' : 'アクセサリーを追加'}
-            </h3>
+            <h3 id="accessory-dialog-title">{formState.id ? 'アクセサリーを編集' : 'アクセサリーを追加'}</h3>
             <form className="accessory-form" onSubmit={handleSubmit}>
               <label className="accessory-label">
                 <span>名称</span>
                 <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  value={formState.name}
+                  onChange={(event) => setFormState((prev) => ({ ...prev, name: event.target.value }))}
                   placeholder="例: TaylorMade TP5/TP5x STRIPE"
                 />
               </label>
@@ -182,17 +186,17 @@ export const AccessoryPanel = ({
                 <input type="file" accept="image/*" onChange={handleImageChange} />
               </label>
 
-              {imageData ? (
+              {formState.imageData ? (
                 <div className="accessory-image-preview-wrapper">
-                  <img src={imageData} alt="選択したアクセサリー" className="accessory-image-preview" />
+                  <img src={formState.imageData} alt="選択したアクセサリー" className="accessory-image-preview" />
                 </div>
               ) : null}
 
               <label className="accessory-label">
                 <span>メモ</span>
                 <textarea
-                  value={memo}
-                  onChange={(event) => setMemo(event.target.value)}
+                  value={formState.note}
+                  onChange={(event) => setFormState((prev) => ({ ...prev, note: event.target.value }))}
                   placeholder="例: 練習用ボール、雨天用など"
                   rows={4}
                 />
@@ -203,7 +207,7 @@ export const AccessoryPanel = ({
                   キャンセル
                 </button>
                 <button type="submit" className="primary">
-                  {editingAccessoryId ? '保存' : '追加'}
+                  {formState.id ? '保存' : '追加'}
                 </button>
               </div>
             </form>

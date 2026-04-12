@@ -9,6 +9,8 @@
 }
 
 .accessory-panel-content {
+  display: flex;
+  flex-direction: column;
   min-height: 160px;
 }
 
@@ -16,6 +18,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  flex: 1;
 }
 
 .accessory-add-card {
@@ -23,24 +26,35 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: 12px;
-  font-size: 13px;
-  width: auto;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1.5px solid #c5dccf;
+  background: #ffffff;
+  color: #2d6245;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.accessory-add-card:hover:not(:disabled) {
+  background: #f5faf7;
+  border-color: #a8caba;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 121, 78, 0.08);
 }
 
 .accessory-add-button {
-  background-color: #f18d3a;
-  border-color: #f18d3a;
+  background: linear-gradient(135deg, #f18d3a, #ffb766);
   color: #ffffff;
+  border-color: #f18d3a;
   box-shadow: 0 4px 12px rgba(241, 141, 58, 0.18);
 }
 
 .accessory-add-button:hover:not(:disabled) {
-  background-color: #d77626;
+  background: linear-gradient(135deg, #d77626, #ffab44);
   border-color: #d77626;
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(241, 141, 58, 0.2);
 }
 
@@ -200,8 +214,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  padding-top: 12px;
+  padding-top: 16px;
   border-top: 1px solid #dfe7e0;
+  justify-content: flex-end;
+  margin-top: auto;
 }
 
 .accessory-modal {
