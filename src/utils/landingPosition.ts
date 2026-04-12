@@ -49,6 +49,7 @@ export type LandingResult = {
   lateralDeviation: number;
   finalX: number;
   finalY: number;
+  shotQuality?: ShotQuality;
   qualityMetrics?: ShotQualityMetrics;
   apexHeight?: number;
   trajectoryPoints?: Array<{ x: number; y: number; z?: number }>;

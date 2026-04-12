@@ -12,6 +12,7 @@ export class GolfBagDatabase extends Dexie {
   clubs!: Table<GolfClub>;
   golfBags!: Table<GolfBag>;
   personalData!: Table<ClubPersonalData>;
+  actualShotRows!: Table<{ bagId: number; rows: Array<Record<string, string>> }>;
   appSettings!: Table<AppSettings>;
 
   constructor() {
@@ -74,6 +75,13 @@ export class GolfBagDatabase extends Dexie {
 
         club.bounceAngle = Math.max(0, Math.min(20, Math.round(numeric * 10) / 10));
       });
+    });
+    this.version(7).stores({
+      clubs: '++id, name',
+      golfBags: '++id, name',
+      personalData: 'clubId',
+      actualShotRows: 'bagId',
+      appSettings: 'id',
     });
   }
 }

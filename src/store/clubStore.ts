@@ -10,6 +10,7 @@ type ClubStoreState = {
   loading: boolean;
   error: string | null;
   personalData: Record<string, ClubPersonalData>;
+  actualShotRows: Record<string, Array<Record<string, string>>>;
   playerSkillLevel: number;
 };
 
@@ -36,6 +37,8 @@ type ClubStoreActions = {
   removePersonalData: (clubId: string) => Promise<void>;
   loadPlayerSkillLevel: () => Promise<void>;
   setPlayerSkillLevel: (level: number) => Promise<void>;
+  loadActualShotRows: () => Promise<void>;
+  setActualShotRows: (rows: Array<Record<string, string>>, bagId: number | null) => Promise<void>;
 };
 
 type ClubStore = ClubStoreState & ClubStoreActions;
@@ -47,6 +50,7 @@ const INITIAL_STATE: ClubStoreState = {
   loading: false,
   error: null,
   personalData: {},
+  actualShotRows: {},
   playerSkillLevel: 0.5,
 };
 
@@ -401,12 +405,39 @@ export const useClubStore = create<ClubStore>((set) => ({
     }
   },
 
+  loadActualShotRows: async () => {
+    set({ error: null });
+    try {
+      const actualShotRows = await ClubService.getAllActualShotRows();
+      set({ actualShotRows });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
   setPlayerSkillLevel: async (level) => {
     set({ error: null });
     try {
       const clamped = clampSkillLevel(level);
       await ClubService.setPlayerSkillLevel(clamped);
       set({ playerSkillLevel: clamped });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+  setActualShotRows: async (rows, bagId) => {
+    if (bagId == null) {
+      return;
+    }
+    const bagKey = String(bagId);
+    set((state) => ({
+      actualShotRows: {
+        ...state.actualShotRows,
+        [bagKey]: rows,
+      },
+    }));
+    try {
+      await ClubService.setActualShotRows(bagId, rows);
     } catch (error) {
       setStoreError(set, error);
     }

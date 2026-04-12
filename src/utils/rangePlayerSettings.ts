@@ -1,4 +1,4 @@
-export type RangeSeatType = "robot" | "personal";
+export type RangeSeatType = "robot" | "personal" | "actual";
 
 export type RangePlayerSettings = {
   seatType: RangeSeatType;
@@ -40,7 +40,7 @@ export function loadRangePlayerSettings(): RangePlayerSettings {
     const parsed = JSON.parse(raw) as Partial<RangePlayerSettings>;
 
     return {
-      seatType: parsed.seatType === "robot" ? "robot" : "personal",
+      seatType: parsed.seatType === "robot" || parsed.seatType === "actual" ? parsed.seatType : "personal",
       robotHeadSpeed: clampNumber(Number(parsed.robotHeadSpeed), 20, 60),
       robotSkillLevel: clampNumber(Number(parsed.robotSkillLevel), 0, 1),
       reuseLastSeed: parsed.reuseLastSeed === true,

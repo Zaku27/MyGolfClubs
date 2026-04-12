@@ -41,6 +41,7 @@ type DispersionPoint = ScatterDataPoint & {
   carry?: number;
   roll?: number;
   totalDistance?: number;
+  shotQuality?: string;
 };
 
 type ConfidenceLevelOption = {
@@ -48,7 +49,7 @@ type ConfidenceLevelOption = {
   label: string;
 };
 
-const DEFAULT_CHART_HEIGHT = 360;
+const DEFAULT_CHART_HEIGHT = 560;
 const DEFAULT_CONFIDENCE_LEVEL: ConfidenceLevelOption['value'] = 0.95;
 const TARGET_GREEN_RADIUS_YARDS = 10;
 const STANDARD_MAX_CARRY_MULTIPLIER = 1.15;
@@ -105,6 +106,7 @@ export function ShotDispersionChart({
       carry: shot.carry,
       roll: shot.roll,
       totalDistance: shot.totalDistance,
+      shotQuality: (shot as unknown as { shotQuality?: string }).shotQuality,
     }));
   }, [monteCarloResult.shots]);
 
@@ -274,18 +276,20 @@ export function ShotDispersionChart({
           pointStyle: 'crossRot',
           clip: false,
         },
-        {
-          label: '狙い位置',
-          data: [{ x: aim?.x ?? target.x, y: aim?.y ?? target.y }],
-          backgroundColor: '#0ea5e9',
-          pointBackgroundColor: '#0ea5e9',
-          pointBorderColor: '#075985',
-          pointBorderWidth: 1.5,
-          pointRadius: 7,
-          pointHoverRadius: 9,
-          pointStyle: 'triangle',
-          clip: false,
-        },
+        ...(aim ? [
+          {
+            label: '狙い位置',
+            data: [{ x: aim.x, y: aim.y }],
+            backgroundColor: '#0ea5e9',
+            pointBackgroundColor: '#0ea5e9',
+            pointBorderColor: '#075985',
+            pointBorderWidth: 1.5,
+            pointRadius: 7,
+            pointHoverRadius: 9,
+            pointStyle: 'triangle',
+            clip: false as const,
+          },
+        ] : []),
         ...(showMeanPoint
           ? [
               {
@@ -295,6 +299,7 @@ export function ShotDispersionChart({
                 pointRadius: 7,
                 pointHoverRadius: 9,
                 pointStyle: 'rectRot' as const,
+                clip: false as const,
               },
             ]
           : []),
@@ -317,7 +322,9 @@ export function ShotDispersionChart({
         },
         title: {
           display: true,
-          text: `${skillLevelName} - ${clubName} (${numShots} shots)`,
+          text: skillLevelName
+            ? `${skillLevelName} - ${clubName} (${numShots} shots)`
+            : `${clubName} (${numShots} shots)`,
           font: {
             size: 15,
             weight: 'bold',
@@ -344,12 +351,7 @@ export function ShotDispersionChart({
             },
             label: (context) => {
               const raw = getRawPoint(context);
-              const parsedX = Number(context.parsed.x ?? 0);
-              const parsedY = Number(context.parsed.y ?? 0);
-              const lines: string[] = [
-                `左右偏差: ${parsedX.toFixed(1)} y`,
-                `目標方向距離: ${parsedY.toFixed(1)} y`,
-              ];
+              const lines: string[] = [];
 
               if (typeof raw.carry === 'number') {
                 lines.push(`キャリー: ${raw.carry.toFixed(1)} y`);
@@ -359,6 +361,14 @@ export function ShotDispersionChart({
               }
               if (typeof raw.totalDistance === 'number') {
                 lines.push(`トータル: ${raw.totalDistance.toFixed(1)} y`);
+              }
+
+              const parsedX = Number(context.parsed.x ?? 0);
+              lines.push(`左右偏差: ${parsedX.toFixed(1)} y`);
+
+              if (typeof raw.shotQuality === 'string') {
+                const qualityLabel = raw.shotQuality.charAt(0).toUpperCase() + raw.shotQuality.slice(1);
+                lines.push(`品質: ${qualityLabel}`);
               }
 
               return lines;

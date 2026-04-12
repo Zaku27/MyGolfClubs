@@ -388,6 +388,32 @@ export class ClubService {
     await db.personalData.clear();
   }
 
+  static async getAllActualShotRows(): Promise<Record<string, Array<Record<string, string>>>> {
+    const records = await db.actualShotRows.toArray();
+    const map: Record<string, Array<Record<string, string>>> = {};
+    for (const record of records) {
+      map[String(record.bagId)] = record.rows ?? [];
+    }
+    return map;
+  }
+
+  static async getActualShotRowsForBag(bagId: number): Promise<Array<Record<string, string>>> {
+    const record = await db.actualShotRows.get(bagId);
+    return record?.rows ?? [];
+  }
+
+  static async setActualShotRows(bagId: number, rows: Array<Record<string, string>>): Promise<void> {
+    if (rows.length === 0) {
+      await db.actualShotRows.delete(bagId);
+      return;
+    }
+    await db.actualShotRows.put({ bagId, rows });
+  }
+
+  static async deleteActualShotRowsForBag(bagId: number): Promise<void> {
+    await db.actualShotRows.delete(bagId);
+  }
+
   // ─── App Settings ─────────────────────────────────────────────────────────────
 
   static async getPlayerSkillLevel(): Promise<number> {

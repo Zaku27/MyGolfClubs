@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Papa from "papaparse";
+
+const EMPTY_SHOT_RECORDS: ShotRecord[] = [];
 import { GolfBagPanel } from "../GolfBagPanel";
 import "../ClubList.css";
 import {
@@ -113,8 +115,11 @@ export function PersonalDataInput() {
   const initializeDefaults = useClubStore((state) => state.initializeDefaults);
   const loadPersonalData = useClubStore((state) => state.loadPersonalData);
   const loadPlayerSkillLevel = useClubStore((state) => state.loadPlayerSkillLevel);
+  const loadActualShotRows = useClubStore((state) => state.loadActualShotRows);
   const setPersonalData = useClubStore((state) => state.setPersonalData);
   const setPlayerSkillLevel = useClubStore((state) => state.setPlayerSkillLevel);
+  const setActualShotRows = useClubStore((state) => state.setActualShotRows);
+  const actualShotRows = useClubStore((state) => state.actualShotRows);
   const setActiveBag = useClubStore((state) => state.setActiveBag);
   const swingWeightTarget = readStoredNumber(
     SWING_TARGET_STORAGE_KEY,
@@ -271,8 +276,10 @@ export function PersonalDataInput() {
       const text = await response.text();
       const rows = parseShotCsvRows(text);
       setShotRows(rows);
+      await setActualShotRows(rows, activeBag?.id ?? null);
     } catch (error) {
       setShotRows([]);
+      await setActualShotRows([], activeBag?.id ?? null);
       setShotLoadError(`CSV読み込みエラー: ${(error as Error).message}`);
     } finally {
       setIsLoadingShotData(false);
@@ -296,12 +303,20 @@ export function PersonalDataInput() {
       const text = await file.text();
       const rows = parseShotCsvRows(text);
       setShotRows(rows);
+      await setActualShotRows(rows, activeBag?.id ?? null);
     } catch (error) {
       setShotRows([]);
+      await setActualShotRows([], activeBag?.id ?? null);
       setShotLoadError(`CSV読み込みエラー: ${(error as Error).message}`);
     } finally {
       setIsLoadingShotData(false);
     }
+  };
+
+  const handleClearShotData = async () => {
+    setShotRows([]);
+    setShotLoadError(null);
+    await setActualShotRows([], activeBag?.id ?? null);
   };
 
   const shotSummary = useMemo(() => {
@@ -414,11 +429,21 @@ export function PersonalDataInput() {
   useEffect(() => {
     const init = async () => {
       await initializeDefaults();
-      await Promise.all([loadClubs(), loadBags(), loadPersonalData(), loadPlayerSkillLevel()]);
+      await Promise.all([
+        loadClubs(),
+        loadBags(),
+        loadPersonalData(),
+        loadPlayerSkillLevel(),
+        loadActualShotRows(),
+      ]);
       setIsInitialized(true);
     };
     void init();
-  }, [initializeDefaults, loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel]);
+  }, [initializeDefaults, loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel, loadActualShotRows]);
+
+  useEffect(() => {
+    setShotRows(activeBag?.id != null ? (actualShotRows[String(activeBag.id)] ?? EMPTY_SHOT_RECORDS) as ShotRecord[] : EMPTY_SHOT_RECORDS);
+  }, [activeBag?.id, actualShotRows]);
 
   useEffect(() => {
     const nextDraft: Record<string, DraftRow> = {};
@@ -670,6 +695,14 @@ export function PersonalDataInput() {
                     onChange={handleImportShotCsv}
                   />
                 </label>
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                  onClick={handleClearShotData}
+                  disabled={isLoadingShotData || shotRows.length === 0}
+                >
+                  データをクリア
+                </button>
               </div>
             </div>
 
