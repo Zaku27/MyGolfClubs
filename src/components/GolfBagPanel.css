@@ -1,8 +1,10 @@
 .golf-bag-panel {
   display: grid;
-  gap: 18px;
-  margin-bottom: 32px;
-  padding: 28px;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  align-items: start;
+  gap: 8px;
+  margin-bottom: 0;
+  padding: 14px 12px 6px;
   border-radius: 24px;
   border: 1px solid #cae2d0;
   background:
@@ -60,6 +62,108 @@
   flex-wrap: wrap;
 }
 
+.golf-bag-panel-image-column {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.golf-bag-panel-content-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: start;
+}
+
+.golf-bag-panel-image-wrapper {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0;
+}
+
+.golf-bag-panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.golf-bag-panel-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #c8dccf;
+  background: rgba(247, 251, 247, 0.95);
+  color: #2d6245;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: help;
+  line-height: 1;
+}
+
+.golf-bag-panel-tooltip:hover {
+  background: #eef9ee;
+  border-color: #9bc7a8;
+}
+
+.golf-bag-panel-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 82.5%;
+  max-width: 300px;
+  min-width: 165px;
+  aspect-ratio: 1 / 1;
+  border-radius: 24px;
+  border: 1px dashed #c8dccf;
+  background: #f7fbf7;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.golf-bag-panel-image:hover {
+  transform: translateY(-1px);
+  border-color: #9bc7a8;
+  background: #eef9ee;
+}
+
+.golf-bag-panel-image.with-image {
+  border-style: solid;
+  border-color: #c8dccf;
+}
+
+.golf-bag-panel-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.golf-bag-panel-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  color: #4a6a53;
+  font-size: 13px;
+  padding: 8px;
+}
+
+.golf-bag-panel-image-placeholder small {
+  display: block;
+  color: #6b8d78;
+  font-size: 11px;
+}
+
 .golf-bag-panel-eyebrow {
   margin: 0 0 8px;
   font-size: 11px;
@@ -76,15 +180,6 @@
   letter-spacing: -0.02em;
   color: #0f2818;
   line-height: 1.2;
-}
-
-.golf-bag-panel-description {
-  margin: 10px 0 0;
-  max-width: 620px;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.6;
-  color: #5a7d6e;
 }
 
 .golf-bag-panel-summary {
@@ -238,8 +333,8 @@
 .golf-bag-panel-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 8px;
+  gap: 8px;
+  padding-top: 4px;
   border-top: 1px solid #dfe8e1;
 }
 
@@ -285,6 +380,16 @@
   background: #ffeef0;
   border-color: #f0a8ac;
   box-shadow: 0 4px 12px rgba(194, 41, 42, 0.08);
+}
+
+@media (max-width: 900px) {
+  .golf-bag-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .golf-bag-panel-image-wrapper {
+    min-height: 220px;
+  }
 }
 
 @media (max-width: 768px) {

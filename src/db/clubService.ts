@@ -113,21 +113,30 @@ const normalizeBagRecord = (bag: GolfBag): GolfBag => ({
   ...bag,
   name: normalizeBagName(bag.name),
   clubIds: normalizeBagClubIds(bag.clubIds ?? []),
+  imageData: normalizeImageData(bag.imageData),
 });
 
-const createBagRecord = (name: string, clubIds: number[]): GolfBag => {
+const createBagRecord = (
+  name: string,
+  clubIds: number[],
+  imageData?: string[] | undefined,
+): GolfBag => {
   const timestamp = createTimestamp();
   return {
     name: normalizeBagName(name),
     clubIds: validateBagClubIds(clubIds),
+    imageData: normalizeImageData(imageData),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
 };
 
-const createUpdatedBagRecord = (patch: Partial<Pick<GolfBag, 'name' | 'clubIds'>>): Partial<GolfBag> => ({
+const createUpdatedBagRecord = (
+  patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData'>>,
+): Partial<GolfBag> => ({
   ...(patch.name != null ? { name: normalizeBagName(patch.name) } : {}),
   ...(patch.clubIds != null ? { clubIds: validateBagClubIds(patch.clubIds) } : {}),
+  ...(patch.imageData != null ? { imageData: normalizeImageData(patch.imageData) } : {}),
   updatedAt: createTimestamp(),
 });
 
@@ -261,7 +270,7 @@ export class ClubService {
 
   static async updateBag(
     id: number,
-    patch: Partial<Pick<GolfBag, 'name' | 'clubIds'>>,
+    patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData'>>,
   ): Promise<number> {
     return db.golfBags.update(id, createUpdatedBagRecord(patch));
   }

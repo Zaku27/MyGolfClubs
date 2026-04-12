@@ -4,6 +4,19 @@
   padding: 48px 20px 60px;
 }
 
+.app-top-panel-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 980px) {
+  .app-top-panel-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .error-message {
   background: #fff2f2;
   border: 1px solid #ffcbcb;

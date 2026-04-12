@@ -223,9 +223,9 @@
 }
 
 .club-image-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
+  width: 45px;
+  height: 45px;
+  border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
   border: 1px solid rgba(17, 24, 39, 0.08);
@@ -239,6 +239,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 12px;
 }
 
 .club-type {

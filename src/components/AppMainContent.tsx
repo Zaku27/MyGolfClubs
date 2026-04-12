@@ -1,9 +1,10 @@
 import { ClubList } from './ClubList';
 import { ClubForm } from './ClubForm';
 import { AnalysisScreen } from './AnalysisScreen';
+import { AccessoryPanel } from './AccessoryPanel';
 import { GolfBagPanel } from './GolfBagPanel';
 import { SimulatorApp } from './simulator/SimulatorApp';
-import type { GolfClub, GolfBag } from '../types/golf';
+import type { AccessoryItem, GolfClub, GolfBag } from '../types/golf';
 import type { UserLieAngleStandards } from '../types/lieStandards';
 
 export type AppMainContentProps = {
@@ -46,6 +47,7 @@ export type AppMainContentProps = {
   handleResetLieStandards: () => void;
   onSelectBag: (bagId: number) => void;
   onCreateBag: () => void;
+  onAddBagImage: (bagId: number, imageData: string[]) => void;
   onRenameActiveBag: () => void;
   onDeleteActiveBag: () => void;
   onShiftSelectedBagLeft: () => void;
@@ -63,6 +65,10 @@ export type AppMainContentProps = {
   handleBackToList: () => void;
   handleBackFromSimulator: () => void;
   handleShowSimulator: () => void;
+  accessories: AccessoryItem[];
+  onAddAccessory: (accessory: Omit<AccessoryItem, 'id' | 'createdAt'>) => void;
+  onUpdateAccessory: (accessory: AccessoryItem) => void;
+  onDeleteAccessory: (id: string) => void;
   headSpeed: number;
   onHeadSpeedChange: (value: number) => void;
 };
@@ -107,6 +113,7 @@ export function AppMainContent({
   handleResetLieStandards,
   onSelectBag,
   onCreateBag,
+  onAddBagImage,
   onRenameActiveBag,
   onDeleteActiveBag,
   onShiftSelectedBagLeft,
@@ -124,6 +131,10 @@ export function AppMainContent({
   handleBackToList,
   handleBackFromSimulator,
   handleShowSimulator,
+  accessories,
+  onAddAccessory,
+  onUpdateAccessory,
+  onDeleteAccessory,
   headSpeed,
   onHeadSpeedChange,
 }: AppMainContentProps) {
@@ -174,19 +185,29 @@ export function AppMainContent({
         />
       ) : (
         <>
-          <GolfBagPanel
-            bags={bags}
-            activeBagId={activeBag?.id ?? null}
-            activeBagClubCount={activeBagClubCount}
-            onSelectBag={onSelectBag}
-            onCreateBag={onCreateBag}
-            onRenameActiveBag={onRenameActiveBag}
-            onDeleteActiveBag={onDeleteActiveBag}
-            onShiftSelectedBagLeft={onShiftSelectedBagLeft}
-            listScope={clubListScope}
-            onChangeListScope={onChangeClubListScope}
-            compact
-          />
+          <div className="app-top-panel-row">
+            <GolfBagPanel
+              bags={bags}
+              activeBagId={activeBag?.id ?? null}
+              activeBagClubCount={activeBagClubCount}
+              onSelectBag={onSelectBag}
+              onCreateBag={onCreateBag}
+              onAddBagImage={onAddBagImage}
+              onRenameActiveBag={onRenameActiveBag}
+              onDeleteActiveBag={onDeleteActiveBag}
+              onShiftSelectedBagLeft={onShiftSelectedBagLeft}
+              listScope={clubListScope}
+              onChangeListScope={onChangeClubListScope}
+              compact
+            />
+
+            <AccessoryPanel
+              accessories={accessories}
+              onAddAccessory={onAddAccessory}
+              onUpdateAccessory={onUpdateAccessory}
+              onDeleteAccessory={onDeleteAccessory}
+            />
+          </div>
 
           <ClubList
             clubs={clubListScope === 'bag' ? activeBagClubs : sortedClubs}

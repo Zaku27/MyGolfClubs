@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useLocation } from 'react-router-dom';
-import type { GolfClub } from './types/golf';
+import type { AccessoryItem, GolfClub } from './types/golf';
 import {
   DEFAULT_USER_LIE_ANGLE_STANDARDS,
   normalizeLieStandardKey,
@@ -36,6 +37,7 @@ const SWING_GOOD_TOLERANCE_STORAGE_KEY = 'golfbag-swing-good-tolerance';
 const SWING_ADJUST_THRESHOLD_STORAGE_KEY = 'golfbag-swing-adjust-threshold';
 const ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY = 'golfbag-analysis-hidden-clubs';
 const CLUB_LIST_SCOPE_STORAGE_KEY = 'golfbag-club-list-scope';
+const ACCESSORY_STORAGE_KEY = 'golfbag-accessories';
 const DEFAULT_SWING_TARGET = 2.0;
 const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
 const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
@@ -63,6 +65,33 @@ const parseHiddenAnalysisClubKeys = (value: unknown): string[] => {
 const parseClubListScope = (value: unknown): 'bag' | 'all' => {
   return value === 'all' ? 'all' : 'bag';
 };
+
+const parseAccessories = (value: unknown): AccessoryItem[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is AccessoryItem =>
+      item && typeof item === 'object' &&
+      typeof (item as any).id === 'string' &&
+      typeof (item as any).name === 'string' &&
+      typeof (item as any).createdAt === 'string'
+    )
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      note: typeof item.note === 'string' ? item.note : undefined,
+      imageData: typeof item.imageData === 'string' ? item.imageData : undefined,
+      createdAt: item.createdAt,
+    }));
+};
+
+const DEFAULT_ACCESSORIES: AccessoryItem[] = [
+  { id: 'ball', name: 'ボール', note: '練習用ボール', createdAt: new Date().toISOString() },
+  { id: 'glove', name: 'グローブ', note: '雨天用グローブ', createdAt: new Date().toISOString() },
+  { id: 'rangefinder', name: '計測器', note: '距離計', createdAt: new Date().toISOString() },
+];
 
 type ClubTypeFilter = 'All' | GolfClub['clubType'];
 
@@ -122,8 +151,12 @@ function App() {
   const [showRenameBagDialog, setShowRenameBagDialog] = useState(false);
   const [renameBagTargetId, setRenameBagTargetId] = useState<number | null>(null);
   const [renameBagDefaultName, setRenameBagDefaultName] = useState('');
+  
   const [clubListScope, setClubListScope] = useState<'bag' | 'all'>(() => {
     return readStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, 'bag', parseClubListScope);
+  });
+  const [accessories, setAccessories] = useState<AccessoryItem[]>(() => {
+    return readStoredJson(ACCESSORY_STORAGE_KEY, DEFAULT_ACCESSORIES, parseAccessories);
   });
   const [clubNameSearchText, setClubNameSearchText] = useState('');
   const [clubTypeFilter, setClubTypeFilter] = useState<ClubTypeFilter>('All');
@@ -170,6 +203,7 @@ function App() {
     moveBagLeft,
     toggleClubInActiveBag,
     replaceActiveBagClubIds,
+    updateBagImage,
   } = useClubStore();
 
   useBagIdUrlSync({
@@ -264,6 +298,10 @@ function App() {
   useEffect(() => {
     writeStoredJson(CLUB_LIST_SCOPE_STORAGE_KEY, clubListScope);
   }, [clubListScope]);
+
+  useEffect(() => {
+    writeStoredJson(ACCESSORY_STORAGE_KEY, accessories);
+  }, [accessories]);
 
   useEffect(() => {
     if (clubListScope === 'bag' && activeBagClubCount === 0 && sortedClubs.length > 0 && bags.length === 1) {
@@ -370,7 +408,30 @@ function App() {
     setShowForm(true);
   };
 
-  const handleCreateBag = async () => {
+  const handleAddAccessory = (accessory: Omit<AccessoryItem, 'id' | 'createdAt'>) => {
+    setAccessories((prevAccessories) => [
+      ...prevAccessories,
+      {
+        id: `accessory-${Date.now()}`,
+        ...accessory,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+  };
+
+  const handleUpdateAccessory = (updatedAccessory: AccessoryItem) => {
+    setAccessories((prevAccessories) =>
+      prevAccessories.map((accessory) =>
+        accessory.id === updatedAccessory.id ? updatedAccessory : accessory,
+      ),
+    );
+  };
+
+  const handleDeleteAccessory = (id: string) => {
+    setAccessories((prevAccessories) => prevAccessories.filter((accessory) => accessory.id !== id));
+  };
+
+  const handleCreateBag = () => {
     setShowCreateBagDialog(true);
   };
 
@@ -378,6 +439,10 @@ function App() {
     await createBag(bagName);
     setShowCreateBagDialog(false);
     setClubListScope('bag');
+  };
+
+  const handleAddBagImage = async (bagId: number, imageData: string[]) => {
+    await updateBagImage(bagId, imageData);
   };
 
   const handleRenameActiveBag = async () => {
@@ -574,7 +639,9 @@ function App() {
         bags={bags}
         loading={loading}
         onCreateBagConfirm={handleCreateBagConfirm}
-        onCancelCreateBag={() => setShowCreateBagDialog(false)}
+        onCancelCreateBag={() => {
+          setShowCreateBagDialog(false);
+        }}
         onRenameBagConfirm={handleRenameBagConfirm}
         onCancelRenameBag={() => {
           setShowRenameBagDialog(false);
@@ -623,6 +690,7 @@ function App() {
         handleResetLieStandards={handleResetLieStandards}
         onSelectBag={(bagId) => void setActiveBag(bagId)}
         onCreateBag={() => void handleCreateBag()}
+        onAddBagImage={(bagId, imageData) => void handleAddBagImage(bagId, imageData)}
         onRenameActiveBag={() => void handleRenameActiveBag()}
         onDeleteActiveBag={() => void handleDeleteActiveBag()}
         onShiftSelectedBagLeft={() => {
@@ -644,6 +712,10 @@ function App() {
         handleBackToList={() => setShowAnalysis(false)}
         handleBackFromSimulator={() => setShowSimulator(false)}
         handleShowSimulator={() => setShowSimulator(true)}
+        accessories={accessories}
+        onAddAccessory={handleAddAccessory}
+        onUpdateAccessory={handleUpdateAccessory}
+        onDeleteAccessory={handleDeleteAccessory}
         headSpeed={headSpeed}
         onHeadSpeedChange={setHeadSpeed}
       />

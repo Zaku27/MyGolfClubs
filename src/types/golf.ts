@@ -35,8 +35,17 @@ export interface GolfBag {
   id?: number;
   name: string;
   clubIds: number[];
+  imageData?: string[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface AccessoryItem {
+  id: string;
+  name: string;
+  imageData?: string;
+  note?: string;
+  createdAt: string;
 }
 
 export interface ClubPersonalData {
