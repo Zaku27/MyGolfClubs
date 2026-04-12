@@ -1105,15 +1105,16 @@ export default function RangeScreen() {
           </div>
 
             {seatType === 'personal' && (
-            <div className="w-full bg-white rounded shadow p-4">
+            <div className="w-full bg-white rounded shadow p-4 range-use-bag-panel">
               <GolfBagPanel
                 bags={bags}
                 activeBagId={activeBag?.id ?? null}
                 activeBagClubCount={activeBag?.clubIds.length ?? 0}
                 onSelectBag={(bagId) => void setActiveBag(bagId)}
                 showManagement={false}
+                showImage={false}
                 compact
-                title="練習するバッグ"
+                title="使用するバッグ"
                 description="個人データではバッグ内クラブを使用します。ロボットでは全クラブを使用します。"
               />
             </div>

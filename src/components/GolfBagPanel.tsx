@@ -19,6 +19,7 @@ type GolfBagPanelProps = {
   listScope?: ListScope;
   onChangeListScope?: (scope: ListScope) => void;
   showManagement?: boolean;
+  showImage?: boolean;
   compact?: boolean;
   title?: string;
   description?: string;
@@ -35,6 +36,7 @@ export const GolfBagPanel = ({
   onDeleteActiveBag,
   onShiftSelectedBagLeft,
   showManagement = true,
+  showImage = true,
   compact = true,
   title,
   description,
@@ -68,31 +70,33 @@ export const GolfBagPanel = ({
 
   return (
     <section className={`golf-bag-panel ${compact ? 'compact' : ''}`}>
-      <div className="golf-bag-panel-image-column">
-        <div className="golf-bag-panel-image-wrapper">
-          <button
-            type="button"
-            className={`golf-bag-panel-image ${activeImage ? 'with-image' : ''}`}
-            onClick={handleImageClick}
-            aria-label={activeImage ? 'バッグ画像を変更' : 'バッグ画像を追加'}
-          >
-            {activeBag ? (
-              <img src={activeImage} alt={`バッグ ${activeBag.name} の画像`} />
-            ) : (
-              <div className="golf-bag-panel-image-placeholder">
-                <span>画像を追加</span>
-              </div>
-            )}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageFileChange}
-            hidden
-          />
+      {showImage && (
+        <div className="golf-bag-panel-image-column">
+          <div className="golf-bag-panel-image-wrapper">
+            <button
+              type="button"
+              className={`golf-bag-panel-image ${activeImage ? 'with-image' : ''}`}
+              onClick={handleImageClick}
+              aria-label={activeImage ? 'バッグ画像を変更' : 'バッグ画像を追加'}
+            >
+              {activeBag ? (
+                <img src={activeImage} alt={`バッグ ${activeBag.name} の画像`} />
+              ) : (
+                <div className="golf-bag-panel-image-placeholder">
+                  <span>画像を追加</span>
+                </div>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageFileChange}
+              hidden
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="golf-bag-panel-content-column">
         <div className="golf-bag-panel-title-row">

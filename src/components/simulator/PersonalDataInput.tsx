@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Papa from "papaparse";
 import { GolfBagPanel } from "../GolfBagPanel";
+import "../ClubList.css";
 import {
   selectActiveGolfBag,
   selectSortedActiveBagClubs,
@@ -17,6 +18,7 @@ import {
 } from "../../utils/clubSuccessDisplay";
 import { ClubDisplayName } from "../ClubDisplayName";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
+import { formatSimClubLabel } from "../../utils/simClubLabel";
 import {
   buildLieAngleAnalysis,
   buildSwingWeightAnalysis,
@@ -184,6 +186,51 @@ export function PersonalDataInput() {
     return `${metersPerSecond.toFixed(1)} m/s`;
   };
 
+  const mapCsvClubToSimClubLabel = (clubValue: string): string => {
+    const value = clubValue.trim();
+    const normalized = value.replace(/\s+/g, '').toLowerCase();
+
+    if (/^driver$/i.test(value) || /^minidriver$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Driver', number: '' });
+    }
+
+    const woodMatch = normalized.match(/^(\d+)(wood|w)$/i);
+    if (woodMatch) {
+      return formatSimClubLabel({ type: 'Wood', number: woodMatch[1] });
+    }
+
+    const hybridMatch = normalized.match(/^(\d+)(hybrid|h)$/i);
+    if (hybridMatch) {
+      return formatSimClubLabel({ type: 'Hybrid', number: hybridMatch[1] });
+    }
+
+    const ironMatch = normalized.match(/^(\d+)(iron|i)$/i);
+    if (ironMatch) {
+      return formatSimClubLabel({ type: 'Iron', number: ironMatch[1] });
+    }
+
+    if (/^(pw|gw|sw)$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Wedge', number: normalized.toUpperCase() });
+    }
+
+    if (/^(putter|p)$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Putter', number: '' });
+    }
+
+    // Already valid simulator label like Driver, 3Wood, 4Hybrid, 7Iron, PW, Putter
+    if (/^(Driver|\d+Wood|\d+Hybrid|\d+Iron|PW|GW|SW|Putter)$/i.test(value)) {
+      return formatSimClubLabel({ type: /^Driver$/i.test(value) ? 'Driver' : /Putter/i.test(value) ? 'Putter' : /^(PW|GW|SW)$/i.test(value) ? 'Wedge' : (/Wood/i.test(value) ? 'Wood' : /Hybrid/i.test(value) ? 'Hybrid' : 'Iron'),
+        number: (() => {
+          if (/^Driver$/i.test(value) || /^Putter$/i.test(value)) return '';
+          const numberMatch = value.match(/^(\d+)/);
+          if (numberMatch) return numberMatch[1];
+          return value.toUpperCase();
+        })() });
+    }
+
+    throw new Error(`クラブ名「${clubValue}」を formatSimClubLabel にマッピングできませんでした。`);
+  };
+
   const parseShotCsvRows = (text: string): ShotRecord[] => {
     const result = Papa.parse<ShotRecord>(text, {
       header: true,
@@ -193,10 +240,18 @@ export function PersonalDataInput() {
       throw new Error(result.errors.map((error) => error.message).join('; '));
     }
 
-    const rows = result.data.filter((row) => {
-      const shotNumber = Number(row.Shot);
-      return Number.isFinite(shotNumber) && shotNumber > 0;
-    });
+    const rows = result.data
+      .filter((row) => {
+        const shotNumber = Number(row.Shot);
+        return Number.isFinite(shotNumber) && shotNumber > 0;
+      })
+      .map((row) => {
+        const normalizedClub = mapCsvClubToSimClubLabel(row.club);
+        return {
+          ...row,
+          club: normalizedClub,
+        };
+      });
 
     if (rows.length === 0) {
       throw new Error('ショットデータが有効な形式ではありませんでした。');
@@ -319,6 +374,40 @@ export function PersonalDataInput() {
       return row.club.toLowerCase().includes(normalizedSearch);
     });
   }, [shotRows, shotSearchText]);
+
+  const compareSimClubLabel = (a: string, b: string) => {
+    const getRank = (label: string) => {
+      if (/^Driver$/i.test(label)) return { rank: 0, value: 0 };
+      const woodMatch = label.match(/^(\d+)Wood$/i);
+      if (woodMatch) return { rank: 1, value: Number(woodMatch[1]) };
+      const hybridMatch = label.match(/^(\d+)Hybrid$/i);
+      if (hybridMatch) return { rank: 2, value: Number(hybridMatch[1]) };
+      const ironMatch = label.match(/^(\d+)Iron$/i);
+      if (ironMatch) return { rank: 3, value: Number(ironMatch[1]) };
+      if (/^PW$/i.test(label)) return { rank: 4, value: 0 };
+      if (/^GW$/i.test(label)) return { rank: 4, value: 1 };
+      if (/^SW$/i.test(label)) return { rank: 4, value: 2 };
+      if (/^Putter$/i.test(label)) return { rank: 5, value: 0 };
+      return { rank: 6, value: 0 };
+    };
+
+    const left = getRank(a);
+    const right = getRank(b);
+    if (left.rank !== right.rank) {
+      return left.rank - right.rank;
+    }
+    if (left.value !== right.value) {
+      return left.value - right.value;
+    }
+    return a.localeCompare(b, undefined, { sensitivity: 'base' });
+  };
+
+  const clubSearchOptions = useMemo(() => {
+    return clubs
+      .map((club) => formatSimClubLabel(toSimClub(club)))
+      .filter((label, index, self) => self.indexOf(label) === index)
+      .sort(compareSimClubLabel);
+  }, [clubs]);
 
   const appLink = activeBag?.id != null ? `/?bagId=${activeBag.id}` : "/";
 
@@ -601,15 +690,24 @@ export function PersonalDataInput() {
                 <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="font-semibold text-slate-900">読み込み結果</p>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <input
-                        type="search"
-                        placeholder="クラブ名を入力"
+                    <div className="club-search-inline" aria-label="クラブ検索">
+                      <select
                         value={shotSearchText}
                         onChange={(event) => setShotSearchText(event.target.value)}
-                        className="w-full max-w-xs rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
-                      />
-                      <span className="text-xs text-slate-500">表示 {filteredShotRows.length} / {shotRows.length} 行</span>
+                      >
+                        <option value="">すべて</option>
+                        {clubSearchOptions.map((label) => (
+                          <option key={label} value={label}>{label}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="btn-clear-filter"
+                        onClick={() => setShotSearchText('')}
+                        disabled={!shotSearchText}
+                      >
+                        クリア
+                      </button>
                     </div>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
