@@ -427,65 +427,71 @@ export const ClubForm: React.FC<ClubFormProps> = ({
       {/* Section 1: Basic Information */}
       <div className="form-section">
         <h3 className="form-section-title">基本情報</h3>
-        
-        {/* Club Type */}
-        <div className="form-group">
-          <label htmlFor="clubType">クラブの種類 *</label>
-          <div className="club-type-select-wrap">
-            <select
-              id="clubType"
-              name="clubType"
-              value={formData.clubType}
-              onChange={(e) => {
-                const selected = e.target.value;
-                if (!selected) {
-                  clearClubTypeSelection();
-                  return;
-                }
-                applyClubTypeChange(selected as ClubCategory);
-              }}
-              required
-              className={errors.clubType ? 'error' : ''}
-            >
-              <option value="">種類を選択してください</option>
-              {CLUB_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {errors.clubType && (
-            <span className="error-message">{errors.clubType}</span>
-          )}
-          {!formData.clubType && !errors.clubType && (
-            <span className="form-help-text">種類を選択すると、クラブ名以外の項目にデフォルト値を読み込みます。</span>
-          )}
-        </div>
-        
-        {/* Club Name */}
-        <div className="form-group">
-          <label htmlFor="name">クラブ名 *</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            placeholder="例: Ping G430、Titleist T150"
-            required
-            className={errors.name ? 'error' : ''}
-          />
-          {errors.name && (
-            <span className="error-message">{errors.name}</span>
-          )}
-        </div>
 
-        <ClubImageUploader
-          imageData={formData.imageData}
-          onImageDataChange={(nextImages) => setFormData((prev) => ({ ...prev, imageData: nextImages }))}
-          onError={(message) => setErrors((prev) => ({ ...prev, imageData: message }))}
-        />
+        <div className="basic-info-grid">
+          <div className="basic-info-column basic-info-column--fields">
+            {/* Club Type */}
+            <div className="form-group">
+              <label htmlFor="clubType">クラブの種類 *</label>
+              <div className="club-type-select-wrap">
+                <select
+                  id="clubType"
+                  name="clubType"
+                  value={formData.clubType}
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    if (!selected) {
+                      clearClubTypeSelection();
+                      return;
+                    }
+                    applyClubTypeChange(selected as ClubCategory);
+                  }}
+                  required
+                  className={errors.clubType ? 'error' : ''}
+                >
+                  <option value="">種類を選択してください</option>
+                  {CLUB_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {errors.clubType && (
+                <span className="error-message">{errors.clubType}</span>
+              )}
+              {!formData.clubType && !errors.clubType && (
+                <span className="form-help-text">種類を選択すると、クラブ名以外の項目にデフォルト値を読み込みます。</span>
+              )}
+            </div>
+
+            {/* Club Name */}
+            <div className="form-group">
+              <label htmlFor="name">クラブ名 *</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="例: Ping G430、Titleist T150"
+                required
+                className={errors.name ? 'error' : ''}
+              />
+              {errors.name && (
+                <span className="error-message">{errors.name}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="basic-info-column basic-info-column--image">
+            <ClubImageUploader
+              imageData={formData.imageData}
+              onImageDataChange={(nextImages) => setFormData((prev) => ({ ...prev, imageData: nextImages }))}
+              onError={(message) => setErrors((prev) => ({ ...prev, imageData: message }))}
+            />
+          </div>
+        </div>
 
         {/* Club Number */}
         {renderClubNumberField()}

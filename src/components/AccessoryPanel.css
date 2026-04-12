@@ -6,12 +6,12 @@
   border: 1px solid #d6e7dc;
   background: radial-gradient(circle at top right, rgba(24, 121, 78, 0.12), transparent 38%), linear-gradient(145deg, #fcfefc, #f3f8f3);
   box-shadow: 0 8px 24px rgba(24, 121, 78, 0.06);
+  align-self: start;
 }
 
 .accessory-panel-content {
   display: flex;
   flex-direction: column;
-  min-height: 160px;
 }
 
 .accessory-badge-list {

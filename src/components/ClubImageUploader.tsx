@@ -472,7 +472,7 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
 
   return (
     <div className="w-full bg-white rounded shadow p-4">
-      <label className="block font-semibold mb-2">クラブ画像</label>
+      <label className="club-image-upload-label">クラブ画像</label>
       <div className="club-image-upload">
         {imageData.length > 0 ? (
           <>

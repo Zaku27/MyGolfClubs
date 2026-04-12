@@ -159,7 +159,7 @@ export const AccessoryPanel = ({
             type="button"
             className="accessory-add-card accessory-add-button"
             onClick={openAddDialog}
-            aria-label="新しいアクセサリーを追加"
+            aria-label="新しいアイテムを追加"
           >
             <span className="accessory-add-label">アイテムを追加</span>
           </button>
@@ -170,7 +170,7 @@ export const AccessoryPanel = ({
         <div className="accessory-modal" role="dialog" aria-modal="true" aria-labelledby="accessory-dialog-title">
           <div className="accessory-modal-backdrop" onClick={closeDialog} />
           <div className="accessory-modal-card">
-            <h3 id="accessory-dialog-title">{formState.id ? 'アクセサリーを編集' : 'アクセサリーを追加'}</h3>
+            <h3 id="accessory-dialog-title">{formState.id ? 'アイテムを編集' : 'アイテムを追加'}</h3>
             <form className="accessory-form" onSubmit={handleSubmit}>
               <label className="accessory-label">
                 <span>名称</span>
