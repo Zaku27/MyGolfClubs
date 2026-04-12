@@ -33,6 +33,7 @@ export function loadRangePlayerSettings(): RangePlayerSettings {
         seatType: "personal",
         robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
         robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
+        reuseLastSeed: false,
       };
     }
 
@@ -49,6 +50,7 @@ export function loadRangePlayerSettings(): RangePlayerSettings {
       seatType: "personal",
       robotHeadSpeed: DEFAULT_ROBOT_HEAD_SPEED,
       robotSkillLevel: DEFAULT_ROBOT_SKILL_LEVEL,
+      reuseLastSeed: false,
     };
   }
 }

@@ -78,6 +78,7 @@ interface GameStoreState {
   shotPowerPercent: number;
   aimXOffset: number;
   shotInProgress: boolean;
+  confidenceBoost: number;
   currentHoleShots: ShotLog[];
   roundShots: ShotLog[];
   lastHoleSummary: HoleSummary | null;
@@ -128,6 +129,7 @@ const INITIAL_STATE: GameStoreState = {
   shotInProgress: false,
   currentHoleShots: [],
   roundShots: [],
+  confidenceBoost: 0,
   lastHoleSummary: null,
   holeSummaries: [],
   goodShotStreak: 0,

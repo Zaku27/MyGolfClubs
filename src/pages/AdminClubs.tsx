@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Papa from 'papaparse';
-import type { ParseError, ParseResult } from 'papaparse';
+import type { ParseResult } from 'papaparse';
 import { Link } from 'react-router-dom';
 import {
   buildCatalogSpecKey,
@@ -49,14 +49,6 @@ type ImportCandidate = {
   spec: CatalogSpec | null;
   reason?: string;
 };
-
-type StructuredTextParseResult = {
-  headers: string[];
-  rows: CsvRow[];
-  usedHeaderRow: boolean;
-};
-
-type RowNumberSet = Set<number>;
 
 const defaultSortState: { key: SortKey; direction: SortDirection } = {
   key: 'year',
@@ -222,41 +214,6 @@ const toNullableNumber = (value: string | undefined): number | null => {
 
 const toOptionalNumber = (value: string | undefined): number | undefined => {
   return extractNumericValue(value);
-};
-
-const parseRowNumberSpec = (spec: string, maxRow: number): RowNumberSet => {
-  const next = new Set<number>();
-  const normalized = spec.trim();
-  if (!normalized) {
-    return next;
-  }
-
-  for (const part of normalized.split(',')) {
-    const token = part.trim();
-    if (!token) {
-      continue;
-    }
-
-    if (token.includes('-')) {
-      const [startRaw, endRaw] = token.split('-').map((value) => Number(value.trim()));
-      if (!Number.isInteger(startRaw) || !Number.isInteger(endRaw) || startRaw <= 0 || endRaw <= 0) {
-        continue;
-      }
-      const start = Math.min(startRaw, endRaw);
-      const end = Math.max(startRaw, endRaw);
-      for (let row = start; row <= end && row <= maxRow; row += 1) {
-        next.add(row);
-      }
-      continue;
-    }
-
-    const numeric = Number(token);
-    if (Number.isInteger(numeric) && numeric > 0 && numeric <= maxRow) {
-      next.add(numeric);
-    }
-  }
-
-  return next;
 };
 
 const buildCsvLookup = (row: CsvRow): Record<string, string> => {
@@ -658,7 +615,7 @@ export default function AdminClubs() {
             setCsvLoading(false);
           }
         },
-        error: (error: ParseError) => {
+        error: (error: Error) => {
           setImportError(`CSVアップロードに失敗しました: ${error.message}`);
           setCsvLoading(false);
         },

@@ -350,6 +350,8 @@ export function HoleMapCanvas({
   onSelectHazardId,
   onSelectHoleArea,
   onHazardsChange,
+  onCanvasClick,
+  onCanvasDoubleClick,
 }: HoleMapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -407,10 +409,6 @@ export function HoleMapCanvas({
     return buildAbsolutePointFromOrigin(currentOrigin, targetDistance, aimPoint.x, aimPoint.y);
   }, [aimPoint, currentOrigin, targetDistance]);
 
-  const pinPoint = useMemo<Point2D>(() => ({ x: 0, y: targetDistance }), [targetDistance]);
-
-  const distanceToPin = useMemo(() => Math.hypot(currentOrigin.x - pinPoint.x, currentOrigin.y - pinPoint.y), [currentOrigin, pinPoint]);
-
   const screenToWorld = (screenX: number, screenY: number, overrideViewport: Viewport = viewport): Point2D => ({
     x: (screenX - overrideViewport.offsetX) / overrideViewport.scale,
     y: (screenY - overrideViewport.offsetY) / overrideViewport.scale,
@@ -449,19 +447,6 @@ export function HoleMapCanvas({
 
   const resetViewport = () => {
     animateViewportTo(DEFAULT_VIEWPORT);
-  };
-
-  const buildCenteredViewport = (scale: number, centerPoint: Point2D): Viewport => {
-    const centerScreen = {
-      x: yardToPxX(centerPoint.x),
-      y: yardToPxY(centerPoint.y),
-    };
-
-    return {
-      scale,
-      offsetX: size.width / 2 - scale * centerScreen.x,
-      offsetY: size.height / 2 - scale * centerScreen.y,
-    };
   };
 
   const handleCanvasWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {

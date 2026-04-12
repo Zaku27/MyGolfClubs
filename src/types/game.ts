@@ -25,6 +25,10 @@ export interface Hazard {
   yBack: number;    // distance to the back edge, yards
   xCenter: number;  // lateral offset from center line, yards
   width: number;    // total width, yards
+  height?: number;
+  x?: number;
+  y?: number;
+  points?: Array<{ x: number; y: number }>;
   penaltyStrokes: 0 | 1 | 2;
   liePenalty?: {
     distanceMultiplier: number;  // 0.75 = 25%飛距離減
@@ -115,6 +119,7 @@ export interface ShotResult {
   penaltyStrokes: number;
   penaltyDropOrigin?: { x: number; y: number };
   origin?: { x: number; y: number };
+  confidenceBoostApplied?: boolean;
 }
 
 export interface ShotLog {

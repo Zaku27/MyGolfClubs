@@ -1,6 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { ClubCategory } from '../types/golf';
-import { CLUB_NUMBER_DEFAULT } from '../utils/clubFormUtils';
 import './ClubForm.css';
 
 type ClubImageUploaderProps = {

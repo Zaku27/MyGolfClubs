@@ -130,9 +130,6 @@ function getPenaltyStrokesByType(type: HazardType): 0 | 1 | 2 {
 }
 
 export function CourseEditor({ holes, onChange }: CourseEditorProps) {
-  // 保存時データのデバッグ用
-  const [lastSavedHoles, setLastSavedHoles] = useState<Hole[] | null>(null);
-
   const [selectedHoleIndex, setSelectedHoleIndex] = useState(0);
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
   const [polygonCreationMode, setPolygonCreationMode] = useState(false);
@@ -213,7 +210,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       yFront: Math.min(...points.map((p) => p.y)),
       yBack: Math.max(...points.map((p) => p.y)),
     };
-    const newHazard = {
+    const newHazard: Hazard = {
       id: `hazard-${selectedHole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type,
       shape: "polygon",
@@ -326,7 +323,6 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       }
       return updater({ ...hole, hazards: cloneHazards(hole.hazards) });
     });
-    setLastSavedHoles(next); // 保存直後のデータを記録
     onChange(next);
   };
 

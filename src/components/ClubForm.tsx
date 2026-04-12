@@ -51,22 +51,6 @@ const EMPTY_FORM_DATA: ClubFormData = {
   imageData: [],
 };
 
-const readFileAsDataURL = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === 'string') {
-        resolve(result);
-      } else {
-        reject(new Error('画像の読み込みに失敗しました'));
-      }
-    };
-    reader.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
-    reader.readAsDataURL(file);
-  });
-};
-
 const normalizeImageData = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return value.filter((item): item is string => typeof item === 'string');

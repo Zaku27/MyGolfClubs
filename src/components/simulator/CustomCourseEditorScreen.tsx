@@ -69,8 +69,9 @@ function normalizeGroundCondition(value: unknown): Hole['groundCondition'] | und
   if (!value || typeof value !== "object") return undefined;
 
   const raw = value as Record<string, unknown>;
+  type GroundConditionHardness = NonNullable<Hole['groundCondition']>['hardness'];
   const hardness = raw.hardness === "soft" || raw.hardness === "medium" || raw.hardness === "firm"
-    ? (raw.hardness as Hole['groundCondition']['hardness'])
+    ? (raw.hardness as GroundConditionHardness)
     : undefined;
   const slopeAngle = Number(raw.slopeAngle);
   const slopeDirection = Number(raw.slopeDirection);
