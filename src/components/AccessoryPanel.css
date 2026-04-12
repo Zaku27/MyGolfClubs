@@ -1,7 +1,7 @@
 .accessory-panel {
   display: grid;
-  gap: 16px;
-  padding: 28px;
+  gap: 12px;
+  padding: 18px;
   border-radius: 24px;
   border: 1px solid #d6e7dc;
   background: radial-gradient(circle at top right, rgba(24, 121, 78, 0.12), transparent 38%), linear-gradient(145deg, #fcfefc, #f3f8f3);
@@ -13,31 +13,35 @@
 }
 
 .accessory-badge-list {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
 .accessory-add-card {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 100px;
-  padding: 18px;
-  border-radius: 18px;
-  border: 2px dashed #c5dccf;
-  background: #fbfdf9;
-  color: #46614d;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  gap: 6px;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  width: auto;
 }
 
-.accessory-add-card:hover {
-  background: #f5fbf3;
-  border-color: #a8caba;
-  transform: translateY(-1px);
+.accessory-add-button {
+  background-color: #f18d3a;
+  border-color: #f18d3a;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(241, 141, 58, 0.18);
+}
+
+.accessory-add-button:hover:not(:disabled) {
+  background-color: #d77626;
+  border-color: #d77626;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(241, 141, 58, 0.2);
 }
 
 .accessory-add-icon {
@@ -58,19 +62,32 @@
 }
 
 .accessory-item-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0;
   border-radius: 18px;
-  background: #ffffff;
-  border: 1px solid #cde0d5;
+  background: transparent;
+  border: none;
+}
+
+.accessory-item-image-group {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+
+.accessory-item-image-group:hover .accessory-item-actions,
+.accessory-item-image-group:focus-within .accessory-item-actions {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .accessory-item-image-button {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
   padding: 0;
   border: none;
   background: transparent;
@@ -100,8 +117,16 @@
 }
 
 .accessory-item-actions {
+  position: absolute;
+  inset: 0;
   display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
 }
 
 .accessory-item-actions .btn-icon {

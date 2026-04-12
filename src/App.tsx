@@ -89,8 +89,6 @@ const parseAccessories = (value: unknown): AccessoryItem[] => {
 
 const DEFAULT_ACCESSORIES: AccessoryItem[] = [
   { id: 'ball', name: 'ボール', note: '練習用ボール', createdAt: new Date().toISOString() },
-  { id: 'glove', name: 'グローブ', note: '雨天用グローブ', createdAt: new Date().toISOString() },
-  { id: 'rangefinder', name: '計測器', note: '距離計', createdAt: new Date().toISOString() },
 ];
 
 type ClubTypeFilter = 'All' | GolfClub['clubType'];

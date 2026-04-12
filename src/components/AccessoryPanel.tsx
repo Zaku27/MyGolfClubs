@@ -99,6 +99,7 @@ export const AccessoryPanel = ({
         <div className="accessory-badge-list">
           {accessories.map((accessory) => (
             <div key={accessory.id} className="accessory-item-row">
+              <div className="accessory-item-image-group">
                 <button
                   type="button"
                   className="accessory-item-image-button"
@@ -145,15 +146,15 @@ export const AccessoryPanel = ({
                   </button>
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
 
             <button
               type="button"
-              className="accessory-add-card"
+              className="accessory-add-card accessory-add-button"
               onClick={openAddDialog}
               aria-label="新しいアクセサリーを追加"
             >
-              <span className="accessory-add-icon">+</span>
               <span className="accessory-add-label">アイテムを追加</span>
             </button>
         </div>
@@ -172,7 +173,7 @@ export const AccessoryPanel = ({
                 <input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="例: ボール"
+                  placeholder="例: TaylorMade TP5/TP5x STRIPE"
                 />
               </label>
 
