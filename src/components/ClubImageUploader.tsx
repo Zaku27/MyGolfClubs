@@ -509,7 +509,7 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
               }
             }}
           >
-            クラブ画像をアップロードできます
+            クラブ画像を追加できます
           </div>
         )}
         <div className="club-image-actions">

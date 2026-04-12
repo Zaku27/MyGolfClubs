@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import Papa from "papaparse";
 import { GolfBagPanel } from "../GolfBagPanel";
 import {
   selectActiveGolfBag,
@@ -36,6 +37,30 @@ type DraftRow = {
 type AnalysisPenalty = {
   points: number;
   reasons: string[];
+};
+
+type ShotRecord = {
+  club: string;
+  Shot: string;
+  "Ball (mph)": string;
+  "Club (mph)": string;
+  Smash: string;
+  "Carry (yds)": string;
+  "Total (yds)": string;
+  "Roll (yds)": string;
+  "Spin (rpm)": string;
+  "Height (ft)": string;
+  "Time (s)": string;
+  "AOA (°)": string;
+  "Spin Loft (°)": string;
+  "Spin Axis (°)": string;
+  "Lateral (yds)": string;
+  "Shot Type": string;
+  "Launch H (°)": string;
+  "Launch V (°)": string;
+  Mode: string;
+  Location: string;
+  "Altitude (ft)": string;
 };
 
 const SWING_TARGET_STORAGE_KEY = "golfbag-swing-weight-target";
@@ -113,6 +138,11 @@ export function PersonalDataInput() {
   const [draftByClubId, setDraftByClubId] = useState<Record<string, DraftRow>>({});
   // 分析減点の寄与割合（重み）: 全クラブ共通
   const [analysisPenaltyWeight, setAnalysisPenaltyWeight] = useState(1.0);
+  const [activeMode, setActiveMode] = useState<'skill' | 'actual'>('skill');
+  const [shotRows, setShotRows] = useState<ShotRecord[]>([]);
+  const [shotSearchText, setShotSearchText] = useState('');
+  const [shotLoadError, setShotLoadError] = useState<string | null>(null);
+  const [isLoadingShotData, setIsLoadingShotData] = useState(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   useBagIdUrlSync({
@@ -120,6 +150,175 @@ export function PersonalDataInput() {
     activeBagId: activeBag?.id ?? null,
     setActiveBag,
   });
+
+  const parseShotValue = (value: string) => {
+    const normalized = value.replace(/,/g, '').replace(/ /g, ' ').trim();
+    const numeric = Number(normalized);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+
+  const formatLateralValue = (value: string | undefined) => {
+    if (!value) {
+      return '';
+    }
+
+    return value
+      .replace(/ /g, ' ')
+      .trim()
+      .replace(/\bL\b/g, '左')
+      .replace(/\bR\b/g, '右');
+  };
+
+  const formatBallSpeed = (value: string | undefined) => {
+    if (!value) {
+      return '';
+    }
+
+    const normalized = value.replace(/,/g, '').replace(/ /g, ' ').trim();
+    const numeric = Number(normalized);
+    if (!Number.isFinite(numeric)) {
+      return value;
+    }
+
+    const metersPerSecond = numeric * 0.44704;
+    return `${metersPerSecond.toFixed(1)} m/s`;
+  };
+
+  const parseShotCsvRows = (text: string): ShotRecord[] => {
+    const result = Papa.parse<ShotRecord>(text, {
+      header: true,
+      skipEmptyLines: true,
+    });
+    if (result.errors.length > 0) {
+      throw new Error(result.errors.map((error) => error.message).join('; '));
+    }
+
+    const rows = result.data.filter((row) => {
+      const shotNumber = Number(row.Shot);
+      return Number.isFinite(shotNumber) && shotNumber > 0;
+    });
+
+    if (rows.length === 0) {
+      throw new Error('ショットデータが有効な形式ではありませんでした。');
+    }
+
+    return rows;
+  };
+
+  const loadShotCsvText = async (sourceUrl: string) => {
+    setIsLoadingShotData(true);
+    setShotLoadError(null);
+    try {
+      const response = await fetch(sourceUrl);
+      if (!response.ok) {
+        throw new Error(`CSVの取得に失敗しました: ${response.status}`);
+      }
+      const text = await response.text();
+      const rows = parseShotCsvRows(text);
+      setShotRows(rows);
+    } catch (error) {
+      setShotRows([]);
+      setShotLoadError(`CSV読み込みエラー: ${(error as Error).message}`);
+    } finally {
+      setIsLoadingShotData(false);
+    }
+  };
+
+  const handleLoadDefaultCsv = async () => {
+    await loadShotCsvText('/2026-04-11shots.csv');
+  };
+
+  const handleImportShotCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    setIsLoadingShotData(true);
+    setShotLoadError(null);
+    try {
+      const text = await file.text();
+      const rows = parseShotCsvRows(text);
+      setShotRows(rows);
+    } catch (error) {
+      setShotRows([]);
+      setShotLoadError(`CSV読み込みエラー: ${(error as Error).message}`);
+    } finally {
+      setIsLoadingShotData(false);
+    }
+  };
+
+  const shotSummary = useMemo(() => {
+    const count = shotRows.length;
+    if (count === 0) {
+      return null;
+    }
+
+    const accumulators = shotRows.reduce(
+      (acc, row) => {
+        const carry = parseShotValue(row['Carry (yds)']);
+        const total = parseShotValue(row['Total (yds)']);
+        const ball = parseShotValue(row['Ball (mph)']);
+        const smash = parseShotValue(row.Smash);
+        const spin = parseShotValue(row['Spin (rpm)']);
+
+        if (carry != null) {
+          acc.carrySum += carry;
+          acc.carryCount += 1;
+        }
+        if (total != null) {
+          acc.totalSum += total;
+          acc.totalCount += 1;
+        }
+        if (ball != null) {
+          acc.ballSum += ball;
+          acc.ballCount += 1;
+        }
+        if (smash != null) {
+          acc.smashSum += smash;
+          acc.smashCount += 1;
+        }
+        if (spin != null) {
+          acc.spinSum += spin;
+          acc.spinCount += 1;
+        }
+        return acc;
+      },
+      {
+        carrySum: 0,
+        carryCount: 0,
+        totalSum: 0,
+        totalCount: 0,
+        ballSum: 0,
+        ballCount: 0,
+        smashSum: 0,
+        smashCount: 0,
+        spinSum: 0,
+        spinCount: 0,
+      },
+    );
+
+    return {
+      count,
+      avgCarry: accumulators.carryCount > 0 ? accumulators.carrySum / accumulators.carryCount : null,
+      avgTotal: accumulators.totalCount > 0 ? accumulators.totalSum / accumulators.totalCount : null,
+      avgBall: accumulators.ballCount > 0 ? (accumulators.ballSum / accumulators.ballCount) * 0.44704 : null,
+      avgSmash: accumulators.smashCount > 0 ? accumulators.smashSum / accumulators.smashCount : null,
+      avgSpin: accumulators.spinCount > 0 ? accumulators.spinSum / accumulators.spinCount : null,
+    };
+  }, [shotRows]);
+
+  const filteredShotRows = useMemo(() => {
+    const normalizedSearch = shotSearchText.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return shotRows;
+    }
+
+    return shotRows.filter((row) => {
+      return row.club.toLowerCase().includes(normalizedSearch);
+    });
+  }, [shotRows, shotSearchText]);
 
   const appLink = activeBag?.id != null ? `/?bagId=${activeBag.id}` : "/";
 
@@ -314,6 +513,33 @@ export function PersonalDataInput() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveMode('skill')}
+            className={[
+              "rounded-lg border px-3 py-2 text-sm font-medium",
+              activeMode === 'skill'
+                ? 'border-emerald-700 bg-emerald-700 text-white'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+            ].join(' ')}
+          >
+            分析ベースのパーソナルデータ
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMode('actual')}
+            className={[
+              "rounded-lg border px-3 py-2 text-sm font-medium",
+              activeMode === 'actual'
+                ? 'border-slate-700 bg-slate-900 text-white'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+            ].join(' ')}
+          >
+            実測データCSV読み込み
+          </button>
+        </div>
+
         <GolfBagPanel
           bags={bags}
           activeBagId={activeBag?.id ?? null}
@@ -328,8 +554,140 @@ export function PersonalDataInput() {
           </div>
         )}
 
-        {analysisAdjustedRows.length > 0 && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+        {activeMode === 'actual' && (
+          <section className="rounded-xl border border-slate-300 bg-slate-50 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">実測データCSV読み込み</h2>
+                <p className="text-sm text-slate-600">
+                  計測器のショットCSVを読み込み、実際のショットデータを確認します。
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                  onClick={handleLoadDefaultCsv}
+                  disabled={isLoadingShotData}
+                >
+                  /2026-04-11shots.csv を読み込む
+                </button>
+                <label className="inline-flex cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                  ファイル選択
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="sr-only"
+                    onChange={handleImportShotCsv}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {shotLoadError && (
+              <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {shotLoadError}
+              </div>
+            )}
+
+            {isLoadingShotData && (
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700">
+                CSVを読み込み中...
+              </div>
+            )}
+
+            {shotRows.length > 0 && (
+              <div className="mt-4 space-y-4">
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="font-semibold text-slate-900">読み込み結果</p>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        type="search"
+                        placeholder="クラブ名を入力"
+                        value={shotSearchText}
+                        onChange={(event) => setShotSearchText(event.target.value)}
+                        className="w-full max-w-xs rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+                      />
+                      <span className="text-xs text-slate-500">表示 {filteredShotRows.length} / {shotRows.length} 行</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+                    <div>
+                      <p className="text-xs text-slate-500">ショット数</p>
+                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.count ?? 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">平均キャリー</p>
+                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgCarry?.toFixed(1) ?? '-'} yd</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">平均トータル</p>
+                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgTotal?.toFixed(1) ?? '-'} yd</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">平均ボールスピード (m/s)</p>
+                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgBall?.toFixed(1) ?? '-'} m/s</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">平均スマッシュファクター</p>
+                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgSmash?.toFixed(2) ?? '-'} </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-slate-100 text-slate-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left">ショット</th>
+                          <th className="px-3 py-2 text-left">クラブ</th>
+                          <th className="px-3 py-2 text-right">キャリー</th>
+                          <th className="px-3 py-2 text-right">トータル</th>
+                          <th className="px-3 py-2 text-right">ボールスピード (m/s)</th>
+                          <th className="px-3 py-2 text-right">左右偏差</th>
+                          <th className="px-3 py-2 text-left">ショットタイプ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredShotRows.length > 0 ? (
+                          filteredShotRows.slice(0, 10).map((row, index) => (
+                            <tr key={`${row.club}-${row.Shot}-${index}`} className="border-t border-slate-200">
+                              <td className="px-3 py-2">{row.Shot}</td>
+                              <td className="px-3 py-2">{row.club}</td>
+                              <td className="px-3 py-2 text-right">{row['Carry (yds)']}</td>
+                              <td className="px-3 py-2 text-right">{row['Total (yds)']}</td>
+                              <td className="px-3 py-2 text-right">{formatBallSpeed(row['Ball (mph)'])}</td>
+                              <td className="px-3 py-2 text-right">{formatLateralValue(row['Lateral (yds)'])}</td>
+                              <td className="px-3 py-2">{row['Shot Type']}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                              クラブ名に一致するショットが見つかりません。
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {filteredShotRows.length > 10 && (
+                    <div className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">
+                      最初の 10 行を表示しています。合計 {filteredShotRows.length} 行。
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeMode === 'skill' ? (
+          <>
+            {analysisAdjustedRows.length > 0 && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <p className="font-semibold mb-1 sm:mb-0">分析結果により基本成功率を下げたクラブがあります。</p>
               <span className="flex items-center gap-2">
@@ -557,6 +915,8 @@ export function PersonalDataInput() {
             デフォルトにリセット
           </button>
         </div>
+        </>
+        ) : null}
       </div>
     </div>
   );

@@ -64,7 +64,7 @@ export function AppDialogs({
           <div className="image-propagation-card">
             <h3>同じクラブ名称の他のクラブにも画像を反映しますか？</h3>
             <p>
-              同じクラブ名を持つ他のクラブにも、今回アップロードした画像を適用します。
+              同じクラブ名を持つ他のクラブにも、今回追加した画像を適用します。
               反映したくない場合は「いいえ」を選択してください。
             </p>
             <div className="image-propagation-actions">

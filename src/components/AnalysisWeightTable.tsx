@@ -26,7 +26,7 @@ export const AnalysisWeightTable = ({
   <div className="analysis-card table-card">
     <div className="analysis-table-header">
       <h2>クラブ仕様</h2>
-      <p>クラブ長と重量の実データ一覧です。</p>
+      <p>クラブ長と重量の実測データ一覧です。</p>
     </div>
     <div className="analysis-table-wrap">
       <table className="analysis-table">

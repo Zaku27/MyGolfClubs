@@ -1,0 +1,8 @@
+club,Shot,Ball (mph),Club (mph),Smash,Carry (yds),Total (yds),Roll (yds),Spin (rpm),Height (ft),Time (s),AOA (°),Spin Loft (°),Spin Axis (°),Lateral (yds),Shot Type,Launch H (°),Launch V (°),Mode,Location,Altitude (ft)
+Driver,1,143,96.4,1.48,263.5,273.3,9.9,2253,114.2,7,8.4,7.9,16.7 L,27.8 L,Hook,1.5 R,15.8,Outdoor,View,206.7 ft
+Driver,2,141.9,97.4,1.46,262,271.3,9.3,2286,126.1,7.1,8.6,10.9,1.2 L,13.4 R,Push,3.5 R,18.4,Outdoor,View,206.7 ft
+Driver,3,141.9,99.3,1.43,266.1,272.6,6.5,2311,150.3,7.8,9.5,10.1,9.1 L,6.6 L,Draw,3.4 R,18.7,Outdoor,View,206.7 ft
+Driver,4,147.2,100.4,1.47,269.5,274.3,4.9,2839,161,8.2,7.6,11.4,1 R,34.3 R,Push,6.7 R,17.4,Outdoor,View,206.7 ft
+Driver,5,145.8,96.6,1.51,260.6,270.7,10.2,2378,108.4,6.8,9.1,7.7,9.3 L,3.3 R,Push/Draw,4.5 R,15.8,Outdoor,View,206.7 ft
+Driver,Avg,144,98,1.47,264.3,272.5,8.1,2413,132,7.4,8.6,9.6,7.1 L,3.3 R,-,3.9 R,17.2,-,-,-
+Driver,Dev,2.2,1.6,0.03,3.2,1.3,2.1,217,20.4,0.5,0.7,1.5,6.3,20.6,-,1.7,1.2,-,-,-
