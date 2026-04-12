@@ -179,11 +179,11 @@ export const ClubList: React.FC<ClubListProps> = ({
             <button className="btn-icon btn-simulator" onClick={onShowSimulator} disabled={loading} title="コースシミュレーター" aria-label="コースシミュレーター">
               <SimulatorIcon size={20} />
             </button>
+            <Link className="btn-admin-link" to="/admin/clubs" title="管理画面" aria-label="管理画面">
+              管理
+            </Link>
           </>
         )}
-        <Link className="btn-admin-link" to="/admin/clubs" title="管理画面" aria-label="管理画面">
-          管理
-        </Link>
         <div className="club-list-actions-spacer" />
         <div className="club-search-inline" aria-label="クラブ検索">
           <select
