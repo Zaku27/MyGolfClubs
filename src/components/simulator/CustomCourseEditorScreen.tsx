@@ -176,12 +176,25 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
           })
         : [];
 
+    const greenPolygon = Array.isArray(raw.greenPolygon)
+      ? raw.greenPolygon
+          .filter((pt) => pt && typeof pt === "object")
+          .map((pt) => {
+            const rawPoint = pt as Record<string, unknown>;
+            return {
+              x: Number(rawPoint.x) || 0,
+              y: Number(rawPoint.y) || 0,
+            };
+          })
+      : [];
+
     acc.push({
       number: index + 1,
       par,
       distanceFromTee: distance,
       targetDistance: distance,
       greenRadius,
+      greenPolygon: greenPolygon.length >= 3 ? greenPolygon : undefined,
       hazards,
       groundCondition: normalizeGroundCondition(raw.groundCondition),
     });

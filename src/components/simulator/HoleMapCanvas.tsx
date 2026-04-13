@@ -28,6 +28,7 @@ interface HoleMapCanvasProps {
   onSelectHazardId?: (hazardId: string | null) => void;
   onSelectHoleArea?: () => void;
   onHazardsChange?: (hazards: Hazard[]) => void;
+  onGreenPolygonChange?: (greenPolygon: Point2D[]) => void;
   onCanvasClick?: (point: Point2D) => void;
   onCanvasDoubleClick?: (point: Point2D) => void;
 }
@@ -65,6 +66,7 @@ type DragState = {
   startClientX: number;
   startClientY: number;
   initialHazard: Hazard;
+  initialGreenPolygonPoints?: Point2D[];
 };
 
 type CanvasMetrics = {
@@ -100,9 +102,23 @@ const TEE_GROUND_CORNER_RADIUS = 2;
 const MIN_CANVAS_HEIGHT = 280;
 const COURSE_WIDTH_YARDS = 400;
 const DEFAULT_GREEN_RADIUS = 12;
+const GREEN_SELECTION_ID = "__green__";
+const GREEN_POLYGON_SIDES = 20;
 const MIN_HAZARD_WIDTH = 8;
 const MIN_HAZARD_DEPTH = 6;
 const EDITABLE_Y_AXIS_OFFSET_YARDS = 25;
+
+function buildRegularPolygonPoints(centerX: number, centerY: number, radius: number, sides: number) {
+  const points: Point2D[] = [];
+  for (let index = 0; index < sides; index += 1) {
+    const angle = (2 * Math.PI * index) / sides - Math.PI / 2;
+    points.push({
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle),
+    });
+  }
+  return points;
+}
 
 function chooseYardTickStep(range: number, targetTickCount = 8): number {
   if (range <= 0) {
@@ -297,7 +313,7 @@ function drawShot(
 
   if (showTrajectories) {
     context.save();
-    context.strokeStyle = "rgba(220, 38, 38, 0.55)";
+    context.strokeStyle = "rgba(255, 255, 255, 0.92)";
     context.lineWidth = 2;
 
     if (shot.path.length > 1) {
@@ -323,7 +339,7 @@ function drawShot(
     return;
   }
 
-  context.fillStyle = "#dc2626";
+  context.fillStyle = "#ffffff";
   context.beginPath();
   context.arc(landingX, landingY, 4.5, 0, Math.PI * 2);
   context.fill();
@@ -394,6 +410,7 @@ export function HoleMapCanvas({
   onSelectHazardId,
   onSelectHoleArea,
   onHazardsChange,
+  onGreenPolygonChange,
   onCanvasClick,
   onCanvasDoubleClick,
 }: HoleMapCanvasProps) {
@@ -406,6 +423,13 @@ export function HoleMapCanvas({
   const viewportRef = useRef<Viewport>(DEFAULT_VIEWPORT);
   const animationFrameRef = useRef<number | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [greenPolygon, setGreenPolygon] = useState<Point2D[]>(() => {
+    const initialPoints = hole.greenPolygon;
+    if (Array.isArray(initialPoints) && initialPoints.length >= 3) {
+      return initialPoints.map((point) => ({ x: point.x, y: point.y }));
+    }
+    return buildRegularPolygonPoints(0, hole.targetDistance ?? hole.distanceFromTee, hole.greenRadius ?? DEFAULT_GREEN_RADIUS, GREEN_POLYGON_SIDES);
+  });
   const panStartRef = useRef<Point2D | null>(null);
   const initialOffsetRef = useRef<Point2D>({ x: 0, y: 0 });
   const [textures, setTextures] = useState<Record<TextureKey, HTMLImageElement | null>>(() => ({
@@ -470,6 +494,16 @@ export function HoleMapCanvas({
   }, [currentOrigin, targetDistance, transientLandingResult]);
 
   const shouldUseTextures = !editable;
+
+  useEffect(() => {
+    const initialPoints = hole.greenPolygon;
+    if (Array.isArray(initialPoints) && initialPoints.length >= 3) {
+      setGreenPolygon(initialPoints.map((point) => ({ x: point.x, y: point.y })));
+      return;
+    }
+
+    setGreenPolygon(buildRegularPolygonPoints(0, targetDistance, greenRadius, GREEN_POLYGON_SIDES));
+  }, [targetDistance, greenRadius, hole.number, hole.greenPolygon]);
 
   useEffect(() => {
     if (!shouldUseTextures) {
@@ -732,7 +766,6 @@ export function HoleMapCanvas({
     const teeY = yardToPxY(0);
     const pinX = yardToPxX(0);
     const pinY = yardToPxY(targetDistance);
-    const greenRadiusPx = Math.max(1, Math.abs(greenRadius * yardScale));
 
     // 背景にフェアウェイテクスチャを敷き、読み込みできない場合はグラデーションを使う。
     if (shouldUseTextures) {
@@ -896,11 +929,20 @@ export function HoleMapCanvas({
       drawObBoundaryMarkers(context, hazard, yardToPxX, yardToPxY);
     }
 
-    // ピン周囲のグリーン領域を描画。
+    // ピン周囲のグリーン領域を 30 辺のポリゴンで描画。
     const greenPattern = shouldUseTextures ? createTexturePattern(context, "green") : null;
     context.save();
     context.beginPath();
-    context.ellipse(pinX, pinY, greenRadiusPx, greenRadiusPx, 0, 0, Math.PI * 2);
+    greenPolygon.forEach((point, index) => {
+      const x = yardToPxX(point.x);
+      const y = yardToPxY(point.y);
+      if (index === 0) {
+        context.moveTo(x, y);
+      } else {
+        context.lineTo(x, y);
+      }
+    });
+    context.closePath();
     if (greenPattern) {
       context.fillStyle = greenPattern;
       context.globalAlpha = 0.94;
@@ -909,8 +951,9 @@ export function HoleMapCanvas({
       context.fillStyle = "rgba(187, 247, 208, 0.72)";
       context.fill();
     }
-    context.strokeStyle = "rgba(21, 128, 61, 0.9)";
+    context.strokeStyle = "rgba(16, 185, 129, 0.98)";
     context.lineWidth = 2;
+    context.lineJoin = "round";
     context.stroke();
     context.restore();
 
@@ -1045,14 +1088,82 @@ export function HoleMapCanvas({
     }
   };
 
+  const metricPointsToPx = (points: Point2D[]) => {
+    const currentMetrics = metrics ?? metricsRef.current;
+    if (!currentMetrics || points.length === 0) {
+      return null;
+    }
+
+    const { offsetX, offsetY, yardScale, maxYardY } = currentMetrics;
+    const yardToPxX = (yardX: number) => offsetX + (yardX + currentMetrics.halfYardX) * yardScale;
+    const yardToPxY = (yardY: number) => offsetY + (maxYardY - yardY) * yardScale;
+
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    return {
+      left: yardToPxX(minX),
+      top: yardToPxY(maxY),
+      width: Math.max(2, yardToPxX(maxX) - yardToPxX(minX)),
+      height: Math.max(2, yardToPxY(minY) - yardToPxY(maxY)),
+    };
+  };
+
   const updateHazardByDrag = (state: DragState, clientX: number, clientY: number) => {
-    if (!onHazardsChange) return;
     const metrics = metricsRef.current;
     if (!metrics) return;
     const yardPerPx = 1 / metrics.yardScale;
     const deltaX = (clientX - state.startClientX) * yardPerPx;
     const deltaY = -(clientY - state.startClientY) * yardPerPx;
 
+    if (state.hazardId === GREEN_SELECTION_ID) {
+        if (!state.initialGreenPolygonPoints) return;
+
+        if (state.mode === "move") {
+          const minX = -metrics.halfYardX;
+          const maxX = metrics.halfYardX;
+          const minY = metrics.minYardY;
+          const maxY = metrics.maxYardY;
+
+          const newPoints = state.initialGreenPolygonPoints.map((pt) => ({
+            x: Math.max(minX, Math.min(maxX, pt.x + deltaX)),
+            y: Math.max(minY, Math.min(maxY, pt.y + deltaY)),
+          }));
+
+          setGreenPolygon(newPoints);
+          onGreenPolygonChange?.(newPoints);
+          return;
+        }
+
+        if (state.mode === "vertex" && typeof state.vertexIndex === "number") {
+          const idx = state.vertexIndex;
+          const currentPoints = state.initialGreenPolygonPoints;
+          if (idx < 0 || idx >= currentPoints.length) return;
+
+          const minX = -metrics.halfYardX;
+          const maxX = metrics.halfYardX;
+          const minY = metrics.minYardY;
+          const maxY = metrics.maxYardY;
+
+          const newPoints = currentPoints.map((pt, i) => {
+            if (i !== idx) return pt;
+            return {
+              x: Math.max(minX, Math.min(maxX, pt.x + deltaX)),
+              y: Math.max(minY, Math.min(maxY, pt.y + deltaY)),
+            };
+          });
+
+          setGreenPolygon(newPoints);
+          onGreenPolygonChange?.(newPoints);
+        }
+
+        return;
+      }
+    if (!onHazardsChange) return;
     const next = hazards.map((hazard) => {
       if (hazard.id !== state.hazardId) return hazard;
       const original = state.initialHazard;
@@ -1369,6 +1480,110 @@ export function HoleMapCanvas({
               </div>
             );
           })}
+          {(() => {
+            const box = metricPointsToPx(greenPolygon);
+            if (!box) return null;
+
+            const isSelected = selectedHazardId === GREEN_SELECTION_ID;
+            const baseClass = isSelected
+              ? "border-emerald-900 bg-emerald-300/20"
+              : "border-transparent bg-transparent";
+
+            const pointPaths = greenPolygon
+              .map((pt) => {
+                const px = yardToPxX(pt.x);
+                const py = yardToPxY(pt.y);
+                return `${px - box.left},${py - box.top}`;
+              })
+              .join(" ");
+
+            return (
+              <div
+                key={GREEN_SELECTION_ID}
+                className={`pointer-events-auto absolute border-2 ${baseClass}`}
+                style={{
+                  left: `${box.left}px`,
+                  top: `${box.top}px`,
+                  width: `${box.width}px`,
+                  height: `${box.height}px`,
+                }}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onSelectHazardId?.(GREEN_SELECTION_ID);
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectHazardId?.(GREEN_SELECTION_ID);
+                }}
+              >
+                <svg
+                  className="pointer-events-none absolute inset-0"
+                  viewBox={`0 0 ${box.width} ${box.height}`}
+                  preserveAspectRatio="none"
+                >
+                  <polygon
+                    points={pointPaths}
+                    fill="none"
+                    stroke="rgba(34, 197, 94, 0.85)"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {isSelected && (
+                  <>
+                    <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
+                      GREEN
+                    </div>
+                    {greenPolygon.map((pt, idx) => {
+                      const px = yardToPxX(pt.x);
+                      const py = yardToPxY(pt.y);
+                      return (
+                        <span
+                          key={`${GREEN_SELECTION_ID}-pt-${idx}`}
+                          className="absolute h-3 w-3 rounded-full border border-white bg-emerald-700 cursor-pointer"
+                          style={{
+                            left: `${px - box.left - 6}px`,
+                            top: `${py - box.top - 6}px`,
+                          }}
+                          onPointerDown={(event) => {
+                            if (dragState) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              return;
+                            }
+
+                            event.preventDefault();
+                            event.stopPropagation();
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            onSelectHazardId?.(GREEN_SELECTION_ID);
+                            setDragState({
+                              hazardId: GREEN_SELECTION_ID,
+                              mode: "vertex",
+                              vertexIndex: idx,
+                              startClientX: event.clientX,
+                              startClientY: event.clientY,
+                              initialHazard: {
+                                id: GREEN_SELECTION_ID,
+                                type: "rough",
+                                shape: "polygon",
+                                yFront: targetDistance - greenRadius,
+                                yBack: targetDistance + greenRadius,
+                                xCenter: 0,
+                                width: greenRadius * 2,
+                                penaltyStrokes: 0,
+                              },
+                              initialGreenPolygonPoints: greenPolygon,
+                            });
+                          }}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

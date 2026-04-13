@@ -56,6 +56,7 @@ export interface Hole {
   targetDistance?: number; // ピンまでの距離。未指定時は distanceFromTee を使用
   greenRadius?: number; // ヤード。未指定時は既定値を使用
   hazards?: Hazard[];
+  greenPolygon?: Array<{ x: number; y: number }>;
   groundCondition?: GroundCondition; // 将来コースエディタで編集する予定の地面パラメータ
 }
 

@@ -471,7 +471,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
             value={selectedHole.greenRadius ?? 12}
             onChange={(event) => {
               const radius = Math.max(6, Math.min(25, Number(event.target.value) || 12));
-              updateHole((hole) => ({ ...hole, greenRadius: radius }));
+              updateHole((hole) => ({ ...hole, greenRadius: radius, greenPolygon: undefined }));
             }}
             className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
           />
@@ -490,6 +490,9 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
           onSelectHazardId={setSelectedHazardId}
           onSelectHoleArea={() => setSelectedHazardId(null)}
           onHazardsChange={updateSelectedHoleHazards}
+          onGreenPolygonChange={(greenPolygon) => {
+            updateHole((hole) => ({ ...hole, greenPolygon }));
+          }}
           onCanvasClick={handleCanvasClick}
           onCanvasDoubleClick={handleCanvasDoubleClick}
         />

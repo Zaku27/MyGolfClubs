@@ -5,6 +5,7 @@ import type { TextureKey } from "./texturePaths";
 const SCALE = 1;                    // 1px = 1 yard（調整可能）
 const COURSE_WIDTH_YARDS = 400;     // コースの横幅（ラフ含む最大幅）
 const COURSE_LENGTH_YARDS = 500;    // ティーからグリーンまでの距離（グリーンまでの距離基準）
+const GREEN_POLYGON_SIDES = 20;
 
 const VIEWBOX_WIDTH = COURSE_WIDTH_YARDS * SCALE;   // 例: 400
 const VIEWBOX_HEIGHT = COURSE_LENGTH_YARDS * SCALE; // 例: 500
@@ -44,6 +45,13 @@ const clipPathRenderers = {
     return <polygon key={hazard.id} points={points} />;
   },
 };
+
+function buildGreenPolygonPoints(cx: number, cy: number, radius: number, sides: number) {
+  return Array.from({ length: sides }, (_, index) => {
+    const angle = (2 * Math.PI * index) / sides - Math.PI / 2;
+    return `${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`;
+  }).join(" ");
+}
 
 const groupHazardsByTexture = (hazards: Hole["hazards"] = []) => {
   const groups: Record<DisplayTextureType, Hazard[]> = {
@@ -107,10 +115,13 @@ export const GolfCourseMap = ({ hole, extraInfo }: GolfCourseMapProps) => {
 
             {hasGreen && (
               <clipPath id="green-clip" clipPathUnits="userSpaceOnUse">
-                <circle
-                  cx={VIEWBOX_WIDTH / 2}
-                  cy={VIEWBOX_HEIGHT - Math.min(hole.greenRadius ?? 0, VIEWBOX_HEIGHT / 4) - 40}
-                  r={hole.greenRadius ?? 0}
+                <polygon
+                  points={buildGreenPolygonPoints(
+                    VIEWBOX_WIDTH / 2,
+                    VIEWBOX_HEIGHT - Math.min(hole.greenRadius ?? 0, VIEWBOX_HEIGHT / 4) - 40,
+                    hole.greenRadius ?? 0,
+                    GREEN_POLYGON_SIDES,
+                  )}
                 />
               </clipPath>
             )}
