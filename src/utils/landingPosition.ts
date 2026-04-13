@@ -1,10 +1,9 @@
 import * as seedrandomModule from "seedrandom";
 import { estimateTheoreticalDistance } from "./distanceEstimation";
 import type { GolfClub } from "../types/golf";
-import type { GroundCondition } from "../types/game";
-import type { ShotQuality, ShotQualityMetrics } from "../types/game";
+import type { GroundCondition, ShotQuality, ShotQualityMetrics } from "../types/game";
 
-const seedrandom = ((seedrandomModule as unknown as { default?: typeof seedrandomModule }).default ?? seedrandomModule) as (
+const seedrandom = (((seedrandomModule as unknown as { default?: typeof seedrandomModule }).default ?? seedrandomModule) as unknown) as (
   seed?: string
 ) => () => number;
 
@@ -38,7 +37,7 @@ export type ShotInput = {
     groundHardness: number;
     headSpeed?: number;
     seed?: string;
-  baseDistanceOverride?: number;
+    baseDistanceOverride?: number;
   };
 };
 
@@ -123,6 +122,19 @@ function randomInRange(rng: () => number, min: number, max: number): number {
 function normalizeSkillValue(raw: number): number {
   if (raw <= 1) return clamp(raw, 0, 1);
   return clamp(raw / 100, 0, 1);
+}
+
+function roundTo(value: number, digits: number): number {
+  const factor = Math.pow(10, digits);
+  return Math.round(value * factor) / factor;
+}
+
+function roundToTenth(value: number): number {
+  return roundTo(value, 1);
+}
+
+function roundToHundredth(value: number): number {
+  return roundTo(value, 2);
 }
 
 /**
@@ -245,21 +257,21 @@ export function applyGroundCondition(
 
   return {
     ...landingResult,
-    carry: Math.round(adjustedCarry * 10) / 10,
-    roll: Math.round(adjustedRoll * 10) / 10,
-    totalDistance: Math.round(totalDistance * 10) / 10,
-    lateralDeviation: Math.round(adjustedLateralDeviation * 10) / 10,
-    finalX: Math.round(finalX * 10) / 10,
-    finalY: Math.round(finalY * 10) / 10,
-    apexHeight: Math.round(apexHeight * 10) / 10,
+    carry: roundToTenth(adjustedCarry),
+    roll: roundToTenth(adjustedRoll),
+    totalDistance: roundToTenth(totalDistance),
+    lateralDeviation: roundToTenth(adjustedLateralDeviation),
+    finalX: roundToTenth(finalX),
+    finalY: roundToTenth(finalY),
+    apexHeight: roundToTenth(apexHeight),
     trajectoryPoints: trajectoryPoints.map((p) => ({
-      x: Math.round(p.x * 10) / 10,
-      y: Math.round(p.y * 10) / 10,
-      z: Math.round(p.z * 10) / 10,
+      x: roundToTenth(p.x),
+      y: roundToTenth(p.y),
+      z: roundToTenth(p.z),
     })),
     nextShotAdjustment: {
-      dispersionMultiplier: Math.round(dispersionMultiplier * 100) / 100,
-      mishitRateBonus: Math.round(mishitRateBonus * 100) / 100,
+      dispersionMultiplier: roundToHundredth(dispersionMultiplier),
+      mishitRateBonus: roundToHundredth(mishitRateBonus),
       groundCondition: ground,
     },
   };
@@ -369,10 +381,14 @@ export function classifyShotQualityByTargetError(
       ? 0
       : Number.POSITIVE_INFINITY;
 
-  if (percentError <= 3) return { quality: "excellent", percentError, distanceError };
-  if (percentError <= 7) return { quality: "good", percentError, distanceError };
-  if (percentError <= 13) return { quality: "average", percentError, distanceError };
-  if (percentError <= 25) return { quality: "misshot", percentError, distanceError };
+  if (expectedCarry < 70 && distanceError <= 2) {
+    return { quality: "excellent", percentError, distanceError }; /* 70ヤード未満は誤差2ヤード以内をExcellentに固定 */
+  }
+
+  if (percentError <= 3) return { quality: "excellent", percentError, distanceError }; /* Grok推奨5% → 3%に厳格化。理由は、品質と距離誤差の相関を高めるため。 */
+  if (percentError <= 7) return { quality: "good", percentError, distanceError }; /* Grok推奨10% → 7%に厳格化。理由は、excellentと同様。 */
+  if (percentError <= 15) return { quality: "average", percentError, distanceError }; /* Grok推奨20% → 15%に厳格化。理由は、goodと同様。 */
+  if (percentError <= 25) return { quality: "misshot", percentError, distanceError }; /* Grok推奨30% → misshotカテゴリを追加して、poorとの間に緩衝ゾーンを設ける。理由は、品質と距離誤差の相関を高めるため。 */
   return { quality: "poor", percentError, distanceError };
 }
 
@@ -753,26 +769,26 @@ export function calculateLandingOutcome(input: ShotInput): LandingOutcome {
   return {
     shotQuality: resolvedQuality,
     landing: {
-      carry: Math.round(carry * 10) / 10,
-      roll: Math.round(roll * 10) / 10,
-      totalDistance: Math.round(totalDistance * 10) / 10,
-      lateralDeviation: Math.round(lateralDeviation * 10) / 10,
-      finalX: Math.round(finalX * 10) / 10,
-      finalY: Math.round(finalY * 10) / 10,
+      carry: roundToTenth(carry),
+      roll: roundToTenth(roll),
+      totalDistance: roundToTenth(totalDistance),
+      lateralDeviation: roundToTenth(lateralDeviation),
+      finalX: roundToTenth(finalX),
+      finalY: roundToTenth(finalY),
       qualityMetrics: {
-        carryZ: Math.round(qualityMetrics.carryZ * 100) / 100,
-        lateralZ: Math.round(qualityMetrics.lateralZ * 100) / 100,
-        weightedCarry: Math.round(qualityMetrics.weightedCarry * 100) / 100,
-        weightedLateral: Math.round(qualityMetrics.weightedLateral * 100) / 100,
-        score: Math.round(qualityMetrics.score * 100) / 100,
+        carryZ: roundToHundredth(qualityMetrics.carryZ),
+        lateralZ: roundToHundredth(qualityMetrics.lateralZ),
+        weightedCarry: roundToHundredth(qualityMetrics.weightedCarry),
+        weightedLateral: roundToHundredth(qualityMetrics.weightedLateral),
+        score: roundToHundredth(qualityMetrics.score),
         poorThreshold: qualityMetrics.poorThreshold,
         decisiveAxis: qualityMetrics.decisiveAxis,
       },
-      apexHeight: Math.round(apexHeight * 10) / 10,
+      apexHeight: roundToTenth(apexHeight),
       trajectoryPoints: trajectoryPoints.map((p) => ({
-        x: Math.round(p.x * 10) / 10,
-        y: Math.round(p.y * 10) / 10,
-        z: Math.round(p.z * 10) / 10,
+        x: roundToTenth(p.x),
+        y: roundToTenth(p.y),
+        z: roundToTenth(p.z),
       })),
     },
   };
