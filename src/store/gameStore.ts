@@ -148,6 +148,7 @@ function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: numb
     originX: 0,
     originY: 0,
     greenRadius: hole.greenRadius,
+    greenPolygon: hole.greenPolygon,
     hazards: hole.hazards ?? [],
     ...generateWind(windRandom),
   };

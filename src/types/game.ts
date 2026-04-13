@@ -59,7 +59,6 @@ export interface Hole {
   greenPolygon?: Array<{ x: number; y: number }>;
   groundCondition?: GroundCondition; // 将来コースエディタで編集する予定の地面パラメータ
 }
-
 // ─── Shot context ─────────────────────────────────────────────────────────────
 export type LieType = "tee" | "fairway" | "semirough" | "rough" | "bareground" | "bunker" | "green";
 
@@ -73,6 +72,7 @@ export interface ShotContext {
   windStrength?: number; // mph
   windDirectionDegrees?: number; // 0=北へ吹く, 時計回り
   greenRadius?: number; // ヤード。ピン中心の捕捉半径
+  greenPolygon?: Array<{ x: number; y: number }>;
   hazards?: Hazard[];
   groundHardness?: number; // 0-100 地面硬さ
   groundSlopeAngle?: number; // degree

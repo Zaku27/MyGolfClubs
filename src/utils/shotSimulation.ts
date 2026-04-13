@@ -897,6 +897,7 @@ export function simulateShot(
     context.targetDistance,
     hazards,
     greenRadius,
+    context.greenPolygon,
     absoluteTrajectoryPoints,
   );
   let { geometricRemainingDistance: geometricRemaining, hazard: landedHazard, isOnGreen } = assessment;

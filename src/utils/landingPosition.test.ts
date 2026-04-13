@@ -189,6 +189,28 @@ describe('applyGroundCondition side slope behavior with fixed seed', () => {
       expect(assessment.finalOutcome).toBe('water');
       expect(assessment.hazard?.type).toBe('water');
     });
+
+    it('does not treat points outside a polygon hazard as inside when they are only in its bounding box', () => {
+      const polygonHazard: Hazard = {
+        id: 'hazard-polygon',
+        type: 'bunker',
+        shape: 'polygon',
+        points: [
+          { x: 0, y: 80 },
+          { x: 10, y: 80 },
+          { x: 5, y: 100 },
+        ],
+        yFront: 80,
+        yBack: 100,
+        xCenter: 5,
+        width: 10,
+        penaltyStrokes: 0,
+      };
+
+      const assessment = assessLanding(8, 89, 120, [polygonHazard]);
+      expect(assessment.hazard).toBeNull();
+      expect(assessment.finalOutcome).toBe('fairway');
+    });
   });
 
   describe('getWaterHazardDropOrigin', () => {

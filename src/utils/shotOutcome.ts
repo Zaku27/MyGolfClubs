@@ -110,13 +110,16 @@ function isPointInObArea(
 
 /**
  * 着弾点が障害物内部にあるかを判定する。
- * polygon 形状は現状データが最小限なため、矩形境界で代用する。
  */
 function isPointInHazard(
   x: number,
   y: number,
   hazard: Hazard,
 ): boolean {
+  if (hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3) {
+    return isPointInPolygon(x, y, hazard.points);
+  }
+
   if (hazard.type === "ob") {
     return isPointInObArea(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack);
   }
@@ -365,12 +368,34 @@ export function buildDetailedShotMessage({
   return `${qualityLabel} ${clubLabel} — ${actualDistance}y、残り${newRemainingDistance}y（${lieLabel}）`;
 }
 
+function isPointInPolygon(
+  x: number,
+  y: number,
+  polygon: Array<{ x: number; y: number }>,
+): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+
+    const intersect = ((yi > y) !== (yj > y)) &&
+      (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+    if (intersect) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 export function assessLanding(
   landingX: number,
   landingY: number,
   targetDistance: number,
   hazards: Hazard[],
   greenRadius: number = DEFAULT_GREEN_RADIUS,
+  greenPolygon?: Array<{ x: number; y: number }>,
   trajectoryPoints?: Array<{ x: number; y: number }>,
 ): {
   hazard: Hazard | null;
@@ -394,7 +419,9 @@ export function assessLanding(
     0,
     Math.round(distanceToPinFromLanding(targetDistance, crossingX, crossingY)),
   );
-  const isOnGreen = geometricRemainingDistance <= greenRadius;
+  const isOnGreen = greenPolygon && greenPolygon.length >= 3
+    ? isPointInPolygon(landingX, landingY, greenPolygon)
+    : geometricRemainingDistance <= greenRadius;
 
   if (hazard) {
     if (hazard.type === "water") {
