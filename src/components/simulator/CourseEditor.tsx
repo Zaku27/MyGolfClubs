@@ -146,22 +146,6 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const selectedGroundCondition = selectedHazard?.groundCondition ?? selectedHole?.groundCondition ?? DEFAULT_GROUND_CONDITION;
   const normalizedSlope = normalizeSlopeForDisplay(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection);
 
-  const normalizedHazards = useMemo(() =>
-    (selectedHole?.hazards ?? []).map((h) => {
-      if (h.shape === "polygon") {
-        return {
-          ...h,
-          points: Array.isArray(h.points) ? h.points.map((pt) => ({ ...pt })) : [],
-        };
-      }
-      if (h.shape === "rectangle") {
-        return { ...h };
-      }
-      throw new Error(`[CourseEditor] 不正なshape値: ${h.shape}`);
-    }),
-    [selectedHole?.hazards],
-  );
-
   // 10角形のデフォルト多角形を生成
   function buildDefaultPolygonPoints(
     centerX: number,
@@ -319,7 +303,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const updateHole = (updater: (hole: Hole) => Hole) => {
     const next = holes.map((hole, index) => {
       if (index !== safeHoleIndex) {
-        return { ...hole, hazards: cloneHazards(hole.hazards) };
+        return hole;
       }
       return updater({ ...hole, hazards: cloneHazards(hole.hazards) });
     });
@@ -500,7 +484,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
       <div className="mt-4 w-full max-w-screen-md">
         <HoleMapCanvas
-          hole={{ ...selectedHole, hazards: normalizedHazards }}
+          hole={selectedHole}
           landingResults={[]}
           showTrajectories={false}
           editable

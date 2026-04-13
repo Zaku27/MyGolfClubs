@@ -7,6 +7,8 @@ import { getHazardStyle } from "./hazardStyle";
 import { drawPolygon } from "./drawPolygon";
 import { drawRectangle } from "./drawRectangle";
 import { drawObBoundaryMarkers } from "./drawObBoundaryMarkers";
+import { TEXTURE_PATHS_TOPDOWN as TEXTURE_PATHS } from "../texturePaths";
+import type { TextureKey } from "../texturePaths";
 
 interface HoleMapCanvasProps {
   hole: Hole;
@@ -81,7 +83,16 @@ type AbsoluteShot = {
   local: LandingResult;
 };
 
+const HAZARD_TEXTURE_ORDER: TextureKey[] = [
+  "rough",
+  "bareground",
+  "ob",
+  "bunker",
+  "water",
+];
+
 const MIN_CANVAS_HEIGHT = 280;
+const COURSE_WIDTH_YARDS = 400;
 const DEFAULT_GREEN_RADIUS = 12;
 const MIN_HAZARD_WIDTH = 8;
 const MIN_HAZARD_DEPTH = 6;
@@ -364,6 +375,15 @@ export function HoleMapCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<Point2D | null>(null);
   const initialOffsetRef = useRef<Point2D>({ x: 0, y: 0 });
+  const [textures, setTextures] = useState<Record<TextureKey, HTMLImageElement | null>>(() => ({
+    fairway: null,
+    rough: null,
+    bareground: null,
+    bunker: null,
+    green: null,
+    water: null,
+    ob: null,
+  }));
 
   const targetDistance = hole.targetDistance ?? hole.distanceFromTee;
   const greenRadius = hole.greenRadius ?? DEFAULT_GREEN_RADIUS;
@@ -371,6 +391,10 @@ export function HoleMapCanvas({
   const absoluteShots = useMemo(
     () => buildAbsoluteShots(landingResults, targetDistance),
     [landingResults, targetDistance],
+  );
+  const yardBounds = useMemo(
+    () => buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots),
+    [targetDistance, greenRadius, hazards, absoluteShots],
   );
 
   const metrics = useMemo(() => {
@@ -404,6 +428,52 @@ export function HoleMapCanvas({
     if (!transientLandingResult) return null;
     return buildAbsoluteShotFromOrigin(currentOrigin, transientLandingResult, targetDistance);
   }, [currentOrigin, targetDistance, transientLandingResult]);
+
+  const shouldUseTextures = !editable;
+
+  useEffect(() => {
+    if (!shouldUseTextures) {
+      return;
+    }
+
+    let active = true;
+    const nextTextures: Record<TextureKey, HTMLImageElement | null> = {
+      fairway: null,
+      rough: null,
+      bareground: null,
+      bunker: null,
+      green: null,
+      water: null,
+      ob: null,
+    };
+    let remaining = Object.keys(TEXTURE_PATHS).length;
+
+    const checkFinish = () => {
+      remaining -= 1;
+      if (remaining <= 0 && active) {
+        setTextures(nextTextures);
+      }
+    };
+
+    for (const key of Object.keys(TEXTURE_PATHS) as TextureKey[]) {
+      const image = new Image();
+      image.src = TEXTURE_PATHS[key];
+      image.onload = () => {
+        if (!active) return;
+        nextTextures[key] = image;
+        checkFinish();
+      };
+      image.onerror = () => {
+        if (!active) return;
+        nextTextures[key] = null;
+        checkFinish();
+      };
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [shouldUseTextures]);
   const absoluteAimPoint = useMemo(() => {
     if (!aimPoint) return null;
     return buildAbsolutePointFromOrigin(currentOrigin, targetDistance, aimPoint.x, aimPoint.y);
@@ -413,6 +483,22 @@ export function HoleMapCanvas({
     x: (screenX - overrideViewport.offsetX) / overrideViewport.scale,
     y: (screenY - overrideViewport.offsetY) / overrideViewport.scale,
   });
+
+  const resolveHazardTextureType = (type: string): TextureKey => {
+    if (type === "semirough" || type === "rough") return "rough";
+    if (type === "bareground") return "bareground";
+    if (type === "bunker") return "bunker";
+    if (type === "water") return "water";
+    if (type === "ob") return "ob";
+    return "rough";
+  };
+
+  const createTexturePattern = (context: CanvasRenderingContext2D, key: TextureKey | null) => {
+    if (!shouldUseTextures || !key) return null;
+    const image = textures[key];
+    if (!image) return null;
+    return context.createPattern(image, "repeat");
+  };
 
   const animateViewportTo = useCallback((target: Viewport, duration = 450) => {
     if (animationFrameRef.current !== null) {
@@ -544,9 +630,14 @@ export function HoleMapCanvas({
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
 
+    const aspectRatio = Math.max(
+      0.7,
+      Math.min(2.5, yardBounds.maxYardY / COURSE_WIDTH_YARDS),
+    );
+
     const updateSize = () => {
       const width = Math.max(1, Math.round(wrapper.clientWidth));
-      const height = Math.max(MIN_CANVAS_HEIGHT, Math.round(width * 1.75));
+      const height = Math.max(MIN_CANVAS_HEIGHT, Math.round(width * aspectRatio));
       setSize((prev) => {
         if (prev.width === width && prev.height === height) {
           return prev;
@@ -566,7 +657,7 @@ export function HoleMapCanvas({
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [yardBounds]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -602,12 +693,29 @@ export function HoleMapCanvas({
     const pinY = yardToPxY(targetDistance);
     const greenRadiusPx = Math.max(1, Math.abs(greenRadius * yardScale));
 
-    // 背景グラデーションを引いて、地形の奥行きを視覚化する。
-    const bg = context.createLinearGradient(0, padding.top, 0, size.height - padding.bottom);
-    bg.addColorStop(0, "#dcfce7");
-    bg.addColorStop(1, "#86efac");
-    context.fillStyle = bg;
-    context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
+    // 背景にフェアウェイテクスチャを敷き、読み込みできない場合はグラデーションを使う。
+    if (shouldUseTextures) {
+      const fairwayPattern = createTexturePattern(context, "fairway");
+      if (fairwayPattern) {
+        context.save();
+        context.fillStyle = fairwayPattern;
+        context.globalAlpha = 0.96;
+        context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
+        context.restore();
+      } else {
+        const bg = context.createLinearGradient(0, padding.top, 0, size.height - padding.bottom);
+        bg.addColorStop(0, "#dcfce7");
+        bg.addColorStop(1, "#86efac");
+        context.fillStyle = bg;
+        context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
+      }
+    } else {
+      const bg = context.createLinearGradient(0, padding.top, 0, size.height - padding.bottom);
+      bg.addColorStop(0, "#dcfce7");
+      bg.addColorStop(1, "#86efac");
+      context.fillStyle = bg;
+      context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
+    }
 
     context.save();
     context.lineWidth = 1;
@@ -663,15 +771,6 @@ export function HoleMapCanvas({
 
     context.restore();
 
-    // ピン周囲にグリーン領域を円として描画し、同一スケールで正しい範囲を視覚化する。
-    context.fillStyle = "rgba(187, 247, 208, 0.72)";
-    context.strokeStyle = "rgba(21, 128, 61, 0.9)";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.ellipse(pinX, pinY, greenRadiusPx, greenRadiusPx, 0, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
-
     // センターライン(ティー→ピン)を点線で描き、基準軸をわかりやすくする。
     context.save();
     context.setLineDash([6, 6]);
@@ -683,17 +782,79 @@ export function HoleMapCanvas({
     context.stroke();
     context.restore();
 
-    // ハザード描画: util関数で整理
-    for (const hazard of hazards) {
+    // ハザード描画: rough / bareground / ob / bunker を先に描画し、water は最後に描く。
+    const sortedHazards = [...hazards].sort((a, b) => {
+      const orderA = HAZARD_TEXTURE_ORDER.indexOf(resolveHazardTextureType(a.type));
+      const orderB = HAZARD_TEXTURE_ORDER.indexOf(resolveHazardTextureType(b.type));
+      return orderA - orderB;
+    });
+
+    for (const hazard of sortedHazards) {
+      if (hazard.type === "water") continue;
       const style = getHazardStyle(hazard.type);
-      context.fillStyle = style.fill;
+      const textureKey = resolveHazardTextureType(hazard.type);
+      const pattern = shouldUseTextures ? createTexturePattern(context, textureKey) : null;
+
+      context.save();
+      if (pattern) {
+        context.fillStyle = pattern;
+        context.globalAlpha = 0.94;
+      } else {
+        context.fillStyle = style.fill;
+      }
       context.strokeStyle = style.stroke;
       context.lineWidth = 1.5;
+
       if (hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3) {
         drawPolygon(context, hazard, yardToPxX, yardToPxY);
       } else {
         drawRectangle(context, hazard, yardToPxX, yardToPxY);
       }
+      context.restore();
+      drawObBoundaryMarkers(context, hazard, yardToPxX, yardToPxY);
+    }
+
+    // ピン周囲のグリーン領域を描画。
+    const greenPattern = shouldUseTextures ? createTexturePattern(context, "green") : null;
+    context.save();
+    context.beginPath();
+    context.ellipse(pinX, pinY, greenRadiusPx, greenRadiusPx, 0, 0, Math.PI * 2);
+    if (greenPattern) {
+      context.fillStyle = greenPattern;
+      context.globalAlpha = 0.94;
+      context.fill();
+    } else {
+      context.fillStyle = "rgba(187, 247, 208, 0.72)";
+      context.fill();
+    }
+    context.strokeStyle = "rgba(21, 128, 61, 0.9)";
+    context.lineWidth = 2;
+    context.stroke();
+    context.restore();
+
+    // water を最後に描画し、緑地やバンカー上に重ねる。
+    for (const hazard of sortedHazards) {
+      if (hazard.type !== "water") continue;
+      const style = getHazardStyle(hazard.type);
+      const textureKey = resolveHazardTextureType(hazard.type);
+      const pattern = shouldUseTextures ? createTexturePattern(context, textureKey) : null;
+
+      context.save();
+      if (pattern) {
+        context.fillStyle = pattern;
+        context.globalAlpha = 0.94;
+      } else {
+        context.fillStyle = style.fill;
+      }
+      context.strokeStyle = style.stroke;
+      context.lineWidth = 1.5;
+
+      if (hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3) {
+        drawPolygon(context, hazard, yardToPxX, yardToPxY);
+      } else {
+        drawRectangle(context, hazard, yardToPxX, yardToPxY);
+      }
+      context.restore();
       drawObBoundaryMarkers(context, hazard, yardToPxX, yardToPxY);
     }
 
