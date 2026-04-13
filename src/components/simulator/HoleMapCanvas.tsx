@@ -20,6 +20,7 @@ interface HoleMapCanvasProps {
   showTrajectories?: boolean;
   className?: string;
   editable?: boolean;
+  useExtendedYAxis?: boolean;
   selectedHazardId?: string | null;
   currentHoleKey?: string | number;
   holeComplete?: boolean;
@@ -70,6 +71,7 @@ type CanvasMetrics = {
   drawWidth: number;
   drawHeight: number;
   maxYardY: number;
+  minYardY: number;
   halfYardX: number;
   yardScale: number;
   offsetX: number;
@@ -96,6 +98,7 @@ const COURSE_WIDTH_YARDS = 400;
 const DEFAULT_GREEN_RADIUS = 12;
 const MIN_HAZARD_WIDTH = 8;
 const MIN_HAZARD_DEPTH = 6;
+const EDITABLE_Y_AXIS_OFFSET_YARDS = 25;
 
 function chooseYardTickStep(range: number, targetTickCount = 8): number {
   if (range <= 0) {
@@ -355,6 +358,7 @@ export function HoleMapCanvas({
   showTrajectories = true,
   className,
   editable = false,
+  useExtendedYAxis = false,
   selectedHazardId = null,
   currentHoleKey,
   holeComplete = false,
@@ -408,15 +412,18 @@ export function HoleMapCanvas({
     const drawWidth = size.width - padding.left - padding.right;
     const drawHeight = size.height - padding.top - padding.bottom;
     const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
-    const yardScale = Math.min(drawWidth / (halfYardX * 2), drawHeight / maxYardY);
+    const minYardY = (editable || useExtendedYAxis) ? -EDITABLE_Y_AXIS_OFFSET_YARDS : 0;
+    const yardRange = maxYardY - minYardY;
+    const yardScale = Math.min(drawWidth / (halfYardX * 2), drawHeight / yardRange);
     const offsetX = padding.left + (drawWidth - halfYardX * 2 * yardScale) / 2;
-    const offsetY = padding.top + (drawHeight - maxYardY * yardScale);
+    const offsetY = padding.top + (drawHeight - yardRange * yardScale);
 
     return {
       padding,
       drawWidth,
       drawHeight,
       maxYardY,
+      minYardY,
       halfYardX,
       yardScale,
       offsetX,
@@ -722,27 +729,39 @@ export function HoleMapCanvas({
     context.font = "11px sans-serif";
     context.fillStyle = "rgba(6, 95, 70, 0.85)";
 
-    for (let y = 0; y <= maxYardY + 0.01; y += 50) {
+    const firstY = Math.min(0, Math.floor(metrics.minYardY / 50) * 50);
+    for (let y = firstY; y <= maxYardY + 0.01; y += 50) {
       const py = yardToPxY(y);
-      const isMajorGuide = y % 100 === 0;
-      context.strokeStyle = y === 0
-        ? "rgba(6, 95, 70, 0.5)"
-        : isMajorGuide
-          ? "rgba(21, 94, 117, 0.45)"
-          : "rgba(6, 95, 70, 0.18)";
-      context.lineWidth = isMajorGuide ? 1.8 : 1;
+      const isMajorGuide = y >= 0 && Math.abs(y) % 100 === 0;
+      const isZeroGuide = y === 0;
+      const isHighlightedZero = editable && isZeroGuide;
+
+      context.strokeStyle = isHighlightedZero
+        ? "rgba(16, 185, 129, 0.85)"
+        : isZeroGuide
+          ? "rgba(6, 95, 70, 0.5)"
+          : isMajorGuide
+            ? "rgba(21, 94, 117, 0.45)"
+            : "rgba(6, 95, 70, 0.18)";
+      context.lineWidth = isHighlightedZero ? 2 : (isMajorGuide ? 1.8 : 1);
+      context.setLineDash(isHighlightedZero ? [6, 4] : []);
       context.beginPath();
       context.moveTo(padding.left, py);
       context.lineTo(padding.left + drawWidth, py);
       context.stroke();
+      context.setLineDash([]);
 
-      context.fillStyle = isMajorGuide
-        ? "rgba(21, 94, 117, 0.92)"
-        : "rgba(6, 95, 70, 0.85)";
-      context.font = isMajorGuide ? "bold 11px sans-serif" : "11px sans-serif";
-      context.textAlign = "right";
-      context.textBaseline = "middle";
-      context.fillText(`${Math.round(y)}`, padding.left - 2, py);
+      if (y >= 0) {
+        context.fillStyle = isHighlightedZero
+          ? "rgba(16, 185, 129, 0.92)"
+          : isMajorGuide
+            ? "rgba(21, 94, 117, 0.92)"
+            : "rgba(6, 95, 70, 0.85)";
+        context.font = isHighlightedZero || isMajorGuide ? "bold 11px sans-serif" : "11px sans-serif";
+        context.textAlign = "right";
+        context.textBaseline = "middle";
+        context.fillText(`${Math.round(y)}`, padding.left - 2, py);
+      }
     }
 
     context.fillStyle = "rgba(6, 95, 70, 0.9)";
@@ -794,6 +813,8 @@ export function HoleMapCanvas({
       const style = getHazardStyle(hazard.type);
       const textureKey = resolveHazardTextureType(hazard.type);
       const pattern = shouldUseTextures ? createTexturePattern(context, textureKey) : null;
+      const isPolygon = hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3;
+      const shouldHidePolygonStroke = isPolygon && !editable;
 
       context.save();
       if (pattern) {
@@ -802,10 +823,10 @@ export function HoleMapCanvas({
       } else {
         context.fillStyle = style.fill;
       }
-      context.strokeStyle = style.stroke;
-      context.lineWidth = 1.5;
+      context.strokeStyle = shouldHidePolygonStroke ? "transparent" : style.stroke;
+      context.lineWidth = shouldHidePolygonStroke ? 0 : 1.5;
 
-      if (hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3) {
+      if (isPolygon) {
         drawPolygon(context, hazard, yardToPxX, yardToPxY);
       } else {
         drawRectangle(context, hazard, yardToPxX, yardToPxY);
@@ -1055,14 +1076,15 @@ export function HoleMapCanvas({
         back = center + MIN_HAZARD_DEPTH / 2;
       }
 
-      front = Math.max(0, front);
+      const minY = metrics.minYardY;
+      front = Math.max(minY, front);
       back = Math.min(metrics.maxYardY, back);
 
       if (back - front < MIN_HAZARD_DEPTH) {
-        if (front <= 0) {
-          back = MIN_HAZARD_DEPTH;
+        if (front <= minY) {
+          back = Math.min(metrics.maxYardY, front + MIN_HAZARD_DEPTH);
         } else {
-          front = Math.max(0, back - MIN_HAZARD_DEPTH);
+          front = Math.max(minY, back - MIN_HAZARD_DEPTH);
         }
       }
 
@@ -1108,20 +1130,28 @@ export function HoleMapCanvas({
   }, [dragState, hazards]);
 
   // --- ポリゴン作成用canvasクリックイベント ---
+  const convertScreenPointToYardPoint = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!metrics) {
+      return { x: 0, y: 0 };
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const canvasX = (event.clientX - rect.left - viewport.offsetX) / viewport.scale;
+    const canvasY = (event.clientY - rect.top - viewport.offsetY) / viewport.scale;
+    const worldX = (canvasX - metrics.offsetX) / metrics.yardScale - metrics.halfYardX;
+    const worldY = metrics.maxYardY - (canvasY - metrics.offsetY) / metrics.yardScale;
+
+    return { x: worldX, y: worldY };
+  };
+
   const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onCanvasClick) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = (event.clientX - rect.left - viewport.offsetX) / viewport.scale;
-    const y = (event.clientY - rect.top - viewport.offsetY) / viewport.scale;
-    onCanvasClick({ x, y });
+    onCanvasClick(convertScreenPointToYardPoint(event));
   };
 
   const handleCanvasDoubleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onCanvasDoubleClick) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = (event.clientX - rect.left - viewport.offsetX) / viewport.scale;
-    const y = (event.clientY - rect.top - viewport.offsetY) / viewport.scale;
-    onCanvasDoubleClick({ x, y });
+    onCanvasDoubleClick(convertScreenPointToYardPoint(event));
   };
 
   return (

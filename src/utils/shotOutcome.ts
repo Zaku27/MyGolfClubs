@@ -124,18 +124,36 @@ function isPointInHazard(
   return isPointInRectangle(x, y, hazard.xCenter, hazard.width, hazard.yFront, hazard.yBack);
 }
 
+const HAZARD_TYPE_PRIORITY: Record<Hazard["type"], number> = {
+  ob: 0,
+  water: 1,
+  bunker: 2,
+  bareground: 3,
+  rough: 4,
+  semirough: 5,
+};
+
 export function checkLandingInHazard(
   x: number,
   y: number,
   hazards: Hazard[],
 ): Hazard | null {
+  let selectedHazard: Hazard | null = null;
+  let selectedPriority = Number.MAX_SAFE_INTEGER;
+
   for (const hazard of hazards) {
-    if (isPointInHazard(x, y, hazard)) {
-      return hazard;
+    if (!isPointInHazard(x, y, hazard)) {
+      continue;
+    }
+
+    const priority = HAZARD_TYPE_PRIORITY[hazard.type] ?? Number.MAX_SAFE_INTEGER;
+    if (selectedHazard === null || priority < selectedPriority) {
+      selectedHazard = hazard;
+      selectedPriority = priority;
     }
   }
 
-  return null;
+  return selectedHazard;
 }
 
 export function findFirstHazardEntryPoint(

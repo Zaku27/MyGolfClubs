@@ -133,6 +133,62 @@ describe('applyGroundCondition side slope behavior with fixed seed', () => {
       const advice = buildNextShotAdvice('rough', 'bareground');
       expect(advice).toContain('ベアグラウンドからのショットです');
     });
+
+    it('chooses OB over overlapping rough when both hazards contain the landing point', () => {
+      const roughHazard: Hazard = {
+        id: 'hazard-rough',
+        type: 'rough',
+        shape: 'rectangle',
+        yFront: 80,
+        yBack: 100,
+        xCenter: 0,
+        width: 12,
+        penaltyStrokes: 0,
+      };
+
+      const obHazard: Hazard = {
+        id: 'hazard-ob',
+        type: 'ob',
+        shape: 'rectangle',
+        yFront: 80,
+        yBack: 100,
+        xCenter: 0,
+        width: 12,
+        penaltyStrokes: 1,
+      };
+
+      const assessment = assessLanding(0, 90, 120, [roughHazard, obHazard]);
+      expect(assessment.finalOutcome).toBe('ob');
+      expect(assessment.hazard?.type).toBe('ob');
+    });
+
+    it('chooses water over overlapping bunker when both hazards contain the landing point', () => {
+      const bunkerHazard: Hazard = {
+        id: 'hazard-bunker',
+        type: 'bunker',
+        shape: 'rectangle',
+        yFront: 80,
+        yBack: 100,
+        xCenter: 0,
+        width: 12,
+        penaltyStrokes: 0,
+      };
+
+      const waterHazard: Hazard = {
+        id: 'hazard-water',
+        type: 'water',
+        shape: 'rectangle',
+        yFront: 80,
+        yBack: 100,
+        xCenter: 0,
+        width: 12,
+        penaltyStrokes: 1,
+      };
+
+      const assessment = assessLanding(0, 90, 120, [bunkerHazard, waterHazard]);
+      expect(assessment.finalOutcome).toBe('water');
+      expect(assessment.hazard?.type).toBe('water');
+    });
   });
 
   describe('getWaterHazardDropOrigin', () => {

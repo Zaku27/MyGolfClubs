@@ -363,12 +363,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
   const addBaregroundHazard = () => {
     if (!selectedHole) return;
-    const newHazard = buildEmptyHazard(selectedHole, "bareground", -75, 20, 300);
-    updateHole((hole) => ({
-      ...hole,
-      hazards: [...cloneHazards(hole.hazards), newHazard],
-    }));
-    setSelectedHazardId(newHazard.id);
+    addPolygonHazard(12, 150, 12, "bareground", -75, 0, 0.12);
   };
 
   const addRoughHazard = () => {
@@ -378,12 +373,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
   const addHazard = () => {
     if (!selectedHole) return;
-    const newHazard = buildEmptyHazard(selectedHole, "ob", 75, 20, 300);
-    updateHole((hole) => ({
-      ...hole,
-      hazards: [...cloneHazards(hole.hazards), newHazard],
-    }));
-    setSelectedHazardId(newHazard.id);
+    addPolygonHazard(12, 150, 12, "ob", 75, 0, 0.12);
   };
 
   const deleteSelectedHazard = () => {
