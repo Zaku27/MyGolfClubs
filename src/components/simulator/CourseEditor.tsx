@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import type { GroundCondition, Hazard, HazardType, Hole } from "../../types/game";
+import { CourseInfoPreview } from "./CourseInfoPreview";
 import { HoleMapCanvas } from "./HoleMapCanvas";
 
 type Point2D = { x: number; y: number };
@@ -100,29 +101,6 @@ function buildHazardName(type: HazardType, xCenter: number, width: number) {
   return `${label} ${Math.round(xCenter)} ${Math.round(width)}`;
 }
 
-function buildEmptyHazard(
-  hole: Hole,
-  type: HazardType = "ob",
-  xCenter: number = 100,
-  width: number = 50,
-  depth: number = 200,
-): Hazard {
-  const yFront = 0;
-
-  return {
-    id: `hazard-${hole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    type,
-    shape: "rectangle",
-    yFront,
-    yBack: yFront + depth,
-    xCenter,
-    width,
-    penaltyStrokes: getPenaltyStrokesByType(type),
-    groundCondition: { ...DEFAULT_GROUND_CONDITION },
-    name: buildHazardName(type, xCenter, width),
-  };
-}
-
 function getPenaltyStrokesByType(type: HazardType): 0 | 1 | 2 {
   if (type === "ob") return 2;
   if (type === "water") return 1;
@@ -134,9 +112,16 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
   const [polygonCreationMode, setPolygonCreationMode] = useState(false);
   const [polygonDraftPoints, setPolygonDraftPoints] = useState<any[]>([]);
+  const [distanceInputValue, setDistanceInputValue] = useState<string>(() => holes[0]?.distanceFromTee.toString() ?? "");
+  const [showPreview, setShowPreview] = useState(false);
 
   const safeHoleIndex = Math.max(0, Math.min(selectedHoleIndex, holes.length - 1));
   const selectedHole = holes[safeHoleIndex];
+
+  useEffect(() => {
+    if (!selectedHole) return;
+    setDistanceInputValue(String(selectedHole.distanceFromTee));
+  }, [selectedHole?.number, selectedHole?.distanceFromTee]);
 
   const selectedHazard = useMemo(
     () => selectedHole?.hazards?.find((hazard) => hazard.id === selectedHazardId) ?? null,
@@ -220,6 +205,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const addSmallBunkerHazard = () => addPolygonHazard(12, 12, 10, "bunker", undefined, 25, 0.12);
   const addDefaultPolygonHazard = () => addPolygonHazard(16, 16, 10, "bunker", undefined, undefined, 0.14);
   const addLargePolygonHazard = () => addPolygonHazard(20, 20, 15, "water", 25, 125, 0.16);
+  const addExtraLargeWaterHazard = () => addPolygonHazard(30, 40, 30, "water", 25, 125, 0.16);
 
   const handleCanvasClick = (point: Point2D) => {
     if (!polygonCreationMode || !selectedHole) return;
@@ -371,6 +357,11 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     addPolygonHazard(12.5, 75, 8, "rough", -40, 0, 0.1);
   };
 
+  const addLargeRoughHazard = () => {
+    if (!selectedHole) return;
+    addPolygonHazard(20, 120, 20, "rough", -40, 0, 0.12);
+  };
+
   const addHazard = () => {
     if (!selectedHole) return;
     addPolygonHazard(12, 150, 12, "ob", 75, 0, 0.12);
@@ -401,6 +392,13 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   return (
     <section className="mx-auto mt-4 w-full max-w-2xl rounded-2xl border border-emerald-300 bg-white/80 p-4 shadow-sm shadow-emerald-300/30">
       <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setShowPreview(true)}
+          className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900 transition hover:bg-emerald-100"
+        >
+          プレビュー
+        </button>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -447,9 +445,17 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
             type="number"
             min={30}
             max={700}
-            value={selectedHole.distanceFromTee}
+            value={distanceInputValue}
             onChange={(event) => {
-              const distance = Math.max(30, Math.min(700, Number(event.target.value) || 30));
+              const raw = event.target.value;
+              setDistanceInputValue(raw);
+
+              const parsed = Number(raw);
+              if (raw.trim() === "" || Number.isNaN(parsed)) {
+                return;
+              }
+
+              const distance = Math.max(30, Math.min(700, parsed));
               updateHole((hole) => ({ ...hole, distanceFromTee: distance, targetDistance: distance }));
             }}
             className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
@@ -478,6 +484,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
           landingResults={[]}
           showTrajectories={false}
           editable
+          allowDynamicScale={distanceInputValue.trim().length === 0}
           currentHoleKey={selectedHole.number}
           selectedHazardId={selectedHazardId}
           onSelectHazardId={setSelectedHazardId}
@@ -590,10 +597,17 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
           </button>
           <button
             type="button"
+            onClick={addLargeRoughHazard}
+            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+          >
+            ラフ大
+          </button>
+          <button
+            type="button"
             onClick={addSmallBunkerHazard}
             className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
           >
-            バンカー小
+            バンカー
           </button>
           <button
             type="button"
@@ -608,6 +622,13 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
             className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
           >
             ウォーター
+          </button>
+          <button
+            type="button"
+            onClick={addExtraLargeWaterHazard}
+            className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
+          >
+            ウォーター大
           </button>
           <button
             type="button"
@@ -628,6 +649,10 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
         <p className="mt-3 text-xs text-emerald-700">ハザードはドラッグで移動、四隅ハンドルでリサイズできます。</p>
       </div>
+
+      {showPreview && selectedHole && (
+        <CourseInfoPreview hole={selectedHole} onClose={() => setShowPreview(false)} />
+      )}
 
       {selectedHazard && (
         <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">

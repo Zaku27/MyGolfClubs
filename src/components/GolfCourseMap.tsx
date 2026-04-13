@@ -54,6 +54,7 @@ const groupHazardsByTexture = (hazards: Hole["hazards"] = []) => {
     water: [],
     ob: [],
     green: [],
+    teeground: [],
   };
 
   for (const hazard of hazards) {

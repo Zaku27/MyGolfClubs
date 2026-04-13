@@ -21,6 +21,7 @@ interface HoleMapCanvasProps {
   className?: string;
   editable?: boolean;
   useExtendedYAxis?: boolean;
+  allowDynamicScale?: boolean;
   selectedHazardId?: string | null;
   currentHoleKey?: string | number;
   holeComplete?: boolean;
@@ -93,6 +94,9 @@ const HAZARD_TEXTURE_ORDER: TextureKey[] = [
   "water",
 ];
 
+const TEE_GROUND_WIDTH = 20;
+const TEE_GROUND_HEIGHT = 30;
+const TEE_GROUND_CORNER_RADIUS = 2;
 const MIN_CANVAS_HEIGHT = 280;
 const COURSE_WIDTH_YARDS = 400;
 const DEFAULT_GREEN_RADIUS = 12;
@@ -348,6 +352,30 @@ function drawHighlightPoint(
   context.restore();
 }
 
+function drawRoundedRectangle(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.lineTo(x + width - r, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + r);
+  context.lineTo(x + width, y + height - r);
+  context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  context.lineTo(x + r, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - r);
+  context.lineTo(x, y + r);
+  context.quadraticCurveTo(x, y, x + r, y);
+  context.closePath();
+  context.fill();
+  context.stroke();
+}
+
 export function HoleMapCanvas({
   hole,
   landingResults,
@@ -360,6 +388,7 @@ export function HoleMapCanvas({
   editable = false,
   useExtendedYAxis = false,
   selectedHazardId = null,
+  allowDynamicScale = true,
   currentHoleKey,
   holeComplete = false,
   onSelectHazardId,
@@ -385,6 +414,7 @@ export function HoleMapCanvas({
     bareground: null,
     bunker: null,
     green: null,
+    teeground: null,
     water: null,
     ob: null,
   }));
@@ -412,8 +442,11 @@ export function HoleMapCanvas({
     const drawWidth = size.width - padding.left - padding.right;
     const drawHeight = size.height - padding.top - padding.bottom;
     const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
-    const minYardY = (editable || useExtendedYAxis) ? -EDITABLE_Y_AXIS_OFFSET_YARDS : 0;
-    const yardRange = maxYardY - minYardY;
+    const minYardY = (editable || useExtendedYAxis) ? -EDITABLE_Y_AXIS_OFFSET_YARDS : -TEE_GROUND_HEIGHT / 2;
+    const effectiveMaxYardY = editable && !allowDynamicScale
+      ? Math.min(targetDistance * 1.2, targetDistance + 40)
+      : maxYardY;
+    const yardRange = effectiveMaxYardY - minYardY;
     const yardScale = Math.min(drawWidth / (halfYardX * 2), drawHeight / yardRange);
     const offsetX = padding.left + (drawWidth - halfYardX * 2 * yardScale) / 2;
     const offsetY = padding.top + (drawHeight - yardRange * yardScale);
@@ -422,14 +455,14 @@ export function HoleMapCanvas({
       padding,
       drawWidth,
       drawHeight,
-      maxYardY,
+      maxYardY: effectiveMaxYardY,
       minYardY,
       halfYardX,
       yardScale,
       offsetX,
       offsetY,
     };
-  }, [editable, greenRadius, hazards, size.height, size.width, targetDistance, absoluteShots]);
+  }, [allowDynamicScale, editable, greenRadius, hazards, size.height, size.width, targetDistance, absoluteShots]);
   const currentOrigin = shotOrigin ?? (absoluteShots.length > 0 ? absoluteShots[absoluteShots.length - 1].landing : { x: 0, y: 0 });
   const transientShot = useMemo(() => {
     if (!transientLandingResult) return null;
@@ -450,6 +483,7 @@ export function HoleMapCanvas({
       bareground: null,
       bunker: null,
       green: null,
+      teeground: null,
       water: null,
       ob: null,
     };
@@ -723,6 +757,33 @@ export function HoleMapCanvas({
       context.fillStyle = bg;
       context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
     }
+
+    const teeGroundLeft = yardToPxX(-TEE_GROUND_WIDTH / 2);
+    const teeGroundRight = yardToPxX(TEE_GROUND_WIDTH / 2);
+    const teeGroundTop = yardToPxY(TEE_GROUND_HEIGHT / 2);
+    const teeGroundBottom = yardToPxY(-TEE_GROUND_HEIGHT / 2);
+    const teeGroundWidthPx = teeGroundRight - teeGroundLeft;
+    const teeGroundHeightPx = teeGroundBottom - teeGroundTop;
+    const teeGroundPattern = shouldUseTextures ? createTexturePattern(context, "teeground") : null;
+
+    context.save();
+    if (teeGroundPattern) {
+      context.fillStyle = teeGroundPattern;
+      context.globalAlpha = 0.92;
+    } else {
+      context.fillStyle = "rgba(187, 247, 208, 0.72)";
+    }
+    context.strokeStyle = "rgba(16, 185, 129, 0.85)";
+    context.lineWidth = 1.2;
+    drawRoundedRectangle(
+      context,
+      teeGroundLeft,
+      teeGroundTop,
+      teeGroundWidthPx,
+      teeGroundHeightPx,
+      Math.min(TEE_GROUND_CORNER_RADIUS * yardScale, teeGroundWidthPx / 2, teeGroundHeightPx / 2),
+    );
+    context.restore();
 
     context.save();
     context.lineWidth = 1;
@@ -1001,10 +1062,20 @@ export function HoleMapCanvas({
         const idx = state.vertexIndex;
         const initialPoints = state.initialHazard.points;
         if (initialPoints.length < 3) return hazard;
-        const newPoints = initialPoints.map((pt, i) =>
-          i === idx ? { x: pt.x + deltaX, y: pt.y + deltaY } : pt
-        );
-        // bounds再計算
+
+        const minX = -metrics.halfYardX;
+        const maxX = metrics.halfYardX;
+        const minY = metrics.minYardY;
+        const maxY = metrics.maxYardY;
+
+        const newPoints = initialPoints.map((pt, i) => {
+          if (i !== idx) return pt;
+          return {
+            x: Math.max(minX, Math.min(maxX, pt.x + deltaX)),
+            y: Math.max(minY, Math.min(maxY, pt.y + deltaY)),
+          };
+        });
+
         const xs = newPoints.map((p) => p.x);
         const ys = newPoints.map((p) => p.y);
         return {
@@ -1022,19 +1093,39 @@ export function HoleMapCanvas({
 
       // polygon全体move
       if (state.mode === "move" && hazard.shape === "polygon" && Array.isArray(hazard.points) && Array.isArray(state.initialHazard.points)) {
-        const newPoints = state.initialHazard.points.map((pt) => ({ x: pt.x + deltaX, y: pt.y + deltaY }));
-        const xs = newPoints.map((p) => p.x);
-        const ys = newPoints.map((p) => p.y);
+        const rawPoints = state.initialHazard.points.map((pt) => ({ x: pt.x + deltaX, y: pt.y + deltaY }));
+        const xs = rawPoints.map((p) => p.x);
+        const ys = rawPoints.map((p) => p.y);
+        const left = Math.min(...xs);
+        const right = Math.max(...xs);
+        const top = Math.min(...ys);
+        const bottom = Math.max(...ys);
+
+        const shiftX = left < -metrics.halfYardX
+          ? -metrics.halfYardX - left
+          : right > metrics.halfYardX
+            ? metrics.halfYardX - right
+            : 0;
+        const shiftY = top < metrics.minYardY
+          ? metrics.minYardY - top
+          : bottom > metrics.maxYardY
+            ? metrics.maxYardY - bottom
+            : 0;
+
+        const newPoints = rawPoints.map((pt) => ({ x: pt.x + shiftX, y: pt.y + shiftY }));
+        const clampedXs = newPoints.map((p) => p.x);
+        const clampedYs = newPoints.map((p) => p.y);
+
         return {
           ...hazard,
           points: newPoints,
-          x: Math.min(...xs),
-          y: Math.min(...ys),
-          width: Math.max(...xs) - Math.min(...xs),
-          height: Math.max(...ys) - Math.min(...ys),
-          xCenter: (Math.max(...xs) + Math.min(...xs)) / 2,
-          yFront: Math.min(...ys),
-          yBack: Math.max(...ys),
+          x: Math.min(...clampedXs),
+          y: Math.min(...clampedYs),
+          width: Math.max(...clampedXs) - Math.min(...clampedXs),
+          height: Math.max(...clampedYs) - Math.min(...clampedYs),
+          xCenter: (Math.max(...clampedXs) + Math.min(...clampedXs)) / 2,
+          yFront: Math.min(...clampedYs),
+          yBack: Math.max(...clampedYs),
         };
       }
 
@@ -1203,6 +1294,7 @@ export function HoleMapCanvas({
                 return;
               }
 
+              event.preventDefault();
               event.stopPropagation();
               event.currentTarget.setPointerCapture(event.pointerId);
               onSelectHazardId?.(hazard.id);
