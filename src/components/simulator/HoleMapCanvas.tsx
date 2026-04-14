@@ -108,6 +108,7 @@ const GREEN_POLYGON_SIDES = 20;
 const MIN_HAZARD_WIDTH = 8;
 const MIN_HAZARD_DEPTH = 6;
 const EDITABLE_Y_AXIS_OFFSET_YARDS = 25;
+const EDITABLE_HAZARD_MAX_X = 200;
 
 function buildRegularPolygonPoints(centerX: number, centerY: number, radius: number, sides: number) {
   const points: Point2D[] = [];
@@ -167,7 +168,7 @@ function buildYardBounds(
     return Math.max(max, shot.landing.y, pathMaxY);
   }, 0);
 
-  const baseMaxY = Math.max(targetDistance + greenRadius, maxHazardY, maxLandingY, 1);
+  const baseMaxY = Math.max(targetDistance + 150, maxHazardY, maxLandingY, 1);
   const maxYardY = baseMaxY * 1.1;
 
   const maxHazardX = hazards.reduce((max, hazard) => {
@@ -490,9 +491,7 @@ export function HoleMapCanvas({
       useExtendedYAxis ? [] : absoluteShots,
     );
     const minYardY = (editable || useExtendedYAxis) ? -EDITABLE_Y_AXIS_OFFSET_YARDS : -TEE_GROUND_HEIGHT / 2;
-    const effectiveMaxYardY = editable && !allowDynamicScale
-      ? Math.min(targetDistance * 1.2, targetDistance + 40)
-      : maxYardY;
+    const effectiveMaxYardY = maxYardY;
     const yardRange = effectiveMaxYardY - minYardY;
     const yardScale = Math.min(drawWidth / (halfYardX * 2), drawHeight / yardRange);
     const offsetX = padding.left + (drawWidth - halfYardX * 2 * yardScale) / 2;
@@ -1206,10 +1205,10 @@ export function HoleMapCanvas({
         const initialPoints = state.initialHazard.points;
         if (initialPoints.length < 3) return hazard;
 
-        const minX = -metrics.halfYardX;
-        const maxX = metrics.halfYardX;
+        const minX = editable ? -EDITABLE_HAZARD_MAX_X : -metrics.halfYardX;
+        const maxX = editable ? EDITABLE_HAZARD_MAX_X : metrics.halfYardX;
         const minY = metrics.minYardY;
-        const maxY = metrics.maxYardY;
+        const maxY = editable ? targetDistance + 200 : metrics.maxYardY;
 
         const newPoints = initialPoints.map((pt, i) => {
           if (i !== idx) return pt;
@@ -1244,15 +1243,17 @@ export function HoleMapCanvas({
         const top = Math.min(...ys);
         const bottom = Math.max(...ys);
 
-        const shiftX = left < -metrics.halfYardX
-          ? -metrics.halfYardX - left
-          : right > metrics.halfYardX
-            ? metrics.halfYardX - right
+        const boundaryX = editable ? EDITABLE_HAZARD_MAX_X : metrics.halfYardX;
+        const maxY = editable ? targetDistance + 200 : metrics.maxYardY;
+        const shiftX = left < -boundaryX
+          ? -boundaryX - left
+          : right > boundaryX
+            ? boundaryX - right
             : 0;
         const shiftY = top < metrics.minYardY
           ? metrics.minYardY - top
-          : bottom > metrics.maxYardY
-            ? metrics.maxYardY - bottom
+          : bottom > maxY
+            ? maxY - bottom
             : 0;
 
         const newPoints = rawPoints.map((pt) => ({ x: pt.x + shiftX, y: pt.y + shiftY }));
@@ -1311,18 +1312,19 @@ export function HoleMapCanvas({
       }
 
       const minY = metrics.minYardY;
+      const maxY = editable ? targetDistance + 200 : metrics.maxYardY;
       front = Math.max(minY, front);
-      back = Math.min(metrics.maxYardY, back);
+      back = Math.min(maxY, back);
 
       if (back - front < MIN_HAZARD_DEPTH) {
         if (front <= minY) {
-          back = Math.min(metrics.maxYardY, front + MIN_HAZARD_DEPTH);
+          back = Math.min(maxY, front + MIN_HAZARD_DEPTH);
         } else {
           front = Math.max(minY, back - MIN_HAZARD_DEPTH);
         }
       }
 
-      const maxEdge = metrics.halfYardX;
+      const maxEdge = editable ? EDITABLE_HAZARD_MAX_X : metrics.halfYardX;
       const width = right - left;
       const centerX = (left + right) / 2;
       const minCenter = -maxEdge + width / 2;

@@ -389,15 +389,12 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             <div className="mt-4 w-full">
               <HoleMapCanvas
                 hole={currentHole}
-                landingResults={landingHistory}
-                transientLandingResult={transientLandingResult}
-                aimPoint={selectedAimPoint}
-                shotOrigin={{ x: shotContext.originX, y: shotContext.originY }}
-                highlightPoint={shotContext.penaltyDropOrigin ?? (lastShotResult?.finalOutcome === "water" ? lastShotResult.penaltyDropOrigin : null)}
-                showTrajectories
+                landingResults={[]}
+                showTrajectories={false}
                 useExtendedYAxis
                 currentHoleKey={currentHoleIndex}
-                holeComplete={isHoleComplete}
+                holeComplete={false}
+                showViewportResetButton={false}
               />
             </div>
 
