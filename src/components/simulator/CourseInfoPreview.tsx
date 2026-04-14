@@ -31,31 +31,33 @@ export function CourseInfoPreview({ hole, onClose }: CourseInfoPreviewProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-black/40 p-4">
-      <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">コース情報プレビュー</p>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">{hole.number}H • PAR {hole.par}</h2>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">{hole.number}H • PAR {hole.par}</h2>
             <p className="text-sm text-slate-600">{targetDistance}ヤード</p>
           </div>
           <button
             type="button"
-            className="rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
+            className="rounded-full border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
             onClick={onClose}
           >
             閉じる
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3">
+        <div className="p-4 space-y-4">
+          <div className="mx-auto w-full max-w-2xl rounded-3xl border border-slate-200 bg-slate-50 p-3">
             <HoleMapCanvas
+              className="w-full"
               hole={hole}
               landingResults={[]}
               showTrajectories={false}
               useExtendedYAxis
               currentHoleKey={hole.number}
               holeComplete={false}
+              showViewportResetButton={false}
             />
           </div>
 

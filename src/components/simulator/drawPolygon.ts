@@ -11,5 +11,7 @@ export function drawPolygon(context: CanvasRenderingContext2D, hazard: Hazard, y
   }
   context.closePath();
   context.fill();
-  context.stroke();
+  if (context.lineWidth > 0) {
+    context.stroke();
+  }
 }

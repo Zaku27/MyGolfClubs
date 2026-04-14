@@ -12,5 +12,7 @@ export function drawRectangle(context: CanvasRenderingContext2D, hazard: Hazard,
   const widthPx = Math.max(2, rightPx - leftPx);
   const heightPx = Math.max(2, bottomPx - topPx);
   context.fillRect(leftPx, topPx, widthPx, heightPx);
-  context.strokeRect(leftPx, topPx, widthPx, heightPx);
+  if (context.lineWidth > 0) {
+    context.strokeRect(leftPx, topPx, widthPx, heightPx);
+  }
 }

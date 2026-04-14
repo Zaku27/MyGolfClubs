@@ -349,7 +349,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
   const addBaregroundHazard = () => {
     if (!selectedHole) return;
-    addPolygonHazard(12, 150, 12, "bareground", -75, 0, 0.12);
+    addPolygonHazard(12, 100, 12, "bareground", -75, 0, 0.12);
   };
 
   const addRoughHazard = () => {

@@ -31,6 +31,7 @@ interface HoleMapCanvasProps {
   onGreenPolygonChange?: (greenPolygon: Point2D[]) => void;
   onCanvasClick?: (point: Point2D) => void;
   onCanvasDoubleClick?: (point: Point2D) => void;
+  showViewportResetButton?: boolean;
 }
 
 type Size = {
@@ -147,6 +148,7 @@ function chooseYardTickStep(range: number, targetTickCount = 8): number {
 /**
  * ホール全体を収めるための距離レンジを算出する。
  * - Y軸(奥行き): ティー(0y)からピンまでを基本に、ハザードと着地点の最大距離まで拡張
+ *   (ショット結果を空にすると、コースプレビューと同じ Y 軸に揃えられる)
  * - X軸(左右): ハザード幅・着地左右ブレの最大値に余白を加えて決定
  */
 function buildYardBounds(
@@ -377,19 +379,34 @@ function drawRoundedRectangle(
   radius: number,
 ) {
   const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const topBump = Math.min(6, width * 0.03, height * 0.05);
+  const bottomBump = topBump * 0.8;
+  const sideBump = Math.min(4, width * 0.02, height * 0.04);
+  const centerY = y + height / 2;
+  const rightX = x + width;
+  const bottomMidX = x + width * 0.5;
+
   context.beginPath();
   context.moveTo(x + r, y);
-  context.lineTo(x + width - r, y);
-  context.quadraticCurveTo(x + width, y, x + width, y + r);
-  context.lineTo(x + width, y + height - r);
-  context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  context.lineTo(x + r, y + height);
+  context.lineTo(x + width * 0.55, y);
+  context.quadraticCurveTo(bottomMidX, y - topBump, x + width - r, y);
+  context.quadraticCurveTo(rightX, y, rightX, y + r);
+  context.lineTo(rightX, centerY - 8);
+  context.quadraticCurveTo(rightX + sideBump, centerY, rightX, centerY + 8);
+  context.lineTo(rightX, y + height - r);
+  context.quadraticCurveTo(rightX, y + height, x + width - r, y + height);
+  context.lineTo(x + width * 0.45, y + height);
+  context.quadraticCurveTo(bottomMidX, y + height + bottomBump, x + r, y + height);
   context.quadraticCurveTo(x, y + height, x, y + height - r);
+  context.lineTo(x, centerY + 8);
+  context.quadraticCurveTo(x - sideBump, centerY, x, centerY - 8);
   context.lineTo(x, y + r);
   context.quadraticCurveTo(x, y, x + r, y);
   context.closePath();
   context.fill();
-  context.stroke();
+  if (context.lineWidth > 0 && context.strokeStyle !== "transparent") {
+    context.stroke();
+  }
 }
 
 export function HoleMapCanvas({
@@ -413,6 +430,7 @@ export function HoleMapCanvas({
   onGreenPolygonChange,
   onCanvasClick,
   onCanvasDoubleClick,
+  showViewportResetButton = true,
 }: HoleMapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -465,7 +483,12 @@ export function HoleMapCanvas({
       : { top: 20, right: 18, bottom: 18, left: 30 };
     const drawWidth = size.width - padding.left - padding.right;
     const drawHeight = size.height - padding.top - padding.bottom;
-    const { maxYardY, halfYardX } = buildYardBounds(targetDistance, greenRadius, hazards, absoluteShots);
+    const { maxYardY, halfYardX } = buildYardBounds(
+      targetDistance,
+      greenRadius,
+      hazards,
+      useExtendedYAxis ? [] : absoluteShots,
+    );
     const minYardY = (editable || useExtendedYAxis) ? -EDITABLE_Y_AXIS_OFFSET_YARDS : -TEE_GROUND_HEIGHT / 2;
     const effectiveMaxYardY = editable && !allowDynamicScale
       ? Math.min(targetDistance * 1.2, targetDistance + 40)
@@ -806,8 +829,13 @@ export function HoleMapCanvas({
     } else {
       context.fillStyle = "rgba(187, 247, 208, 0.72)";
     }
-    context.strokeStyle = "rgba(16, 185, 129, 0.85)";
-    context.lineWidth = 1.2;
+    if (editable) {
+      context.strokeStyle = "rgba(16, 185, 129, 0.85)";
+      context.lineWidth = 1.2;
+    } else {
+      context.strokeStyle = "transparent";
+      context.lineWidth = 0;
+    }
     drawRoundedRectangle(
       context,
       teeGroundLeft,
@@ -951,10 +979,12 @@ export function HoleMapCanvas({
       context.fillStyle = "rgba(187, 247, 208, 0.72)";
       context.fill();
     }
-    context.strokeStyle = "rgba(16, 185, 129, 0.98)";
-    context.lineWidth = 2;
-    context.lineJoin = "round";
-    context.stroke();
+    if (editable) {
+      context.strokeStyle = "rgba(16, 185, 129, 0.98)";
+      context.lineWidth = 2;
+      context.lineJoin = "round";
+      context.stroke();
+    }
     context.restore();
 
     // water を最後に描画し、緑地やバンカー上に重ねる。
@@ -963,6 +993,8 @@ export function HoleMapCanvas({
       const style = getHazardStyle(hazard.type);
       const textureKey = resolveHazardTextureType(hazard.type);
       const pattern = shouldUseTextures ? createTexturePattern(context, textureKey) : null;
+      const isPolygon = hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3;
+      const shouldHidePolygonStroke = isPolygon && !editable;
 
       context.save();
       if (pattern) {
@@ -971,10 +1003,10 @@ export function HoleMapCanvas({
       } else {
         context.fillStyle = style.fill;
       }
-      context.strokeStyle = style.stroke;
-      context.lineWidth = 1.5;
+      context.strokeStyle = shouldHidePolygonStroke ? "transparent" : style.stroke;
+      context.lineWidth = shouldHidePolygonStroke ? 0 : 1.5;
 
-      if (hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3) {
+      if (isPolygon) {
         drawPolygon(context, hazard, yardToPxX, yardToPxY);
       } else {
         drawRectangle(context, hazard, yardToPxX, yardToPxY);
@@ -1375,7 +1407,7 @@ export function HoleMapCanvas({
         onDoubleClick={handleCanvasDoubleClick}
       />
       <div className="pointer-events-none absolute inset-0 flex items-start justify-end gap-2 p-3">
-        {!editable && !isViewportDefault && (
+        {!editable && !isViewportDefault && showViewportResetButton && (
           <button
             type="button"
             onClick={resetViewport}
