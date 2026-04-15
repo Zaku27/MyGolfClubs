@@ -88,6 +88,7 @@ export function RangeSimulationResults({
           <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="font-bold text-green-900">セッション結果:</span>
             <span>平均飛距離: {summary.avg.toFixed(1)} y</span>
+            目標との差:<span className={summary.diff < 0 ? 'text-red-600' : 'text-blue-600'}> {summary.diff > 0 ? '+' : ''}{summary.diff.toFixed(1)} y</span>{/*値がマイナスなら数値の色を赤に。プラスなら青に。プラスなら+符号をつける*/}  
             <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
             <span>目標までの平均距離: {(summary.avgToTargetDistance ?? 0).toFixed(1)} y</span>
           </div>
