@@ -111,7 +111,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const [selectedHoleIndex, setSelectedHoleIndex] = useState(0);
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
   const [polygonCreationMode, setPolygonCreationMode] = useState(false);
-  const [polygonDraftPoints, setPolygonDraftPoints] = useState<any[]>([]);
+  const [polygonDraftPoints, setPolygonDraftPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [distanceInputValue, setDistanceInputValue] = useState<string>(() => holes[0]?.distanceFromTee.toString() ?? "");
   const [showPreview, setShowPreview] = useState(false);
 

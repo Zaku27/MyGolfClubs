@@ -1,11 +1,7 @@
-import * as seedrandomModule from "seedrandom";
+import seedrandom from "seedrandom";
 import { estimateTheoreticalDistance } from "./distanceEstimation";
 import type { GolfClub } from "../types/golf";
 import type { GroundCondition, ShotQuality, ShotQualityMetrics } from "../types/game";
-
-const seedrandom = (((seedrandomModule as unknown as { default?: typeof seedrandomModule }).default ?? seedrandomModule) as unknown) as (
-  seed?: string
-) => () => number;
 
 export type ClubData = Pick<
   GolfClub,

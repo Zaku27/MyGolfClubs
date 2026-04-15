@@ -44,7 +44,19 @@ import { RangeClubSelectionPanel } from '../components/RangeClubSelectionPanel';
 import { RangeSimulationResults } from '../components/RangeSimulationResults';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
 import type { LieType, ShotQuality, ShotResult } from '../types/game';
+import { type SimClub } from '../types/game';
 import type { GolfClub } from '../types/golf';
+
+type SimulationOptions = {
+  personalData?: any;
+  playerSkillLevel?: number;
+  headSpeed?: number;
+  aimXOffset?: number;
+  shotPowerPercent?: number;
+  shotIndex?: number;
+  seedNonce?: string;
+  useStoredDistance?: boolean;
+};
 import {
   convertMpsToMph,
   formatWindDirectionLabel,
@@ -729,7 +741,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
     [simClub, seatType, clubPersonal, personalSkillLevel, analysisPenaltyByClubId]
   );
 
-  const createSimulationContext = useMemo(() => (club: any) => ({
+  const createSimulationContext = useMemo(() => (club: SimClub) => ({
     lie: gameLie,
     windDirectionDegrees: windDirection,
     // Range  UI input is m/s, but internal calculations use mph for compatibility.
@@ -757,7 +769,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
       const context = createSimulationContext(simClub);
 
       let clubForSim = simClub;
-      let options: any;
+      let options: SimulationOptions;
       if (seatType === 'robot') {
         clubForSim = { ...simClub, successRate: 100 };
         options = {

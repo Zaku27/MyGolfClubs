@@ -269,7 +269,6 @@ export const ClubList: React.FC<ClubListProps> = ({
                 club={club}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                viewMode="compact"
                 activeBagName={activeBagName}
                 isInActiveBag={club.id != null && activeBagClubIdSet.has(club.id)}
                 isActiveBagFull={activeBagClubCount >= activeBagLimit}

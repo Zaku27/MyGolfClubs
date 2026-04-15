@@ -193,7 +193,7 @@ export function ShotDispersionChart({
       yMin: confidenceEllipse.y - confidenceEllipse.height / 2,
       yMax: confidenceEllipse.y + confidenceEllipse.height / 2,
       rotation: confidenceEllipse.rotation ?? 0,
-      backgroundColor: (context: any) => {
+      backgroundColor: (context: { chart: any; scales?: { x?: any; y?: any } }) => {
         const chart = context?.chart;
         const xScale = chart?.scales?.x;
         const yScale = chart?.scales?.y;

@@ -10,6 +10,7 @@ import { useUIState } from './hooks/useUIState';
 import { useClubActions } from './hooks/useClubActions';
 import { useClubStore, selectActiveGolfBag } from './store/clubStore';
 import { getAnalysisClubKey } from './utils/clubUtils';
+import type { GolfClub } from './types/golf';
 import './App.css';
 
 function App() {
@@ -111,11 +112,11 @@ function App() {
     }
   };
 
-  const handleToggleActiveBagMembership = async (club: any) => {
+  const handleToggleActiveBagMembership = async (club: GolfClub) => {
     await clubActions.handleToggleActiveBagMembership(club);
   };
 
-  const handleFormSubmit = async (clubData: any) => {
+  const handleFormSubmit = async (clubData: Partial<GolfClub>) => {
     await clubActions.handleFormSubmit(clubData, uiState.editingClub);
   };
 
@@ -148,7 +149,7 @@ function App() {
     uiState.handleShowForm();
   };
 
-  const handleEditClub = (club: any) => {
+  const handleEditClub = (club: GolfClub) => {
     uiState.handleShowFormWithClub(club);
   };
 
