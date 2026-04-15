@@ -53,7 +53,7 @@ export function RangeClubSelectionPanel({
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
               <span className="font-bold">{selectedClub.name}</span>
               <span>
-                {seatType === 'personal'
+                {seatType === 'personal' || seatType === 'actual'
                   ? `実測飛距離: ${selectedClub?.distance != null ? selectedClub.distance.toFixed(1) : '-'} y`
                   : `推定飛距離: ${simClub ? estimatedClubDistance.toFixed(1) : '-'} y`}
               </span>

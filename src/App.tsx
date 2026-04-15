@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import type { AccessoryItem, GolfClub } from './types/golf';
 import {
   DEFAULT_USER_LIE_ANGLE_STANDARDS,
@@ -18,6 +19,8 @@ import {
   writeStoredJson,
   writeStoredValue,
 } from './utils/storage';
+import { APP } from './constants/app';
+import { Header } from './components/Header';
 import { AppDialogs } from './components/AppDialogs';
 import { AppMainContent } from './components/AppMainContent';
 import {
@@ -616,6 +619,19 @@ function App() {
 
   return (
     <>
+      <Helmet>
+        <title>{`${APP.short} - ${APP.name}`}</title>
+        <meta name="description" content={APP.tagline} />
+        <meta property="og:title" content={`${APP.short} - ${APP.name}`} />
+        <meta property="og:description" content={APP.tagline} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={`${APP.short} - ${APP.name}`} />
+        <meta name="twitter:description" content={APP.tagline} />
+      </Helmet>
+      
+      <Header />
+      
       <AppDialogs
         error={error}
         showImagePropagationConfirm={showImagePropagationConfirm}

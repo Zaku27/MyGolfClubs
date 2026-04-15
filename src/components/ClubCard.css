@@ -218,13 +218,13 @@
   color: var(--text);
   flex: 1;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
 .club-image-icon {
-  width: 45px;
-  height: 45px;
+  width: 55px;
+  height: 55px;
   border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;

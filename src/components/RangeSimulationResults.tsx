@@ -3,6 +3,7 @@ import type { MonteCarloResult } from '../utils/landingPosition';
 import type { ShotResult } from '../types/game';
 import type { GroundHardness } from '../utils/rangeUtils';
 import { qualityLabel } from '../utils/rangeUtils';
+import { useMemo } from 'react';
 
 type RangeSimulationResultsProps = {
   results: ShotResult[];
@@ -81,6 +82,25 @@ export function RangeSimulationResults({
   slopeAngle,
   slopeDirection,
 }: RangeSimulationResultsProps) {
+  // Memoize calculations to improve performance
+  const memoizedResults = useMemo(() => {
+    return results.map((r, i) => {
+      const finalX = r.landing?.finalX ?? 0;
+      const finalY = r.landing?.finalY ?? 0;
+      const targetY = chartTarget.y;
+      const distanceToTarget = targetY > 0
+        ? Math.sqrt(finalX * finalX + Math.pow(finalY - targetY, 2))
+        : null;
+      
+      return {
+        ...r,
+        distanceToTarget,
+        groundImpact: summary ? formatGroundHardnessImpact(summary.appliedGroundHardness, r.landing?.roll) : '-',
+        slopeImpact: formatSlopeImpact(r.landing, flatBaselineResults[i]?.landing)
+      };
+    });
+  }, [results, chartTarget.y, summary?.appliedGroundHardness, flatBaselineResults]);
+
   return (
     <>
       {results.length > 0 && summary && (
@@ -110,20 +130,20 @@ export function RangeSimulationResults({
               <thead>
                 <tr className="bg-green-100">
                   <th className="px-1 py-0.5">#</th>
-                  <th className="px-1 py-0.5">Distance</th>
-                  <th className="px-1 py-0.5">Carry</th>
-                  <th className="px-1 py-0.5">Roll</th>
-                  <th className="px-1 py-0.5">Lateral</th>
-                  <th className="px-1 py-0.5">Distance to Target</th>
-                  <th className="px-1 py-0.5">Ground Impact</th>
-                  <th className="px-1 py-0.5">Slope Impact</th>
-                  <th className="px-1 py-0.5">Landing X</th>
-                  <th className="px-1 py-0.5">Landing Y</th>
-                  <th className="px-1 py-0.5">Shot Quality</th>
+                  <th className="px-1 py-0.5">飛距離</th>
+                  <th className="px-1 py-0.5">キャリー</th>
+                  <th className="px-1 py-0.5">ラン</th>
+                  <th className="px-1 py-0.5">左右偏差</th>
+                  <th className="px-1 py-0.5">目標までの距離</th>
+                  <th className="px-1 py-0.5">地面影響</th>
+                  <th className="px-1 py-0.5">傾斜影響</th>
+                  <th className="px-1 py-0.5">着地点 X</th>
+                  <th className="px-1 py-0.5">着地点 Y</th>
+                  <th className="px-1 py-0.5">ショット品質</th>
                 </tr>
               </thead>
               <tbody>
-                {results.map((r, i) => (
+                {memoizedResults.map((r, i) => (
                   <tr key={i} className="border-b last:border-0">
                     <td className="px-1 py-0.5 text-center">{i + 1}</td>
                     <td className="px-1 py-0.5 text-center">{(r.landing?.totalDistance ?? r.distanceHit).toFixed(1)}</td>
@@ -131,17 +151,10 @@ export function RangeSimulationResults({
                     <td className="px-1 py-0.5 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
                     <td className="px-1 py-0.5 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
                     <td className="px-1 py-0.5 text-center">
-                      {(() => {
-                        const finalX = r.landing?.finalX ?? 0;
-                        const finalY = r.landing?.finalY ?? 0;
-                        const targetY = chartTarget.y;
-                        return targetY > 0
-                          ? Math.sqrt(finalX * finalX + Math.pow(finalY - targetY, 2)).toFixed(1)
-                          : '-';
-                      })()}
+                      {r.distanceToTarget?.toFixed(1) ?? '-'}
                     </td>
-                    <td className="px-1 py-0.5 text-center">{formatGroundHardnessImpact(summary.appliedGroundHardness, r.landing?.roll)}</td>
-                    <td className="px-1 py-0.5 text-center">{formatSlopeImpact(r.landing, flatBaselineResults[i]?.landing)}</td>
+                    <td className="px-1 py-0.5 text-center">{r.groundImpact}</td>
+                    <td className="px-1 py-0.5 text-center">{r.slopeImpact}</td>
                     <td className="px-1 py-0.5 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
                     <td className="px-1 py-0.5 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
                     <td className={`px-1 py-0.5 text-center font-bold ${qualityStatusColor(r.shotQuality)}`}>{qualityLabel(r.shotQuality)}</td>

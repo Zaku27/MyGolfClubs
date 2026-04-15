@@ -120,8 +120,8 @@ export const ClubList: React.FC<ClubListProps> = ({
     <div className="club-list-container">
       <div className="club-list-header">
         <h1 className="club-list-title">
-          <span className="title-main">My Golf Clubs</span>
-          <span className="title-sub">- マイクラブを簡単管理＆上達サポート -</span>
+          <span className="title-main">My Golf Room</span>
+          <span className="title-sub">- ゴルフギアを簡単管理＆上達サポート -</span>
         </h1>
         <div className="club-list-header-meta">
           {filteredCountLabel && (
