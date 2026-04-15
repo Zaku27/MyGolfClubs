@@ -30,7 +30,7 @@ export function RangeClubSelectionPanel({
 }: RangeClubSelectionPanelProps) {
   return (
     <div className="w-full bg-white rounded shadow p-4">
-      <label className="block font-semibold mb-2">Club Selection</label>
+      <label className="block font-semibold mb-2">クラブ選択</label>
       {clubs.length === 0 ? (
         <div className="text-red-600 font-bold py-2">
           No clubs registered.<br />Please add clubs in the club management screen.
@@ -55,7 +55,7 @@ export function RangeClubSelectionPanel({
               <span>
                 {seatType === 'personal'
                   ? `Measured Distance: ${selectedClub?.distance ?? '-'} y`
-                  : `Estimated Distance: ${simClub ? estimatedClubDistance : '-'} y`}
+                  : `推定飛距離: ${simClub ? estimatedClubDistance : '-'} y`}
               </span>
               {seatType !== 'actual' && (
                 <div className="relative inline-flex items-center gap-2 whitespace-nowrap">

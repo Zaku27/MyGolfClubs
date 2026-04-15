@@ -1,7 +1,7 @@
 import type { GolfClub, ClubPersonalData } from '../types/golf';
 
 /**
- * Adjusts weaknessFactor based on session results.
+ * Adjusts weaknessFactor based on セッション結果.
  */
 export function rangeAutoCalibrate(
   _club: GolfClub,

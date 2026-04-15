@@ -86,10 +86,10 @@ export function RangeSimulationResults({
       {results.length > 0 && summary && (
         <div className="w-full bg-white rounded shadow p-4 mb-4">
           <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="font-bold text-green-900">Session Results:</span>
-            <span>Average: {summary.avg.toFixed(1)} y</span>
-            <span>Success Rate: {(summary.success * 100).toFixed(1)}%</span>
-            <span>Avg Distance to Target: {(summary.avgToTargetDistance ?? 0).toFixed(1)} y</span>
+            <span className="font-bold text-green-900">セッション結果:</span>
+            <span>平均飛距離: {summary.avg.toFixed(1)} y</span>
+            <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
+            <span>目標までの平均距離: {(summary.avgToTargetDistance ?? 0).toFixed(1)} y</span>
           </div>
           <div className="mb-4 rounded border border-green-200 bg-green-50/40 p-2">
             <ShotDispersionChart
@@ -106,8 +106,8 @@ export function RangeSimulationResults({
           </div>
           {summary.estimatedDist && (
             <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-              <span className="font-semibold">Comparison with Estimated Distance:</span>
-              <span>Estimated: {summary.estimatedDist} y / Actual Average: {summary.avg.toFixed(1)} y</span>
+              <span className="font-semibold">推定飛距離との比較:</span>
+              <span>推定飛距離: {summary.estimatedDist} y / 実績平均: {summary.avg.toFixed(1)} y</span>
               <span className={summary.diff > 0 ? 'text-red-600 font-bold' : summary.diff < 0 ? 'text-blue-600 font-bold' : ''}>
                 {summary.diff > 0 ? ` (+${summary.diff}y)` : summary.diff < 0 ? ` (${summary.diff}y)` : ' (Match)'}
               </span>
