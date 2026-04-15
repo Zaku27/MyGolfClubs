@@ -104,15 +104,6 @@ export function RangeSimulationResults({
               slopeDirection={slopeDirection}
             />
           </div>
-          {summary.estimatedDist && (
-            <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-              <span className="font-semibold">推定飛距離との比較:</span>
-              <span>推定飛距離: {summary.estimatedDist} y / 実績平均: {summary.avg.toFixed(1)} y</span>
-              <span className={summary.diff > 0 ? 'text-red-600 font-bold' : summary.diff < 0 ? 'text-blue-600 font-bold' : ''}>
-                {summary.diff > 0 ? ` (+${summary.diff}y)` : summary.diff < 0 ? ` (${summary.diff}y)` : ' (Match)'}
-              </span>
-            </div>
-          )}
           <div className="overflow-x-auto">
             <table className="min-w-full text-xs">
               <thead>

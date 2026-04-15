@@ -54,16 +54,16 @@ export function RangeClubSelectionPanel({
               <span className="font-bold">{selectedClub.name}</span>
               <span>
                 {seatType === 'personal'
-                  ? `Measured Distance: ${selectedClub?.distance ?? '-'} y`
+                  ? `実測飛距離: ${selectedClub?.distance ?? '-'} y`
                   : `推定飛距離: ${simClub ? estimatedClubDistance : '-'} y`}
               </span>
               {seatType !== 'actual' && (
                 <div className="relative inline-flex items-center gap-2 whitespace-nowrap">
                   <span>
-                    Club Success Rate: {
+                    クラブ成功率: {
                       simClub ? (
                         seatType === 'robot'
-                          ? '100% (Robot Fixed)'
+                          ? '100% (ロボット固定)'
                           : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
                       ) : '--'
                     }
@@ -71,12 +71,12 @@ export function RangeClubSelectionPanel({
                   {seatType === 'robot' && (
                     <button
                       type="button"
-                      aria-label="Robot seat club success rate hint"
+                      aria-label="Robot seat クラブ成功率 hint"
                       className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-300 bg-blue-100 text-xs font-bold text-blue-700"
                     >
                       ?
                       <span className="help-tooltip-text whitespace-normal">
-                        Robot seat is not affected by club individual differences or personal data, so club success rate is always fixed at 100%.
+                        Robot seat is not affected by club individual differences or personal data, so クラブ成功率 is always fixed at 100%.
                       </span>
                     </button>
                   )}
