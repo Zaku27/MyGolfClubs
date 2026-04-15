@@ -9,6 +9,12 @@ import {
 import type { ShotResult } from '../types/game';
 import type { GolfClub } from '../types/golf';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
+import {
+  loadRangeConditionSettings,
+  saveRangeConditionSettings,
+  type RangeConditionSettings,
+  type GroundHardness,
+} from '../utils/rangeUtils';
 
 // Temporary functions until they're moved to utils
 function buildMonteCarloResult(rawResults: ShotResult[]): MonteCarloResult {
@@ -76,6 +82,7 @@ function getSelectableRangeClubs(
 export function useRangeState(allClubs: GolfClub[], activeBagClubs: GolfClub[]) {
   const storedPlayerSkillLevel = useClubStore((state) => state.playerSkillLevel);
   const initialRangePlayerSettings = loadRangePlayerSettings();
+  const initialRangeConditionSettings = loadRangeConditionSettings();
 
   // Player settings
   const [selectedClubId, setSelectedClubId] = useState<string>('');
@@ -83,6 +90,16 @@ export function useRangeState(allClubs: GolfClub[], activeBagClubs: GolfClub[]) 
   const [robotHeadSpeed, setRobotHeadSpeed] = useState<number>(initialRangePlayerSettings.robotHeadSpeed);
   const [robotSkillLevel, setRobotSkillLevel] = useState<number>(initialRangePlayerSettings.robotSkillLevel);
   const [reuseLastSeed, setReuseLastSeed] = useState(initialRangePlayerSettings.reuseLastSeed);
+
+  // Course condition settings
+  const [lie, setLie] = useState<string>(initialRangeConditionSettings.lie);
+  const [windDirection, setWindDirection] = useState<number>(initialRangeConditionSettings.windDirection);
+  const [windSpeed, setWindSpeed] = useState<number>(initialRangeConditionSettings.windSpeed);
+  const [groundHardness, setGroundHardness] = useState<GroundHardness>(initialRangeConditionSettings.groundHardness);
+  const [slopeAngle, setSlopeAngle] = useState<number>(initialRangeConditionSettings.slopeAngle);
+  const [slopeDirection, setSlopeDirection] = useState<number>(initialRangeConditionSettings.slopeDirection);
+  const [isWindControlOpen, setIsWindControlOpen] = useState<boolean>(false);
+  const [isCourseConditionOpen, setIsCourseConditionOpen] = useState<boolean>(false);
 
   // Simulation settings
   const [numShots, setNumShots] = useState<number>(10);
@@ -94,7 +111,7 @@ export function useRangeState(allClubs: GolfClub[], activeBagClubs: GolfClub[]) 
   // Results
   const [results, setResults] = useState<ShotResult[]>([]);
   const [flatBaselineResults, setFlatBaselineResults] = useState<ShotResult[]>([]);
-  const [summary, setSummary] = useState<RangeSummary | null>(null);
+  const [summary, setSummary] = useState<any>(null);
 
   // Computed values
   const monteCarloResult = useMemo(() => buildMonteCarloResult(results), [results]);
@@ -108,7 +125,7 @@ export function useRangeState(allClubs: GolfClub[], activeBagClubs: GolfClub[]) 
   const selectableClubs = useMemo(() => getSelectableRangeClubs(clubs, seatType), [clubs, seatType]);
 
   // Save settings when they change
-  const saveSettings = useCallback(() => {
+  const savePlayerSettings = useCallback(() => {
     saveRangePlayerSettings({
       seatType,
       robotHeadSpeed,
@@ -117,8 +134,19 @@ export function useRangeState(allClubs: GolfClub[], activeBagClubs: GolfClub[]) 
     });
   }, [seatType, robotHeadSpeed, robotSkillLevel, reuseLastSeed]);
 
+  const saveCourseSettings = useCallback(() => {
+    saveRangeConditionSettings({
+      lie,
+      windDirection,
+      windSpeed,
+      groundHardness,
+      slopeAngle,
+      slopeDirection,
+    });
+  }, [lie, windDirection, windSpeed, groundHardness, slopeAngle, slopeDirection]);
+
   return {
-    // State
+    // Player settings
     selectedClubId,
     setSelectedClubId,
     seatType,
@@ -129,6 +157,28 @@ export function useRangeState(allClubs: GolfClub[], activeBagClubs: GolfClub[]) 
     setRobotSkillLevel,
     reuseLastSeed,
     setReuseLastSeed,
+    savePlayerSettings,
+
+    // Course condition settings
+    lie,
+    setLie,
+    windDirection,
+    setWindDirection,
+    windSpeed,
+    setWindSpeed,
+    groundHardness,
+    setGroundHardness,
+    slopeAngle,
+    setSlopeAngle,
+    slopeDirection,
+    setSlopeDirection,
+    isWindControlOpen,
+    setIsWindControlOpen,
+    isCourseConditionOpen,
+    setIsCourseConditionOpen,
+    saveCourseSettings,
+
+    // Simulation settings
     numShots,
     setNumShots,
     aimXOffset,
@@ -156,8 +206,5 @@ export function useRangeState(allClubs: GolfClub[], activeBagClubs: GolfClub[]) 
     displayedSkillLevelName,
     clubs,
     selectableClubs,
-
-    // Actions
-    saveSettings,
   };
 }

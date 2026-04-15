@@ -42,7 +42,7 @@ export function RangeClubSelectionPanel({
             value={selectedClubId}
             onChange={(e) => onSelectedClubIdChange(e.target.value)}
           >
-            <option value="">-- Select Club --</option>
+            <option value="">-- クラブを選択 --</option>
             {selectableClubs.map((club) => (
               <option key={club.id} value={club.id}>
                 {formatGolfClubDisplayName(club)}

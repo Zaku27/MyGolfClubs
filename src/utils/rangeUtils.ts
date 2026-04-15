@@ -88,6 +88,59 @@ export type RangeConditionSettings = {
   slopeDirection: number;
 };
 
+const RANGE_CONDITION_SETTINGS_KEY = 'rangeConditionSettings';
+
+export function loadRangeConditionSettings(): RangeConditionSettings {
+  if (typeof window === 'undefined') {
+    return {
+      lie: 'Tee',
+      windDirection: 180,
+      windSpeed: 0,
+      groundHardness: 'medium',
+      slopeAngle: 0,
+      slopeDirection: 0,
+    };
+  }
+
+  const stored = localStorage.getItem(RANGE_CONDITION_SETTINGS_KEY);
+  if (!stored) {
+    return {
+      lie: 'Tee',
+      windDirection: 180,
+      windSpeed: 0,
+      groundHardness: 'medium',
+      slopeAngle: 0,
+      slopeDirection: 0,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    return {
+      lie: parsed.lie ?? 'Tee',
+      windDirection: parsed.windDirection ?? 180,
+      windSpeed: parsed.windSpeed ?? 0,
+      groundHardness: parsed.groundHardness ?? 'medium',
+      slopeAngle: parsed.slopeAngle ?? 0,
+      slopeDirection: parsed.slopeDirection ?? 0,
+    };
+  } catch {
+    return {
+      lie: 'Tee',
+      windDirection: 180,
+      windSpeed: 0,
+      groundHardness: 'medium',
+      slopeAngle: 0,
+      slopeDirection: 0,
+    };
+  }
+}
+
+export function saveRangeConditionSettings(settings: RangeConditionSettings): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(RANGE_CONDITION_SETTINGS_KEY, JSON.stringify(settings));
+}
+
 export type AnalysisPenalty = {
   points: number;
   reasons: string[];
