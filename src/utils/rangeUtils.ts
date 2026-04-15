@@ -21,3 +21,74 @@ export function rangeAutoCalibrate(
     weaknessFactor: Number(newWeak.toFixed(2)),
   };
 }
+
+// RangeScreen utility functions
+export const LIE_OPTIONS = [
+  'Tee',
+  'Fairway',
+  'Semi Rough',
+  'Rough',
+  'Bare Ground',
+  'Bunker',
+];
+
+export const SHOT_COUNTS = [5, 10, 20, 40];
+
+export function qualityLabel(q: string): string {
+  switch (q) {
+    case "excellent": return "Excellent";
+    case "good": return "Good";
+    case "average": return "Average";
+    case "misshot": return "Misshot";
+    case "poor": return "Poor";
+    default: return q;
+  }
+}
+
+export function getLiePenaltyInfo(lie: string, clubType: string): string {
+  switch (lie) {
+    case 'Tee':
+      return 'Standard lie with minimal distance impact.';
+    case 'Fairway':
+      return 'Nearly normal lie with minimal distance loss.';
+    case 'Semi Rough':
+      return 'Distance reduced by ~10% with slightly decreased directional stability.';
+    case 'Rough':
+      return 'Distance reduced by ~18% with increased shot instability.';
+    case 'Bare Ground':
+      return 'Distance reduced by ~40% with very difficult lie conditions.';
+    case 'Bunker':
+      return clubType === 'Wedge'
+        ? 'Wedge: ~30% distance reduction. Other clubs: ~50% reduction. Sand affects direction.'
+        : '~50% distance reduction. Sand causes directional instability.';
+    case 'Green':
+      return 'Putting lie. Distance correction depends on putting stroke.';
+    default:
+      return 'No penalty information available for selected lie.';
+  }
+}
+
+export function clampAimXOffset(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-50, Math.min(50, Math.round(value)));
+}
+
+export type GroundHardness = "soft" | "medium" | "firm";
+
+export function formatGroundHardnessLabel(groundHardness: GroundHardness): string {
+  return groundHardness === 'soft' ? 'Soft' : groundHardness === 'firm' ? 'Firm' : 'Normal';
+}
+
+export type RangeConditionSettings = {
+  lie: string;
+  windDirection: number;
+  windSpeed: number;
+  groundHardness: GroundHardness;
+  slopeAngle: number;
+  slopeDirection: number;
+};
+
+export type AnalysisPenalty = {
+  points: number;
+  reasons: string[];
+};

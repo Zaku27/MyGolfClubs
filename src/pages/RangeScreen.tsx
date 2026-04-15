@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { classifyShotQualityByTargetError } from '../utils/landingPosition';
 import { GolfBagPanel } from '../components/GolfBagPanel';
@@ -9,7 +9,7 @@ import {
   useClubStore,
 } from '../store/clubStore';
 import { useBagIdUrlSync } from '../hooks/useBagIdUrlSync';
-import { formatGolfClubDisplayName, formatSimClubLabel } from '../utils/simClubLabel';
+import { formatSimClubLabel } from '../utils/simClubLabel';
 import {
   simulateShot,
   estimateBaseDistance,
@@ -38,70 +38,31 @@ import {
   saveRangePlayerSettings,
   type RangeSeatType,
 } from '../utils/rangePlayerSettings';
-import ShotDispersionChart from '../components/ShotDispersionChart';
 import { ShotControlPanel } from '../components/ShotControlPanel';
 import WindDirectionDial from '../components/WindDirectionDial';
+import { RangeClubSelectionPanel } from '../components/RangeClubSelectionPanel';
+import { RangeSimulationResults } from '../components/RangeSimulationResults';
 import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
-import type { LieType, ShotQuality, ShotResult, SimClub } from '../types/game';
-import type { GolfClub, ClubPersonalData } from '../types/golf';
+import type { LieType, ShotQuality, ShotResult } from '../types/game';
+import type { GolfClub } from '../types/golf';
 import {
   convertMpsToMph,
   formatWindDirectionLabel,
   normalizeWindDirection,
   normalizeWindSpeedMps,
 } from '../utils/windDirection';
+import {
+  LIE_OPTIONS,
+  SHOT_COUNTS,
+  getLiePenaltyInfo,
+  clampAimXOffset,
+  formatGroundHardnessLabel,
+  type GroundHardness,
+  type RangeConditionSettings,
+  type AnalysisPenalty,
+} from '../utils/rangeUtils';
 
 const EMPTY_ACTUAL_SHOT_ROWS: Array<Record<string, string>> = [];
-
-// ショット品質の英語ラベル関数
-function qualityLabel(q: string) {
-  switch (q) {
-    case "excellent": return "Excellent";
-    case "good": return "Good";
-    case "average": return "Average";
-    case "misshot": return "Misshot";
-    case "poor": return "Poor";
-    default: return q;
-  }
-}
-const LIE_OPTIONS = [
-  'ティー',
-  'フェアウェイ',
-  'セミラフ',
-  'ラフ',
-  'ベアグラウンド',
-  'バンカー',
-];
-
-function getLiePenaltyInfo(lie: string, clubType: string): string {
-  switch (lie) {
-    case 'ティー':
-      return '標準的なライです。飛距離の影響はほとんどありません。';
-    case 'フェアウェイ':
-      return 'ほぼ通常のライです。飛距離はほとんど落ちません。';
-    case 'セミラフ':
-      return '飛距離は約10%減少し、方向の安定性もやや低下します。';
-    case 'ラフ':
-      return '飛距離は約18%減少し、ショットが不安定になります。';
-    case 'ベアグラウンド':
-      return '飛距離は約40%減少し、非常に打ちにくいライです。';
-    case 'バンカー':
-      return clubType === 'Wedge'
-        ? 'ウェッジでは飛距離約30%減、その他番手では約50%減。砂では方向も乱れやすいです。'
-        : '飛距離は約50%減。砂地では方向も不安定になります。';
-    case 'グリーン':
-      return 'パター用のライです。飛距離補正はパット動作によります。';
-    default:
-      return '選択したライのペナルティ情報はありません。';
-  }
-}
-
-const SHOT_COUNTS = [5, 10, 20, 40];
-
-function clampAimXOffset(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(-50, Math.min(50, Math.round(value)));
-}
 
 const RANGE_CONDITION_SETTINGS_KEY = 'rangeConditionSettings';
 const SWING_TARGET_STORAGE_KEY = 'golfbag-swing-weight-target';
@@ -111,26 +72,6 @@ const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
 const DEFAULT_SWING_TARGET = 2.0;
 const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
 const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
-
-type GroundHardness = "soft" | "medium" | "firm";
-
-function formatGroundHardnessLabel(groundHardness: GroundHardness): string {
-  return groundHardness === 'soft' ? '柔らかい' : groundHardness === 'firm' ? '硬い' : '普通';
-}
-
-type RangeConditionSettings = {
-  lie: string;
-  windDirection: number;
-  windSpeed: number;
-  groundHardness: GroundHardness;
-  slopeAngle: number;
-  slopeDirection: number;
-};
-
-type AnalysisPenalty = {
-  points: number;
-  reasons: string[];
-};
 
 function toCanonicalSlopeSettings(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
   const safeAngle = Number.isFinite(slopeAngle) ? slopeAngle : 0;
@@ -236,14 +177,6 @@ function parseUserLieAngleStandards(value: unknown): UserLieAngleStandards {
   };
 }
 
-const qualityStatusColor = (shotQuality: string) => {
-  if (shotQuality === 'excellent') return 'text-blue-700';
-  if (shotQuality === 'good') return 'text-green-700';
-  if (shotQuality === 'average') return 'text-amber-600';
-  if (shotQuality === 'misshot') return 'text-fuchsia-600';
-  if (shotQuality === 'poor') return 'text-pink-600';
-  return 'text-gray-700';
-};
 
 type RangeSummary = {
   avg: number;
@@ -258,19 +191,6 @@ type RangeSummary = {
   groundLateralContribution: string;
   appliedGroundHardness: GroundHardness;
 };
-
-function formatGroundHardnessImpact(groundHardness: GroundHardness, roll: number | undefined): string {
-  if (roll == null || !Number.isFinite(roll)) return '-';
-
-  const hardnessValue = groundHardness === 'firm' ? 90 : groundHardness === 'soft' ? 60 : 75;
-  const currentFactor = 0.8 + (hardnessValue / 100) * 0.4;
-  const mediumFactor = 0.8 + (75 / 100) * 0.4;
-  const baseline = roll * (mediumFactor / currentFactor);
-  const delta = roll - baseline;
-  const deltaLabel = delta === 0 ? '0.0y' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}y`;
-
-  return `ラン ${deltaLabel}`;
-}
 
 function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number): { slopeAngle: number; slopeDirection: number } {
   return toCanonicalSlopeSettings(slopeAngle, slopeDirection);
@@ -309,19 +229,6 @@ function formatSlopeEffectGuide(slopeAngle: number, slopeDirection: number): str
   return `${normalizedSlope.slopeAngle}° / ${directionLabel}: ${effect}`;
 }
 
-function formatSlopeImpact(
-  landing: ShotResult['landing'] | undefined,
-  baselineLanding: ShotResult['landing'] | undefined,
-): string {
-  if (!landing || !baselineLanding) return '-';
-
-  const carryDiff = (landing.carry ?? 0) - (baselineLanding.carry ?? 0);
-  const rollDiff = (landing.roll ?? 0) - (baselineLanding.roll ?? 0);
-  const finalXDiff = (landing.finalX ?? 0) - (baselineLanding.finalX ?? 0);
-  const fmt = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}y`;
-
-  return `C ${fmt(carryDiff)} / R ${fmt(rollDiff)} / X ${fmt(finalXDiff)}`;
-}
 
 function mapLieUiToGameLie(lie: string): LieType {
   switch (lie) {
@@ -423,204 +330,6 @@ function getSelectableRangeClubs(
   });
 }
 
-type RangeClubSelectionPanelProps = {
-  clubs: GolfClub[];
-  selectableClubs: GolfClub[];
-  selectedClubId: string;
-  onSelectedClubIdChange: (value: string) => void;
-  selectedClub?: GolfClub | null;
-  simClub?: SimClub;
-  estimatedClubDistance: number;
-  seatType: RangeSeatType;
-  clubPersonal?: ClubPersonalData | undefined;
-  effectiveSuccess: number | null;
-};
-
-function RangeClubSelectionPanel({
-  clubs,
-  selectableClubs,
-  selectedClubId,
-  onSelectedClubIdChange,
-  selectedClub,
-  simClub,
-  estimatedClubDistance,
-  seatType,
-  clubPersonal,
-  effectiveSuccess,
-}: RangeClubSelectionPanelProps) {
-  return (
-    <div className="w-full bg-white rounded shadow p-4">
-      <label className="block font-semibold mb-2">クラブ選択</label>
-      {clubs.length === 0 ? (
-        <div className="text-red-600 font-bold py-2">
-          クラブが登録されていません。<br />クラブ管理画面でクラブを追加してください。
-        </div>
-      ) : (
-        <>
-          <select
-            className="w-full border rounded p-2 mb-2"
-            value={selectedClubId}
-            onChange={(e) => onSelectedClubIdChange(e.target.value)}
-          >
-            <option value="">-- クラブを選択 --</option>
-            {selectableClubs.map((club) => (
-              <option key={club.id} value={club.id}>
-                {formatGolfClubDisplayName(club)}
-              </option>
-            ))}
-          </select>
-          {selectedClub && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-green-900 text-sm">
-              <span className="font-bold">{selectedClub.name}</span>
-              <span>
-                {seatType === 'personal'
-                  ? `実測飛距離: ${selectedClub?.distance ?? '-'} y`
-                  : `推定飛距離: ${simClub ? estimatedClubDistance : '-'} y`}
-              </span>
-              {seatType !== 'actual' && (
-                <div className="relative inline-flex items-center gap-2 whitespace-nowrap">
-                  <span>
-                    クラブ成功率: {
-                      simClub ? (
-                        seatType === 'robot'
-                          ? '100% (ロボット固定)'
-                          : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
-                      ) : '--'
-                    }
-                  </span>
-                  {seatType === 'robot' && (
-                    <button
-                      type="button"
-                      aria-label="ロボット打席のクラブ成功率ヒント"
-                      className="help-tooltip inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-300 bg-blue-100 text-xs font-bold text-blue-700"
-                    >
-                      ?
-                      <span className="help-tooltip-text whitespace-normal">
-                        ロボット打席はクラブの個体差や個人データの影響を受けないため、クラブ成功率は常に100%で固定されます。
-                      </span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-type RangeSimulationResultsProps = {
-  results: ShotResult[];
-  summary: RangeSummary | null;
-  flatBaselineResults: ShotResult[];
-  chartTarget: { x: number; y: number };
-  chartAim?: { x: number; y: number };
-  monteCarloResult: MonteCarloResult;
-  clubName: string;
-  skillLevelName: string;
-  numShots: number;
-  groundHardness: GroundHardness;
-  slopeAngle: number;
-  slopeDirection: number;
-};
-
-function RangeSimulationResults({
-  results,
-  summary,
-  flatBaselineResults,
-  chartTarget,
-  chartAim,
-  monteCarloResult,
-  clubName,
-  skillLevelName,
-  numShots,
-  groundHardness,
-  slopeAngle,
-  slopeDirection,
-}: RangeSimulationResultsProps) {
-  return (
-    <>
-      {results.length > 0 && summary && (
-        <div className="w-full bg-white rounded shadow p-4 mb-4">
-          <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="font-bold text-green-900">セッション結果：</span>
-            <span>平均: {summary.avg.toFixed(1)} y</span>
-            <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
-            <span>目標まで平均距離: {(summary.avgToTargetDistance ?? 0).toFixed(1)} y</span>
-          </div>
-          <div className="mb-4 rounded border border-green-200 bg-green-50/40 p-2">
-            <ShotDispersionChart
-              monteCarloResult={monteCarloResult}
-              target={chartTarget}
-              aim={chartAim}
-              clubName={clubName}
-              skillLevelName={skillLevelName}
-              numShots={numShots}
-              groundHardness={groundHardness}
-              slopeAngle={slopeAngle}
-              slopeDirection={slopeDirection}
-            />
-          </div>
-          {summary.estimatedDist && (
-            <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-              <span className="font-semibold">推定飛距離との比較：</span>
-              <span>推定: {summary.estimatedDist} y / 実績平均: {summary.avg.toFixed(1)} y</span>
-              <span className={summary.diff > 0 ? 'text-red-600 font-bold' : summary.diff < 0 ? 'text-blue-600 font-bold' : ''}>
-                {summary.diff > 0 ? ` (+${summary.diff}y)` : summary.diff < 0 ? ` (${summary.diff}y)` : ' (一致)'}
-              </span>
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs">
-              <thead>
-                <tr className="bg-green-100">
-                  <th className="px-1 py-0.5">#</th>
-                  <th className="px-1 py-0.5">飛距離</th>
-                  <th className="px-1 py-0.5">キャリー</th>
-                  <th className="px-1 py-0.5">ラン</th>
-                  <th className="px-1 py-0.5">横ブレ</th>
-                  <th className="px-1 py-0.5">目標までの距離</th>
-                  <th className="px-1 py-0.5">地面影響</th>
-                  <th className="px-1 py-0.5">傾斜影響</th>
-                  <th className="px-1 py-0.5">着地X</th>
-                  <th className="px-1 py-0.5">着地Y</th>
-                  <th className="px-1 py-0.5">ショット品質</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="px-1 py-0.5 text-center">{i + 1}</td>
-                    <td className="px-1 py-0.5 text-center">{(r.landing?.totalDistance ?? r.distanceHit).toFixed(1)}</td>
-                    <td className="px-1 py-0.5 text-center">{r.landing?.carry?.toFixed(1) ?? '-'}</td>
-                    <td className="px-1 py-0.5 text-center">{r.landing?.roll?.toFixed(1) ?? '-'}</td>
-                    <td className="px-1 py-0.5 text-center">{r.landing?.lateralDeviation?.toFixed(1) ?? '-'}</td>
-                    <td className="px-1 py-0.5 text-center">
-                      {(() => {
-                        const finalX = r.landing?.finalX ?? 0;
-                        const finalY = r.landing?.finalY ?? 0;
-                        const targetY = chartTarget.y;
-                        return targetY > 0
-                          ? Math.sqrt(finalX * finalX + Math.pow(finalY - targetY, 2)).toFixed(1)
-                          : '-';
-                      })()}
-                    </td>
-                    <td className="px-1 py-0.5 text-center">{formatGroundHardnessImpact(summary.appliedGroundHardness, r.landing?.roll)}</td>
-                    <td className="px-1 py-0.5 text-center">{formatSlopeImpact(r.landing, flatBaselineResults[i]?.landing)}</td>
-                    <td className="px-1 py-0.5 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
-                    <td className="px-1 py-0.5 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
-                    <td className={`px-1 py-0.5 text-center font-bold ${qualityStatusColor(r.shotQuality)}`}>{qualityLabel(r.shotQuality)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
 
 export default function RangeScreen() {
   const allClubs = useClubStore(selectSortedClubsForDisplay);
@@ -670,15 +379,15 @@ export default function RangeScreen() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [reuseLastSeed, setReuseLastSeed] = useState(initialRangePlayerSettings.reuseLastSeed);
   const [lastSimulationSeedNonce, setLastSimulationSeedNonce] = useState<string | null>(null);
-  const monteCarloResult = buildMonteCarloResult(results);
+  const monteCarloResult = useMemo(() => buildMonteCarloResult(results), [results]);
   const personalSkillLevel = storedPlayerSkillLevel;
-  const personalSkillLevelLabel = getSkillLabel(personalSkillLevel);
-  const displayedSkillLevel = seatType === 'robot' ? robotSkillLevel : personalSkillLevel;
-  const displayedSkillLabel = getSkillLabel(displayedSkillLevel);
-  const skillLevelName = `適用スキルレベル ${(displayedSkillLevel * 100).toFixed(0)}% (${displayedSkillLabel})`;
-  const displayedSkillLevelName = seatType === 'actual' ? '' : skillLevelName;
-  const clubs = seatType === 'robot' ? allClubs : activeBagClubs;
-  const selectableClubs = getSelectableRangeClubs(clubs, seatType);
+  const personalSkillLevelLabel = useMemo(() => getSkillLabel(personalSkillLevel), [personalSkillLevel]);
+  const displayedSkillLevel = useMemo(() => seatType === 'robot' ? robotSkillLevel : personalSkillLevel, [seatType, robotSkillLevel, personalSkillLevel]);
+  const displayedSkillLabel = useMemo(() => getSkillLabel(displayedSkillLevel), [displayedSkillLevel]);
+  const skillLevelName = useMemo(() => `適用スキルレベル ${(displayedSkillLevel * 100).toFixed(0)}% (${displayedSkillLabel})`, [displayedSkillLevel, displayedSkillLabel]);
+  const displayedSkillLevelName = useMemo(() => seatType === 'actual' ? '' : skillLevelName, [seatType, skillLevelName]);
+  const clubs = useMemo(() => seatType === 'robot' ? allClubs : activeBagClubs, [seatType, allClubs, activeBagClubs]);
+  const selectableClubs = useMemo(() => getSelectableRangeClubs(clubs, seatType), [clubs, seatType]);
 
   const swingWeightTarget = readStoredNumber(
     SWING_TARGET_STORAGE_KEY,
@@ -706,17 +415,17 @@ export default function RangeScreen() {
     activeBagId: activeBag?.id ?? null,
     setActiveBag,
   });
-  const gameLie = mapLieUiToGameLie(lie);
-  // 既存シミュレーションは mph 前提なので、UI(m/s)から変換して渡す。
-  const windSpeedMph = convertMpsToMph(windSpeed);
-  // 閉じた状態でも現在値が分かるよう、角度+方位ラベルを作って表示する。
-  const windDirectionSummary = formatWindDirectionLabel(windDirection);
+  const gameLie = useMemo(() => mapLieUiToGameLie(lie), [lie]);
+  // Range  UI input is m/s, but internal calculations use mph for compatibility.
+  const windSpeedMph = useMemo(() => convertMpsToMph(windSpeed), [windSpeed]);
+  // Create angle+direction label for display even when closed.
+  const windDirectionSummary = useMemo(() => formatWindDirectionLabel(windDirection), [windDirection]);
 
-  // 風向・風速を初期状態へ戻す。
-  const handleResetWind = () => {
+  // Reset wind direction and speed to initial state.
+  const handleResetWind = useCallback(() => {
     setWindDirection(0);
     setWindSpeed(0);
-  };
+  }, []);
 
   useEffect(() => {
     const initializeScreen = async () => {
@@ -772,16 +481,24 @@ export default function RangeScreen() {
 
 
   // avgDistanceが無い場合はdistanceをavgDistanceとして使う
-  let selectedClub = clubs.find((c) => String(c.id) === String(selectedClubId));
-  const simClub = selectedClub ? toSimClub(selectedClub) : undefined;
-  const estimatedClubDistance = simClub
+  const selectedClub = useMemo(() => 
+    clubs.find((c) => String(c.id) === String(selectedClubId)),
+    [clubs, selectedClubId]
+  );
+  const simClub = useMemo(() => 
+    selectedClub ? toSimClub(selectedClub) : undefined,
+    [selectedClub]
+  );
+  const estimatedClubDistance = useMemo(() => simClub
     ? estimateBaseDistance(
         simClub,
         seatType === 'robot' ? robotHeadSpeed : undefined,
         undefined,
         true,
       )
-    : 0;
+    : 0,
+    [simClub, seatType, robotHeadSpeed]
+  );
   const actualModeResults = useMemo(() => {
     if (seatType !== 'actual' || !selectedClub) {
       return [] as ShotResult[];
@@ -936,7 +653,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
     ? undefined
     : { x: aimXOffset, y: Math.round(targetDistance * shotPowerPercent / 100) };
   const showRangeAimControls = !selectedClub?.clubType || selectedClub.clubType !== 'Putter';
-  const analysisPenaltyByClubId = (() => {
+  const analysisPenaltyByClubId = useMemo(() => {
     const penaltyMap: Record<string, AnalysisPenalty> = {};
 
     const addPenalty = (clubId: string, points: number, reason: string) => {
@@ -994,11 +711,13 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
     }
 
     return penaltyMap;
-  })();
+  }, [clubs, swingWeightTarget, swingGoodTolerance, swingAdjustThreshold, userLieAngleStandards]);
 
-  const clubPersonal: import('../types/golf').ClubPersonalData | undefined =
-    simClub ? resolvePersonalDataForSimClub(simClub, personalData) : undefined;
-  const effectiveSuccess =
+  const clubPersonal = useMemo(() => 
+    simClub ? resolvePersonalDataForSimClub(simClub, personalData) : undefined,
+    [simClub, personalData]
+  );
+  const effectiveSuccess = useMemo(() => 
     simClub && seatType === 'personal'
       ? calculateDisplayClubSuccessRate(
           simClub,
@@ -1006,7 +725,24 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
           personalSkillLevel,
           analysisPenaltyByClubId[simClub.id]?.points ?? 0,
         )
-      : null;
+      : null,
+    [simClub, seatType, clubPersonal, personalSkillLevel, analysisPenaltyByClubId]
+  );
+
+  const createSimulationContext = useMemo(() => (club: any) => ({
+    lie: gameLie,
+    windDirectionDegrees: windDirection,
+    // Range  UI input is m/s, but internal calculations use mph for compatibility.
+    windStrength: windSpeedMph,
+    remainingDistance: club.avgDistance,
+    targetDistance: club.avgDistance,
+    originX: 0,
+    originY: 0,
+    hazards: [],
+    groundHardness: groundHardness === 'soft' ? 60 : groundHardness === 'firm' ? 90 : 75,
+    groundSlopeAngle: slopeAngle,
+    groundSlopeDirection: slopeDirection,
+  }), [gameLie, windDirection, windSpeedMph, groundHardness, slopeAngle, slopeDirection]);
 
   const handleSimulate = async () => {
     if (!simClub) return;
@@ -1018,20 +754,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
       : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     setLastSimulationSeedNonce(simulationSeedNonce);
     for (let i = 0; i < numShots; i++) {
-      const context = {
-        lie: gameLie,
-        windDirectionDegrees: windDirection,
-        // Range 画面の入力は m/s だが、内部計算は互換のため mph を利用する。
-        windStrength: windSpeedMph,
-        remainingDistance: simClub.avgDistance,
-        targetDistance: simClub.avgDistance,
-        originX: 0,
-        originY: 0,
-        hazards: [],
-        groundHardness: groundHardness === 'soft' ? 60 : groundHardness === 'firm' ? 90 : 75,
-        groundSlopeAngle: slopeAngle,
-        groundSlopeDirection: slopeDirection,
-      };
+      const context = createSimulationContext(simClub);
 
       let clubForSim = simClub;
       let options: any;
