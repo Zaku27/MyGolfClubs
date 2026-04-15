@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { AccessoryItem } from '../types/golf';
 import './AccessoryPanel.css';
 
@@ -31,6 +31,7 @@ export const AccessoryPanel = ({
 }: AccessoryPanelProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formState, setFormState] = useState<AccessoryFormState>(initialFormState);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const openAddDialog = () => {
     setFormState(initialFormState);
@@ -55,7 +56,7 @@ export const AccessoryPanel = ({
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
-      setFormState((prev) => ({ ...prev, imageData: '' }));
+      // ファイルが選択されなかった場合は既存の画像を保持
       return;
     }
 
@@ -183,14 +184,44 @@ export const AccessoryPanel = ({
 
               <label className="accessory-label">
                 <span>画像</span>
-                <input type="file" accept="image/*" onChange={handleImageChange} />
-              </label>
-
-              {formState.imageData ? (
-                <div className="accessory-image-preview-wrapper">
-                  <img src={formState.imageData} alt="選択したアクセサリー" className="accessory-image-preview" />
+                <div className="accessory-image-upload-area">
+                  {formState.imageData ? (
+                    <div className="accessory-image-with-controls">
+                      <img src={formState.imageData} alt="選択したアクセサリー" className="accessory-image-preview" />
+                      <div className="accessory-image-controls">
+                        <button
+                          type="button"
+                          className="accessory-change-image-btn"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          画像を変更
+                        </button>
+                        <button
+                          type="button"
+                          className="accessory-remove-image-btn"
+                          onClick={() => setFormState((prev) => ({ ...prev, imageData: '' }))}
+                        >
+                          画像を削除
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="accessory-upload-placeholder">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="accessory-file-input"
+                      />
+                      <div className="accessory-upload-content">
+                        <div className="accessory-upload-icon">📷</div>
+                        <span>画像を選択</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ) : null}
+              </label>
 
               <label className="accessory-label">
                 <span>メモ</span>

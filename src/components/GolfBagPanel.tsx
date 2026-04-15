@@ -44,6 +44,7 @@ export const GolfBagPanel = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeBag = bags.find((bag) => bag.id === activeBagId) ?? bags[0] ?? null;
   const activeImage = activeBag ? (activeBag.imageData?.[0] ?? '/images/GolfBag.png') : undefined;
+  const tooltipText = description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。';
 
   const handleImageClick = () => {
     if (!activeBag || !onAddBagImage) {
@@ -73,20 +74,25 @@ export const GolfBagPanel = ({
       {showImage && (
         <div className="golf-bag-panel-image-column">
           <div className="golf-bag-panel-image-wrapper">
-            <button
-              type="button"
-              className={`golf-bag-panel-image ${activeImage ? 'with-image' : ''}`}
-              onClick={handleImageClick}
-              aria-label={activeImage ? 'バッグ画像を変更' : 'バッグ画像を追加'}
-            >
-              {activeBag ? (
-                <img src={activeImage} alt={`バッグ ${activeBag.name} の画像`} />
-              ) : (
-                <div className="golf-bag-panel-image-placeholder">
-                  <span>画像を追加</span>
-                </div>
-              )}
-            </button>
+            <div className="help-tooltip golf-bag-panel-image-container">
+              <button
+                type="button"
+                className={`golf-bag-panel-image ${activeImage ? 'with-image' : ''}`}
+                onClick={handleImageClick}
+                aria-label={activeImage ? 'バッグ画像を変更' : 'バッグ画像を追加'}
+              >
+                {activeBag ? (
+                  <img src={activeImage} alt={`バッグ ${activeBag.name} の画像`} />
+                ) : (
+                  <div className="golf-bag-panel-image-placeholder">
+                    <span>画像を追加</span>
+                  </div>
+                )}
+              </button>
+              <span className="help-tooltip-text whitespace-normal">
+                {tooltipText}
+              </span>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -99,17 +105,6 @@ export const GolfBagPanel = ({
       )}
 
       <div className="golf-bag-panel-content-column">
-        <div className="golf-bag-panel-title-row">
-          <h2>{title ?? (compact ? 'Golf Bag' : 'Golf Bag')}</h2>
-          <span
-            className="golf-bag-panel-tooltip"
-            title={description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。'}
-            aria-label={description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。'}
-          >
-            i
-          </span>
-        </div>
-
         {bags.length > 1 ? (
           <div className="golf-bag-chip-list" role="tablist" aria-label="ゴルフバッグ選択">
             {bags.map((bag) => {

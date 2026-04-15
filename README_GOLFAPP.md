@@ -1,4 +1,4 @@
-# ⛳ My Golf Bag - Golf Club Data Management App
+# ⛳ My Golf Room - Golf Club Data Management App
 
 > Status (2026-03): Active development is Web-only (React + TypeScript). Flutter development is paused and no new Flutter features are planned for now.
 

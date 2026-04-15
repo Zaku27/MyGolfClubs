@@ -90,6 +90,29 @@
   padding: 0;
 }
 
+.golf-bag-panel-image-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.golf-bag-panel-image-tooltip {
+  display: none;
+}
+
+.golf-bag-panel-image-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 4px solid rgba(15, 40, 24, 0.95);
+}
+
 .golf-bag-panel-title-row {
   display: flex;
   align-items: center;
