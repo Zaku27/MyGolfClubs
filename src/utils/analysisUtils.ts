@@ -179,7 +179,7 @@ export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   }
 
   estimated = Math.max(model.min, Math.min(model.max, estimated));
-  return Math.round(estimated);
+  return Math.round(estimated * 10) / 10;
 };
 
 export const getCategoryColor = (category: ClubCategory) => {

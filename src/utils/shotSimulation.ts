@@ -376,7 +376,7 @@ export function estimateBaseDistance(
   playerSkillLevel?: number,
   useTheoretical?: boolean,
 ): number {
-  if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance));
+  if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance * 10) / 10);
 
   const baseDistance = resolveBaseDistanceWithTheoretical(
     club,
@@ -386,7 +386,7 @@ export function estimateBaseDistance(
   const skillDistanceMultiplier = getSkillDistanceMultiplier(playerSkillLevel);
   const result = baseDistance * skillDistanceMultiplier;
 
-  return Math.max(5, Math.round(result));
+  return Math.max(5, Math.round(result * 10) / 10);
 }
 
 /**
@@ -405,7 +405,7 @@ export function estimateShotDistance(
     useTheoretical?: boolean;
   }
 ): number {
-  if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance));
+  if (club.type === "Putter") return Math.max(1, Math.round(club.avgDistance * 10) / 10);
 
   const lieMultiplier = getLieDistanceMultiplier(context.lie, club.type);
   const windYards = getWindYards(context.windStrength ?? 7, context.windDirectionDegrees);
@@ -433,7 +433,7 @@ export function estimateShotDistance(
   const skillDistanceMultiplier = getSkillDistanceMultiplier(playerSkillLevel);
   let expected = baseDistance * lieMultiplier * weakDistanceMultiplier * skillDistanceMultiplier + windYards;
 
-  return Math.max(5, Math.round(expected));
+  return Math.max(5, Math.round(expected * 10) / 10);
 }
 
 /** Effective success rate after personal data, lie, and risk adjustments. */

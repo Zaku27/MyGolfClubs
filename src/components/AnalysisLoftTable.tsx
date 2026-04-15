@@ -52,7 +52,7 @@ export const AnalysisLoftTable = ({
                 <ClubDisplayName clubType={club.clubType} number={club.number} name={club.name} />
               </td>
               <td>{club.loftAngle.toFixed(1)}°</td>
-              <td>{club.estimatedDistance.toFixed(0)} y</td>
+              <td>{club.estimatedDistance.toFixed(1)} y</td>
               <td>
                 <input
                   type="number"
