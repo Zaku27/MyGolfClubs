@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import type { AccessoryItem } from '../types/golf';
 import './AccessoryPanel.css';
+import './SharedUI.css';
 
 type AccessoryPanelProps = {
   accessories: AccessoryItem[];

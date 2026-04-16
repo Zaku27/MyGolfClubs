@@ -157,6 +157,18 @@ export class ClubService {
     if (propagateSameName && newClub.imageData && newClub.name) {
       await propagateImageToSameNameClubs(newClub.name, newClub.imageData, id);
     }
+    
+    // Automatically add the new club to the active bag
+    try {
+      const activeBagId = await this.getActiveBagId();
+      if (activeBagId != null) {
+        await this.addClubToBag(activeBagId, id);
+      }
+    } catch (error) {
+      // If adding to bag fails (e.g., bag is full), log error but don't fail club creation
+      console.warn('Failed to add new club to active bag:', error);
+    }
+    
     return id;
   }
 

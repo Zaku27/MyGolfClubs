@@ -129,6 +129,8 @@ export const useClubStore = create<ClubStore>((set) => ({
         createdAt: timestamp,
         updatedAt: timestamp,
       };
+      // Refresh bags to include the newly added club
+      const bags = await ClubService.getAllBags();
       set((state) => ({
         clubs: [
           newClub,
@@ -138,6 +140,7 @@ export const useClubStore = create<ClubStore>((set) => ({
               : c,
           ),
         ],
+        bags,
       }));
     } catch (error) {
       setStoreError(set, error);

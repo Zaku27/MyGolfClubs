@@ -145,8 +145,8 @@
   align-items: center;
   justify-content: center;
   width: 82.5%;
-  max-width: 300px;
-  min-width: 165px;
+  max-width: 280px;
+  min-width: 150px;
   aspect-ratio: 1 / 1;
   border-radius: 24px;
   border: 1px dashed #c8dccf;
@@ -354,8 +354,52 @@
   box-shadow: 0 6px 18px rgba(31, 143, 84, 0.2);
 }
 
-.golf-bag-scope-toggle button:not(.active) {
-  color: #4d7b62;
+.golf-bag-panel .panel-with-hover-actions {
+  position: relative;
+  min-height: 40px;
+  padding-top: 4px;
+  border-top: 1px solid #dfe8e1;
+}
+
+.golf-bag-panel .hover-actions {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+  z-index: 10;
+}
+
+.golf-bag-panel .panel-with-hover-actions:hover .hover-actions {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.golf-bag-management-area {
+  position: relative;
+  min-height: 40px;
+  padding-top: 4px;
+  border-top: 1px solid #dfe8e1;
+}
+
+.golf-bag-management-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  opacity: 0.3;
+  transition: opacity 0.18s ease;
+}
+
+.golf-bag-management-area:hover .golf-bag-management-actions {
+  opacity: 1;
 }
 
 .golf-bag-panel-actions {

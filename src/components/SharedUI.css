@@ -1,0 +1,109 @@
+/* Shared UI Components and Styles for Golf Bag and Accessories */
+
+/* Common button styles */
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #cdded1;
+  border-radius: 10px;
+  background-color: #f8fbf9;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-icon svg {
+  width: 18px;
+  height: 18px;
+  color: #5e7265;
+}
+
+.btn-icon:hover {
+  background-color: #edf4ef;
+  transform: translateY(-1px);
+}
+
+.btn-icon.btn-edit:hover {
+  background-color: #2d8db3;
+  border-color: #2d8db3;
+}
+
+.btn-icon.btn-edit:hover svg {
+  color: white;
+}
+
+.btn-icon.btn-delete:hover {
+  background-color: #d12f31;
+  border-color: #d12f31;
+}
+
+.btn-icon.btn-delete:hover svg {
+  color: white;
+}
+
+.btn-icon.btn-add:hover {
+  background-color: #f18d3a;
+  border-color: #f18d3a;
+}
+
+.btn-icon.btn-add:hover svg {
+  color: white;
+}
+
+.btn-icon.btn-shift:hover {
+  background-color: #4aa3cd;
+  border-color: #4aa3cd;
+}
+
+.btn-icon.btn-shift:hover svg {
+  color: white;
+}
+
+/* Common hover action container */
+.hover-actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.hover-actions:hover,
+.hover-actions:focus-within {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Common panel styles */
+.panel-with-hover-actions {
+  position: relative;
+}
+
+.panel-with-hover-actions:hover .hover-actions,
+.panel-with-hover-actions:focus-within .hover-actions {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Common transition effects */
+.transition-smooth {
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.transition-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.transition-lift:hover {
+  transform: translateY(-1px);
+}

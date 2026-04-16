@@ -66,12 +66,14 @@ function App() {
   }, [clubActions.activeBagClubs, appSettings.hiddenAnalysisClubKeys]);
 
   // Image propagation confirmation handler
-  const handleConfirmPropagation = async (propagate: boolean) => {
+  const handleConfirmPropagation = async () => {
     if (!uiState.pendingClubData) {
       uiState.handleCancelImagePropagation();
       return;
     }
-    await clubActions.submitClubData(uiState.pendingClubData, uiState.editingClub, propagate);
+    // Always pass false to prevent duplicate propagation in service layer
+    // The propagation is handled by the dialog flow itself
+    await clubActions.submitClubData(uiState.pendingClubData, uiState.editingClub, false);
   };
 
   // Bag management handlers
@@ -231,8 +233,7 @@ function App() {
         handleClearLieClubStandard={appSettings.handleClearLieClubStandard}
         handleResetLieStandards={appSettings.handleResetLieStandards}
         onSelectBag={(bagId) => {
-          // This would need to be implemented in the store
-          // clubActions.setActiveBag(bagId);
+          clubActions.setActiveBag(bagId);
         }}
         onCreateBag={uiState.handleShowCreateBagDialog}
         onAddBagImage={handleAddBagImage}

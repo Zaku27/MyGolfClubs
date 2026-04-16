@@ -310,7 +310,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
 }
 
 .club-image-crop-backdrop {
@@ -323,11 +323,14 @@
 .club-image-crop-card {
   position: relative;
   z-index: 1;
-  width: min(100%, 720px);
+  width: min(100%, 90vw);
+  max-width: 720px;
   background: #ffffff;
   border-radius: 24px;
   padding: 24px;
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.16);
+  max-height: 95vh;
+  overflow-y: auto;
 }
 
 .club-image-crop-header {
@@ -366,7 +369,9 @@
   overflow: hidden;
   background: #f8fafc;
   cursor: grab;
-  height: 480px;
+  height: 60vh;
+  max-height: 600px;
+  min-height: 400px;
 }
 
 .club-image-crop-frame img,
@@ -920,5 +925,38 @@
   .form-section-title {
     font-size: 13px;
     margin-bottom: 12px;
+  }
+
+  .club-image-crop-modal {
+    padding: 8px;
+  }
+
+  .club-image-crop-card {
+    width: min(100%, 95vw);
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .club-image-crop-frame {
+    height: 50vh;
+    min-height: 300px;
+    max-height: 500px;
+  }
+
+  .club-image-crop-header {
+    margin-bottom: 12px;
+  }
+
+  .club-image-crop-header h3 {
+    font-size: 16px;
+  }
+
+  .club-image-crop-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .club-image-crop-actions button {
+    width: 100%;
   }
 }

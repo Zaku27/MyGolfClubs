@@ -88,8 +88,8 @@
 
 .accessory-item-image-group {
   position: relative;
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
 }
 
 .accessory-item-image-group:hover .accessory-item-actions,
@@ -100,8 +100,8 @@
 }
 
 .accessory-item-image-button {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   padding: 0;
   border: none;
   background: transparent;
@@ -124,8 +124,8 @@
 }
 
 .accessory-badge-placeholder {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: 16px;
   background: #e7f1e7;
 }
@@ -143,48 +143,7 @@
   transition: opacity 0.18s ease, visibility 0.18s ease;
 }
 
-.accessory-item-actions .btn-icon {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid #cdded1;
-  border-radius: 10px;
-  background-color: #f8fbf9;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.accessory-item-actions .btn-icon svg {
-  width: 18px;
-  height: 18px;
-  color: #5e7265;
-}
-
-.accessory-item-actions .btn-icon:hover {
-  background-color: #edf4ef;
-  transform: translateY(-1px);
-}
-
-.accessory-item-actions .btn-edit:hover {
-  background-color: #2d8db3;
-  border-color: #2d8db3;
-}
-
-.accessory-item-actions .btn-edit:hover svg {
-  color: white;
-}
-
-.accessory-item-actions .btn-delete:hover {
-  background-color: #d12f31;
-  border-color: #d12f31;
-}
-
-.accessory-item-actions .btn-delete:hover svg {
-  color: white;
-}
+/* btn-icon styles moved to SharedUI.css */
 
 .accessory-badge-text strong {
   font-size: 14px;

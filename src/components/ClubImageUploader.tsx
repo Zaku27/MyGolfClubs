@@ -195,9 +195,14 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
     }
 
     const rect = wrapper.getBoundingClientRect();
-    const size = Math.min(rect.width, rect.height);
-    setCropSize(size);
-    setCropPosition({ x: 0, y: 0 });
+    const maxSize = Math.min(rect.width, rect.height);
+    // Start with a reasonable default size (70% of the available space)
+    const defaultSize = Math.max(200, Math.floor(maxSize * 0.7));
+    setCropSize(defaultSize);
+    // Center the crop area
+    const x = Math.max(0, (rect.width - defaultSize) / 2);
+    const y = Math.max(0, (rect.height - defaultSize) / 2);
+    setCropPosition({ x, y });
   };
 
   const handleImageFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -352,7 +357,7 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
       return;
     }
     const maxSize = Math.min(wrapper.clientWidth, wrapper.clientHeight);
-    const nextSize = Math.max(80, Math.min(maxSize, value));
+    const nextSize = Math.max(50, Math.min(maxSize, value));
     setCropPosition((prev) => ({
       x: Math.min(prev.x, wrapper.clientWidth - nextSize),
       y: Math.min(prev.y, wrapper.clientHeight - nextSize),
@@ -602,8 +607,8 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
                 <input
                   id="cropSize"
                   type="range"
-                  min="80"
-                  max="500"
+                  min="50"
+                  max="800"
                   value={cropSize}
                   onChange={(e) => handleCropSizeChange(parseInt(e.target.value, 10))}
                 />
