@@ -733,7 +733,7 @@
 }
 
 .swing-weight-editor-input {
-  width: 60px;
+  width: 72px;
   height: 32px;
   border: 1px solid #d9e7db;
   border-radius: 6px;
@@ -755,7 +755,7 @@
   font-size: 14px;
   font-weight: 600;
   color: #4a9d5f;
-  min-width: 40px;
+  min-width: 48px;
   text-align: left;
 }
 

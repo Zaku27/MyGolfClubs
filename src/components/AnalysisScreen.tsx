@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GolfClub } from '../types/golf';
 import { AnalysisHeader, type AnalysisTab } from './AnalysisHeader';
 import { AnalysisLieChart } from './AnalysisLieChart';
@@ -131,6 +131,12 @@ export const AnalysisScreen = ({
 }: AnalysisScreenProps) => {
   const [activeTab, setActiveTab] = useState<AnalysisTab>('loftDistance');
   const [localSwingWeightTarget, setLocalSwingWeightTarget] = useState(swingWeightTarget);
+
+  // Sync local state with DB value when prop changes (bag switch, DB load, etc.)
+  useEffect(() => {
+    setLocalSwingWeightTarget(swingWeightTarget);
+  }, [swingWeightTarget]);
+
   const [showLieSettings, setShowLieSettings] = useState(false);
   const loftChartContainerRef = useRef<HTMLDivElement | null>(null);
   const loftLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
