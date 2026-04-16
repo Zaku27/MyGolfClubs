@@ -11,6 +11,7 @@ import {
   normalizeSwingWeightInput,
 } from '../utils/clubFormUtils';
 import { ClubImageUploader } from './ClubImageUploader';
+import { SwingWeightInput } from './SwingWeightInput';
 import './ClubForm.css';
 
 interface ClubFormProps {
@@ -696,16 +697,11 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           {formData.clubType !== 'Putter' && (
             <div className="form-group">
               <label htmlFor="swingWeight">バランス</label>
-              <input
-                type="text"
-                id="swingWeight"
-                name="swingWeight"
+              <SwingWeightInput
                 value={formData.swingWeight}
-                onChange={handleChange}
-                placeholder="例: C9, D0.5, E1"
-                className={errors.swingWeight ? 'error' : ''}
+                onChange={(value) => setFormData((prev) => ({ ...prev, swingWeight: value }))}
+                error={errors.swingWeight}
               />
-              {errors.swingWeight && <span className="error-message">{errors.swingWeight}</span>}
             </div>
           )}
         </div>

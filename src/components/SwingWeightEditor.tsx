@@ -41,12 +41,12 @@ export const SwingWeightEditor = ({
 
   const startIncrement = useCallback(() => {
     handleIncrement();
-    intervalRef.current = setInterval(handleIncrement, 100);
+    intervalRef.current = setInterval(handleIncrement, 200);
   }, [handleIncrement]);
 
   const startDecrement = useCallback(() => {
     handleDecrement();
-    intervalRef.current = setInterval(handleDecrement, 100);
+    intervalRef.current = setInterval(handleDecrement, 200);
   }, [handleDecrement]);
 
   const stopChange = useCallback(() => {

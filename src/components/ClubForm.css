@@ -837,6 +837,77 @@
   color: #dc2626;
 }
 
+/* Swing Weight Input - matching SwingWeightEditor UI */
+.swing-weight-input-wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+.swing-weight-input-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.swing-weight-input-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d9e7db;
+  background: #ffffff;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #344b3e;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.swing-weight-input-button:hover:not(:disabled) {
+  background: #e8f5ea;
+  border-color: #b8d4be;
+}
+
+.swing-weight-input-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.swing-weight-input-field {
+  flex: 1;
+  min-width: 60px;
+  max-width: 80px;
+  height: 32px;
+  border: 1px solid #d9e7db;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #344b3e;
+  text-align: center;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.swing-weight-input-field:focus {
+  outline: none;
+  border-color: #4a9d5f;
+  box-shadow: 0 0 0 2px rgba(74, 157, 95, 0.2);
+}
+
+.swing-weight-input-field.error {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.swing-weight-error {
+  margin-top: 4px;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
