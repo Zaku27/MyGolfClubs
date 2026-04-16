@@ -302,6 +302,8 @@ export const useClubStore = create<ClubStore>((set) => ({
           bags: state.bags.map(bag => bag.id === id ? updatedBag : bag),
           error: null
         }));
+        // Invalidate cache to ensure activeBag is recalculated
+        invalidateActiveGolfBagCache();
       }
     } catch (error) {
       setStoreError(set, error);
@@ -512,6 +514,12 @@ export const selectActiveGolfBag = (state: ClubStoreState): GolfBag | null => {
 
   lastActiveBag = state.bags.find((bag) => bag.id === state.activeBagId) ?? state.bags[0] ?? null;
   return lastActiveBag;
+};
+
+export const invalidateActiveGolfBagCache = () => {
+  lastBagsRef = null;
+  lastActiveBagId = null;
+  lastActiveBag = null;
 };
 
 export const selectSortedActiveBagClubs = (state: ClubStoreState): GolfClub[] => {

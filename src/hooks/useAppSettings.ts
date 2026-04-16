@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   DEFAULT_USER_LIE_ANGLE_STANDARDS,
   normalizeLieStandardKey,
@@ -15,7 +15,6 @@ import type { AccessoryItem, GolfBag } from '../types/golf';
 // Storage keys
 const HEAD_SPEED_STORAGE_KEY = 'golfbag-head-speed-ms';
 const LIE_STANDARDS_STORAGE_KEY = 'golfbag-user-lie-angle-standards';
-const SWING_TARGET_STORAGE_KEY = 'golfbag-swing-weight-target';
 const SWING_GOOD_TOLERANCE_STORAGE_KEY = 'golfbag-swing-good-tolerance';
 const SWING_ADJUST_THRESHOLD_STORAGE_KEY = 'golfbag-swing-adjust-threshold';
 const ANALYSIS_HIDDEN_CLUBS_STORAGE_KEY = 'golfbag-analysis-hidden-clubs';
@@ -91,8 +90,28 @@ export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSetting
     });
 
   // Swing weight settings - use per-bag values with fallback to global defaults
-  const swingWeightTarget = activeBag?.swingWeightTarget ?? 
-    readStoredNumber(SWING_TARGET_STORAGE_KEY, DEFAULT_SWING_TARGET, { decimals: 1 });
+  const [swingWeightTarget, setSwingWeightTarget] = useState<number>(() => {
+    return activeBag?.swingWeightTarget ?? DEFAULT_SWING_TARGET;
+  });
+
+  // Update swingWeightTarget when activeBag changes
+  useEffect(() => {
+    const value = activeBag?.swingWeightTarget ?? DEFAULT_SWING_TARGET;
+    setSwingWeightTarget(value);
+  }, [activeBag?.id, activeBag?.swingWeightTarget]);
+
+  // Update swingWeightTarget immediately after saving to DB
+  const handleSetSwingWeightTarget = useCallback((value: number) => {
+    if (!activeBag?.id || !updateBagSwingSettings) {
+      return;
+    }
+    const rounded = Math.round(value * 10) / 10;
+    const clamped = Math.max(-10, Math.min(50, rounded));
+    // Update local state immediately
+    setSwingWeightTarget(clamped);
+    // Then save to DB
+    void updateBagSwingSettings(activeBag.id, { swingWeightTarget: clamped });
+  }, [activeBag?.id, updateBagSwingSettings]);
 
   const swingGoodTolerance = activeBag?.swingGoodTolerance ?? 
     readStoredNumber(SWING_GOOD_TOLERANCE_STORAGE_KEY, DEFAULT_SWING_GOOD_TOLERANCE, { decimals: 1 });
@@ -193,20 +212,11 @@ export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSetting
     writeStoredJson(LIE_STANDARDS_STORAGE_KEY, DEFAULT_USER_LIE_ANGLE_STANDARDS);
   }, []);
 
-  // Swing weight handlers - use per-bag settings
-  const handleSetSwingWeightTarget = useCallback((value: number) => {
-    if (!activeBag?.id || !updateBagSwingSettings) {
-      return;
-    }
-    const rounded = Math.round(value * 10) / 10;
-    const clamped = Math.max(-10, Math.min(50, rounded));
-    void updateBagSwingSettings(activeBag.id, { swingWeightTarget: clamped });
-  }, [activeBag?.id, updateBagSwingSettings]);
-
   const handleResetSwingWeightTarget = useCallback(() => {
     if (!activeBag?.id || !updateBagSwingSettings) {
       return;
     }
+    setSwingWeightTarget(DEFAULT_SWING_TARGET);
     void updateBagSwingSettings(activeBag.id, { swingWeightTarget: DEFAULT_SWING_TARGET });
   }, [activeBag?.id, updateBagSwingSettings]);
 

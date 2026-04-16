@@ -732,6 +732,21 @@
   cursor: not-allowed;
 }
 
+.swing-weight-editor-button.save {
+  width: auto;
+  padding: 0 16px;
+  background: #4a9d5f;
+  color: #ffffff;
+  border-color: #4a9d5f;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.swing-weight-editor-button.save:hover:not(:disabled) {
+  background: #3d8a4f;
+  border-color: #3d8a4f;
+}
+
 .swing-weight-editor-input {
   width: 72px;
   height: 32px;

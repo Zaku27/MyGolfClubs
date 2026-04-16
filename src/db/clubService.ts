@@ -134,11 +134,14 @@ const createBagRecord = (
 };
 
 const createUpdatedBagRecord = (
-  patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData'>>,
+  patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData' | 'swingWeightTarget' | 'swingGoodTolerance' | 'swingAdjustThreshold'>>,
 ): Partial<GolfBag> => ({
   ...(patch.name != null ? { name: normalizeBagName(patch.name) } : {}),
   ...(patch.clubIds != null ? { clubIds: validateBagClubIds(patch.clubIds) } : {}),
   ...(patch.imageData != null ? { imageData: normalizeImageData(patch.imageData) } : {}),
+  ...(patch.swingWeightTarget != null ? { swingWeightTarget: patch.swingWeightTarget } : {}),
+  ...(patch.swingGoodTolerance != null ? { swingGoodTolerance: patch.swingGoodTolerance } : {}),
+  ...(patch.swingAdjustThreshold != null ? { swingAdjustThreshold: patch.swingAdjustThreshold } : {}),
   updatedAt: createTimestamp(),
 });
 
