@@ -43,7 +43,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
   const activeBag = useClubStore(selectActiveGolfBag);
   const bags = useClubStore((state) => state.bags);
   const sortedClubs = useClubStore(selectSortedClubsForDisplay);
-  const activeBagClubCount = activeBag?.clubIds.length ?? 0;
+  const activeBagClubCount = activeBagClubs.length;
 
   // Helper function to check if image data is the same
   const isSameImageData = useCallback((a?: string[], b?: string[]): boolean => {

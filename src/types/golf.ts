@@ -20,7 +20,7 @@ export interface GolfClub {
   shaftType: string; // e.g., "Steel", "Graphite"
   torque: number; // トルク（小数1桁）
   condition?: '先調子' | '先中調子' | '中調子' | '中元調子' | '手元調子'; // 調子（省略可）
-  flex: 'S' | 'SR' | 'R' | 'A' | 'L'; // フレックス
+  flex?: 'S' | 'SR' | 'R' | 'A' | 'L'; // フレックス（パターは不要）
   distance: number; // 飛距離（小数1桁）
   notes: string;
   imageData?: string[];
@@ -75,7 +75,7 @@ export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
   { clubType: 'Wedge', name: 'Wedge', number: 'GW', length: 35.25, weight: 450, swingWeight: 'D1', lieAngle: 64, loftAngle: 50, bounceAngle: 12, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 110, notes: '' },
   { clubType: 'Wedge', name: 'Wedge', number: 'SW', length: 35, weight: 455, swingWeight: 'D1', lieAngle: 64, loftAngle: 54, bounceAngle: 14, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 100, notes: '' },
   { clubType: 'Wedge', name: 'Wedge', number: 'LW', length: 34.75, weight: 460, swingWeight: 'D1', lieAngle: 64, loftAngle: 58, bounceAngle: 8, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 90, notes: '' },
-  { clubType: 'Putter', name: 'Putter', number: 'P', length: 33, weight: 500, swingWeight: 'D1', lieAngle: 70, loftAngle: 3, shaftType: 'Steel', torque: 1.0, flex: 'S', distance: 10, notes: '' },
+  { clubType: 'Putter', name: 'Putter', number: 'P', length: 33, weight: 500, swingWeight: 'D1', lieAngle: 70, loftAngle: 3, shaftType: 'Steel', torque: 1.0, distance: 10, notes: '' },
 ];
  
 // ─── ユーザープロフィール情報 ──────────────────────────────

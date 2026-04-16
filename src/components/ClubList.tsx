@@ -134,7 +134,7 @@ export const ClubList: React.FC<ClubListProps> = ({
                 className={listScope === 'bag' ? 'active' : ''}
                 onClick={() => onChangeListScope('bag')}
               >
-                バッグの14本
+                バッグの{activeBagClubCount}本
               </button>
               <button
                 type="button"

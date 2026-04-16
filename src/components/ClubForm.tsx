@@ -46,7 +46,7 @@ const EMPTY_FORM_DATA: ClubFormData = {
   shaftType: '',
   torque: 0,
   condition: undefined,
-  flex: 'S',
+  flex: undefined,
   distance: 0,
   notes: '',
   imageData: [],
@@ -349,7 +349,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         shaftType: formData.shaftType,
         torque: selectedClubType === 'Putter' ? 0 : formData.torque,
         condition: formData.condition,
-        flex: formData.flex,
+        flex: selectedClubType === 'Putter' ? undefined : formData.flex,
         distance: selectedClubType === 'Putter' ? 0 : formData.distance,
         notes: formData.notes,
         imageData: formData.imageData,
@@ -723,21 +723,23 @@ export const ClubForm: React.FC<ClubFormProps> = ({
             placeholder="例: VENTUS TR"
           />
         </div>
-        <div className="form-group">
-          <label htmlFor="flex">フレックス</label>
-          <select
-            id="flex"
-            name="flex"
-            value={formData.flex}
-            onChange={handleChange}
-          >
-            <option value="S">S</option>
-            <option value="SR">SR</option>
-            <option value="R">R</option>
-            <option value="A">A</option>
-            <option value="L">L</option>
-          </select>
-        </div>
+        {formData.clubType !== 'Putter' && (
+          <div className="form-group">
+            <label htmlFor="flex">フレックス</label>
+            <select
+              id="flex"
+              name="flex"
+              value={formData.flex}
+              onChange={handleChange}
+            >
+              <option value="S">S</option>
+              <option value="SR">SR</option>
+              <option value="R">R</option>
+              <option value="A">A</option>
+              <option value="L">L</option>
+            </select>
+          </div>
+        )}
         {formData.clubType !== 'Putter' && (
           <div className="form-group">
             <label htmlFor="torque">トルク</label>

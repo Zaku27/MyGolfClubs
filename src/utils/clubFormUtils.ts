@@ -27,7 +27,7 @@ export const CLUB_NUMBER_DEFAULT: Record<ClubCategory, string> = {
   Putter: 'Putter',
 };
 
-const FALLBACK_CLUB_FIELDS: Omit<GolfClub, 'id' | 'clubType' | 'name' | 'number'> = {
+const FALLBACK_CLUB_FIELDS: Omit<GolfClub, 'id' | 'clubType' | 'name' | 'number' | 'flex'> = {
   length: 0,
   weight: 0,
   swingWeight: '',
@@ -35,7 +35,6 @@ const FALLBACK_CLUB_FIELDS: Omit<GolfClub, 'id' | 'clubType' | 'name' | 'number'
   loftAngle: 0,
   shaftType: '',
   torque: 0,
-  flex: 'S',
   distance: 0,
   notes: '',
 };
@@ -71,6 +70,7 @@ export const buildClubDefaults = (clubType: ClubCategory): Omit<GolfClub, 'id'> 
       name: '',
       number: CLUB_NUMBER_DEFAULT[clubType],
       ...FALLBACK_CLUB_FIELDS,
+      flex: clubType === 'Putter' ? undefined : 'S',
     };
   }
 
