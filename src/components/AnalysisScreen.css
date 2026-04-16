@@ -580,6 +580,13 @@
   padding: 18px 18px 8px;
 }
 
+.analysis-table-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
 .analysis-table-header h2 {
   margin: 0;
   font-size: 18px;
@@ -589,6 +596,43 @@
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--text-soft);
+}
+
+.analysis-button {
+  padding: 10px 16px;
+  border: 1px solid #1b5e20;
+  background: #1b5e20;
+  color: #ffffff;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.analysis-button:hover {
+  background: #2e7d32;
+  border-color: #2e7d32;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(27, 94, 32, 0.25);
+}
+
+.analysis-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(27, 94, 32, 0.2);
+}
+
+.reflect-button {
+  background: #2e7d32;
+  border-color: #2e7d32;
+  font-size: 12px;
+  padding: 8px 14px;
+}
+
+.reflect-button:hover {
+  background: #388e3c;
+  border-color: #388e3c;
 }
 
 .analysis-table-wrap {
@@ -793,6 +837,16 @@
 
   .analysis-controls {
     align-items: stretch;
+  }
+
+  .analysis-table-header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .reflect-button {
+    align-self: flex-start;
   }
 }
 

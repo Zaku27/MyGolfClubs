@@ -16,6 +16,7 @@ type AnalysisLoftTableProps = {
   hiddenClubKeySet: Set<string>;
   onSetAnalysisClubVisible: (clubKey: string, visible: boolean) => void;
   onActualDistanceChange: (clubId: number | undefined, event: ChangeEvent<HTMLInputElement>) => void;
+  onReflectAllEstimatedToActual: () => void;
 };
 
 export const AnalysisLoftTable = ({
@@ -23,11 +24,24 @@ export const AnalysisLoftTable = ({
   hiddenClubKeySet,
   onSetAnalysisClubVisible,
   onActualDistanceChange,
+  onReflectAllEstimatedToActual,
 }: AnalysisLoftTableProps) => (
   <div className="analysis-card table-card">
     <div className="analysis-table-header">
-      <h2>クラブデータ</h2>
-      <p>実測飛距離は一覧データに直接反映されます。</p>
+      <div className="analysis-table-header-content">
+        <div>
+          <h2>クラブデータ</h2>
+          <p>実測飛距離は一覧データに直接反映されます。</p>
+        </div>
+        <button
+          type="button"
+          onClick={onReflectAllEstimatedToActual}
+          className="analysis-button reflect-button"
+          title="すべてのクラブの推定飛距離を実測飛距離に反映します"
+        >
+          推定→実測を反映
+        </button>
+      </div>
     </div>
     <div className="analysis-table-wrap">
       <table className="analysis-table">

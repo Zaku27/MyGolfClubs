@@ -15,13 +15,13 @@ import './App.css';
 
 function App() {
   // Initialize custom hooks
-  const appSettings = useAppSettings();
   const uiState = useUIState();
   const clubActions = useClubActions(uiState);
+  const activeBag = useClubStore(selectActiveGolfBag);
+  const appSettings = useAppSettings(activeBag, clubActions.updateBagSwingSettings);
   
   // Store data
   const bags = useClubStore((state) => state.bags);
-  const activeBag = useClubStore(selectActiveGolfBag);
   
   // URL sync for bag ID
   useBagIdUrlSync({
@@ -71,8 +71,18 @@ function App() {
       uiState.handleCancelImagePropagation();
       return;
     }
-    // Always pass false to prevent duplicate propagation in service layer
-    // The propagation is handled by the dialog flow itself
+    // Pass true to enable image propagation to other clubs with same name
+    await clubActions.submitClubData(uiState.pendingClubData, uiState.editingClub, true);
+    uiState.handleCancelImagePropagation();
+  };
+
+  // Handle when user chooses not to propagate image
+  const handleNoPropagation = async () => {
+    if (!uiState.pendingClubData) {
+      uiState.handleCancelImagePropagation();
+      return;
+    }
+    // Submit club data without propagation
     await clubActions.submitClubData(uiState.pendingClubData, uiState.editingClub, false);
     uiState.handleCancelImagePropagation();
   };
@@ -180,6 +190,7 @@ function App() {
         showImagePropagationConfirm={uiState.showImagePropagationConfirm}
         pendingClubData={uiState.pendingClubData}
         onCancelImagePropagation={uiState.handleCancelImagePropagation}
+        onNoPropagation={handleNoPropagation}
         onConfirmPropagation={handleConfirmPropagation}
         confirmDialog={uiState.confirmDialog}
         onCloseConfirmDialog={uiState.closeConfirmDialog}

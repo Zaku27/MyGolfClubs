@@ -284,7 +284,7 @@ export class ClubService {
 
   static async updateBag(
     id: number,
-    patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData'>>,
+    patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData' | 'swingWeightTarget' | 'swingGoodTolerance' | 'swingAdjustThreshold'>>,
   ): Promise<number> {
     return db.golfBags.update(id, createUpdatedBagRecord(patch));
   }

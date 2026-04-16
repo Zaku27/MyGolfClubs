@@ -7,6 +7,7 @@ export type AppDialogsProps = {
   showImagePropagationConfirm: boolean;
   pendingClubData: Omit<GolfClub, 'id'> | Partial<GolfClub> | null;
   onCancelImagePropagation: () => void;
+  onNoPropagation: () => void;
   onConfirmPropagation: () => Promise<void>;
   confirmDialog: ConfirmDialogState | null;
   onCloseConfirmDialog: () => void;
@@ -35,6 +36,7 @@ export function AppDialogs({
   showImagePropagationConfirm,
   pendingClubData,
   onCancelImagePropagation,
+  onNoPropagation,
   onConfirmPropagation,
   confirmDialog,
   onCloseConfirmDialog,
@@ -68,7 +70,7 @@ export function AppDialogs({
               反映したくない場合は「いいえ」を選択してください。
             </p>
             <div className="image-propagation-actions">
-              <button type="button" className="btn-secondary" onClick={() => void onCancelImagePropagation()}>
+              <button type="button" className="btn-secondary" onClick={() => void onNoPropagation()}>
                 いいえ
               </button>
               <button type="button" className="btn-primary" onClick={() => void onConfirmPropagation()}>

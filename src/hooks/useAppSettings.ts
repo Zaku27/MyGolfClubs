@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   DEFAULT_USER_LIE_ANGLE_STANDARDS,
   normalizeLieStandardKey,
@@ -10,7 +10,7 @@ import {
   writeStoredJson,
   writeStoredValue,
 } from '../utils/storage';
-import type { AccessoryItem } from '../types/golf';
+import type { AccessoryItem, GolfBag } from '../types/golf';
 
 // Storage keys
 const HEAD_SPEED_STORAGE_KEY = 'golfbag-head-speed-ms';
@@ -74,7 +74,7 @@ const parseAccessories = (value: unknown): AccessoryItem[] => {
     }));
 };
 
-export const useAppSettings = () => {
+export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSettings?: (id: number, settings: { swingWeightTarget?: number; swingGoodTolerance?: number; swingAdjustThreshold?: number }) => Promise<void>) => {
   // Head speed settings
   const [headSpeed, setHeadSpeed] = useState<number>(() => {
     return readStoredNumber(HEAD_SPEED_STORAGE_KEY, 42, { min: 0.1 });
@@ -90,26 +90,21 @@ export const useAppSettings = () => {
       );
     });
 
-  // Swing weight settings
-  const [swingWeightTarget, setSwingWeightTarget] = useState<number>(() => {
-    return readStoredNumber(SWING_TARGET_STORAGE_KEY, DEFAULT_SWING_TARGET, { decimals: 1 });
-  });
+  // Swing weight settings - use per-bag values with fallback to global defaults
+  const swingWeightTarget = useMemo(() => {
+    return activeBag?.swingWeightTarget ?? 
+      readStoredNumber(SWING_TARGET_STORAGE_KEY, DEFAULT_SWING_TARGET, { decimals: 1 });
+  }, [activeBag]);
 
-  const [swingGoodTolerance, setSwingGoodTolerance] = useState<number>(() => {
-    return readStoredNumber(
-      SWING_GOOD_TOLERANCE_STORAGE_KEY,
-      DEFAULT_SWING_GOOD_TOLERANCE,
-      { decimals: 1 },
-    );
-  });
+  const swingGoodTolerance = useMemo(() => {
+    return activeBag?.swingGoodTolerance ?? 
+      readStoredNumber(SWING_GOOD_TOLERANCE_STORAGE_KEY, DEFAULT_SWING_GOOD_TOLERANCE, { decimals: 1 });
+  }, [activeBag]);
 
-  const [swingAdjustThreshold, setSwingAdjustThreshold] = useState<number>(() => {
-    return readStoredNumber(
-      SWING_ADJUST_THRESHOLD_STORAGE_KEY,
-      DEFAULT_SWING_ADJUST_THRESHOLD,
-      { decimals: 1 },
-    );
-  });
+  const swingAdjustThreshold = useMemo(() => {
+    return activeBag?.swingAdjustThreshold ?? 
+      readStoredNumber(SWING_ADJUST_THRESHOLD_STORAGE_KEY, DEFAULT_SWING_ADJUST_THRESHOLD, { decimals: 1 });
+  }, [activeBag]);
 
   // Analysis settings
   const [hiddenAnalysisClubKeys, setHiddenAnalysisClubKeys] = useState<string[]>(() => {
@@ -204,40 +199,57 @@ export const useAppSettings = () => {
     writeStoredJson(LIE_STANDARDS_STORAGE_KEY, DEFAULT_USER_LIE_ANGLE_STANDARDS);
   }, []);
 
-  // Swing weight handlers
+  // Swing weight handlers - use per-bag settings
   const handleSetSwingWeightTarget = useCallback((value: number) => {
+    if (!activeBag?.id || !updateBagSwingSettings) {
+      return;
+    }
     const rounded = Math.round(value * 10) / 10;
     const clamped = Math.max(-30, Math.min(30, rounded));
-    setSwingWeightTarget(clamped);
-    writeStoredValue(SWING_TARGET_STORAGE_KEY, clamped);
-  }, []);
+    void updateBagSwingSettings(activeBag.id, { swingWeightTarget: clamped });
+  }, [activeBag?.id, updateBagSwingSettings]);
 
   const handleResetSwingWeightTarget = useCallback(() => {
-    setSwingWeightTarget(DEFAULT_SWING_TARGET);
-    writeStoredValue(SWING_TARGET_STORAGE_KEY, DEFAULT_SWING_TARGET);
-  }, []);
+    if (!activeBag?.id || !updateBagSwingSettings) {
+      return;
+    }
+    void updateBagSwingSettings(activeBag.id, { swingWeightTarget: DEFAULT_SWING_TARGET });
+  }, [activeBag?.id, updateBagSwingSettings]);
 
   const handleSetSwingGoodTolerance = useCallback((value: number) => {
+    if (!activeBag?.id || !updateBagSwingSettings) {
+      return;
+    }
     const rounded = Math.round(value * 10) / 10;
     const clamped = Math.max(0.1, Math.min(30, rounded));
-    setSwingGoodTolerance(clamped);
-    writeStoredValue(SWING_GOOD_TOLERANCE_STORAGE_KEY, clamped);
-    setSwingAdjustThreshold((prev) => Math.max(clamped, prev));
-  }, []);
+    const currentSwingAdjustThreshold = activeBag?.swingAdjustThreshold ?? 
+      readStoredNumber(SWING_ADJUST_THRESHOLD_STORAGE_KEY, DEFAULT_SWING_ADJUST_THRESHOLD, { decimals: 1 });
+    void updateBagSwingSettings(activeBag.id, { 
+      swingGoodTolerance: clamped,
+      swingAdjustThreshold: Math.max(clamped, currentSwingAdjustThreshold)
+    });
+  }, [activeBag?.id, updateBagSwingSettings]);
 
   const handleSetSwingAdjustThreshold = useCallback((value: number) => {
+    if (!activeBag?.id || !updateBagSwingSettings) {
+      return;
+    }
     const rounded = Math.round(value * 10) / 10;
-    const clamped = Math.max(swingGoodTolerance, Math.min(30, rounded));
-    setSwingAdjustThreshold(clamped);
-    writeStoredValue(SWING_ADJUST_THRESHOLD_STORAGE_KEY, clamped);
-  }, [swingGoodTolerance]);
+    const currentSwingGoodTolerance = activeBag?.swingGoodTolerance ?? 
+      readStoredNumber(SWING_GOOD_TOLERANCE_STORAGE_KEY, DEFAULT_SWING_GOOD_TOLERANCE, { decimals: 1 });
+    const clamped = Math.max(currentSwingGoodTolerance, Math.min(30, rounded));
+    void updateBagSwingSettings(activeBag.id, { swingAdjustThreshold: clamped });
+  }, [activeBag?.id, updateBagSwingSettings]);
 
   const handleResetSwingThresholds = useCallback(() => {
-    setSwingGoodTolerance(DEFAULT_SWING_GOOD_TOLERANCE);
-    setSwingAdjustThreshold(DEFAULT_SWING_ADJUST_THRESHOLD);
-    writeStoredValue(SWING_GOOD_TOLERANCE_STORAGE_KEY, DEFAULT_SWING_GOOD_TOLERANCE);
-    writeStoredValue(SWING_ADJUST_THRESHOLD_STORAGE_KEY, DEFAULT_SWING_ADJUST_THRESHOLD);
-  }, []);
+    if (!activeBag?.id || !updateBagSwingSettings) {
+      return;
+    }
+    void updateBagSwingSettings(activeBag.id, { 
+      swingGoodTolerance: DEFAULT_SWING_GOOD_TOLERANCE,
+      swingAdjustThreshold: DEFAULT_SWING_ADJUST_THRESHOLD 
+    });
+  }, [activeBag?.id, updateBagSwingSettings]);
 
   // Analysis club visibility handlers
   const handleSetAnalysisClubVisible = useCallback((clubKey: string, visible: boolean) => {

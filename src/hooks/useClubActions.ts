@@ -28,6 +28,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     toggleClubInActiveBag,
     replaceActiveBagClubIds,
     updateBagImage,
+    updateBagSwingSettings,
   } = useClubStore();
 
   const {
@@ -274,6 +275,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     handleToggleActiveBagMembership,
     handleAddBagImage,
     setActiveBag,
+    updateBagSwingSettings,
 
     // App initialization
     initializeApp,

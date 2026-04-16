@@ -165,6 +165,14 @@ export const AnalysisScreen = ({
     onHeadSpeedChange,
   });
 
+  const handleReflectAllEstimatedToActual = () => {
+    loftTableClubs.forEach((club) => {
+      if (club.id && club.estimatedDistance > 0) {
+        onUpdateActualDistance(club.id, club.estimatedDistance);
+      }
+    });
+  };
+
   const loftChartSize = useResponsiveChartSize(
     activeTab === 'loftDistance',
     loftChartContainerRef,
@@ -600,6 +608,7 @@ export const AnalysisScreen = ({
             hiddenClubKeySet={hiddenClubKeySet}
             onSetAnalysisClubVisible={onSetAnalysisClubVisible}
             onActualDistanceChange={handleActualDistanceChange}
+            onReflectAllEstimatedToActual={handleReflectAllEstimatedToActual}
           />
         </>
       ) : activeTab === 'lieAngle' ? (

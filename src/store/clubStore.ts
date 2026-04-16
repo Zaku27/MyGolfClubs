@@ -26,6 +26,7 @@ type ClubStoreActions = {
   createBag: (name: string) => Promise<void>;
   renameBag: (id: number, name: string) => Promise<void>;
   updateBagImage: (id: number, imageData: string[]) => Promise<void>;
+  updateBagSwingSettings: (id: number, settings: { swingWeightTarget?: number; swingGoodTolerance?: number; swingAdjustThreshold?: number }) => Promise<void>;
   deleteBag: (id: number) => Promise<void>;
   setActiveBag: (id: number) => Promise<void>;
   moveBagLeft: (id: number) => Promise<void>;
@@ -131,11 +132,15 @@ export const useClubStore = create<ClubStore>((set) => ({
       };
       // Refresh bags to include the newly added club
       const bags = await ClubService.getAllBags();
+      
+      // Only propagate if images are added (new clubs always start with no images, so any images are additions)
+      const shouldPropagate = propagateSameName && club.imageData && club.imageData.length > 0 && club.name;
+      
       set((state) => ({
         clubs: [
           newClub,
           ...state.clubs.map((c) =>
-            propagateSameName && club.imageData && club.name && c.name === club.name
+            shouldPropagate && c.name === club.name
               ? { ...c, imageData: club.imageData, updatedAt: timestamp }
               : c,
           ),
@@ -155,12 +160,21 @@ export const useClubStore = create<ClubStore>((set) => ({
       set((state) => {
         const targetClub = state.clubs.find((c) => c.id === id);
         const nameToMatch = club.name ?? targetClub?.name;
+        const originalImageData = targetClub?.imageData ?? [];
+        const newImageData = club.imageData ?? [];
+        
+        // Only propagate if images were added (new array has more items than original)
+        const shouldPropagate = propagateSameName && 
+          club.imageData != null && 
+          nameToMatch && 
+          newImageData.length > originalImageData.length;
+        
         return {
           clubs: state.clubs.map((c) => {
             if (c.id === id) {
               return { ...c, ...club, updatedAt };
             }
-            if (propagateSameName && club.imageData != null && nameToMatch && c.name === nameToMatch) {
+            if (shouldPropagate && c.name === nameToMatch) {
               return { ...c, imageData: club.imageData, updatedAt };
             }
             return c;
@@ -270,6 +284,17 @@ export const useClubStore = create<ClubStore>((set) => ({
     set({ error: null });
     try {
       await ClubService.updateBag(id, { imageData });
+      const bags = await ClubService.getAllBags();
+      set({ bags, error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  updateBagSwingSettings: async (id, settings) => {
+    set({ error: null });
+    try {
+      await ClubService.updateBag(id, settings);
       const bags = await ClubService.getAllBags();
       set({ bags, error: null });
     } catch (error) {

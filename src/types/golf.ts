@@ -37,6 +37,9 @@ export interface GolfBag {
   name: string;
   clubIds: number[];
   imageData?: string[];
+  swingWeightTarget?: number;
+  swingGoodTolerance?: number;
+  swingAdjustThreshold?: number;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -85,7 +85,7 @@ export const SwingTargetInputRow = ({
 
   useEffect(() => {
     setDraft(numericToSwingWeightLabel(value));
-  }, [value]);
+  }, [value, numericToSwingWeightLabel]); // Fix: add numericToSwingWeightLabel to dependency array
 
   const commit = () => {
     const parsed = parseSwingWeightInput(draft);

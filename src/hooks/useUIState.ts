@@ -96,6 +96,11 @@ export const useUIState = () => {
     setPendingClubData(null);
   }, []);
 
+  const handleNoPropagation = useCallback(() => {
+    setShowImagePropagationConfirm(false);
+    // Don't clear pendingClubData - let the parent handle submission with propagateSameName = false
+  }, []);
+
   // Confirm dialog handlers
   const openConfirmDialog = useCallback((dialogState: ConfirmDialogState) => {
     setConfirmDialog(dialogState);
@@ -180,6 +185,7 @@ export const useUIState = () => {
     submitClubData,
     handleShowImagePropagationConfirm,
     handleCancelImagePropagation,
+    handleNoPropagation,
     openConfirmDialog,
     closeConfirmDialog,
     handleConfirmDialogConfirm,
