@@ -199,7 +199,7 @@ export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSetting
       return;
     }
     const rounded = Math.round(value * 10) / 10;
-    const clamped = Math.max(-30, Math.min(30, rounded));
+    const clamped = Math.max(-10, Math.min(50, rounded));
     void updateBagSwingSettings(activeBag.id, { swingWeightTarget: clamped });
   }, [activeBag?.id, updateBagSwingSettings]);
 

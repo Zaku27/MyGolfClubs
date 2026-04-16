@@ -42,7 +42,7 @@ export const SwingTargetInput = ({
     <div className="swing-target-input">
       <div className="swing-target-labels">
         <label htmlFor="swing-target-input">
-          <strong>目安ターゲット</strong>
+          <strong>目安値</strong>
         </label>
         <span className="swing-target-default">既定値: D2 ({numericToSwingWeightLabel(20)})</span>
         <span className="swing-target-current">
@@ -69,7 +69,7 @@ export const SwingTargetInput = ({
           min="0"
           max="99"
           className="swing-target-field"
-          aria-label="目安ターゲット値"
+          aria-label="目安値値"
         />
         
         <button

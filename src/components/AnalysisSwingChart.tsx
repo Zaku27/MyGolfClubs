@@ -4,6 +4,7 @@ import { getSwingBarColor, getSwingClubLabel, numericToSwingWeightLabel } from '
 import { SWING_PADDING } from './analysisConfig';
 import type { SwingTooltipState } from './analysisTypes';
 import { SwingLegend } from './AnalysisLegends';
+import { SwingWeightEditor } from './SwingWeightEditor';
 
 type SwingChartClub = SwingTooltipState['club'];
 
@@ -12,6 +13,7 @@ type AnalysisSwingChartProps = {
   hasSwingWeightData: boolean;
   swingGoodTolerance?: number;
   swingWeightTarget?: number;
+  onSetSwingWeightTarget?: (value: number) => void;
   swingChartContainerRef: RefObject<HTMLDivElement | null>;
   swingChartSize: { width: number; height: number };
   swingTicks: number[];
@@ -32,6 +34,7 @@ export const AnalysisSwingChart = ({
   hasSwingWeightData,
   swingGoodTolerance,
   swingWeightTarget,
+  onSetSwingWeightTarget,
   swingChartContainerRef,
   swingChartSize,
   swingTicks,
@@ -50,12 +53,21 @@ export const AnalysisSwingChart = ({
     {hasAnySwingWeightData ? (
       <>
         <SwingLegend swingGoodTolerance={swingGoodTolerance ?? 2} swingAdjustThreshold={swingAdjustThreshold} />
-        <div className="swing-chart-toolbar">
-          <span className="swing-target-badge">
-            <i className="legend-standard-line" />
-            {`目安ターゲット: ${numericToSwingWeightLabel(swingWeightTarget ?? 20)}`}
-          </span>
-        </div>
+        {onSetSwingWeightTarget && (
+          <SwingWeightEditor
+            value={swingWeightTarget}
+            onChange={onSetSwingWeightTarget}
+            disabled={!hasSwingWeightData}
+          />
+        )}
+        {!onSetSwingWeightTarget && (
+          <div className="swing-chart-toolbar">
+            <span className="swing-target-badge">
+              <i className="legend-standard-line" />
+              {`目安値: ${numericToSwingWeightLabel(swingWeightTarget ?? 20)}`}
+            </span>
+          </div>
+        )}
         {hasSwingWeightData ? (
           <div
             className="chart-scroll interactive-chart-scroll"

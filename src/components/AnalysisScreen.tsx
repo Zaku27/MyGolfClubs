@@ -130,6 +130,7 @@ export const AnalysisScreen = ({
   onResetLieStandards,
 }: AnalysisScreenProps) => {
   const [activeTab, setActiveTab] = useState<AnalysisTab>('loftDistance');
+  const [localSwingWeightTarget, setLocalSwingWeightTarget] = useState(swingWeightTarget);
   const [showLieSettings, setShowLieSettings] = useState(false);
   const loftChartContainerRef = useRef<HTMLDivElement | null>(null);
   const loftLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -240,6 +241,14 @@ export const AnalysisScreen = ({
     hasVisibleData: hasWeightLengthData,
   } = buildWeightLengthAnalysis(clubs, isClubVisible);
 
+  // Sync local state with prop when it changes from outside
+  const effectiveSwingWeightTarget = localSwingWeightTarget ?? swingWeightTarget ?? 2.0;
+
+  const handleLocalSwingWeightTargetChange = useCallback((value: number) => {
+    setLocalSwingWeightTarget(value);
+    onSetSwingWeightTarget?.(value);
+  }, [onSetSwingWeightTarget]);
+
   const {
     tableClubs: swingWeightTableClubs,
     chartClubs: swingWeightClubs,
@@ -249,7 +258,7 @@ export const AnalysisScreen = ({
     hasVisibleData: hasSwingWeightData,
   } = buildSwingWeightAnalysis(
     clubs,
-    swingWeightTarget ?? 2.0,
+    effectiveSwingWeightTarget,
     swingGoodTolerance ?? 1.5,
     swingAdjustThreshold ?? 2.0,
     isClubVisible,
@@ -477,7 +486,8 @@ export const AnalysisScreen = ({
       hasAnySwingWeightData={hasAnySwingWeightData}
       hasSwingWeightData={hasSwingWeightData}
       swingGoodTolerance={swingGoodTolerance}
-      swingWeightTarget={swingWeightTarget}
+      swingWeightTarget={effectiveSwingWeightTarget}
+      onSetSwingWeightTarget={handleLocalSwingWeightTargetChange}
       swingChartContainerRef={swingChartContainerRef}
       swingChartSize={swingChartSize}
       swingTicks={swingTicks}
@@ -654,7 +664,7 @@ export const AnalysisScreen = ({
             swingWeightTableClubs={swingWeightTableClubs}
             hiddenClubKeySet={hiddenClubKeySet}
             onSetAnalysisClubVisible={onSetAnalysisClubVisible}
-            swingWeightTarget={swingWeightTarget}
+            swingWeightTarget={effectiveSwingWeightTarget}
           />
         </>
       ) : activeTab === 'specComparison' ? (
