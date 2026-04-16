@@ -10,8 +10,8 @@ type SwingChartClub = SwingTooltipState['club'];
 type AnalysisSwingChartProps = {
   hasAnySwingWeightData: boolean;
   hasSwingWeightData: boolean;
-  swingGoodTolerance: number;
-  swingWeightTarget: number;
+  swingGoodTolerance?: number;
+  swingWeightTarget?: number;
   swingChartContainerRef: RefObject<HTMLDivElement | null>;
   swingChartSize: { width: number; height: number };
   swingTicks: number[];
@@ -20,7 +20,7 @@ type AnalysisSwingChartProps = {
   swingBarWidth: number;
   swingChartMin: number;
   swingWeightClubs: SwingChartClub[];
-  swingAdjustThreshold: number;
+  swingAdjustThreshold?: number;
   swingTooltip: SwingTooltipState | null;
   swingTooltipRef: RefObject<HTMLDivElement | null>;
   swingTooltipPos: { left: number; top: number } | null;
@@ -49,11 +49,11 @@ export const AnalysisSwingChart = ({
   <div className="analysis-card chart-card swing-weight-frame">
     {hasAnySwingWeightData ? (
       <>
-        <SwingLegend swingGoodTolerance={swingGoodTolerance} />
+        <SwingLegend swingGoodTolerance={swingGoodTolerance ?? 2} />
         <div className="swing-chart-toolbar">
           <span className="swing-target-badge">
             <i className="legend-standard-line" />
-            {`目安ターゲット: ${numericToSwingWeightLabel(swingWeightTarget)}`}
+            {`目安ターゲット: ${numericToSwingWeightLabel(swingWeightTarget ?? 20)}`}
           </span>
         </div>
         {hasSwingWeightData ? (
@@ -100,8 +100,8 @@ export const AnalysisSwingChart = ({
             <line
               x1={SWING_PADDING.left}
               x2={swingChartSize.width - SWING_PADDING.right}
-              y1={mapSwingY(swingWeightTarget)}
-              y2={mapSwingY(swingWeightTarget)}
+              y1={mapSwingY(swingWeightTarget ?? 20)}
+              y2={mapSwingY(swingWeightTarget ?? 20)}
               stroke="#2e7d32"
               strokeWidth="2"
               strokeDasharray="8 4"
@@ -117,8 +117,8 @@ export const AnalysisSwingChart = ({
               const color = getSwingBarColor(
                 club.category,
                 club.swingDeviation,
-                swingGoodTolerance,
-                swingAdjustThreshold,
+                swingGoodTolerance ?? 2,
+                swingAdjustThreshold ?? 5,
               );
               const clubLabel = getSwingClubLabel(club);
 

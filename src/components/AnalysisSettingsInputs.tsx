@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react';
-import { numericToSwingWeightLabel, parseSwingWeightInput } from '../utils/analysisUtils';
 
 type LieStandardInputRowProps = {
   label: string;
@@ -8,19 +6,6 @@ type LieStandardInputRowProps = {
   onCommit: (value: number) => void;
   onClear: () => void;
   subLabel?: string;
-};
-
-type SwingTargetInputRowProps = {
-  value: number;
-  onCommit: (value: number) => void;
-  onReset: () => void;
-};
-
-type SwingThresholdInputRowProps = {
-  label: string;
-  value: number;
-  description: string;
-  onCommit: (value: number) => void;
 };
 
 export const LieStandardInputRow = ({
@@ -72,101 +57,6 @@ export const LieStandardInputRow = ({
       >
         解除
       </button>
-    </div>
-  );
-};
-
-export const SwingTargetInputRow = ({
-  value,
-  onCommit,
-  onReset,
-}: SwingTargetInputRowProps) => {
-  const [draft, setDraft] = useState(numericToSwingWeightLabel(value));
-
-  useEffect(() => {
-    setDraft(numericToSwingWeightLabel(value));
-  }, [value, numericToSwingWeightLabel]); // Fix: add numericToSwingWeightLabel to dependency array
-
-  const commit = () => {
-    const parsed = parseSwingWeightInput(draft);
-    if (parsed == null) return;
-    onCommit(parsed);
-  };
-
-  return (
-    <div className="lie-setting-row">
-      <div className="lie-setting-labels">
-        <strong>目安ターゲット</strong>
-        <span>既定値: D2</span>
-        <em className="lie-setting-state">D1 や D1.5 の形式で設定できます</em>
-      </div>
-      <input
-        className="analysis-input lie-setting-input"
-        type="text"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            commit();
-            (event.currentTarget as HTMLInputElement).blur();
-          }
-        }}
-        onBlur={commit}
-        placeholder="D2"
-      />
-      <button
-        className="btn-secondary lie-setting-reset"
-        type="button"
-        onClick={onReset}
-      >
-        リセット
-      </button>
-    </div>
-  );
-};
-
-export const SwingThresholdInputRow = ({
-  label,
-  value,
-  description,
-  onCommit,
-}: SwingThresholdInputRowProps) => {
-  const [draft, setDraft] = useState(value.toFixed(1));
-
-  useEffect(() => {
-    setDraft(value.toFixed(1));
-  }, [value]);
-
-  const commit = () => {
-    const parsed = Number(draft);
-    if (!Number.isFinite(parsed)) return;
-    onCommit(parsed);
-  };
-
-  return (
-    <div className="lie-setting-row">
-      <div className="lie-setting-labels">
-        <strong>{label}</strong>
-        <span>{description}</span>
-        <em className="lie-setting-state">0.1 刻みで設定できます</em>
-      </div>
-      <input
-        className="analysis-input lie-setting-input"
-        type="number"
-        step="0.1"
-        min="0.1"
-        max="30"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            commit();
-            (event.currentTarget as HTMLInputElement).blur();
-          }
-        }}
-        onBlur={commit}
-      />
-      <div />
     </div>
   );
 };

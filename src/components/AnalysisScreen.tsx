@@ -11,7 +11,6 @@ import { AnalysisLieTable } from './AnalysisLieTable';
 import { AnalysisLoftChart } from './AnalysisLoftChart';
 import { AnalysisLoftLengthChart } from './AnalysisLoftLengthChart';
 import { AnalysisSwingChart } from './AnalysisSwingChart';
-import { AnalysisSwingSettingsCard } from './AnalysisSwingSettingsCard';
 import { AnalysisSwingTable } from './AnalysisSwingTable';
 import { AnalysisWeightChart } from './AnalysisWeightChart';
 import { AnalysisWeightTable } from './AnalysisWeightTable';
@@ -69,13 +68,14 @@ import {
   getWeightPointStyle,
   isAnalysisClubVisible,
   type ClubCategory,
+  swingWeightToNumeric,
+  getClubCategoryByType,
 } from '../utils/analysisUtils';
 import {
   buildLieAngleAnalysis,
   buildLieLengthAnalysis,
   buildLoftDistanceAnalysis,
   buildLoftLengthComparisonAnalysis,
-  buildSwingWeightAnalysis,
   buildWeightLengthAnalysis,
 } from '../utils/analysisBuilders';
 import {
@@ -91,14 +91,6 @@ type AnalysisScreenProps = {
   onHeadSpeedChange: (value: number) => void;
   hiddenAnalysisClubKeys: string[];
   onSetAnalysisClubVisible: (clubKey: string, visible: boolean) => void;
-  swingWeightTarget: number;
-  swingGoodTolerance: number;
-  swingAdjustThreshold: number;
-  onSetSwingWeightTarget: (value: number) => void;
-  onSetSwingGoodTolerance: (value: number) => void;
-  onSetSwingAdjustThreshold: (value: number) => void;
-  onResetSwingWeightTarget: () => void;
-  onResetSwingThresholds: () => void;
   userLieAngleStandards: UserLieAngleStandards;
   onSetLieTypeStandard: (clubType: string, value: number) => void;
   onSetLieClubStandard: (clubName: string, value: number) => void;
@@ -115,14 +107,6 @@ export const AnalysisScreen = ({
   onHeadSpeedChange,
   hiddenAnalysisClubKeys,
   onSetAnalysisClubVisible,
-  swingWeightTarget,
-  swingGoodTolerance,
-  swingAdjustThreshold,
-  onSetSwingWeightTarget,
-  onSetSwingGoodTolerance,
-  onSetSwingAdjustThreshold,
-  onResetSwingWeightTarget,
-  onResetSwingThresholds,
   userLieAngleStandards,
   onSetLieTypeStandard,
   onSetLieClubStandard,
@@ -132,7 +116,6 @@ export const AnalysisScreen = ({
 }: AnalysisScreenProps) => {
   const [activeTab, setActiveTab] = useState<AnalysisTab>('loftDistance');
   const [showLieSettings, setShowLieSettings] = useState(false);
-  const [showSwingSettings, setShowSwingSettings] = useState(false);
   const loftChartContainerRef = useRef<HTMLDivElement | null>(null);
   const loftLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
   const weightChartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -242,21 +225,24 @@ export const AnalysisScreen = ({
     hasVisibleData: hasWeightLengthData,
   } = buildWeightLengthAnalysis(clubs, isClubVisible);
 
-  const {
-    tableClubs: swingWeightTableClubs,
-    chartClubs: swingWeightClubs,
-    chartMin: swingChartMin,
-    chartMax: swingChartMax,
-    ticks: swingTicks,
-    hasAnyData: hasAnySwingWeightData,
-    hasVisibleData: hasSwingWeightData,
-  } = buildSwingWeightAnalysis(
-    clubs,
-    swingWeightTarget,
-    swingGoodTolerance,
-    swingAdjustThreshold,
-    isClubVisible,
-  );
+  const swingWeightClubsRaw = clubs.filter(club => club.swingWeight && isClubVisible(club));
+  const hasAnySwingWeightData = clubs.some(club => club.swingWeight);
+  const hasSwingWeightData = swingWeightClubsRaw.length > 0;
+  
+  const swingWeightClubs = swingWeightClubsRaw.map(club => ({
+    ...club,
+    category: getClubCategoryByType(club.clubType),
+    swingWeightNumeric: swingWeightToNumeric(club.swingWeight!),
+    swingDeviation: 0, // Default deviation since we removed SW settings
+    swingStatus: '良好' as const, // Default status since we removed SW settings
+  }));
+  
+  const swingWeightTableClubs = swingWeightClubs;
+  const swingWeights = swingWeightClubs.map(club => club.swingWeightNumeric);
+  const swingChartMin = swingWeights.length > 0 ? Math.min(...swingWeights) : 0;
+  const swingChartMax = swingWeights.length > 0 ? Math.max(...swingWeights) : 30;
+  const swingTicks = Array.from({ length: Math.ceil(swingChartMax) - Math.floor(swingChartMin) + 1 }, 
+    (_, i) => Math.floor(swingChartMin) + i);
 
   const {
     tableClubs: lieAngleTableClubs,
@@ -476,8 +462,6 @@ export const AnalysisScreen = ({
     <AnalysisSwingChart
       hasAnySwingWeightData={hasAnySwingWeightData}
       hasSwingWeightData={hasSwingWeightData}
-      swingGoodTolerance={swingGoodTolerance}
-      swingWeightTarget={swingWeightTarget}
       swingChartContainerRef={swingChartContainerRef}
       swingChartSize={swingChartSize}
       swingTicks={swingTicks}
@@ -486,7 +470,6 @@ export const AnalysisScreen = ({
       swingBarWidth={swingBarWidth}
       swingChartMin={swingChartMin}
       swingWeightClubs={swingWeightClubs}
-      swingAdjustThreshold={swingAdjustThreshold}
       swingTooltip={swingTooltip}
       swingTooltipRef={swingTooltipRef}
       swingTooltipPos={swingTooltipPos}
@@ -593,8 +576,6 @@ export const AnalysisScreen = ({
       <AnalysisHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        showSwingSettings={showSwingSettings}
-        onToggleSwingSettings={() => setShowSwingSettings((prev) => !prev)}
         showLieSettings={showLieSettings}
         onToggleLieSettings={() => setShowLieSettings((prev) => !prev)}
         onBack={onBack}
@@ -650,25 +631,13 @@ export const AnalysisScreen = ({
         </>
       ) : activeTab === 'swingWeight' ? (
         <>
-          {showSwingSettings && (
-            <AnalysisSwingSettingsCard
-              swingWeightTarget={swingWeightTarget}
-              swingGoodTolerance={swingGoodTolerance}
-              swingAdjustThreshold={swingAdjustThreshold}
-              onSetSwingWeightTarget={onSetSwingWeightTarget}
-              onSetSwingGoodTolerance={onSetSwingGoodTolerance}
-              onSetSwingAdjustThreshold={onSetSwingAdjustThreshold}
-              onResetSwingWeightTarget={onResetSwingWeightTarget}
-              onResetSwingThresholds={onResetSwingThresholds}
-            />
-          )}
           {renderSwingChart()}
           <AnalysisSwingTable
             hasAnySwingWeightData={hasAnySwingWeightData}
             swingWeightTableClubs={swingWeightTableClubs}
             hiddenClubKeySet={hiddenClubKeySet}
             onSetAnalysisClubVisible={onSetAnalysisClubVisible}
-            swingWeightTarget={swingWeightTarget}
+            swingWeightTarget={20}
           />
         </>
       ) : activeTab === 'specComparison' ? (

@@ -41,8 +41,6 @@ const ANALYSIS_TAB_SUBTITLE: Record<AnalysisTab, string> = {
 type AnalysisHeaderProps = {
   activeTab: AnalysisTab;
   onTabChange: (tab: AnalysisTab) => void;
-  showSwingSettings: boolean;
-  onToggleSwingSettings: () => void;
   showLieSettings: boolean;
   onToggleLieSettings: () => void;
   onBack: () => void;
@@ -51,8 +49,6 @@ type AnalysisHeaderProps = {
 export const AnalysisHeader = ({
   activeTab,
   onTabChange,
-  showSwingSettings,
-  onToggleSwingSettings,
   showLieSettings,
   onToggleLieSettings,
   onBack,
@@ -78,11 +74,6 @@ export const AnalysisHeader = ({
       </div>
     </div>
     <div className="analysis-controls">
-      {activeTab === 'swingWeight' && (
-        <button className="btn-secondary" onClick={onToggleSwingSettings}>
-          {showSwingSettings ? 'SW目安設定を閉じる' : 'SW目安設定を開く'}
-        </button>
-      )}
       {activeTab === 'lieAngle' && (
         <button className="btn-secondary" onClick={onToggleLieSettings}>
           {showLieSettings ? '基準値設定を閉じる' : '基準値設定を開く'}

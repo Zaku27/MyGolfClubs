@@ -29,6 +29,8 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     replaceActiveBagClubIds,
     updateBagImage,
     updateBagSwingSettings,
+    moveBagLeft,
+    moveBagRight,
   } = useClubStore();
 
   const {
@@ -231,6 +233,14 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     await updateBagImage(bagId, imageData);
   }, [updateBagImage]);
 
+  const handleMoveBagLeft = useCallback(async (bagId: number) => {
+    await moveBagLeft(bagId);
+  }, [moveBagLeft]);
+
+  const handleMoveBagRight = useCallback(async (bagId: number) => {
+    await moveBagRight(bagId);
+  }, [moveBagRight]);
+
   // Analysis club visibility
   const analysisHiddenKeys = useMemo(() => {
     // This will be handled by the useAppSettings hook
@@ -276,6 +286,8 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     handleAddBagImage,
     setActiveBag,
     updateBagSwingSettings,
+    handleMoveBagLeft,
+    handleMoveBagRight,
 
     // App initialization
     initializeApp,

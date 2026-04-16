@@ -118,10 +118,9 @@ function App() {
     await clubActions.handleDeleteBag(activeBagId, activeBagName);
   };
 
-  const handleShiftSelectedBagLeft = () => {
+  const handleShiftSelectedBagLeft = async () => {
     if (activeBag?.id != null) {
-      // This would need to be implemented in the store
-      // clubActions.moveBagLeft(activeBag.id);
+      await clubActions.handleMoveBagLeft(activeBag.id);
     }
   };
 

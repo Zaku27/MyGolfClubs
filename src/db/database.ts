@@ -50,15 +50,16 @@ export class GolfBagDatabase extends Dexie {
     });
     this.version(5).stores({
       clubs: '++id, name',
-      golfBags: '++id, name',
+      golfBags: '++id, name, createdAt',
       personalData: 'clubId',
       appSettings: 'id',
     });
     // v6: normalize bounceAngle to wedge-only field
     this.version(6).stores({
       clubs: '++id, name',
-      golfBags: '++id, name',
+      golfBags: '++id, name, createdAt',
       personalData: 'clubId',
+      actualShotRows: 'bagId',
       appSettings: 'id',
     }).upgrade(async (tx) => {
       await tx.table('clubs').toCollection().modify((club) => {
@@ -78,7 +79,7 @@ export class GolfBagDatabase extends Dexie {
     });
     this.version(7).stores({
       clubs: '++id, name',
-      golfBags: '++id, name',
+      golfBags: '++id, name, createdAt',
       personalData: 'clubId',
       actualShotRows: 'bagId',
       appSettings: 'id',
@@ -86,7 +87,7 @@ export class GolfBagDatabase extends Dexie {
     // v8: add condition field for shaft condition
     this.version(8).stores({
       clubs: '++id, name',
-      golfBags: '++id, name',
+      golfBags: '++id, name, createdAt',
       personalData: 'clubId',
       actualShotRows: 'bagId',
       appSettings: 'id',

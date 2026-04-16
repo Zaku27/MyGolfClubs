@@ -1,6 +1,6 @@
 .golf-bag-panel {
   display: grid;
-  grid-template-columns: minmax(120px, 180px) 1fr;
+  grid-template-columns: minmax(160px, 220px) 1fr;
   align-items: start;
   gap: 8px;
   margin-bottom: 0;
@@ -82,12 +82,14 @@
 .golf-bag-panel-image-wrapper {
   position: relative;
   display: flex;
+  flex-direction: column;
   width: 100%;
   height: auto;
   min-height: 0;
   align-items: flex-start;
   justify-content: flex-start;
   padding: 0;
+  gap: 12px;
 }
 
 .golf-bag-panel-image-container {
@@ -144,9 +146,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 82.5%;
-  max-width: 280px;
-  min-width: 150px;
+  width: 100%;
+  max-width: 320px;
+  min-width: 180px;
   aspect-ratio: 1 / 1;
   border-radius: 24px;
   border: 1px dashed #c8dccf;
@@ -293,6 +295,14 @@
   color: #28543d;
   font-size: 14px;
   font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.golf-bag-single-management {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .golf-bag-chip-list {
@@ -392,14 +402,74 @@
 .golf-bag-management-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  opacity: 0.3;
-  transition: opacity 0.18s ease;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(247, 251, 247, 0.8);
+  border: 1px solid #e8f3eb;
 }
 
 .golf-bag-management-area:hover .golf-bag-management-actions {
   opacity: 1;
+}
+
+/* Icon button styles */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid #c5dccf;
+  background: #ffffff;
+  color: #2d6245;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: #f5faf7;
+  border-color: #a8caba;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 121, 78, 0.08);
+}
+
+.btn-icon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-add:hover {
+  background: #e8f5e8;
+  border-color: #62c78e;
+  color: #1f8f54;
+}
+
+.btn-edit:hover {
+  background: #fff3e0;
+  border-color: #ffb766;
+  color: #f18d3a;
+}
+
+.btn-shift:hover {
+  background: #e3f2fd;
+  border-color: #64b5f6;
+  color: #1976d2;
+}
+
+.btn-delete:hover {
+  background: #ffebee;
+  border-color: #ef5350;
+  color: #c2292a;
 }
 
 .golf-bag-panel-actions {

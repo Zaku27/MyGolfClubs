@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import {
   DEFAULT_USER_LIE_ANGLE_STANDARDS,
   normalizeLieStandardKey,
@@ -91,20 +91,14 @@ export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSetting
     });
 
   // Swing weight settings - use per-bag values with fallback to global defaults
-  const swingWeightTarget = useMemo(() => {
-    return activeBag?.swingWeightTarget ?? 
-      readStoredNumber(SWING_TARGET_STORAGE_KEY, DEFAULT_SWING_TARGET, { decimals: 1 });
-  }, [activeBag]);
+  const swingWeightTarget = activeBag?.swingWeightTarget ?? 
+    readStoredNumber(SWING_TARGET_STORAGE_KEY, DEFAULT_SWING_TARGET, { decimals: 1 });
 
-  const swingGoodTolerance = useMemo(() => {
-    return activeBag?.swingGoodTolerance ?? 
-      readStoredNumber(SWING_GOOD_TOLERANCE_STORAGE_KEY, DEFAULT_SWING_GOOD_TOLERANCE, { decimals: 1 });
-  }, [activeBag]);
+  const swingGoodTolerance = activeBag?.swingGoodTolerance ?? 
+    readStoredNumber(SWING_GOOD_TOLERANCE_STORAGE_KEY, DEFAULT_SWING_GOOD_TOLERANCE, { decimals: 1 });
 
-  const swingAdjustThreshold = useMemo(() => {
-    return activeBag?.swingAdjustThreshold ?? 
-      readStoredNumber(SWING_ADJUST_THRESHOLD_STORAGE_KEY, DEFAULT_SWING_ADJUST_THRESHOLD, { decimals: 1 });
-  }, [activeBag]);
+  const swingAdjustThreshold = activeBag?.swingAdjustThreshold ?? 
+    readStoredNumber(SWING_ADJUST_THRESHOLD_STORAGE_KEY, DEFAULT_SWING_ADJUST_THRESHOLD, { decimals: 1 });
 
   // Analysis settings
   const [hiddenAnalysisClubKeys, setHiddenAnalysisClubKeys] = useState<string[]>(() => {

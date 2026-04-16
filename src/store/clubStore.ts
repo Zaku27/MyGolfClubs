@@ -296,7 +296,13 @@ export const useClubStore = create<ClubStore>((set) => ({
     try {
       await ClubService.updateBag(id, settings);
       const bags = await ClubService.getAllBags();
-      set({ bags, error: null });
+      const updatedBag = bags.find(bag => bag.id === id);
+      if (updatedBag) {
+        set(state => ({
+          bags: state.bags.map(bag => bag.id === id ? updatedBag : bag),
+          error: null
+        }));
+      }
     } catch (error) {
       setStoreError(set, error);
     }

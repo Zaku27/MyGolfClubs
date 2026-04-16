@@ -21,7 +21,7 @@ type AnalysisSwingTableProps = {
   swingWeightTableClubs: SwingTableClub[];
   hiddenClubKeySet: Set<string>;
   onSetAnalysisClubVisible: (clubKey: string, visible: boolean) => void;
-  swingWeightTarget: number;
+  swingWeightTarget?: number;
 };
 
 export const AnalysisSwingTable = ({
@@ -34,7 +34,7 @@ export const AnalysisSwingTable = ({
   <div className="analysis-card table-card">
     <div className="analysis-table-header">
       <h2>スイングウェイト詳細</h2>
-      <p>目安値 {numericToSwingWeightLabel(swingWeightTarget)} を基準に、クラブごとの偏差と調整優先度を表示します。</p>
+      <p>目安値 {numericToSwingWeightLabel(swingWeightTarget ?? 20)} を基準に、クラブごとの偏差と調整優先度を表示します。</p>
     </div>
     <div className="analysis-table-wrap">
       <table className="analysis-table">
