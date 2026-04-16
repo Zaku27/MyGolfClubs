@@ -74,6 +74,7 @@ function App() {
     // Always pass false to prevent duplicate propagation in service layer
     // The propagation is handled by the dialog flow itself
     await clubActions.submitClubData(uiState.pendingClubData, uiState.editingClub, false);
+    uiState.handleCancelImagePropagation();
   };
 
   // Bag management handlers

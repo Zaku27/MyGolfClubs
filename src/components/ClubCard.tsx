@@ -239,6 +239,12 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                 <span className="spec-label">トルク</span>
                 <span className="spec-value">{club.torque != null ? club.torque.toFixed(1) : '-'}</span>
               </div>
+              {club.condition && (
+                <div className="spec-row">
+                  <span className="spec-label">調子</span>
+                  <span className="spec-value">{club.condition}</span>
+                </div>
+              )}
               {club.notes && (
                 <div className="spec-row notes">
                   <span className="spec-label">ノート</span>

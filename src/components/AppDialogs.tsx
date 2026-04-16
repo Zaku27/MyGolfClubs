@@ -68,7 +68,7 @@ export function AppDialogs({
               反映したくない場合は「いいえ」を選択してください。
             </p>
             <div className="image-propagation-actions">
-              <button type="button" className="btn-secondary" onClick={() => void onConfirmPropagation()}>
+              <button type="button" className="btn-secondary" onClick={() => void onCancelImagePropagation()}>
                 いいえ
               </button>
               <button type="button" className="btn-primary" onClick={() => void onConfirmPropagation()}>

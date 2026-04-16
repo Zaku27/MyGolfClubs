@@ -196,8 +196,8 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
 
     const rect = wrapper.getBoundingClientRect();
     const maxSize = Math.min(rect.width, rect.height);
-    // Start with a reasonable default size (70% of the available space)
-    const defaultSize = Math.max(200, Math.floor(maxSize * 0.7));
+    // Start with 100% of the available space
+    const defaultSize = Math.max(200, Math.floor(maxSize * 1.0));
     setCropSize(defaultSize);
     // Center the crop area
     const x = Math.max(0, (rect.width - defaultSize) / 2);
@@ -608,7 +608,7 @@ export function ClubImageUploader({ imageData, onImageDataChange, onError }: Clu
                   id="cropSize"
                   type="range"
                   min="50"
-                  max="800"
+                  max={cropWrapperRef.current ? Math.min(cropWrapperRef.current.clientWidth, cropWrapperRef.current.clientHeight) : 800}
                   value={cropSize}
                   onChange={(e) => handleCropSizeChange(parseInt(e.target.value, 10))}
                 />

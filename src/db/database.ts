@@ -83,6 +83,19 @@ export class GolfBagDatabase extends Dexie {
       actualShotRows: 'bagId',
       appSettings: 'id',
     });
+    // v8: add condition field for shaft condition
+    this.version(8).stores({
+      clubs: '++id, name',
+      golfBags: '++id, name',
+      personalData: 'clubId',
+      actualShotRows: 'bagId',
+      appSettings: 'id',
+    }).upgrade(async (tx) => {
+      await tx.table('clubs').toCollection().modify(() => {
+        // condition field is optional, so no default value needed
+        // existing clubs will have undefined condition
+      });
+    });
   }
 }
 

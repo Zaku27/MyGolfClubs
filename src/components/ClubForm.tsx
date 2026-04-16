@@ -45,6 +45,7 @@ const EMPTY_FORM_DATA: ClubFormData = {
   bounceAngle: undefined,
   shaftType: '',
   torque: 0,
+  condition: undefined,
   flex: 'S',
   distance: 0,
   notes: '',
@@ -67,22 +68,29 @@ const toFormData = (source?: GolfClub): ClubFormData => {
   }
 
   const derivedStandard = source.lengthStandard ?? source.length;
-  const derivedAdjustment = source.lengthAdjustment ?? (source.length - derivedStandard);
+  const derivedAdjustment = source.lengthAdjustment ?? 0;
   const derivedLieStandard = source.lieStandard ?? source.lieAngle;
-  const derivedLieAdjustment = source.lieAdjustment ?? (source.lieAngle - derivedLieStandard);
+  const derivedLieAdjustment = source.lieAdjustment ?? 0;
+
+  // Ensure total values are consistent with breakdown values
+  // If lengthStandard is not available, use source.length directly as total
+  const calculatedLength = source.lengthStandard != null 
+    ? derivedStandard + derivedAdjustment 
+    : source.length;
+  const calculatedLieAngle = derivedLieStandard + derivedLieAdjustment;
 
   return {
     clubType: source.clubType,
     name: source.name,
     number: source.number,
-    length: source.length,
+    length: calculatedLength,
     lengthStandard: derivedStandard,
     lengthAdjustment: derivedAdjustment,
     lieStandard: derivedLieStandard,
     lieAdjustment: derivedLieAdjustment,
     weight: source.weight,
     swingWeight: source.swingWeight,
-    lieAngle: source.lieAngle,
+    lieAngle: calculatedLieAngle,
     loftAngle: source.loftAngle,
     bounceAngle: source.clubType === 'Wedge' ? source.bounceAngle : undefined,
     shaftType: source.shaftType,
@@ -106,18 +114,18 @@ export const ClubForm: React.FC<ClubFormProps> = ({
   const [formData, setFormData] = useState<ClubFormData>(() => toFormData(club));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showLengthBreakdown, setShowLengthBreakdown] = useState<boolean>(() =>
-    club !== undefined && (club.lengthStandard != null || club.lengthAdjustment != null)
+    club !== undefined && club.lengthStandard != null && club.lengthAdjustment != null && club.lengthAdjustment !== 0
   );
   const [showLieBreakdown, setShowLieBreakdown] = useState<boolean>(() =>
-    club !== undefined && (club.lieStandard != null || club.lieAdjustment != null)
+    club !== undefined && (club.lieAdjustment != null && club.lieAdjustment !== 0)
   );
 
   const toggleLengthBreakdown = () => {
     setShowLengthBreakdown((prev) => {
       if (!prev) {
-        // 内訳を開く: 現在の長さを標準長さに初期値として設定
+        // 内訳を開く: 新規クラブの場合のみ初期化、既存クラブは現在の値を保持
         setFormData((fd) => {
-          if (fd.lengthStandard === 0 && fd.lengthAdjustment === 0 && fd.length > 0) {
+          if (!club && fd.lengthStandard === 0 && fd.lengthAdjustment === 0 && fd.length > 0) {
             return { ...fd, lengthStandard: fd.length, lengthAdjustment: 0 };
           }
           return fd;
@@ -130,6 +138,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
   const toggleLieBreakdown = () => {
     setShowLieBreakdown((prev) => {
       if (!prev) {
+        // 内訳を開く: 既存の標準ライ角と調整値を保持
         setFormData((fd) => {
           if (fd.lieStandard === 0 && fd.lieAdjustment === 0 && fd.lieAngle > 0) {
             return { ...fd, lieStandard: fd.lieAngle, lieAdjustment: 0 };
@@ -156,14 +165,14 @@ export const ClubForm: React.FC<ClubFormProps> = ({
       const defaults = buildClubDefaults(clubType);
       setFormData((prev) => ({
         ...defaults,
-        lengthStandard: defaults.length,
-        lengthAdjustment: 0,
-        lieStandard: defaults.lieAngle,
-        lieAdjustment: 0,
         name: prev.name,
         swingWeight: clubType === 'Putter' ? '' : defaults.swingWeight,
         distance: clubType === 'Putter' ? 0 : defaults.distance,
         imageData: prev.imageData,
+        lengthStandard: defaults.length,
+        lengthAdjustment: 0,
+        lieStandard: defaults.lieAngle,
+        lieAdjustment: 0,
       }));
     }
     setNumberPreset(clubType === 'Putter' ? 'Putter' : inferNumberPreset(clubType, nextNumber));
@@ -192,13 +201,35 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         const val = parseFloat(value) || 0;
         const std = name === 'lengthStandard' ? val : prev.lengthStandard;
         const adj = name === 'lengthAdjustment' ? val : prev.lengthAdjustment;
-        return { ...prev, [name]: val, length: std + adj };
+        const newLength = std + adj;
+        
+        // 新規クラブで調整値が0の場合は内訳を閉じる
+        if (!club && adj === 0) {
+          setShowLengthBreakdown(false);
+        }
+        
+        return { ...prev, [name]: val, length: newLength, lengthStandard: std };
       }
       if (name === 'lieStandard' || name === 'lieAdjustment') {
         const val = parseFloat(value) || 0;
         const std = name === 'lieStandard' ? val : prev.lieStandard;
         const adj = name === 'lieAdjustment' ? val : prev.lieAdjustment;
-        return { ...prev, [name]: val, lieAngle: std + adj };
+        const newLieAngle = std + adj;
+        
+        // 調整値が0の場合は内訳を閉じる
+        if (adj === 0) {
+          setShowLieBreakdown(false);
+        }
+        
+        return { ...prev, [name]: val, lieAngle: newLieAngle };
+      }
+      if (name === 'length') {
+        const val = parseFloat(value) || 0;
+        // When user enters length directly, update total length
+        return { ...prev, length: val };
+      }
+      if (name.includes('Angle') || name === 'weight') {
+        return { ...prev, [name]: parseFloat(value) || 0 };
       }
       if (name === 'torque') {
         return { ...prev, [name]: parseFloat(value) || 0 };
@@ -211,9 +242,6 @@ export const ClubForm: React.FC<ClubFormProps> = ({
       }
       if (name === 'clubType') {
         return prev;
-      }
-      if (name.includes('Angle') || name === 'length' || name === 'weight') {
-        return { ...prev, [name]: parseFloat(value) || 0 };
       }
       return { ...prev, [name]: value };
     });
@@ -309,13 +337,22 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     if (validateForm()) {
       const selectedClubType = formData.clubType as ClubCategory;
       onSubmit({
-        ...formData,
         clubType: selectedClubType,
+        name: formData.name,
         number: normalizeClubNumberForPreset(selectedClubType, formData.number),
-        bounceAngle: selectedClubType === 'Wedge' ? formData.bounceAngle : undefined,
+        length: formData.length,
+        weight: formData.weight,
         swingWeight: selectedClubType === 'Putter' ? '' : formData.swingWeight.trim(),
+        lieAngle: formData.lieAngle,
+        loftAngle: formData.loftAngle,
+        bounceAngle: selectedClubType === 'Wedge' ? formData.bounceAngle : undefined,
+        shaftType: formData.shaftType,
         torque: selectedClubType === 'Putter' ? 0 : formData.torque,
+        condition: formData.condition,
+        flex: formData.flex,
         distance: selectedClubType === 'Putter' ? 0 : formData.distance,
+        notes: formData.notes,
+        imageData: formData.imageData,
       });
     }
   };
@@ -540,7 +577,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           {showLengthBreakdown ? (
             <div className="length-breakdown-inputs">
               <div className="length-breakdown-field">
-                <span className="length-breakdown-label">標準長さ(カタログ)</span>
+                <span className="length-breakdown-label">標準長さ</span>
                 <input
                   type="number"
                   name="lengthStandard"
@@ -566,7 +603,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               <span className="length-op">=</span>
               <div className="length-total">
                 <span className="length-total-label">合計</span>
-                <div className="length-total-value">{formData.length || 0}</div>
+                <div className="length-total-value">{(formData.lengthStandard || 0) + (formData.lengthAdjustment || 0)}</div>
               </div>
               <span className="form-help-text length-breakdown-note">標準長さに対する調整値を入力すると、合計が長さとして保存されます。</span>
             </div>
@@ -605,7 +642,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
                   name="lieStandard"
                   value={formData.lieStandard || ''}
                   onChange={handleChange}
-                  step="0.5"
+                  step="0.25"
                   min="0"
                   placeholder="例: 62.0"
                 />
@@ -636,7 +673,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               name="lieAngle"
               value={formData.lieAngle || ''}
               onChange={handleChange}
-              step="0.5"
+              step="0.25"
             />
           )}
         </div>
@@ -713,6 +750,24 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               step="0.1"
               min="0"
             />
+          </div>
+        )}
+        {formData.clubType !== 'Putter' && (
+          <div className="form-group">
+            <label htmlFor="condition">調子</label>
+            <select
+              id="condition"
+              name="condition"
+              value={formData.condition || ''}
+              onChange={handleChange}
+            >
+              <option value="">選択してください</option>
+              <option value="先調子">先調子</option>
+              <option value="先中調子">先中調子</option>
+              <option value="中調子">中調子</option>
+              <option value="中元調子">中元調子</option>
+              <option value="手元調子">手元調子</option>
+            </select>
           </div>
         )}
       </div>

@@ -8,6 +8,7 @@ const MAX_BAG_CLUBS = 14;
 const CLUB_VALUE_DEFAULTS = {
   number: '',
   torque: 0,
+  condition: undefined,
   flex: 'R' as GolfClub['flex'],
   distance: 0,
   swingWeight: '',
@@ -51,6 +52,7 @@ const normalizeClubRecord = (club: GolfClub): GolfClub => ({
   ...club,
   number: club.number ?? CLUB_VALUE_DEFAULTS.number,
   torque: club.torque ?? CLUB_VALUE_DEFAULTS.torque,
+  condition: club.condition ?? CLUB_VALUE_DEFAULTS.condition,
   flex: club.flex ?? CLUB_VALUE_DEFAULTS.flex,
   distance: club.distance ?? CLUB_VALUE_DEFAULTS.distance,
   swingWeight: club.swingWeight ?? CLUB_VALUE_DEFAULTS.swingWeight,
