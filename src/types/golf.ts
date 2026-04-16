@@ -21,7 +21,7 @@ export interface GolfClub {
   torque: number; // トルク（小数1桁）
   condition?: '先調子' | '先中調子' | '中調子' | '中元調子' | '手元調子'; // 調子（省略可）
   flex: 'S' | 'SR' | 'R' | 'A' | 'L'; // フレックス
-  distance: number; // 飛距離（整数）
+  distance: number; // 飛距離（小数1桁）
   notes: string;
   imageData?: string[];
   createdAt?: string;
