@@ -27,6 +27,7 @@ type ClubStoreActions = {
   renameBag: (id: number, name: string) => Promise<void>;
   updateBagImage: (id: number, imageData: string[]) => Promise<void>;
   updateBagSwingSettings: (id: number, settings: { swingWeightTarget?: number; swingGoodTolerance?: number; swingAdjustThreshold?: number }) => Promise<void>;
+  updateBagClubIds: (id: number, clubIds: number[]) => Promise<void>;
   deleteBag: (id: number) => Promise<void>;
   setActiveBag: (id: number) => Promise<void>;
   moveBagLeft: (id: number) => Promise<void>;
@@ -295,6 +296,25 @@ export const useClubStore = create<ClubStore>((set) => ({
     set({ error: null });
     try {
       await ClubService.updateBag(id, settings);
+      const bags = await ClubService.getAllBags();
+      const updatedBag = bags.find(bag => bag.id === id);
+      if (updatedBag) {
+        set(state => ({
+          bags: state.bags.map(bag => bag.id === id ? updatedBag : bag),
+          error: null
+        }));
+        // Invalidate cache to ensure activeBag is recalculated
+        invalidateActiveGolfBagCache();
+      }
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  updateBagClubIds: async (id, clubIds) => {
+    set({ error: null });
+    try {
+      await ClubService.updateBag(id, { clubIds });
       const bags = await ClubService.getAllBags();
       const updatedBag = bags.find(bag => bag.id === id);
       if (updatedBag) {

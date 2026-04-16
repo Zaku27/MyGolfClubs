@@ -1,4 +1,4 @@
-import type { GolfClub } from '../types/golf';
+import type { GolfClub, GolfBag, AccessoryItem } from '../types/golf';
 
 type ExportableClub = Omit<GolfClub, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -19,8 +19,28 @@ type BagClubsExportPayload = {
   clubs: ExportableClub[];
 };
 
+type ExportableBag = Omit<GolfBag, 'id' | 'createdAt' | 'updatedAt'>;
+
+type ExportableAccessory = Omit<AccessoryItem, 'id' | 'createdAt'>;
+
+type CompleteDataExportPayload = {
+  format: 'complete-data-v1';
+  exportedAt: string;
+  clubCount: number;
+  bagCount: number;
+  accessoryCount: number;
+  clubs: ExportableClub[];
+  bags: ExportableBag[];
+  accessories: ExportableAccessory[];
+};
+
 const sanitizeClubForTransfer = (club: GolfClub): ExportableClub => {
   const { id, createdAt, updatedAt, ...rest } = club;
+  return rest;
+};
+
+const sanitizeBagForTransfer = (bag: GolfBag): ExportableBag => {
+  const { id, createdAt, updatedAt, ...rest } = bag;
   return rest;
 };
 
@@ -56,6 +76,45 @@ export const readClubsFromJsonFile = async (
   const parsed = JSON.parse(text);
   const clubs = parseTransferPayload(parsed);
   return clubs.map((club) => ({ ...club }));
+};
+
+export const readCompleteDataFromJsonFile = async (
+  file: File,
+): Promise<{ clubs: Omit<GolfClub, 'id'>[]; bags: Omit<GolfBag, 'id'>[]; accessories: Omit<AccessoryItem, 'id' | 'createdAt'>[] }> => {
+  const text = await file.text();
+  const parsed = JSON.parse(text);
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('JSON形式が不正です');
+  }
+
+  const data = parsed as { format?: unknown; clubs?: unknown; bags?: unknown; accessories?: unknown };
+
+  if (data.format === 'complete-data-v1') {
+    if (!isExportableClubArray(data.clubs)) {
+      throw new Error('クラブ配列が見つかりません');
+    }
+    if (!Array.isArray(data.bags)) {
+      throw new Error('バッグ配列が見つかりません');
+    }
+    if (!Array.isArray(data.accessories)) {
+      throw new Error('アクセサリー配列が見つかりません');
+    }
+
+    return {
+      clubs: data.clubs.map((club) => ({ ...club })),
+      bags: data.bags.map((bag) => ({ ...bag })),
+      accessories: data.accessories.map((acc) => ({ ...acc })),
+    };
+  }
+
+  // Fallback to old format (only clubs)
+  const clubs = parseTransferPayload(parsed);
+  return {
+    clubs: clubs.map((club) => ({ ...club })),
+    bags: [],
+    accessories: [],
+  };
 };
 
 export const downloadAllClubsAsJson = (
@@ -107,6 +166,38 @@ export const downloadBagClubsAsJson = (
 
   anchor.href = url;
   anchor.download = filename ?? `golf_bag_${safeFileBagName || 'main'}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+};
+
+export const downloadCompleteDataAsJson = (
+  clubs: GolfClub[],
+  bags: GolfBag[],
+  accessories: AccessoryItem[],
+  filename = 'golf_complete_data.json',
+): void => {
+  const payload: CompleteDataExportPayload = {
+    format: 'complete-data-v1',
+    exportedAt: new Date().toISOString(),
+    clubCount: clubs.length,
+    bagCount: bags.length,
+    accessoryCount: accessories.length,
+    clubs: clubs.map(sanitizeClubForTransfer),
+    bags: bags.map(sanitizeBagForTransfer),
+    accessories: accessories.map((acc) => {
+      const { id, createdAt, ...rest } = acc;
+      return rest;
+    }),
+  };
+  const data = JSON.stringify(payload, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+
+  anchor.href = url;
+  anchor.download = filename;
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);

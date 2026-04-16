@@ -133,11 +133,15 @@ function App() {
   };
 
   const handleExportJSON = () => {
-    clubActions.handleExportJSON(appSettings.clubListScope);
+    clubActions.handleExportJSON(appSettings.clubListScope, appSettings.accessories);
   };
 
   const handleImportJSON = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    await clubActions.handleImportJSON(event);
+    const importedAccessories = await clubActions.handleImportJSON(event);
+    // Restore imported accessories
+    for (const accessory of importedAccessories) {
+      appSettings.handleAddAccessory(accessory);
+    }
     appSettings.handleChangeClubListScope('bag');
   };
 

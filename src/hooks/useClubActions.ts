@@ -2,11 +2,10 @@ import { useCallback, useMemo } from 'react';
 import { useClubStore, selectSortedActiveBagClubs, selectActiveGolfBag, selectSortedClubsForDisplay } from '../store/clubStore';
 import { getClubTypeDisplay } from '../utils/clubUtils';
 import {
-  downloadAllClubsAsJson,
-  downloadBagClubsAsJson,
-  readClubsFromJsonFile,
+  downloadCompleteDataAsJson,
+  readCompleteDataFromJsonFile,
 } from '../utils/clubTransfer';
-import type { GolfClub } from '../types/golf';
+import type { GolfClub, AccessoryItem } from '../types/golf';
 import type { UseUIStateReturn } from './useUIState';
 
 export const useClubActions = (uiState: UseUIStateReturn) => {
@@ -29,6 +28,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     replaceActiveBagClubIds,
     updateBagImage,
     updateBagSwingSettings,
+    updateBagClubIds,
     moveBagLeft,
     moveBagRight,
   } = useClubStore();
@@ -166,39 +166,70 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
   }, [openConfirmDialog, clearAllClubs, handleFormCancel]);
 
   // Import/Export operations
-  const handleImportJSON = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportJSON = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<Omit<AccessoryItem, 'id' | 'createdAt'>[]> => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) return [];
 
     try {
-      const importedClubs = await readClubsFromJsonFile(file);
+      const { clubs: importedClubs, bags: importedBags, accessories: importedAccessories } = await readCompleteDataFromJsonFile(file);
 
       await clearAllClubs();
       for (const club of importedClubs) {
         await addClub(club);
       }
       await loadClubs();
+
+      // Import bags if available
+      if (importedBags.length > 0) {
+        for (const bag of importedBags) {
+          await createBag(bag.name);
+        }
+        await loadBags();
+
+        // Update bags with clubIds and other properties
+        const currentBags = useClubStore.getState().bags;
+        for (let i = 0; i < importedBags.length && i < currentBags.length; i++) {
+          const importedBag = importedBags[i];
+          const currentBag = currentBags[i];
+          if (currentBag.id) {
+            // Update clubIds
+            await updateBagClubIds(currentBag.id, importedBag.clubIds);
+            // Update imageData if present
+            if (importedBag.imageData) {
+              await updateBagImage(currentBag.id, importedBag.imageData);
+            }
+            // Update swing settings if present
+            if (importedBag.swingWeightTarget || importedBag.swingGoodTolerance || importedBag.swingAdjustThreshold) {
+              await updateBagSwingSettings(currentBag.id, {
+                swingWeightTarget: importedBag.swingWeightTarget,
+                swingGoodTolerance: importedBag.swingGoodTolerance,
+                swingAdjustThreshold: importedBag.swingAdjustThreshold,
+              });
+            }
+          }
+        }
+        await loadBags();
+      }
+
+      // Set active bag to first imported bag or default
       const nextClubIds = sortedClubs
         .slice(0, 14)
         .map((club) => club.id)
         .filter((clubId): clubId is number => typeof clubId === 'number');
       await replaceActiveBagClubIds(nextClubIds);
       alert('インポートが完了しました');
+      return importedAccessories;
     } catch (error) {
       alert('インポートに失敗しました: ' + (error as Error).message);
+      return [];
     }
 
     event.target.value = '';
-  }, [clearAllClubs, addClub, loadClubs, sortedClubs, replaceActiveBagClubIds]);
+  }, [clearAllClubs, addClub, loadClubs, sortedClubs, replaceActiveBagClubIds, createBag, loadBags, updateBagImage, updateBagSwingSettings, updateBagClubIds]);
 
-  const handleExportJSON = useCallback((clubListScope: 'bag' | 'all') => {
-    if (clubListScope === 'bag' && activeBag) {
-      downloadBagClubsAsJson(activeBag.name, activeBagClubs);
-      return;
-    }
-
-    downloadAllClubsAsJson(sortedClubs);
-  }, [activeBag, activeBagClubs, sortedClubs]);
+  const handleExportJSON = useCallback((_clubListScope: 'bag' | 'all', accessories: AccessoryItem[] = []) => {
+    downloadCompleteDataAsJson(sortedClubs, bags, accessories);
+  }, [sortedClubs, bags]);
 
   // Bag operations
   const handleCreateBag = useCallback(async (bagName: string) => {
