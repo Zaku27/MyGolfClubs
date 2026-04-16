@@ -49,7 +49,7 @@ export const AnalysisSwingChart = ({
   <div className="analysis-card chart-card swing-weight-frame">
     {hasAnySwingWeightData ? (
       <>
-        <SwingLegend swingGoodTolerance={swingGoodTolerance ?? 2} />
+        <SwingLegend swingGoodTolerance={swingGoodTolerance ?? 2} swingAdjustThreshold={swingAdjustThreshold} />
         <div className="swing-chart-toolbar">
           <span className="swing-target-badge">
             <i className="legend-standard-line" />
