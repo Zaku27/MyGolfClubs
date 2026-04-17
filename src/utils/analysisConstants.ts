@@ -25,6 +25,11 @@ export const WEIGHT_LIGHT_OUTLIER_THRESHOLD = 15;
 export const DISTANCE_GAP_NARROW_THRESHOLD = 8;
 export const DISTANCE_GAP_WIDE_THRESHOLD = 18;
 
+// Distance gap coefficient calculation
+export const DISTANCE_GAP_COEFFICIENT_AT_45 = 3.5;
+export const DISTANCE_GAP_COEFFICIENT_AT_30 = 2.5;
+export const DEFAULT_HEAD_SPEED = 45;
+
 export const SWING_WEIGHT_FULL_PATTERN = /^([A-F])([0-9](?:\.[0-9])?)$/;
 export const SWING_WEIGHT_LEGACY_PATTERN = /^([0-9](?:\.[0-9])?)$/;
 export const SWING_WEIGHT_BASE_LETTER_CODE = 'A'.charCodeAt(0);

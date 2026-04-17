@@ -271,11 +271,9 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     }
 
     // Check for gaps in distance coverage using loft-based projected gaps
-    const headSpeed = readStoredNumber('golfbag-head-speed', 42, { min: 0.1 });
     const { tableClubs: loftLengthTable } = buildLoftLengthComparisonAnalysis(
       bagClubs,
       () => true,
-      headSpeed,
     );
 
     // Find clubs with large projected distance gaps using common function

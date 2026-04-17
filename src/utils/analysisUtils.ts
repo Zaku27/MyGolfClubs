@@ -6,6 +6,8 @@ import { getAnalysisClubKey, getClubTypeDisplay } from './clubUtils';
 import {
   CATEGORY_VISUAL_CONFIG,
   CLUB_TYPE_CATEGORY_MAP,
+  DISTANCE_GAP_COEFFICIENT_AT_30,
+  DISTANCE_GAP_COEFFICIENT_AT_45,
   DISTANCE_GAP_NARROW_THRESHOLD,
   DISTANCE_GAP_WIDE_THRESHOLD,
   DISTANCE_MODELS,
@@ -209,6 +211,54 @@ export const isDistanceGapNarrow = (gap: number | null): boolean => {
 
 export const isDistanceGapNormal = (gap: number | null): boolean => {
   return gap !== null && gap >= DISTANCE_GAP_NARROW_THRESHOLD && gap <= DISTANCE_GAP_WIDE_THRESHOLD;
+};
+
+export const estimateHeadSpeedFromClubs = (clubs: GolfClub[]): number | null => {
+  const clubsWithDistance = clubs.filter(
+    (club) => club.distance != null && club.distance > 0 && club.loftAngle != null && club.loftAngle > 0
+  );
+
+  if (clubsWithDistance.length === 0) {
+    return null;
+  }
+
+  const headSpeeds: number[] = [];
+
+  for (const club of clubsWithDistance) {
+    const category = getClubCategoryByType(club.clubType ?? '');
+    const model = DISTANCE_MODELS[category];
+
+    // 基本式を逆算: headSpeed = (distance - base - (loft - standardLoft) * loftCoeff) / speedCoeff + 44.5
+    const loftAngle = club.loftAngle ?? 0;
+    const distance = club.distance ?? 0;
+
+    const headSpeed =
+      (distance - model.base - (loftAngle - model.standardLoft) * model.loftCoeff) / model.speedCoeff + 44.5;
+
+    if (Number.isFinite(headSpeed) && headSpeed > 20 && headSpeed < 70) {
+      headSpeeds.push(headSpeed);
+    }
+  }
+
+  if (headSpeeds.length === 0) {
+    return null;
+  }
+
+  // 平均を返す
+  return headSpeeds.reduce((sum, hs) => sum + hs, 0) / headSpeeds.length;
+};
+
+export const calculateDistanceGapCoefficient = (headSpeed: number): number => {
+  // ヘッドスピード45で係数3.5、ヘッドスピード30で係数2.5になるように線形補完
+  // coefficient = a * headSpeed + b
+  // 3.5 = a * 45 + b
+  // 2.5 = a * 30 + b
+  // 差分: 1.0 = a * 15 → a = 0.0667
+  // b = 3.5 - 0.0667 * 45 = 0.5
+  const a = (DISTANCE_GAP_COEFFICIENT_AT_45 - DISTANCE_GAP_COEFFICIENT_AT_30) / (45 - 30);
+  const b = DISTANCE_GAP_COEFFICIENT_AT_45 - a * 45;
+
+  return a * headSpeed + b;
 };
 
 export const getWeightLengthDotRadius = (club: Pick<GolfClub, 'clubType'>) => {
