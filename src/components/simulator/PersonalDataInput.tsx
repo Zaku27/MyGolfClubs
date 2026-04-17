@@ -473,21 +473,22 @@ export function PersonalDataInput() {
 
     const alwaysVisible = () => true;
 
-    const { tableClubs: swingTable } = buildSwingWeightAnalysis(
-      clubs,
-      swingWeightTarget,
-      swingGoodTolerance,
-      swingAdjustThreshold,
-      alwaysVisible,
-    );
-    for (const club of swingTable) {
-      const clubId = toSimClub(club).id;
-      if (club.swingStatus === "調整推奨") {
-        addPenalty(clubId, 8, "スイングウェイト: 調整推奨");
-      } else if (club.swingStatus !== "良好") {
-        addPenalty(clubId, 4, `スイングウェイト: ${club.swingStatus}`);
-      }
-    }
+    // SW分布分析を無効化（SWと長さタブに統合）
+    // const { tableClubs: swingTable } = buildSwingWeightAnalysis(
+    //   clubs,
+    //   swingWeightTarget,
+    //   swingGoodTolerance,
+    //   swingAdjustThreshold,
+    //   alwaysVisible,
+    // );
+    // for (const club of swingTable) {
+    //   const clubId = toSimClub(club).id;
+    //   if (club.swingStatus === "調整推奨") {
+    //     addPenalty(clubId, 8, "スイングウェイト: 調整推奨");
+    //   } else if (club.swingStatus !== "良好") {
+    //     addPenalty(clubId, 4, `スイングウェイト: ${club.swingStatus}`);
+    //   }
+    // }
 
     const { tableClubs: weightTable } = buildWeightLengthAnalysis(clubs, alwaysVisible);
     for (const club of weightTable) {
@@ -517,9 +518,9 @@ export function PersonalDataInput() {
     return penaltyMap;
   }, [
     clubs,
-    swingWeightTarget,
-    swingGoodTolerance,
-    swingAdjustThreshold,
+    // swingWeightTarget,
+    // swingGoodTolerance,
+    // swingAdjustThreshold,
     userLieAngleStandards,
   ]);
 

@@ -3,9 +3,9 @@ export type AnalysisTab =
   | 'loftDistance'
   | 'lieAngle'
   | 'lieLength'
-  | 'swingWeight'
+  // | 'swingWeight'
   | 'swingLength'
-  | 'specComparison'
+  // | 'specComparison'
   | 'summary';
 
 const ANALYSIS_TAB_OPTIONS: Array<{ tab: AnalysisTab; label: string }> = [
@@ -13,20 +13,20 @@ const ANALYSIS_TAB_OPTIONS: Array<{ tab: AnalysisTab; label: string }> = [
   { tab: 'lieAngle', label: 'ライ角分布' },
   { tab: 'lieLength', label: 'ライ角と長さ' },
   { tab: 'weightLength', label: '重量と長さ' },
-  { tab: 'swingWeight', label: 'SW分布' },
+  // { tab: 'swingWeight', label: 'SW分布' },
   { tab: 'swingLength', label: 'SWと長さ' },
-  { tab: 'specComparison', label: '3軸比較' },
+  // { tab: 'specComparison', label: '3軸比較' },
   { tab: 'summary', label: 'まとめ & おすすめ' },
 ];
 
 const ANALYSIS_TAB_TITLE: Record<AnalysisTab, string> = {
   weightLength: '重量 - 長さ',
   loftDistance: 'ロフト - 飛距離',
-  swingWeight: 'スイングウェイト分布',
+  // swingWeight: 'スイングウェイト分布',
   swingLength: 'スイングウェイト - 長さ',
   lieAngle: 'ライ角分布',
   lieLength: 'ライ角 - 長さ',
-  specComparison: 'ロフト・重量・ライ角の比較',
+  // specComparison: 'ロフト・重量・ライ角の比較',
   summary: 'クラブセット分析まとめ',
 };
 
@@ -34,16 +34,16 @@ const ANALYSIS_TAB_SUBTITLE: Record<AnalysisTab, string> = {
   weightLength: '回帰トレンドからの偏差で、重すぎるクラブと軽すぎるクラブをすぐに判別できます。',
   loftDistance:
     '各クラブの実測飛距離を入力してください。実測値が分からない場合は、推定飛距離を参考にしてください。',
-  swingWeight:
-    'スイングウェイトのばらつきを可視化し、調整が必要なクラブを特定できます。',
+  // swingWeight:
+  //   'スイングウェイトのばらつきを可視化し、調整が必要なクラブを特定できます。',
   swingLength:
     '長さに対するスイングウェイトの傾斜を分析し、理想的なラインからの偏差を確認できます。',
   lieAngle:
     '全クラブのライ角分布を確認し、アイアンセットの一貫性やフィッティング問題を把握できます。',
   lieLength:
     '回帰トレンドからの偏差で、アップライト寄り/フラット寄りのクラブを見つけやすくします。',
-  specComparison:
-    'ロフト角-長さ、重量-長さ、ライ角分布を同時に表示して、セット全体の整合性を確認できます。',
+  // specComparison:
+  //   'ロフト角-長さ、重量-長さ、ライ角分布を同時に表示して、セット全体の整合性を確認できます。',
   summary:
     '現在のクラブセットの分析結果をまとめ、おすすめの新クラブと調整案を提案します。',
 };
