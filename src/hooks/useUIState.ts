@@ -27,6 +27,7 @@ export const useUIState = () => {
   const [showRenameBagDialog, setShowRenameBagDialog] = useState(false);
   const [renameBagTargetId, setRenameBagTargetId] = useState<number | null>(null);
   const [renameBagDefaultName, setRenameBagDefaultName] = useState('');
+  const [renameBagDefaultImageData, setRenameBagDefaultImageData] = useState<string | undefined>(undefined);
 
   // Search and filter states
   const [clubNameSearchText, setClubNameSearchText] = useState('');
@@ -129,9 +130,10 @@ export const useUIState = () => {
     setShowCreateBagDialog(false);
   }, []);
 
-  const handleShowRenameBagDialog = useCallback((bagId: number, defaultName: string) => {
+  const handleShowRenameBagDialog = useCallback((bagId: number, defaultName: string, defaultImageData?: string) => {
     setRenameBagTargetId(bagId);
     setRenameBagDefaultName(defaultName);
+    setRenameBagDefaultImageData(defaultImageData);
     setShowRenameBagDialog(true);
   }, []);
 
@@ -139,6 +141,7 @@ export const useUIState = () => {
     setShowRenameBagDialog(false);
     setRenameBagTargetId(null);
     setRenameBagDefaultName('');
+    setRenameBagDefaultImageData(undefined);
   }, []);
 
   // Search and filter handlers
@@ -170,6 +173,7 @@ export const useUIState = () => {
     showRenameBagDialog,
     renameBagTargetId,
     renameBagDefaultName,
+    renameBagDefaultImageData,
     clubNameSearchText,
     clubTypeFilter,
 

@@ -1,5 +1,4 @@
-import { useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import { useState } from 'react';
 import type { GolfBag } from '../types/golf';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import './GolfBagPanel.css';
@@ -14,7 +13,6 @@ type GolfBagPanelProps = {
   maxClubs?: number;
   onSelectBag: (bagId: number) => void;
   onCreateBag?: () => void;
-  onAddBagImage?: (bagId: number, imageData: string[]) => void;
   onRenameActiveBag?: () => void;
   onDeleteActiveBag?: () => void;
   onShiftSelectedBagLeft?: () => void;
@@ -32,7 +30,6 @@ export const GolfBagPanel = ({
   maxClubs = 14,
   onSelectBag,
   onCreateBag,
-  onAddBagImage,
   onRenameActiveBag,
   onDeleteActiveBag,
   onShiftSelectedBagLeft,
@@ -41,34 +38,10 @@ export const GolfBagPanel = ({
   compact = true,
   description,
 }: GolfBagPanelProps) => {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const activeBag = bags.find((bag) => bag.id === activeBagId) ?? bags[0] ?? null;
   const activeImage = activeBag ? (activeBag.imageData?.[0] ?? '/images/GolfBag.png') : undefined;
   const tooltipText = description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。';
-
-  const handleImageClick = () => {
-    if (!activeBag || !onAddBagImage) {
-      return;
-    }
-    fileInputRef.current?.click();
-  };
-
-  const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file || !activeBag || !onAddBagImage) {
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        onAddBagImage(activeBag.id ?? 0, [reader.result]);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleDeleteClick = () => {
     setDeleteConfirmOpen(true);
@@ -94,8 +67,7 @@ export const GolfBagPanel = ({
               <button
                 type="button"
                 className={`golf-bag-panel-image ${activeImage ? 'with-image' : ''}`}
-                onClick={handleImageClick}
-                aria-label={activeImage ? 'バッグ画像を変更' : 'バッグ画像を追加'}
+                aria-label={activeImage ? 'バッグ画像' : 'バッグ画像'}
               >
                 {activeBag ? (
                   <img src={activeImage} alt={`バッグ ${activeBag.name} の画像`} />
@@ -109,13 +81,6 @@ export const GolfBagPanel = ({
                 {tooltipText}
               </span>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageFileChange}
-              hidden
-            />
           </div>
         </div>
       )}

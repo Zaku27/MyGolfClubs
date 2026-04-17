@@ -23,8 +23,8 @@ type ClubStoreActions = {
   initializeDefaults: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
   clearAllClubs: () => Promise<void>;
-  createBag: (name: string) => Promise<void>;
-  renameBag: (id: number, name: string) => Promise<void>;
+  createBag: (name: string, imageData?: string[]) => Promise<void>;
+  renameBag: (id: number, name: string, imageData?: string[]) => Promise<void>;
   updateBagImage: (id: number, imageData: string[]) => Promise<void>;
   updateBagSwingSettings: (id: number, settings: { swingWeightTarget?: number; swingGoodTolerance?: number; swingAdjustThreshold?: number }) => Promise<void>;
   updateBagClubIds: (id: number, clubIds: number[]) => Promise<void>;
@@ -258,10 +258,13 @@ export const useClubStore = create<ClubStore>((set) => ({
     }
   },
 
-  createBag: async (name) => {
+  createBag: async (name, imageData) => {
     set({ error: null });
     try {
       const bagId = await ClubService.createBag(name);
+      if (imageData) {
+        await ClubService.updateBag(bagId, { imageData });
+      }
       const bags = await ClubService.getAllBags();
       await ClubService.setActiveBagId(bagId);
       set({ bags, activeBagId: bagId, error: null });
@@ -270,10 +273,13 @@ export const useClubStore = create<ClubStore>((set) => ({
     }
   },
 
-  renameBag: async (id, name) => {
+  renameBag: async (id, name, imageData) => {
     set({ error: null });
     try {
       await ClubService.updateBag(id, { name });
+      if (imageData) {
+        await ClubService.updateBag(id, { imageData });
+      }
       const bags = await ClubService.getAllBags();
       set({ bags, error: null });
     } catch (error) {

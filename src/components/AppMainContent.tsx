@@ -47,7 +47,6 @@ export type AppMainContentProps = {
   handleResetLieStandards: () => void;
   onSelectBag: (bagId: number) => void;
   onCreateBag: () => void;
-  onAddBagImage: (bagId: number, imageData: string[]) => void;
   onRenameActiveBag: () => void;
   onDeleteActiveBag: () => void;
   onShiftSelectedBagLeft: () => void;
@@ -116,7 +115,6 @@ export function AppMainContent({
   handleResetLieStandards,
   onSelectBag,
   onCreateBag,
-  onAddBagImage,
   onRenameActiveBag,
   onDeleteActiveBag,
   onShiftSelectedBagLeft,
@@ -198,7 +196,6 @@ export function AppMainContent({
               activeBagClubCount={activeBagClubCount}
               onSelectBag={onSelectBag}
               onCreateBag={onCreateBag}
-              onAddBagImage={onAddBagImage}
               onRenameActiveBag={onRenameActiveBag}
               onDeleteActiveBag={onDeleteActiveBag}
               onShiftSelectedBagLeft={onShiftSelectedBagLeft}

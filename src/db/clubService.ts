@@ -281,8 +281,8 @@ export class ClubService {
       .sort((left, right) => (left.createdAt ?? '').localeCompare(right.createdAt ?? ''));
   }
 
-  static async createBag(name: string, clubIds: number[] = []): Promise<number> {
-    return db.golfBags.add(createBagRecord(name, clubIds));
+  static async createBag(name: string, clubIds: number[] = [], imageData?: string[]): Promise<number> {
+    return db.golfBags.add(createBagRecord(name, clubIds, imageData));
   }
 
   static async updateBag(

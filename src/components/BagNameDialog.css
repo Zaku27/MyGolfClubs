@@ -68,6 +68,99 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22);
 }
 
+.bag-image-upload-area {
+  position: relative;
+  width: 100%;
+  min-height: 120px;
+}
+
+.bag-image-with-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bag-image-preview {
+  width: 100%;
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 14px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+.bag-image-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.bag-change-image-btn,
+.bag-remove-image-btn {
+  padding: 8px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bag-change-image-btn:hover {
+  background: #f0f9ff;
+  border-color: #3b82f6;
+}
+
+.bag-remove-image-btn:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.bag-upload-placeholder {
+  position: relative;
+  width: 100%;
+  min-height: 120px;
+  border: 2px dashed #bfdbfe;
+  border-radius: 14px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bag-upload-placeholder:hover {
+  border-color: #3b82f6;
+  background: #f0f9ff;
+}
+
+.bag-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.bag-upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.bag-upload-icon {
+  font-size: 32px;
+  opacity: 0.6;
+}
+
 .bag-name-actions {
   margin-top: 18px;
   display: flex;

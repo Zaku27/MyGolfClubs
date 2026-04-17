@@ -88,8 +88,8 @@ function App() {
   };
 
   // Bag management handlers
-  const handleCreateBagConfirm = async (bagName: string) => {
-    await clubActions.handleCreateBag(bagName);
+  const handleCreateBagConfirm = async (bagName: string, imageData?: string) => {
+    await clubActions.handleCreateBag(bagName, imageData ? [imageData] : undefined);
     uiState.handleHideCreateBagDialog();
     appSettings.handleChangeClubListScope('bag');
   };
@@ -98,14 +98,14 @@ function App() {
     if (!activeBag?.id) {
       return;
     }
-    uiState.handleShowRenameBagDialog(activeBag.id, activeBag.name);
+    uiState.handleShowRenameBagDialog(activeBag.id, activeBag.name, activeBag.imageData?.[0]);
   };
 
-  const handleRenameBagConfirm = async (bagName: string) => {
+  const handleRenameBagConfirm = async (bagName: string, imageData?: string) => {
     if (!uiState.renameBagTargetId) {
       return;
     }
-    await clubActions.handleRenameBag(uiState.renameBagTargetId, bagName);
+    await clubActions.handleRenameBag(uiState.renameBagTargetId, bagName, imageData ? [imageData] : undefined);
     uiState.handleHideRenameBagDialog();
   };
 
@@ -184,10 +184,6 @@ function App() {
     uiState.handleShowFormWithClub(club);
   };
 
-  const handleAddBagImage = async (bagId: number, imageData: string[]) => {
-    await clubActions.handleAddBagImage(bagId, imageData);
-  };
-
   return (
     <>
       <Helmet>
@@ -216,6 +212,7 @@ function App() {
         showCreateBagDialog={uiState.showCreateBagDialog}
         showRenameBagDialog={uiState.showRenameBagDialog}
         renameBagDefaultName={uiState.renameBagDefaultName}
+        renameBagDefaultImageData={uiState.renameBagDefaultImageData}
         bags={bags}
         loading={clubActions.loading}
         onCreateBagConfirm={handleCreateBagConfirm}
@@ -266,7 +263,6 @@ function App() {
           clubActions.setActiveBag(bagId);
         }}
         onCreateBag={uiState.handleShowCreateBagDialog}
-        onAddBagImage={handleAddBagImage}
         onRenameActiveBag={handleRenameActiveBag}
         onDeleteActiveBag={handleDeleteActiveBag}
         onShiftSelectedBagLeft={handleShiftSelectedBagLeft}

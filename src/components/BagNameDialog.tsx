@@ -6,11 +6,12 @@ interface BagNameDialogProps {
   title?: string;
   message?: string;
   defaultValue: string;
+  defaultImageData?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   isSubmitting?: boolean;
   onCancel: () => void;
-  onConfirm: (bagName: string) => void | Promise<void>;
+  onConfirm: (bagName: string, imageData?: string) => void | Promise<void>;
 }
 
 export function BagNameDialog({
@@ -18,6 +19,7 @@ export function BagNameDialog({
   title = '新しいバッグを追加',
   message = 'バッグ名を入力してください。あとから変更できます。',
   defaultValue,
+  defaultImageData,
   confirmLabel = '追加する',
   cancelLabel = 'キャンセル',
   isSubmitting = false,
@@ -25,7 +27,9 @@ export function BagNameDialog({
   onConfirm,
 }: BagNameDialogProps) {
   const [bagName, setBagName] = useState(defaultValue);
+  const [imageData, setImageData] = useState(defaultImageData ?? '');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -33,6 +37,7 @@ export function BagNameDialog({
     }
 
     setBagName(defaultValue);
+    setImageData(defaultImageData ?? '');
     const timer = window.setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
@@ -41,7 +46,7 @@ export function BagNameDialog({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [defaultValue, open]);
+  }, [defaultValue, defaultImageData, open]);
 
   if (!open) {
     return null;
@@ -54,7 +59,23 @@ export function BagNameDialog({
     if (!trimmedName || isSubmitting) {
       return;
     }
-    await onConfirm(trimmedName);
+    await onConfirm(trimmedName, imageData || undefined);
+  };
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        setImageData(result);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -76,6 +97,47 @@ export function BagNameDialog({
           placeholder="例: メインバッグ"
           className="bag-name-input"
         />
+
+        <label className="bag-name-input-label">
+          画像
+        </label>
+        <div className="bag-image-upload-area">
+          {imageData ? (
+            <div className="bag-image-with-controls">
+              <img src={imageData} alt="バッグ画像" className="bag-image-preview" />
+              <div className="bag-image-controls">
+                <button
+                  type="button"
+                  className="bag-change-image-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  画像を変更
+                </button>
+                <button
+                  type="button"
+                  className="bag-remove-image-btn"
+                  onClick={() => setImageData('')}
+                >
+                  画像を削除
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bag-upload-placeholder">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="bag-file-input"
+              />
+              <div className="bag-upload-content">
+                <div className="bag-upload-icon">📷</div>
+                <span>画像を選択</span>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="bag-name-actions">
           <button type="button" className="btn-secondary" onClick={onCancel} disabled={isSubmitting}>
             {cancelLabel}

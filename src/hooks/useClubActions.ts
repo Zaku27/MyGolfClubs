@@ -232,12 +232,12 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
   }, [sortedClubs, bags]);
 
   // Bag operations
-  const handleCreateBag = useCallback(async (bagName: string) => {
-    await createBag(bagName);
+  const handleCreateBag = useCallback(async (bagName: string, imageData?: string[]) => {
+    await createBag(bagName, imageData);
   }, [createBag]);
 
-  const handleRenameBag = useCallback(async (bagId: number, bagName: string) => {
-    await renameBag(bagId, bagName);
+  const handleRenameBag = useCallback(async (bagId: number, bagName: string, imageData?: string[]) => {
+    await renameBag(bagId, bagName, imageData);
   }, [renameBag]);
 
   const handleDeleteBag = useCallback(async (bagId: number, bagName: string) => {

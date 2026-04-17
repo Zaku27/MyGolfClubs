@@ -15,11 +15,12 @@ export type AppDialogsProps = {
   showCreateBagDialog: boolean;
   showRenameBagDialog: boolean;
   renameBagDefaultName: string;
+  renameBagDefaultImageData?: string;
   bags: GolfBag[];
   loading: boolean;
-  onCreateBagConfirm: (bagName: string) => Promise<void>;
+  onCreateBagConfirm: (bagName: string, imageData?: string) => Promise<void>;
   onCancelCreateBag: () => void;
-  onRenameBagConfirm: (bagName: string) => Promise<void>;
+  onRenameBagConfirm: (bagName: string, imageData?: string) => Promise<void>;
   onCancelRenameBag: () => void;
 };
 
@@ -44,6 +45,7 @@ export function AppDialogs({
   showCreateBagDialog,
   showRenameBagDialog,
   renameBagDefaultName,
+  renameBagDefaultImageData,
   bags,
   loading,
   onCreateBagConfirm,
@@ -108,6 +110,7 @@ export function AppDialogs({
         title="バッグ名を変更"
         message="新しいバッグ名を入力してください。"
         defaultValue={renameBagDefaultName}
+        defaultImageData={renameBagDefaultImageData}
         confirmLabel="保存する"
         cancelLabel="キャンセル"
         isSubmitting={loading}
