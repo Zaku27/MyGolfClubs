@@ -23,7 +23,7 @@ export const WEIGHT_LIGHT_OUTLIER_THRESHOLD = 15;
 
 export const SWING_WEIGHT_FULL_PATTERN = /^([A-F])([0-9](?:\.[0-9])?)$/;
 export const SWING_WEIGHT_LEGACY_PATTERN = /^([0-9](?:\.[0-9])?)$/;
-export const SWING_WEIGHT_BASE_LETTER_CODE = 'D'.charCodeAt(0);
+export const SWING_WEIGHT_BASE_LETTER_CODE = 'A'.charCodeAt(0);
 
 export const CATEGORY_VISUAL_CONFIG: Record<ClubCategory, CategoryVisualConfig> = {
   driver: { label: 'ドライバー', color: '#1976d2', lieBarColor: '#1976d2' },

@@ -29,6 +29,8 @@ type AnalysisLoftChartProps = {
     bottom: number;
   };
   CHART_WIDTH: number;
+  headSpeed: number;
+  onHeadSpeedChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 };
 
 const formatGapClubSummary = (club: LoftChartClub): string => {
@@ -61,6 +63,8 @@ export const AnalysisLoftChart: React.FC<AnalysisLoftChartProps> = ({
   getCategoryColor,
   LOFT_CHART_PADDING,
   CHART_WIDTH,
+  headSpeed,
+  onHeadSpeedChange,
 }) => {
   const evaluatedGapClubs = chartClubs.filter((club) => club.projectedDistanceGap != null);
   const narrowGapClubs = evaluatedGapClubs.filter((club) => (club.projectedDistanceGap ?? 0) < 8);
@@ -86,7 +90,24 @@ export const AnalysisLoftChart: React.FC<AnalysisLoftChartProps> = ({
 
   return (
     <div className="analysis-card chart-card">
-      <LoftLegend />
+      <div className="chart-card-header">
+        <LoftLegend />
+        <label className="headspeed-control">
+          <span>ヘッドスピード</span>
+          <div className="headspeed-input-wrap">
+            <input
+              type="number"
+              min="30"
+              max="60"
+              step="0.1"
+              value={headSpeed}
+              onChange={onHeadSpeedChange}
+              className="analysis-input headspeed-input"
+            />
+            <em>m/s</em>
+          </div>
+        </label>
+      </div>
       <AnalysisChartWrapper
         containerRef={loftChartContainerRef}
         chartSize={loftChartSize}

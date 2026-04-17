@@ -22,7 +22,7 @@ type AnalysisSwingLengthChartProps = {
   mapSwingLengthX: (value: number) => number;
   swingLengthTrendLinePoints: string | null;
   swingLengthClubs: SwingLengthChartClub[];
-  getSwingLengthPointStyle: (club: SwingLengthChartClub, deviation: number) => {
+  getSwingLengthPointStyle: (club: SwingLengthChartClub, deviation: number, goodTolerance: number, adjustThreshold: number) => {
     radius: number;
     fill: string;
     stroke: string;
@@ -33,8 +33,10 @@ type AnalysisSwingLengthChartProps = {
   swingLengthTooltipRef: RefObject<HTMLDivElement | null>;
   swingLengthTooltipPos: { left?: number; top?: number } | null;
   getCategoryLabel: (category: ClubCategory) => string;
-  getSwingLengthDeviationLabel: (deviation: number) => string;
+  getSwingLengthDeviationLabel: (deviation: number, goodTolerance: number, adjustThreshold: number) => string;
   formatSignedSwingWeight: (value: number) => string;
+  swingGoodTolerance: number;
+  swingAdjustThreshold: number;
   SWING_LENGTH_CHART_PADDING: {
     left: number;
     right: number;
@@ -64,6 +66,8 @@ export const AnalysisSwingLengthChart: React.FC<AnalysisSwingLengthChartProps> =
   getCategoryLabel,
   getSwingLengthDeviationLabel,
   formatSignedSwingWeight,
+  swingGoodTolerance,
+  swingAdjustThreshold,
   SWING_LENGTH_CHART_PADDING,
   regressionSlope,
 }) => {
@@ -163,7 +167,7 @@ export const AnalysisSwingLengthChart: React.FC<AnalysisSwingLengthChartProps> =
                 )}
 
                 {swingLengthClubs.map((club, index) => {
-                  const style = getSwingLengthPointStyle(club, club.deviationFromTrend);
+                  const style = getSwingLengthPointStyle(club, club.deviationFromTrend, swingGoodTolerance, swingAdjustThreshold);
                   return (
                     <g
                       key={`sl-${getAnalysisClubKey(club)}`}
@@ -261,7 +265,7 @@ export const AnalysisSwingLengthChart: React.FC<AnalysisSwingLengthChartProps> =
                     <div className="chart-tooltip-row">
                       <span className="chart-tooltip-label">偏差</span>
                       <span className="chart-tooltip-value">
-                        {getSwingLengthDeviationLabel(swingLengthTooltip.club.deviationFromTrend)}
+                        {getSwingLengthDeviationLabel(swingLengthTooltip.club.deviationFromTrend, swingGoodTolerance, swingAdjustThreshold)}
                       </span>
                     </div>
                     <div className="chart-tooltip-row">

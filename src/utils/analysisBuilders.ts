@@ -521,6 +521,8 @@ const DEFAULT_SWING_LENGTH_BOUNDS = {
 export const buildSwingLengthAnalysis = (
   clubs: GolfClub[],
   isVisible: ClubVisibilityPredicate,
+  swingGoodTolerance: number,
+  swingAdjustThreshold: number,
 ) => {
   const baseClubs = sortClubsForDisplay(
     clubs.filter(
@@ -528,7 +530,7 @@ export const buildSwingLengthAnalysis = (
         Number.isFinite(club.length) &&
         club.length > 0 &&
         club.swingWeight &&
-        swingWeightToNumeric(club.swingWeight) > 0 &&
+        swingWeightToNumeric(club.swingWeight) !== 0 &&
         getClubCategory(club) !== 'putter',
     ),
   ).map(withCategory);
@@ -542,7 +544,7 @@ export const buildSwingLengthAnalysis = (
     const swingWeightNumeric = swingWeightToNumeric(club.swingWeight ?? '');
     const expectedSwingWeight = getExpectedSwingWeight(club.length, regression);
     const deviationFromTrend = swingWeightNumeric - expectedSwingWeight;
-    const trendStatus = getSwingLengthTrendStatus(deviationFromTrend);
+    const trendStatus = getSwingLengthTrendStatus(deviationFromTrend, swingGoodTolerance, swingAdjustThreshold);
 
     return {
       ...club,
@@ -555,7 +557,7 @@ export const buildSwingLengthAnalysis = (
 
   const visibility = splitByVisibility(tableClubs, isVisible);
   const bounds = visibility.hasVisibleData
-    ? getSwingLengthChartBounds(visibility.chartClubs as SwingLengthPoint[], regression)
+    ? getSwingLengthChartBounds(visibility.chartClubs as SwingLengthPoint[], regression, swingAdjustThreshold)
     : DEFAULT_SWING_LENGTH_BOUNDS;
 
   return {

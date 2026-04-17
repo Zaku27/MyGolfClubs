@@ -23,8 +23,8 @@ const ACCESSORY_STORAGE_KEY = 'golfbag-accessories';
 
 // Default values
 const DEFAULT_SWING_TARGET = 2.0;
-const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
-const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
+const DEFAULT_SWING_GOOD_TOLERANCE = 1.0;
+const DEFAULT_SWING_ADJUST_THRESHOLD = 1.5;
 const DEFAULT_ACCESSORIES: AccessoryItem[] = [];
 
 // Parser functions

@@ -97,6 +97,56 @@ export class GolfBagDatabase extends Dexie {
         // existing clubs will have undefined condition
       });
     });
+    // v9: migrate swing weight from D-base (D0=0) to A-base (A0=0) by adding 30
+    this.version(9).stores({
+      clubs: '++id, name',
+      golfBags: '++id, name, createdAt',
+      personalData: 'clubId',
+      actualShotRows: 'bagId',
+      appSettings: 'id',
+    }).upgrade(async (tx) => {
+      // Migrate club swingWeight strings
+      const oldSwingWeightToNumeric = (swingWeightRaw: string): number => {
+        const normalized = (swingWeightRaw ?? '').trim().toUpperCase().replace(/\s+/g, '');
+        const fullMatch = normalized.match(/^([A-F])([0-9](?:\.[0-9])?)$/);
+        const legacyMatch = normalized.match(/^([0-9](?:\.[0-9])?)$/);
+        if (!fullMatch && !legacyMatch) return 0;
+        const letter = fullMatch ? fullMatch[1] : 'D';
+        const point = Number(fullMatch ? fullMatch[2] : legacyMatch?.[1]);
+        if (!Number.isFinite(point) || point < 0 || point > 9.9) return 0;
+        const letterIndex = letter.charCodeAt(0) - 'D'.charCodeAt(0);
+        return letterIndex * 10 + point;
+      };
+
+      const newNumericToSwingWeightLabel = (value: number): string => {
+        const rounded = Math.round(value * 10) / 10;
+        const letterIndex = Math.floor(rounded / 10);
+        const point = rounded - letterIndex * 10;
+        const letterCode = 'A'.charCodeAt(0) + letterIndex;
+        if (letterCode < 'A'.charCodeAt(0) || letterCode > 'Z'.charCodeAt(0)) {
+          return rounded.toFixed(1);
+        }
+        const pointLabel = Number.isInteger(point) ? point.toFixed(0) : point.toFixed(1);
+        return `${String.fromCharCode(letterCode)}${pointLabel}`;
+      };
+
+      await tx.table('clubs').toCollection().modify((club) => {
+        if (club.swingWeight && club.swingWeight.trim()) {
+          const oldNumeric = oldSwingWeightToNumeric(club.swingWeight);
+          if (oldNumeric !== 0) {
+            const newNumeric = oldNumeric + 30;
+            club.swingWeight = newNumericToSwingWeightLabel(newNumeric);
+          }
+        }
+      });
+
+      // Migrate bag swingWeightTarget numbers
+      await tx.table('golfBags').toCollection().modify((bag) => {
+        if (bag.swingWeightTarget != null && typeof bag.swingWeightTarget === 'number') {
+          bag.swingWeightTarget = bag.swingWeightTarget + 30;
+        }
+      });
+    });
   }
 }
 

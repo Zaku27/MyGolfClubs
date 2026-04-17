@@ -38,14 +38,7 @@ export const swingWeightToNumeric = (swingWeightRaw: string): number => {
 
 export const numericToSwingWeightLabel = (value: number): string => {
   const rounded = Math.round(value * 10) / 10;
-  
-  // Handle negative values as C series
-  if (rounded < 0) {
-    const cPoint = 10 + rounded; // Convert -1 to 9, -3 to 7, etc.
-    const pointLabel = Number.isInteger(cPoint) ? cPoint.toFixed(0) : cPoint.toFixed(1);
-    return `C${pointLabel}`;
-  }
-  
+
   const letterIndex = Math.floor(rounded / 10);
   const point = rounded - letterIndex * 10;
   const letterCode = SWING_WEIGHT_BASE_LETTER_CODE + letterIndex;

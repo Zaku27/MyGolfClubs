@@ -72,8 +72,8 @@ const SWING_GOOD_TOLERANCE_STORAGE_KEY = "golfbag-swing-good-tolerance";
 const SWING_ADJUST_THRESHOLD_STORAGE_KEY = "golfbag-swing-adjust-threshold";
 const LIE_STANDARDS_STORAGE_KEY = "golfbag-user-lie-angle-standards";
 const DEFAULT_SWING_TARGET = 2.0;
-const DEFAULT_SWING_GOOD_TOLERANCE = 1.5;
-const DEFAULT_SWING_ADJUST_THRESHOLD = 2.0;
+const DEFAULT_SWING_GOOD_TOLERANCE = 1.0;
+const DEFAULT_SWING_ADJUST_THRESHOLD = 1.5;
 
 const clamp = (value: number, min: number, max: number): number => {
   if (Number.isNaN(value)) {

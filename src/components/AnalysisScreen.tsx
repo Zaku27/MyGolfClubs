@@ -50,7 +50,6 @@ import {
   MIN_DISTANCE,
   MIN_LOFT,
   SWING_LENGTH_CHART_PADDING,
-  SWING_LENGTH_TOLERANCE,
   SWING_PADDING,
   WEIGHT_CHART_PADDING,
   WEIGHT_NORMAL_BAND_TOLERANCE,
@@ -324,7 +323,7 @@ export const AnalysisScreen = ({
     swingWeightTicks,
     hasAnyData: hasAnySwingLengthData,
     hasVisibleData: hasSwingLengthData,
-  } = buildSwingLengthAnalysis(clubs, isClubVisible);
+  } = buildSwingLengthAnalysis(clubs, isClubVisible, swingGoodTolerance ?? 1.5, swingAdjustThreshold ?? 2.0);
 
   const { mapX: mapLoftX, mapY: mapLoftY } = createLoftChartMappers(
     loftChartSize,
@@ -439,7 +438,7 @@ export const AnalysisScreen = ({
       hasSwingLengthData,
       swingLengthBounds,
       swingLengthRegression,
-      SWING_LENGTH_TOLERANCE,
+      swingAdjustThreshold ?? 2.0,
       mapSwingLengthX,
       mapSwingLengthY,
     );
@@ -532,24 +531,9 @@ export const AnalysisScreen = ({
         getCategoryColor={getCategoryColor}
         LOFT_CHART_PADDING={LOFT_CHART_PADDING}
         CHART_WIDTH={CHART_WIDTH}
+        headSpeed={headSpeed}
+        onHeadSpeedChange={handleHeadSpeedChange}
       />
-      <div className="loft-chart-footer">
-        <label className="headspeed-control">
-          <span>ヘッドスピード</span>
-          <div className="headspeed-input-wrap">
-            <input
-              type="number"
-              min="30"
-              max="60"
-              step="0.1"
-              value={headSpeed}
-              onChange={handleHeadSpeedChange}
-              className="analysis-input headspeed-input"
-            />
-            <em>m/s</em>
-          </div>
-        </label>
-      </div>
     </div>
   );
 
@@ -574,6 +558,8 @@ export const AnalysisScreen = ({
       getCategoryLabel={getCategoryLabel}
       getSwingLengthDeviationLabel={getSwingLengthDeviationLabel}
       formatSignedSwingWeight={formatSignedSwingWeight}
+      swingGoodTolerance={swingGoodTolerance ?? 1.5}
+      swingAdjustThreshold={swingAdjustThreshold ?? 2.0}
       SWING_LENGTH_CHART_PADDING={SWING_LENGTH_CHART_PADDING}
       regressionSlope={swingLengthRegression.slope}
     />

@@ -779,9 +779,8 @@ export const isAnalysisClubVisible = (
 ): boolean => !hiddenClubKeys.has(getAnalysisClubKey(club));
 
 // Swing Length Analysis Constants
-const SWING_LENGTH_IDEAL_SLOPE_MIN = -1.2;
+const SWING_LENGTH_IDEAL_SLOPE_MIN = -0.8;
 const SWING_LENGTH_IDEAL_SLOPE_MAX = 0;
-const SWING_LENGTH_TOLERANCE = 2;
 
 const getSwingLengthFallbackRegression = (
   anchorLength: number,
@@ -802,7 +801,7 @@ export const getSwingLengthRegression = (
       Number.isFinite(club.length) &&
       club.length > 0 &&
       club.swingWeight &&
-      swingWeightToNumeric(club.swingWeight) > 0,
+      swingWeightToNumeric(club.swingWeight) !== 0,
   );
 
   if (validClubs.length === 0) {
@@ -844,15 +843,17 @@ export const getExpectedSwingWeight = (length: number, regression: WeightRegress
 
 export const getSwingLengthTrendStatus = (
   deviation: number,
+  goodTolerance: number,
+  adjustThreshold: number,
 ): SwingLengthPoint['trendStatus'] => {
   const absDeviation = Math.abs(deviation);
-  if (absDeviation <= 1.0) return '良好';
-  if (absDeviation <= SWING_LENGTH_TOLERANCE) return deviation > 0 ? 'やや重い' : 'やや軽い';
-  return '調整推奨';
+  if (absDeviation > adjustThreshold) return '調整推奨';
+  if (absDeviation <= goodTolerance) return '良好';
+  return deviation > 0 ? 'やや重い' : 'やや軽い';
 };
 
-export const getSwingLengthTrendMessage = (deviation: number): string => {
-  const status = getSwingLengthTrendStatus(deviation);
+export const getSwingLengthTrendMessage = (deviation: number, goodTolerance: number, adjustThreshold: number): string => {
+  const status = getSwingLengthTrendStatus(deviation, goodTolerance, adjustThreshold);
   if (status === '良好') return 'トレンド内';
   if (status === 'やや重い') return 'やや重め';
   if (status === 'やや軽い') return 'やや軽め';
@@ -862,8 +863,8 @@ export const getSwingLengthTrendMessage = (deviation: number): string => {
 export const formatSignedSwingWeight = (value: number): string =>
   `${value > 0 ? '+' : ''}${value.toFixed(1)}`;
 
-export const getSwingLengthDeviationLabel = (deviation: number): string => {
-  const status = getSwingLengthTrendStatus(deviation);
+export const getSwingLengthDeviationLabel = (deviation: number, goodTolerance: number, adjustThreshold: number): string => {
+  const status = getSwingLengthTrendStatus(deviation, goodTolerance, adjustThreshold);
   if (status === '良好') {
     return `${formatSignedSwingWeight(deviation)} / トレンド内`;
   }
@@ -875,8 +876,10 @@ export const getSwingLengthDeviationLabel = (deviation: number): string => {
 export const getSwingLengthPointStyle = (
   club: Pick<GolfClub, 'clubType'> & { category: ClubCategory },
   deviation: number,
+  goodTolerance: number,
+  adjustThreshold: number,
 ) => {
-  const status = getSwingLengthTrendStatus(deviation);
+  const status = getSwingLengthTrendStatus(deviation, goodTolerance, adjustThreshold);
 
   if (status === '調整推奨') {
     const color = deviation > 0 ? '#c62828' : '#1565c0';
@@ -909,6 +912,7 @@ export const getSwingLengthPointStyle = (
 export const getSwingLengthChartBounds = (
   points: SwingLengthPoint[],
   regression: WeightRegression,
+  adjustThreshold: number,
 ): {
   minLength: number;
   maxLength: number;
@@ -924,9 +928,9 @@ export const getSwingLengthChartBounds = (
   const minLength = Math.max(28, Math.floor(Math.min(...lengths) - 1));
   const maxLength = Math.min(50, Math.ceil(Math.max(...lengths) + 1));
   const projectedMinSwingWeight =
-    getExpectedSwingWeight(maxLength, regression) - SWING_LENGTH_TOLERANCE;
+    getExpectedSwingWeight(maxLength, regression) - adjustThreshold;
   const projectedMaxSwingWeight =
-    getExpectedSwingWeight(minLength, regression) + SWING_LENGTH_TOLERANCE;
+    getExpectedSwingWeight(minLength, regression) + adjustThreshold;
 
   const minSwingWeight = Math.max(
     -5,
@@ -965,7 +969,8 @@ export const getSwingLengthSlopeMessage = (slope: number): string => {
   const evaluation = evaluateSwingLengthSlope(slope);
   if (evaluation === 'ideal') return '傾斜良好';
   if (evaluation === 'tooSteep') return '傾斜が急すぎる';
-  return '傾斜が緩すぎる（フラット）';
+  if (slope === 0) return '傾斜フラット（許容範囲）';
+  return '傾斜がプラス（長いほど重くなる）';
 };
 
 export const buildSwingLengthTrendPoints = (
