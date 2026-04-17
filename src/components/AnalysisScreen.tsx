@@ -15,6 +15,7 @@ import { AnalysisSwingTable } from './AnalysisSwingTable';
 import { AnalysisWeightChart } from './AnalysisWeightChart';
 import { AnalysisWeightTable } from './AnalysisWeightTable';
 import { SummaryTab } from './SummaryTab';
+import { useSummary } from '../hooks/useSummary';
 import {
   useAnalysisInputHandlers,
   useAnalysisTooltip,
@@ -132,6 +133,9 @@ export const AnalysisScreen = ({
 }: AnalysisScreenProps) => {
   const [activeTab, setActiveTab] = useState<AnalysisTab>('loftDistance');
   const [localSwingWeightTarget, setLocalSwingWeightTarget] = useState(swingWeightTarget);
+
+  // Get summary data from useSummary hook
+  const summaryData = useSummary();
 
   // Sync local state with DB value when prop changes (bag switch, DB load, etc.)
   useEffect(() => {
@@ -693,18 +697,7 @@ export const AnalysisScreen = ({
           />
         </>
       ) : activeTab === 'summary' ? (
-        <SummaryTab
-          data={{
-            currentSet: {
-              clubCount: clubs.length,
-              avgDriverDistance: 230,
-              avg7IronDistance: 150,
-              potentialGain: 15,
-            },
-            recommendations: [],
-            adjustments: [],
-          }}
-        />
+        <SummaryTab data={summaryData} />
       ) : (
         <>
           <div className="analysis-card chart-card weight-length-frame">
