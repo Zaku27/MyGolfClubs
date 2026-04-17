@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import type { AccessoryItem } from '../types/golf';
+import { ConfirmationDialog } from './ConfirmationDialog';
 import './AccessoryPanel.css';
 import './SharedUI.css';
 
@@ -33,6 +34,8 @@ export const AccessoryPanel = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formState, setFormState] = useState<AccessoryFormState>(initialFormState);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [accessoryToDelete, setAccessoryToDelete] = useState<string | null>(null);
 
   const openAddDialog = () => {
     setFormState(initialFormState);
@@ -99,6 +102,24 @@ export const AccessoryPanel = ({
     closeDialog();
   };
 
+  const handleDeleteClick = (accessoryId: string) => {
+    setAccessoryToDelete(accessoryId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (accessoryToDelete) {
+      onDeleteAccessory(accessoryToDelete);
+    }
+    setDeleteConfirmOpen(false);
+    setAccessoryToDelete(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false);
+    setAccessoryToDelete(null);
+  };
+
   return (
     <section className="accessory-panel" aria-label="アクセサリー">
       <div className="accessory-panel-content">
@@ -139,7 +160,7 @@ export const AccessoryPanel = ({
                   <button
                     type="button"
                     className="btn-icon btn-delete"
-                    onClick={() => onDeleteAccessory(accessory.id)}
+                    onClick={() => handleDeleteClick(accessory.id)}
                     title="削除"
                     aria-label="削除"
                   >
@@ -250,6 +271,16 @@ export const AccessoryPanel = ({
           </div>
         </div>
       )}
+
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        title="削除の確認"
+        message="このアイテムを削除してもよろしいですか？"
+        confirmLabel="削除"
+        cancelLabel="キャンセル"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </section>
   );
 };

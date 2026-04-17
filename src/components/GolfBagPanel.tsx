@@ -1,6 +1,7 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { GolfBag } from '../types/golf';
+import { ConfirmationDialog } from './ConfirmationDialog';
 import './GolfBagPanel.css';
 import './SharedUI.css';
 
@@ -41,6 +42,7 @@ export const GolfBagPanel = ({
   description,
 }: GolfBagPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const activeBag = bags.find((bag) => bag.id === activeBagId) ?? bags[0] ?? null;
   const activeImage = activeBag ? (activeBag.imageData?.[0] ?? '/images/GolfBag.png') : undefined;
   const tooltipText = description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。';
@@ -66,6 +68,21 @@ export const GolfBagPanel = ({
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDeleteClick = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (onDeleteActiveBag) {
+      onDeleteActiveBag();
+    }
+    setDeleteConfirmOpen(false);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false);
   };
 
   return (
@@ -156,7 +173,7 @@ export const GolfBagPanel = ({
                   </button>
                 )}
                 {activeBag && bags.length > 1 && onDeleteActiveBag && (
-                  <button type="button" className="btn-icon btn-delete" onClick={onDeleteActiveBag} title="バッグを削除">
+                  <button type="button" className="btn-icon btn-delete" onClick={handleDeleteClick} title="バッグを削除">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="3 6 5 6 21 6"></polyline>
                       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -205,7 +222,7 @@ export const GolfBagPanel = ({
                   </button>
                 )}
                 {activeBag && bags.length > 1 && onDeleteActiveBag && (
-                  <button type="button" className="btn-icon btn-delete" onClick={onDeleteActiveBag} title="バッグを削除">
+                  <button type="button" className="btn-icon btn-delete" onClick={handleDeleteClick} title="バッグを削除">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="3 6 5 6 21 6"></polyline>
                       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -219,6 +236,16 @@ export const GolfBagPanel = ({
           </>
         )}
       </div>
+
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        title="削除の確認"
+        message="このゴルフバッグを削除してもよろしいですか？"
+        confirmLabel="削除"
+        cancelLabel="キャンセル"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </section>
   );
 };
