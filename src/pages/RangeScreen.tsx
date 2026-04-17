@@ -891,28 +891,33 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
   // ...existing code...
 
   return (
-    <div className="min-h-screen bg-green-50 flex flex-col items-center py-4 px-2">
-      {/* Header */}
-      <div className="w-full max-w-7xl flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-green-900">レンジシミュレーター</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/personal-data"
-            className="inline-flex items-center justify-center rounded bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-900 shadow hover:bg-emerald-200"
-          >
-            パーソナルデータへ
-          </Link>
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded bg-white px-3 py-2 text-sm font-semibold text-green-900 shadow border border-green-200 hover:bg-green-50"
-          >
-            ホームに戻る
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          {/* Header */}
+          <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">シミュレーター設定</p>
+              <h1 className="text-2xl font-bold text-slate-900">レンジシミュレーター</h1>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Link
+                to="/personal-data"
+                className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 transition-colors"
+              >
+                パーソナルデータへ
+              </Link>
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                ホームに戻る
+              </Link>
+            </div>
+          </div>
 
-      <div className="w-full max-w-7xl flex flex-col gap-4 lg:flex-row lg:items-start">
-        <main className="w-full lg:flex-1 flex flex-col gap-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+        <main className="w-full lg:flex-[1_1_0] min-w-0 flex flex-col gap-4">
           <RangeClubSelectionPanel
             clubs={clubs}
             selectableClubs={selectableClubs}
@@ -957,7 +962,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
           />
         </main>
 
-        <aside className="w-full lg:w-[340px] flex-shrink-0 flex flex-col gap-4">
+        <aside className="w-full lg:w-[340px] lg:flex-shrink-0 flex flex-col gap-4">
           <RangePlayerSettings
             seatType={seatType}
             robotHeadSpeed={robotHeadSpeed}
@@ -978,8 +983,6 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
                 showManagement={false}
                 showImage={false}
                 compact
-                title="使用するバッグ"
-                description="個人データと実測データではアクティブバッグに登録されたクラブを使用します。ロボットでは全クラブを使用します。"
               />
             </div>
           )}
@@ -1016,6 +1019,8 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
           )}
         </aside>
       </div>
+    </div>
+    </div>
     </div>
   );
 }

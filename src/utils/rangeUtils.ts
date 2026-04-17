@@ -76,7 +76,7 @@ export function clampAimXOffset(value: number): number {
 export type GroundHardness = "soft" | "medium" | "firm";
 
 export function formatGroundHardnessLabel(groundHardness: GroundHardness): string {
-  return groundHardness === 'soft' ? 'Soft' : groundHardness === 'firm' ? 'Firm' : 'Normal';
+  return groundHardness === 'soft' ? '柔らかい' : groundHardness === 'firm' ? '硬い' : '普通';
 }
 
 export type RangeConditionSettings = {

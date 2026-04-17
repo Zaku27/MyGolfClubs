@@ -32,7 +32,7 @@ export function RangeSimulationControls({
           </div>
         </div>
         <div className="rounded border border-green-200 bg-green-50 p-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 whitespace-nowrap">
               <label htmlFor="reuse-last-seed" className="block font-semibold text-green-900">
                 再実行時の乱数

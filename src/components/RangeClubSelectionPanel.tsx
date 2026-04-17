@@ -76,7 +76,7 @@ export function RangeClubSelectionPanel({
                     >
                       ?
                       <span className="help-tooltip-text whitespace-normal">
-                        Robot seat is not affected by club individual differences or personal data, so クラブ成功率 is always fixed at 100%.
+                        ロボットシートはクラブの個体差や個人データの影響を受けないため、クラブ成功率は常に100%で固定されます。
                       </span>
                     </button>
                   )}
