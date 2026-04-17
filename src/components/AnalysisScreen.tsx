@@ -12,6 +12,8 @@ import { AnalysisLoftChart } from './AnalysisLoftChart';
 import { AnalysisLoftLengthChart } from './AnalysisLoftLengthChart';
 import { AnalysisSwingChart } from './AnalysisSwingChart';
 import { AnalysisSwingTable } from './AnalysisSwingTable';
+import { AnalysisSwingLengthChart } from './AnalysisSwingLengthChart';
+import { AnalysisSwingLengthTable } from './AnalysisSwingLengthTable';
 import { AnalysisWeightChart } from './AnalysisWeightChart';
 import { AnalysisWeightTable } from './AnalysisWeightTable';
 import { SummaryTab } from './SummaryTab';
@@ -28,6 +30,7 @@ import {
   type LoftLengthTooltipState,
   type LoftTooltipState,
   type SwingTooltipState,
+  type SwingLengthTooltipState,
   type TooltipBoxSize,
   type WeightTooltipState,
 } from './analysisTypes';
@@ -46,6 +49,8 @@ import {
   MAX_LOFT,
   MIN_DISTANCE,
   MIN_LOFT,
+  SWING_LENGTH_CHART_PADDING,
+  SWING_LENGTH_TOLERANCE,
   SWING_PADDING,
   WEIGHT_CHART_PADDING,
   WEIGHT_NORMAL_BAND_TOLERANCE,
@@ -55,16 +60,20 @@ import {
   buildLieLengthTrendPoints,
   buildLieReferencePoints,
   buildWeightTrendPoints,
+  buildSwingLengthTrendPoints,
   createLieChartMappers,
   createLoftChartMappers,
   createSwingChartMappers,
   createWeightChartMappers,
   formatSignedGrams,
   formatSignedDegrees,
+  formatSignedSwingWeight,
   getCategoryColor,
   getCategoryLabel,
   getLieLengthDeviationLabel,
   getLieLengthPointStyle,
+  getSwingLengthDeviationLabel,
+  getSwingLengthPointStyle,
   getTooltipPosition,
   getWeightDeviationLabel,
   getWeightPointStyle,
@@ -76,6 +85,7 @@ import {
   buildLieLengthAnalysis,
   buildLoftDistanceAnalysis,
   buildLoftLengthComparisonAnalysis,
+  buildSwingLengthAnalysis,
   buildSwingWeightAnalysis,
   buildWeightLengthAnalysis,
 } from '../utils/analysisBuilders';
@@ -149,12 +159,14 @@ export const AnalysisScreen = ({
   const swingChartContainerRef = useRef<HTMLDivElement | null>(null);
   const lieChartContainerRef = useRef<HTMLDivElement | null>(null);
   const lieLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
+  const swingLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
   const loftTooltipRef = useRef<HTMLDivElement | null>(null);
   const loftLengthTooltipRef = useRef<HTMLDivElement | null>(null);
   const weightTooltipRef = useRef<HTMLDivElement | null>(null);
   const swingTooltipRef = useRef<HTMLDivElement | null>(null);
   const lieTooltipRef = useRef<HTMLDivElement | null>(null);
   const lieLengthTooltipRef = useRef<HTMLDivElement | null>(null);
+  const swingLengthTooltipRef = useRef<HTMLDivElement | null>(null);
 
   const hiddenClubKeySet = useMemo(() => new Set(hiddenAnalysisClubKeys), [hiddenAnalysisClubKeys]);
   const isClubVisible = useCallback(
@@ -170,6 +182,8 @@ export const AnalysisScreen = ({
   const { tooltip: lieTooltip, setRawTooltip: setLieTooltip } = useAnalysisTooltip<LieTooltipState>(isClubVisible);
   const { tooltip: lieLengthTooltip, setRawTooltip: setLieLengthTooltip } =
     useAnalysisTooltip<LieLengthTooltipState>(isClubVisible);
+  const { tooltip: swingLengthTooltip, setRawTooltip: setSwingLengthTooltip } =
+    useAnalysisTooltip<SwingLengthTooltipState>(isClubVisible);
   const { handleActualDistanceChange, handleHeadSpeedChange } = useAnalysisInputHandlers({
     onUpdateActualDistance,
     onHeadSpeedChange,
@@ -213,6 +227,11 @@ export const AnalysisScreen = ({
     lieLengthChartContainerRef,
     { width: CHART_WIDTH, height: CHART_HEIGHT },
   );
+  const swingLengthChartSize = useResponsiveChartSize(
+    activeTab === 'swingLength',
+    swingLengthChartContainerRef,
+    { width: CHART_WIDTH, height: CHART_HEIGHT },
+  );
 
   const loftTooltipBox: TooltipBoxSize = useTooltipBoxSize(loftTooltip, loftTooltipRef, { width: 200, height: 120 });
   const loftLengthTooltipBox: TooltipBoxSize = useTooltipBoxSize(loftLengthTooltip, loftLengthTooltipRef, { width: 240, height: 140 });
@@ -220,6 +239,7 @@ export const AnalysisScreen = ({
   const swingTooltipBox: TooltipBoxSize = useTooltipBoxSize(swingTooltip, swingTooltipRef, { width: 220, height: 130 });
   const lieTooltipBox: TooltipBoxSize = useTooltipBoxSize(lieTooltip, lieTooltipRef, { width: 200, height: 110 });
   const lieLengthTooltipBox: TooltipBoxSize = useTooltipBoxSize(lieLengthTooltip, lieLengthTooltipRef, { width: 220, height: 130 });
+  const swingLengthTooltipBox: TooltipBoxSize = useTooltipBoxSize(swingLengthTooltip, swingLengthTooltipRef, { width: 220, height: 130 });
 
   const {
     tableClubs: loftTableClubs,
@@ -294,6 +314,17 @@ export const AnalysisScreen = ({
     hasAnyData: hasAnyLieLengthData,
     hasVisibleData: hasLieLengthData,
   } = buildLieLengthAnalysis(clubs, LIE_LENGTH_TREND_BAND_TOLERANCE, isClubVisible);
+
+  const {
+    tableClubs: swingLengthTableClubs,
+    chartClubs: swingLengthClubs,
+    regression: swingLengthRegression,
+    bounds: swingLengthBounds,
+    lengthTicks: swingLengthLengthTicks,
+    swingWeightTicks,
+    hasAnyData: hasAnySwingLengthData,
+    hasVisibleData: hasSwingLengthData,
+  } = buildSwingLengthAnalysis(clubs, isClubVisible);
 
   const { mapX: mapLoftX, mapY: mapLoftY } = createLoftChartMappers(
     loftChartSize,
@@ -392,6 +423,27 @@ export const AnalysisScreen = ({
       mapLieLengthY,
     );
 
+  const { mapX: mapSwingLengthX, mapY: mapSwingLengthY } = createWeightChartMappers(
+    swingLengthChartSize,
+    SWING_LENGTH_CHART_PADDING,
+    {
+      minLength: swingLengthBounds.minLength,
+      maxLength: swingLengthBounds.maxLength,
+      minWeight: swingLengthBounds.minSwingWeight,
+      maxWeight: swingLengthBounds.maxSwingWeight,
+    },
+  );
+
+  const { linePoints: swingLengthTrendLinePoints, bandPoints: swingLengthTrendBandPoints } =
+    buildSwingLengthTrendPoints(
+      hasSwingLengthData,
+      swingLengthBounds,
+      swingLengthRegression,
+      SWING_LENGTH_TOLERANCE,
+      mapSwingLengthX,
+      mapSwingLengthY,
+    );
+
   const weightTooltipPos = weightTooltip
     ? getTooltipPosition(weightTooltip.x, weightTooltip.y, weightChartSize, weightTooltipBox)
     : null;
@@ -423,6 +475,15 @@ export const AnalysisScreen = ({
       lieLengthTooltip.y,
       lieLengthChartSize,
       lieLengthTooltipBox,
+    )
+    : null;
+
+  const swingLengthTooltipPos = swingLengthTooltip
+    ? getTooltipPosition(
+      swingLengthTooltip.x,
+      swingLengthTooltip.y,
+      swingLengthChartSize,
+      swingLengthTooltipBox,
     )
     : null;
 
@@ -490,6 +551,32 @@ export const AnalysisScreen = ({
         </label>
       </div>
     </div>
+  );
+
+  const renderSwingLengthChart = () => (
+    <AnalysisSwingLengthChart
+      hasAnySwingLengthData={hasAnySwingLengthData}
+      hasSwingLengthData={hasSwingLengthData}
+      swingLengthChartContainerRef={swingLengthChartContainerRef}
+      swingLengthChartSize={swingLengthChartSize}
+      swingLengthTrendBandPoints={swingLengthTrendBandPoints}
+      swingWeightTicks={swingWeightTicks}
+      mapSwingLengthY={mapSwingLengthY}
+      lengthTicks={swingLengthLengthTicks}
+      mapSwingLengthX={mapSwingLengthX}
+      swingLengthTrendLinePoints={swingLengthTrendLinePoints}
+      swingLengthClubs={swingLengthClubs}
+      getSwingLengthPointStyle={getSwingLengthPointStyle}
+      setSwingLengthTooltip={setSwingLengthTooltip}
+      swingLengthTooltip={swingLengthTooltip}
+      swingLengthTooltipRef={swingLengthTooltipRef}
+      swingLengthTooltipPos={swingLengthTooltipPos}
+      getCategoryLabel={getCategoryLabel}
+      getSwingLengthDeviationLabel={getSwingLengthDeviationLabel}
+      formatSignedSwingWeight={formatSignedSwingWeight}
+      SWING_LENGTH_CHART_PADDING={SWING_LENGTH_CHART_PADDING}
+      regressionSlope={swingLengthRegression.slope}
+    />
   );
 
   const renderSwingChart = () => (
@@ -681,6 +768,16 @@ export const AnalysisScreen = ({
       ) : activeTab === 'specComparison' ? (
         <>
           {renderSpecComparisonCharts()}
+        </>
+      ) : activeTab === 'swingLength' ? (
+        <>
+          {renderSwingLengthChart()}
+          <AnalysisSwingLengthTable
+            hasAnySwingLengthData={hasAnySwingLengthData}
+            swingLengthTableClubs={swingLengthTableClubs}
+            hiddenClubKeySet={hiddenClubKeySet}
+            onSetAnalysisClubVisible={onSetAnalysisClubVisible}
+          />
         </>
       ) : activeTab === 'lieLength' ? (
         <>

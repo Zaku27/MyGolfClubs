@@ -87,6 +87,13 @@ export type LoftLengthPoint = GolfClubData & {
   projectedSwingWeightImpact: number;
 };
 
+export type SwingLengthPoint = GolfClubData & {
+  swingWeightNumeric: number;
+  expectedSwingWeight: number;
+  deviationFromTrend: number;
+  trendStatus: '良好' | 'やや重い' | 'やや軽い' | '調整推奨';
+};
+
 type LieLengthChartBounds = {
   minLength: number;
   maxLength: number;
@@ -770,3 +777,225 @@ export const isAnalysisClubVisible = (
   club: GolfClub,
   hiddenClubKeys: Set<string>,
 ): boolean => !hiddenClubKeys.has(getAnalysisClubKey(club));
+
+// Swing Length Analysis Constants
+const SWING_LENGTH_IDEAL_SLOPE_MIN = -1.2;
+const SWING_LENGTH_IDEAL_SLOPE_MAX = 0;
+const SWING_LENGTH_TOLERANCE = 2;
+
+const getSwingLengthFallbackRegression = (
+  anchorLength: number,
+  anchorSwingWeight: number,
+): WeightRegression => {
+  const slope = -0.6;
+  return {
+    slope,
+    intercept: anchorSwingWeight - slope * anchorLength,
+  };
+};
+
+export const getSwingLengthRegression = (
+  clubs: Pick<GolfClub, 'length' | 'swingWeight'>[],
+): WeightRegression => {
+  const validClubs = clubs.filter(
+    (club) =>
+      Number.isFinite(club.length) &&
+      club.length > 0 &&
+      club.swingWeight &&
+      swingWeightToNumeric(club.swingWeight) > 0,
+  );
+
+  if (validClubs.length === 0) {
+    return { slope: -0.6, intercept: 30 };
+  }
+
+  const meanLength = validClubs.reduce((sum, club) => sum + club.length, 0) / validClubs.length;
+  const meanSwingWeight =
+    validClubs.reduce((sum, club) => sum + swingWeightToNumeric(club.swingWeight), 0) /
+    validClubs.length;
+
+  let numerator = 0;
+  let denominator = 0;
+
+  for (const club of validClubs) {
+    const dx = club.length - meanLength;
+    const swingWeightNum = swingWeightToNumeric(club.swingWeight);
+    numerator += dx * (swingWeightNum - meanSwingWeight);
+    denominator += dx * dx;
+  }
+
+  if (Math.abs(denominator) < 0.0001) {
+    return getSwingLengthFallbackRegression(meanLength, meanSwingWeight);
+  }
+
+  const slope = numerator / denominator;
+  if (!Number.isFinite(slope) || slope > 0.5 || slope < -2.5) {
+    return getSwingLengthFallbackRegression(meanLength, meanSwingWeight);
+  }
+
+  return {
+    slope,
+    intercept: meanSwingWeight - slope * meanLength,
+  };
+};
+
+export const getExpectedSwingWeight = (length: number, regression: WeightRegression) =>
+  regression.slope * length + regression.intercept;
+
+export const getSwingLengthTrendStatus = (
+  deviation: number,
+): SwingLengthPoint['trendStatus'] => {
+  const absDeviation = Math.abs(deviation);
+  if (absDeviation <= 1.0) return '良好';
+  if (absDeviation <= SWING_LENGTH_TOLERANCE) return deviation > 0 ? 'やや重い' : 'やや軽い';
+  return '調整推奨';
+};
+
+export const getSwingLengthTrendMessage = (deviation: number): string => {
+  const status = getSwingLengthTrendStatus(deviation);
+  if (status === '良好') return 'トレンド内';
+  if (status === 'やや重い') return 'やや重め';
+  if (status === 'やや軽い') return 'やや軽め';
+  return deviation > 0 ? '重すぎる傾向' : '軽すぎる傾向';
+};
+
+export const formatSignedSwingWeight = (value: number): string =>
+  `${value > 0 ? '+' : ''}${value.toFixed(1)}`;
+
+export const getSwingLengthDeviationLabel = (deviation: number): string => {
+  const status = getSwingLengthTrendStatus(deviation);
+  if (status === '良好') {
+    return `${formatSignedSwingWeight(deviation)} / トレンド内`;
+  }
+  return deviation > 0
+    ? `${formatSignedSwingWeight(deviation)} トレンドより重い`
+    : `${formatSignedSwingWeight(deviation)} トレンドより軽い`;
+};
+
+export const getSwingLengthPointStyle = (
+  club: Pick<GolfClub, 'clubType'> & { category: ClubCategory },
+  deviation: number,
+) => {
+  const status = getSwingLengthTrendStatus(deviation);
+
+  if (status === '調整推奨') {
+    const color = deviation > 0 ? '#c62828' : '#1565c0';
+    const stroke = deviation > 0 ? '#7f0000' : '#0d47a1';
+    return {
+      fill: color,
+      stroke,
+      strokeWidth: 2.5,
+      radius: 7,
+    };
+  }
+
+  if (status === 'やや重い' || status === 'やや軽い') {
+    return {
+      fill: getCategoryColor(club.category),
+      stroke: '#ef6c00',
+      strokeWidth: 2,
+      radius: 6.5,
+    };
+  }
+
+  return {
+    fill: getCategoryColor(club.category),
+    stroke: '#ffffff',
+    strokeWidth: 2,
+    radius: getWeightLengthDotRadius(club),
+  };
+};
+
+export const getSwingLengthChartBounds = (
+  points: SwingLengthPoint[],
+  regression: WeightRegression,
+): {
+  minLength: number;
+  maxLength: number;
+  minSwingWeight: number;
+  maxSwingWeight: number;
+  xInterval: number;
+  yInterval: number;
+} => {
+  const lengths = points.map((club) => club.length);
+  const swingWeights = points.map((club) => club.swingWeightNumeric);
+  const expectedSwingWeights = points.map((club) => club.expectedSwingWeight);
+
+  const minLength = Math.max(28, Math.floor(Math.min(...lengths) - 1));
+  const maxLength = Math.min(50, Math.ceil(Math.max(...lengths) + 1));
+  const projectedMinSwingWeight =
+    getExpectedSwingWeight(maxLength, regression) - SWING_LENGTH_TOLERANCE;
+  const projectedMaxSwingWeight =
+    getExpectedSwingWeight(minLength, regression) + SWING_LENGTH_TOLERANCE;
+
+  const minSwingWeight = Math.max(
+    -5,
+    Math.floor(
+      (Math.min(...swingWeights, ...expectedSwingWeights, projectedMinSwingWeight) - 2) / 2,
+    ) * 2,
+  );
+  const maxSwingWeight = Math.min(
+    45,
+    Math.ceil(
+      (Math.max(...swingWeights, ...expectedSwingWeights, projectedMaxSwingWeight) + 2) / 2,
+    ) * 2,
+  );
+
+  return {
+    minLength,
+    maxLength,
+    minSwingWeight,
+    maxSwingWeight,
+    xInterval: maxLength - minLength <= 12 ? 1 : 2,
+    yInterval: maxSwingWeight - minSwingWeight <= 16 ? 2 : 4,
+  };
+};
+
+export const evaluateSwingLengthSlope = (slope: number): 'ideal' | 'tooSteep' | 'tooFlat' => {
+  if (slope >= SWING_LENGTH_IDEAL_SLOPE_MIN && slope <= SWING_LENGTH_IDEAL_SLOPE_MAX) {
+    return 'ideal';
+  }
+  if (slope < SWING_LENGTH_IDEAL_SLOPE_MIN) {
+    return 'tooSteep';
+  }
+  return 'tooFlat';
+};
+
+export const getSwingLengthSlopeMessage = (slope: number): string => {
+  const evaluation = evaluateSwingLengthSlope(slope);
+  if (evaluation === 'ideal') return '傾斜良好';
+  if (evaluation === 'tooSteep') return '傾斜が急すぎる';
+  return '傾斜が緩すぎる（フラット）';
+};
+
+export const buildSwingLengthTrendPoints = (
+  hasData: boolean,
+  bounds: {
+    minLength: number;
+    maxLength: number;
+  },
+  regression: WeightRegression,
+  tolerance: number,
+  mapX: (length: number) => number,
+  mapY: (swingWeight: number) => number,
+) => {
+  if (!hasData) {
+    return { linePoints: '', bandPoints: '' };
+  }
+
+  const linePoints = [bounds.minLength, bounds.maxLength]
+    .map((length) => `${mapX(length)},${mapY(getExpectedSwingWeight(length, regression))}`)
+    .join(' ');
+
+  const upper = [bounds.minLength, bounds.maxLength]
+    .map((length) => `${mapX(length)},${mapY(getExpectedSwingWeight(length, regression) + tolerance)}`)
+    .join(' ');
+  const lower = [bounds.maxLength, bounds.minLength]
+    .map((length) => `${mapX(length)},${mapY(getExpectedSwingWeight(length, regression) - tolerance)}`)
+    .join(' ');
+
+  return {
+    linePoints,
+    bandPoints: `${upper} ${lower}`,
+  };
+};

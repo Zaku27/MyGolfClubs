@@ -1,0 +1,198 @@
+クラブセット分析とフィッティング提案のアルゴリズムを調査します。
+
+もう少し詳細な分析アルゴリズムを調べます。
+
+定数とライ角度基準も確認します。
+
+クラブセット分析のチューニング・フィッティング提案アルゴリズムを説明します。
+
+---
+
+## 分析アルゴリズム概要
+
+アプリケーションは **5つの独立した分析モジュール** で構成されています：
+
+| 分析項目 | 主要ファイル | 目的 |
+|---------|------------|------|
+| **重量・クラブ長分析** | `analysisBuilders.ts:116-159` | バランス調整の検出 |
+| **ロフト・クラブ長分析** | `analysisBuilders.ts:161-283` | ロフトギャップと調整量の算出 |
+| **スイングウェイト分析** | `analysisBuilders.ts:285-330` | ヘッド重量感の統一 |
+| **ライ角度分析** | `analysisBuilders.ts:332-356` | ソール接地の適正化 |
+| **飛距離推定** | `analysisUtils.ts:142-183` | 理論飛距離との比較 |
+
+---
+
+## 1. 重量・クラブ長分析アルゴリズム
+
+### 回帰分析による基準線算出
+```typescript
+@e:\Projects\MyGolfBag\src\utils\analysisUtils.ts:218-250
+const getWeightRegression = (clubs) => {
+  // 最小二乗法で 長さ→重量 の回帰直線を算出
+  const slope = numerator / denominator;  // 傾き（通常 -8 g/inch程度）
+  const intercept = meanWeight - slope * meanLength;
+  
+  // 傾きが -1以上（緩すぎる）場合はフォールバック値を使用
+  if (slope >= -1) return getWeightFallbackRegression(meanLength, meanWeight);
+};
+```
+
+### フィッティング判定基準 (`analysisRules.ts:11-16`)
+| 偏差分類 | 閾値 | 提案内容 |
+|---------|------|---------|
+| `heavyOutlier` | `> +15g` | 「バランス確認推奨」 |
+| `lightOutlier` | `< -15g` | 「軽量側の確認推奨」 |
+| `inBand` | `±12g以内` | 「トレンド内」 |
+| `outOfBand` | その他 | 「ややトレンド外」 |
+
+---
+
+## 2. ロフト・クラブ長分析（最複雑）
+
+### カテゴリ別回帰の仕組み
+```typescript
+@e:\Projects\MyGolfBag\src\utils\analysisBuilders.ts:181-204
+// クラブをカテゴリ（ドライバー/ウッド/ハイブリッド/アイアン/ウェッジ）に分類
+const categoryGroups = visibleBaseClubs.reduce(...);
+
+// 各カテゴリで独立した回帰線を算出
+const categoryRegressions = Object.fromEntries(
+  Object.entries(categoryGroups).map(([category, clubs]) => {
+    if (catClubs.length === 1) {
+      // 1本のみ：そのクラブ自身のロフトを基準（差ゼロ）
+      return [category, { slope: 0, intercept: catClubs[0].loftAngle }];
+    }
+    return [category, getCategoryLoftLengthRegression(catClubs)];
+  })
+);
+```
+
+### 距離ギャップ予測アルゴリズム
+```typescript
+@e:\Projects\MyGolfBag\src\utils\analysisBuilders.ts:206-245
+const clubsByDescendingLoft = [...baseClubs].sort((a, b) => b.loftAngle - a.loftAngle);
+
+for (let i = 0; i < clubsByDescendingLoft.length; i++) {
+  const source = clubsByDescendingLoft[i];
+  // 次に低いロフトのクラブを探す
+  const target = clubsByDescendingLoft.slice(i + 1)
+    .find((club) => club.loftAngle < source.loftAngle);
+  
+  if (target) {
+    const loftDiff = source.loftAngle - target.loftAngle;
+    // ロフト差 × 3.5 ≒ 予測距離差（ヤード）
+    projectedGapByClubKey.set(sourceKey, {
+      gap: Math.round(loftDiff * 3.5),
+      targetClubType: target.clubType,
+      targetNumber: target.number,
+    });
+  }
+}
+```
+
+### 推奨ロフト調整量の算出
+```typescript
+@e:\Projects\MyGolfBag\src\utils\analysisBuilders.ts:247-268
+const expectedLoft = getExpectedLoftAngle(club.length, categoryRegression);
+const deviationFromStandard = club.loftAngle - expectedLoft;
+const recommendedLoftAdjustment = expectedLoft - club.loftAngle;  // 正値=強く、負値=弱く
+```
+
+---
+
+## 3. スイングウェイト分析
+
+### 判定ロジック (`analysisRules.ts:18-27`)
+```typescript
+export const classifySwingDeviation = (deviation, goodTolerance, adjustThreshold) => {
+  const abs = Math.abs(deviation);
+  if (abs > adjustThreshold) return 'adjust';      // 調整推奨
+  if (abs <= goodTolerance) return 'good';         // 良好
+  return deviation > 0 ? 'heavy' : 'light';        // やや重い/軽い
+};
+```
+
+### ユーザー設定可能な閾値
+- `swingGoodTolerance`: 良好判定の許容範囲
+- `swingAdjustThreshold`: 調整推奨判定の閾値
+
+---
+
+## 4. ライ角度分析
+
+### 2つの分析モード
+
+**A. 標準ライ角度との比較** ([buildLieAngleAnalysis](cci:1://file:///e:/Projects/MyGolfBag/src/utils/analysisBuilders.ts:331:0-355:2))
+```typescript
+@e:\Projects\MyGolfBag\src\utils\analysisBuilders.ts:337-348
+const standardLieAngle = resolveStandardLieAngle(club, userLieAngleStandards);
+const deviationFromStandard = club.lieAngle - standardLieAngle;
+const lieStatus = lieStatusFromDeviation(deviationFromStandard);
+```
+
+**B. トレンド線との比較** ([buildLieLengthAnalysis](cci:1://file:///e:/Projects/MyGolfBag/src/utils/analysisBuilders.ts:357:0-401:2))
+```typescript
+@e:\Projects\MyGolfBag\src\utils\analysisUtils.ts:344-376
+const getLieLengthRegression = (clubs) => {
+  // 傾き基準: -0.9°/inch（短くなるほどアップライト）
+  // 許容範囲: -0.15 ～ -2.8 の外はフォールバック
+};
+```
+
+### 判定基準 (`lieStandards.ts:313-318`)
+| 偏差 | 状態 | 日本語表示 |
+|------|------|----------|
+| `≤ ±1.5°` | Good | 良好 |
+| `≤ ±3.0°` | Slightly Off | ややズレ |
+| `> ±3.0°` | Adjust Recommended | 調整推奨 |
+
+---
+
+## 5. 飛距離推定モデル
+
+### カテゴリ別パラメータ (`analysisConstants.ts:49-98`)
+```typescript
+DISTANCE_MODELS = {
+  driver:  { base: 255, speedCoeff: 4.8, loftCoeff: -4.25, standardLoft: 10.5 },
+  wood:    { base: 225, speedCoeff: 4.3, loftCoeff: -4.25, standardLoft: 15 },
+  hybrid:  { base: 195, speedCoeff: 3.8, loftCoeff: -3.25, standardLoft: 22 },
+  iron:    { base: 165, speedCoeff: 3.0, loftCoeff: -2.75, standardLoft: 30 },
+  wedge:   { base: 115, speedCoeff: 2.1, loftCoeff: -2.75, standardLoft: 46 },
+}
+```
+
+### 推定式
+```
+estimated = base + (headSpeed - 44.5) × speedCoeff + (loftAngle - standardLoft) × loftCoeff
+```
+
+### 特殊補正
+- **低ロフトペナルティ**: ロフト18°以下で距離減衰（実際の物理現象をシミュレート）
+- **ドライバーブースト**: ヘッド速度43m/s以上で追加距離補正
+
+---
+
+## 統合ペナルティ評価 (`clubSuccessDisplay.ts:41-113`)
+
+各分析結果を統合して「総合スコア」を算出：
+
+```typescript
+@e:\Projects\MyGolfBag\src\utils\clubSuccessDisplay.ts:78-110
+// スイングウェイト
+if (swingStatus === '調整推奨') addPenalty(clubId, 8);
+else if (swingStatus !== '良好') addPenalty(clubId, 4);
+
+// 重量偏差
+if (weightClass === 'heavyOutlier' || weightClass === 'lightOutlier') addPenalty(clubId, 6);
+else if (weightClass === 'outOfBand') addPenalty(clubId, 3);
+
+// ライ角度
+if (lieStatus === 'Adjust Recommended') addPenalty(clubId, 6);
+else if (lieStatus === 'Slightly Off') addPenalty(clubId, 3);
+```
+
+**最大ペナルティ**: 20点（`Math.min(20, ...)`でキャップ）
+
+---
+
+このアルゴリズム体系により、ユーザーのクラブセットの「穴」（距離ギャップ）と「チューニング必要箇所」を自動検出しています。

@@ -65,6 +65,17 @@ export type SwingTooltipState = {
   };
 };
 
+export type SwingLengthTooltipState = {
+  x: number;
+  y: number;
+  club: GolfClubData & {
+    swingWeightNumeric: number;
+    expectedSwingWeight: number;
+    deviationFromTrend: number;
+    trendStatus: '良好' | 'やや重い' | 'やや軽い' | '調整推奨';
+  };
+};
+
 export type TooltipBoxSize = {
   width: number;
   height: number;

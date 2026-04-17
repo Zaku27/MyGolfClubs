@@ -21,3 +21,6 @@ export const LIE_STANDARD_LINE_COLOR = '#00897b';
 export const LIE_TICKS = [50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70];
 
 export const SWING_PADDING = { top: 30, right: 28, bottom: 80, left: 56 };
+
+export const SWING_LENGTH_CHART_PADDING = { top: 40, right: 28, bottom: 52, left: 60 };
+export const SWING_LENGTH_TOLERANCE = 2;

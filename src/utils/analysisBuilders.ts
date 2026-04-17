@@ -27,6 +27,11 @@ import {
   swingWeightToNumeric,
   type LoftLengthPoint,
   type WeightLengthPoint,
+  getSwingLengthRegression,
+  getExpectedSwingWeight,
+  getSwingLengthTrendStatus,
+  getSwingLengthChartBounds,
+  type SwingLengthPoint,
 } from './analysisUtils';
 
 type ClubVisibilityPredicate = (club: GolfClub) => boolean;
@@ -398,5 +403,63 @@ export const buildLieLengthAnalysis = (
     bounds,
     lengthTicks: makeTickValues(bounds.minLength, bounds.maxLength, bounds.xInterval),
     lieAngleTicks: makeTickValues(bounds.minLieAngle, bounds.maxLieAngle, bounds.yInterval),
+  };
+};
+
+const DEFAULT_SWING_LENGTH_BOUNDS = {
+  minLength: 30,
+  maxLength: 48,
+  minSwingWeight: 0,
+  maxSwingWeight: 35,
+  xInterval: 2,
+  yInterval: 2,
+};
+
+export const buildSwingLengthAnalysis = (
+  clubs: GolfClub[],
+  isVisible: ClubVisibilityPredicate,
+) => {
+  const baseClubs = sortClubsForDisplay(
+    clubs.filter(
+      (club) =>
+        Number.isFinite(club.length) &&
+        club.length > 0 &&
+        club.swingWeight &&
+        swingWeightToNumeric(club.swingWeight) > 0 &&
+        getClubCategory(club) !== 'putter',
+    ),
+  ).map(withCategory);
+
+  const visibleBaseClubs = baseClubs.filter(isVisible);
+  const regression = getSwingLengthRegression(
+    visibleBaseClubs.length > 0 ? visibleBaseClubs : baseClubs,
+  );
+
+  const tableClubs = baseClubs.map((club) => {
+    const swingWeightNumeric = swingWeightToNumeric(club.swingWeight ?? '');
+    const expectedSwingWeight = getExpectedSwingWeight(club.length, regression);
+    const deviationFromTrend = swingWeightNumeric - expectedSwingWeight;
+    const trendStatus = getSwingLengthTrendStatus(deviationFromTrend);
+
+    return {
+      ...club,
+      swingWeightNumeric,
+      expectedSwingWeight,
+      deviationFromTrend,
+      trendStatus,
+    };
+  });
+
+  const visibility = splitByVisibility(tableClubs, isVisible);
+  const bounds = visibility.hasVisibleData
+    ? getSwingLengthChartBounds(visibility.chartClubs as SwingLengthPoint[], regression)
+    : DEFAULT_SWING_LENGTH_BOUNDS;
+
+  return {
+    ...visibility,
+    regression,
+    bounds,
+    lengthTicks: makeTickValues(bounds.minLength, bounds.maxLength, bounds.xInterval),
+    swingWeightTicks: makeTickValues(bounds.minSwingWeight, bounds.maxSwingWeight, bounds.yInterval),
   };
 };
