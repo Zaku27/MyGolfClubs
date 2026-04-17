@@ -2,6 +2,10 @@ import { useMemo } from 'react';
 import { useClubStore } from '../store/clubStore';
 import type { SummaryData, Recommendation, Adjustment } from '../types/summary';
 import type { GolfClub } from '../types/golf';
+import { buildSwingLengthAnalysis, buildLoftLengthComparisonAnalysis } from '../utils/analysisBuilders';
+import { readStoredNumber } from '../utils/storage';
+import { evaluateSwingLengthSlope, getSwingLengthSlopeMessage } from '../utils/analysisUtils';
+import { getClubTypeDisplay } from '../utils/clubUtils';
 
 // Map internal club types to summary category types
 const mapClubTypeToCategory = (clubType: GolfClub['clubType']): Recommendation['category'] | null => {
@@ -197,18 +201,62 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     // Generate adjustments based on club specs
     const adjustments: Adjustment[] = [];
 
-    // Check for swing weight inconsistencies
+    // Swing weight and length analysis using buildSwingLengthAnalysis
+    const swingGoodTolerance = readStoredNumber('golfbag-swing-good-tolerance', 1.0, { decimals: 1 });
+    const swingAdjustThreshold = readStoredNumber('golfbag-swing-adjust-threshold', 1.5, { decimals: 1 });
+    const { tableClubs: swingLengthTable, regression } = buildSwingLengthAnalysis(
+      bagClubs,
+      () => true,
+      swingGoodTolerance,
+      swingAdjustThreshold,
+    );
+
+    // Check for clubs that deviate significantly from the swing weight trend
+    const swingOutliers = swingLengthTable.filter(
+      (club) => club.trendStatus === '調整推奨'
+    );
+
+    if (swingOutliers.length > 0) {
+      const outlierNames = swingOutliers
+        .map((c) => getClubTypeDisplay(c.clubType, c.number || ''))
+        .slice(0, 3)
+        .join(', ');
+      const additionalCount = swingOutliers.length > 3 ? `他${swingOutliers.length - 3}本` : '';
+
+      adjustments.push({
+        priority: 'high',
+        title: 'スイングウェイトのトレンド調整',
+        description: `長さに対するSWのトレンドから大きく外れるクラブがあります（${outlierNames}${additionalCount ? ' ' + additionalCount : ''}）。他のクラブのトレンドに合わせてSW調整を検討してください。`,
+        estimatedEffect: 'スイングフィールの統一、方向性向上',
+        estimatedCost: '¥8,000〜¥15,000/本',
+      });
+    }
+
+    // Evaluate the slope of the swing weight vs length regression
+    const slopeEvaluation = evaluateSwingLengthSlope(regression.slope);
+    if (slopeEvaluation !== 'ideal') {
+      const slopeMessage = getSwingLengthSlopeMessage(regression.slope);
+      adjustments.push({
+        priority: 'medium',
+        title: 'SW-長さの傾斜最適化',
+        description: `現在のSW-長さの傾斜は「${slopeMessage}」です。理想的な傾斜（-0.8〜-1.2）に近づけることで、長いクラブと短いクラブの間で一貫したスイングフィールが得られます。`,
+        estimatedEffect: '長短クラブのフィール適正化',
+        estimatedCost: '¥5,000〜¥10,000/本',
+      });
+    }
+
+    // Check for swing weight inconsistencies (fallback if no length data)
     const swingWeights = bagClubs
       .map((c) => c.swingWeight)
       .filter((sw): sw is string => !!sw && sw.length > 0);
     const uniqueSwingWeights = [...new Set(swingWeights)];
 
-    if (uniqueSwingWeights.length > 2) {
+    if (uniqueSwingWeights.length > 3 && swingOutliers.length === 0) {
       adjustments.push({
-        priority: 'medium',
-        title: 'スイングウェイトの統一',
-        description: `現在${uniqueSwingWeights.length}種類のスイングウェイト（${uniqueSwingWeights.join(', ')}）が混在しています。統一感のあるスイングフィールを目指しましょう。`,
-        estimatedEffect: '方向安定性 +15% 見込み',
+        priority: 'low',
+        title: 'スイングウェイトの確認',
+        description: `現在${uniqueSwingWeights.length}種類のスイングウェイト（${uniqueSwingWeights.slice(0, 3).join(', ')}${uniqueSwingWeights.length > 3 ? '...' : ''}）が混在しています。スイングフィールに違和感がないか確認してみてください。`,
+        estimatedEffect: 'フィールの確認',
         estimatedCost: '¥8,000〜¥15,000/本',
       });
     }
@@ -234,24 +282,32 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       }
     }
 
-    // Check for gaps in distance coverage
-    const sortedDistances = bagClubs
-      .map((c) => c.distance)
-      .filter((d): d is number => d > 0)
-      .sort((a, b) => b - a);
+    // Check for gaps in distance coverage using loft-based projected gaps
+    const { tableClubs: loftLengthTable } = buildLoftLengthComparisonAnalysis(
+      bagClubs,
+      () => true,
+    );
 
-    for (let i = 0; i < sortedDistances.length - 1; i++) {
-      const gap = sortedDistances[i] - sortedDistances[i + 1];
-      if (gap > 40) {
-        adjustments.push({
-          priority: 'high',
-          title: `距離ギャップ解消（${Math.round(sortedDistances[i + 1])}yd〜${Math.round(sortedDistances[i])}yd）`,
-          description: `${Math.round(gap)}ydの距離ギャップが検出されました。中間的なクラブを検討してください。`,
-          estimatedEffect: `アプローチ成功率 +25% 見込み`,
-        });
-        break; // Only report the largest gap
-      }
-    }
+    // Find clubs with large projected distance gaps (same threshold as loft-distance analysis: > 18yd)
+    const largeGapClubs = loftLengthTable
+      .filter((club) => club.projectedDistanceGap !== null && club.projectedDistanceGap > 18)
+      .sort((a, b) => (b.projectedDistanceGap || 0) - (a.projectedDistanceGap || 0));
+
+    // Add adjustments for all large gaps (up to 2)
+    largeGapClubs.slice(0, 2).forEach((club) => {
+      const gap = club.projectedDistanceGap;
+      const clubName = getClubTypeDisplay(club.clubType, club.number || '');
+      const targetClub = club.projectedGapTargetClubType && club.projectedGapTargetNumber
+        ? getClubTypeDisplay(club.projectedGapTargetClubType, club.projectedGapTargetNumber)
+        : '';
+
+      adjustments.push({
+        priority: 'high',
+        title: `距離ギャップ解消（${clubName}と${targetClub}の間）`,
+        description: `ロフト差に基づく予測距離ギャップが${gap}ydあります。中間的なクラブを検討してください。`,
+        estimatedEffect: `アプローチ成功率 +25% 見込み`,
+      });
+    });
 
     // Loft/spin optimization for wedges
     const wedges = bagClubs.filter((c) => c.clubType === 'Wedge');
