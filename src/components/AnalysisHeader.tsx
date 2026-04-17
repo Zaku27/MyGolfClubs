@@ -4,7 +4,8 @@ export type AnalysisTab =
   | 'lieAngle'
   | 'lieLength'
   | 'swingWeight'
-  | 'specComparison';
+  | 'specComparison'
+  | 'summary';
 
 const ANALYSIS_TAB_OPTIONS: Array<{ tab: AnalysisTab; label: string }> = [
   { tab: 'loftDistance', label: 'ロフトと飛距離' },
@@ -13,6 +14,7 @@ const ANALYSIS_TAB_OPTIONS: Array<{ tab: AnalysisTab; label: string }> = [
   { tab: 'weightLength', label: '重量と長さ' },
   { tab: 'swingWeight', label: 'SW分布' },
   { tab: 'specComparison', label: '3軸比較' },
+  { tab: 'summary', label: 'まとめ & おすすめ' },
 ];
 
 const ANALYSIS_TAB_TITLE: Record<AnalysisTab, string> = {
@@ -22,6 +24,7 @@ const ANALYSIS_TAB_TITLE: Record<AnalysisTab, string> = {
   lieAngle: 'ライ角分布',
   lieLength: 'ライ角 - 長さ',
   specComparison: 'ロフト・重量・ライ角の比較',
+  summary: 'クラブセット分析まとめ',
 };
 
 const ANALYSIS_TAB_SUBTITLE: Record<AnalysisTab, string> = {
@@ -36,6 +39,8 @@ const ANALYSIS_TAB_SUBTITLE: Record<AnalysisTab, string> = {
     '回帰トレンドからの偏差で、アップライト寄り/フラット寄りのクラブを見つけやすくします。',
   specComparison:
     'ロフト角-長さ、重量-長さ、ライ角分布を同時に表示して、セット全体の整合性を確認できます。',
+  summary:
+    '現在のクラブセットの分析結果をまとめ、おすすめの新クラブと調整案を提案します。',
 };
 
 type AnalysisHeaderProps = {

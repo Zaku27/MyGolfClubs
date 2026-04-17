@@ -14,6 +14,7 @@ import { AnalysisSwingChart } from './AnalysisSwingChart';
 import { AnalysisSwingTable } from './AnalysisSwingTable';
 import { AnalysisWeightChart } from './AnalysisWeightChart';
 import { AnalysisWeightTable } from './AnalysisWeightTable';
+import { SummaryTab } from './SummaryTab';
 import {
   useAnalysisInputHandlers,
   useAnalysisTooltip,
@@ -691,6 +692,19 @@ export const AnalysisScreen = ({
             formatSignedDegrees={formatSignedDegrees}
           />
         </>
+      ) : activeTab === 'summary' ? (
+        <SummaryTab
+          data={{
+            currentSet: {
+              clubCount: clubs.length,
+              avgDriverDistance: 230,
+              avg7IronDistance: 150,
+              potentialGain: 15,
+            },
+            recommendations: [],
+            adjustments: [],
+          }}
+        />
       ) : (
         <>
           <div className="analysis-card chart-card weight-length-frame">
