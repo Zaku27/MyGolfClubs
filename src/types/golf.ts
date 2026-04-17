@@ -44,11 +44,19 @@ export interface GolfBag {
   updatedAt?: string;
 }
 
+export interface Attachment {
+  type: 'file' | 'url';
+  name: string;
+  value: string;
+  createdAt?: string;
+}
+
 export interface AccessoryItem {
   id: string;
   name: string;
   imageData?: string;
   note?: string;
+  attachments?: Attachment[];
   createdAt: string;
 }
 

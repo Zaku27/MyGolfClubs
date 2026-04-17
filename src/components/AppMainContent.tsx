@@ -69,6 +69,9 @@ export type AppMainContentProps = {
   onAddAccessory: (accessory: Omit<AccessoryItem, 'id' | 'createdAt'>) => void;
   onUpdateAccessory: (accessory: AccessoryItem) => void;
   onDeleteAccessory: (id: string) => void;
+  onShiftSelectedAccessoryLeft?: () => void;
+  selectedAccessoryId: string | null;
+  onAccessorySelect: (id: string | null) => void;
   headSpeed: number;
   onHeadSpeedChange: (value: number) => void;
 };
@@ -135,6 +138,9 @@ export function AppMainContent({
   onAddAccessory,
   onUpdateAccessory,
   onDeleteAccessory,
+  onShiftSelectedAccessoryLeft,
+  selectedAccessoryId,
+  onAccessorySelect,
   headSpeed,
   onHeadSpeedChange,
 }: AppMainContentProps) {
@@ -206,6 +212,9 @@ export function AppMainContent({
               onAddAccessory={onAddAccessory}
               onUpdateAccessory={onUpdateAccessory}
               onDeleteAccessory={onDeleteAccessory}
+              onShiftSelectedAccessoryLeft={onShiftSelectedAccessoryLeft}
+              selectedAccessoryId={selectedAccessoryId}
+              onAccessorySelect={onAccessorySelect}
             />
           </div>
 

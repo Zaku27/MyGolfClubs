@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { APP } from './constants/app';
 import { Header } from './components/Header';
@@ -126,6 +126,21 @@ function App() {
 
   const handleToggleActiveBagMembership = async (club: GolfClub) => {
     await clubActions.handleToggleActiveBagMembership(club);
+  };
+
+  const [selectedAccessoryId, setSelectedAccessoryId] = useState<string | null>(null);
+
+  const handleShiftSelectedAccessoryLeft = () => {
+    if (!selectedAccessoryId) return;
+
+    const currentIndex = appSettings.accessories.findIndex(a => a.id === selectedAccessoryId);
+    if (currentIndex <= 0) return;
+
+    const newAccessories = [...appSettings.accessories];
+    const [movedItem] = newAccessories.splice(currentIndex, 1);
+    newAccessories.splice(currentIndex - 1, 0, movedItem);
+
+    appSettings.setAccessories(newAccessories);
   };
 
   const handleFormSubmit = async (clubData: Partial<GolfClub>) => {
@@ -273,6 +288,9 @@ function App() {
         onAddAccessory={appSettings.handleAddAccessory}
         onUpdateAccessory={appSettings.handleUpdateAccessory}
         onDeleteAccessory={appSettings.handleDeleteAccessory}
+        onShiftSelectedAccessoryLeft={handleShiftSelectedAccessoryLeft}
+        selectedAccessoryId={selectedAccessoryId}
+        onAccessorySelect={setSelectedAccessoryId}
         headSpeed={appSettings.headSpeed}
         onHeadSpeedChange={appSettings.handleHeadSpeedChange}
       />

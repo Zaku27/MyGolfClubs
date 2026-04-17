@@ -69,6 +69,7 @@ const parseAccessories = (value: unknown): AccessoryItem[] => {
       name: item.name,
       note: typeof item.note === 'string' ? item.note : undefined,
       imageData: typeof item.imageData === 'string' ? item.imageData : undefined,
+      attachments: Array.isArray((item as any).attachments) ? (item as any).attachments : undefined,
       createdAt: item.createdAt,
     }));
 };
@@ -340,6 +341,7 @@ export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSetting
     handleAddAccessory,
     handleUpdateAccessory,
     handleDeleteAccessory,
+    setAccessories,
   };
 };
 
