@@ -66,8 +66,8 @@ export function ShotControlPanel({
       </div>
 
       {showPower ? (
-        <div className="w-full lg:w-72 rounded-xl border border-emerald-300/70 bg-emerald-100/70 px-3 py-3">
-          <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-emerald-800">
+        <div className={`w-full lg:w-72 rounded-xl border px-3 py-3 ${shotPowerPercent > 100 ? 'border-red-300/70 bg-red-100/70' : 'border-emerald-300/70 bg-emerald-100/70'}`}>
+          <div className={`mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] ${shotPowerPercent > 100 ? 'text-red-800' : 'text-emerald-800'}`}>
             <span>パワー</span>
             <span>{shotPowerPercent}%</span>
           </div>
@@ -78,14 +78,19 @@ export function ShotControlPanel({
             step={1}
             value={shotPowerPercent}
             onChange={(event: ChangeEvent<HTMLInputElement>) => onShotPowerPercentChange(Number(event.target.value))}
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-emerald-600"
+            className={`h-1.5 w-full cursor-pointer appearance-none rounded-full ${shotPowerPercent > 100 ? 'bg-red-200 accent-red-600' : 'bg-emerald-200 accent-emerald-600'}`}
             aria-label="ショットパワー"
             disabled={effectiveInputsDisabled}
           />
-          <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
+          <div className={`mt-1 flex items-center justify-between text-[10px] font-medium ${shotPowerPercent > 100 ? 'text-red-700' : 'text-emerald-700'}`}>
             <span>0%</span>
             <span>110%</span>
           </div>
+          {shotPowerPercent > 100 && (
+            <div className="mt-2 text-[10px] font-medium text-red-600">
+              パワー100%超過：成功率が低下します
+            </div>
+          )}
         </div>
       ) : null}
     </div>

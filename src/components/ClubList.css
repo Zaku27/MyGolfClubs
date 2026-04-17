@@ -253,6 +253,10 @@
   margin-left: 12px;
 }
 
+.btn-simulator + .btn-toggle-view {
+  margin-left: 12px;
+}
+
 .btn-analysis:hover:not(:disabled) {
   background: linear-gradient(135deg, #5948b9, #7a6ee0) !important;
   border-color: #5948b9 !important;

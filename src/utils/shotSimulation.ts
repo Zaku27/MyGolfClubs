@@ -690,6 +690,11 @@ export function simulateShot(
   ].join("|");
   const random = createSeededRandom(simulationSeedBase);
 
+  // Apply power penalty: 2% reduction for every 1% over 100%, excluding putters
+  const powerPenalty = (club.type !== "Putter" && shotPowerPercent > 100)
+    ? (shotPowerPercent - 100) * 2
+    : 0;
+
   // ── Putter path ────────────────────────────────────────────────────────────
   if (club.type === "Putter") {
     const putt = simulatePutt(remainingDistance, playerSkillLevel, random);
@@ -724,7 +729,7 @@ export function simulateShot(
 
   // ── Success/quality roll ────────────────────────────────────────────────────
   const forcedEffectiveRate = options.forceEffectiveSuccessRate;
-  const effectiveRate = typeof forcedEffectiveRate === "number"
+  let effectiveRate = typeof forcedEffectiveRate === "number"
     ? Math.max(0, Math.min(100, Math.round(forcedEffectiveRate)))
     : getEffectiveSuccessRate(
         club,
@@ -732,6 +737,10 @@ export function simulateShot(
         playerSkillLevel,
         personalData,
       );
+  
+  // Apply power penalty to effective rate
+  effectiveRate = Math.max(5, effectiveRate - powerPenalty);
+  
   const effectiveSkill = composeEffectiveSkill(
     playerSkillLevel,
     effectiveRate
