@@ -54,8 +54,8 @@ export function RangeClubSelectionPanel({
               <span className="font-bold">{selectedClub.name}</span>
               <span>
                 {seatType === 'personal' || seatType === 'actual'
-                  ? `実測飛距離: ${selectedClub?.distance != null ? selectedClub.distance.toFixed(1) : '-'} y`
-                  : `推定飛距離: ${simClub ? estimatedClubDistance.toFixed(1) : '-'} y`}
+                  ? `実測飛距離: ${selectedClub?.distance != null ? selectedClub.distance.toFixed(1) : '-'} yd`
+                  : `推定飛距離: ${simClub ? estimatedClubDistance.toFixed(1) : '-'} yd`}
               </span>
               {seatType !== 'actual' && (
                 <div className="relative inline-flex items-center gap-2 whitespace-nowrap">

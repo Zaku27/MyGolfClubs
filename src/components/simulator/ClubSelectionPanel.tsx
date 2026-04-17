@@ -147,7 +147,7 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
             <div className="text-right flex-shrink-0">
               <div className="text-sm font-mono font-bold">
                 {estimatedDistance}
-                <span className="text-xs text-green-500 font-normal">y</span>
+                <span className="text-xs text-green-500 font-normal">yd</span>
               </div>
               <div className="text-xs text-green-500">{effectiveRate.toFixed(1)}%</div>
             </div>

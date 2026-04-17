@@ -33,7 +33,7 @@ export function ShotControlPanel({
         <div className="w-full rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-3 lg:w-72">
           <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
             <span>方向</span>
-            <span>{aimXOffset > 0 ? `右 ${aimXOffset}y` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}y` : '中央'}</span>
+            <span>{aimXOffset > 0 ? `右 ${aimXOffset}yd` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}yd` : '中央'}</span>
           </div>
           <input
             type="range"
@@ -47,9 +47,9 @@ export function ShotControlPanel({
             disabled={effectiveInputsDisabled}
           />
           <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-sky-700">
-            <span>左 50y</span>
+            <span>左 50yd</span>
             <span>中央</span>
-            <span>右 50y</span>
+            <span>右 50yd</span>
           </div>
         </div>
       ) : null}

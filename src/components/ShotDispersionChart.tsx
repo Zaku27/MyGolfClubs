@@ -354,17 +354,17 @@ export function ShotDispersionChart({
               const lines: string[] = [];
 
               if (typeof raw.carry === 'number') {
-                lines.push(`キャリー: ${raw.carry.toFixed(1)} y`);
+                lines.push(`キャリー: ${raw.carry.toFixed(1)} yd`);
               }
               if (typeof raw.roll === 'number') {
-                lines.push(`ラン: ${raw.roll.toFixed(1)} y`);
+                lines.push(`ラン: ${raw.roll.toFixed(1)} yd`);
               }
               if (typeof raw.totalDistance === 'number') {
-                lines.push(`トータル: ${raw.totalDistance.toFixed(1)} y`);
+                lines.push(`トータル: ${raw.totalDistance.toFixed(1)} yd`);
               }
 
               const parsedX = Number(context.parsed.x ?? 0);
-              lines.push(`左右偏差: ${parsedX.toFixed(1)} y`);
+              lines.push(`左右偏差: ${parsedX.toFixed(1)} yd`);
 
               if (typeof raw.shotQuality === 'string') {
                 const qualityLabel = raw.shotQuality.charAt(0).toUpperCase() + raw.shotQuality.slice(1);

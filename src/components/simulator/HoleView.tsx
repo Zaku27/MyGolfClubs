@@ -283,9 +283,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     : null;
   const resultDistanceLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotWasPutter
-      ? `パット距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}y`
-      : `飛距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}y`
-    : `飛距離: ${((lastShotResult?.landing?.totalDistance ?? lastShotResult?.distanceHit ?? 0)).toFixed(1)}y`;
+      ? `パット距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}yd`
+      : `飛距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}yd`
+    : `飛距離: ${((lastShotResult?.landing?.totalDistance ?? lastShotResult?.distanceHit ?? 0)).toFixed(1)}yd`;
   const resultOutcomeLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotResult.newRemainingDistance === 0
       ? "カップイン"
@@ -469,10 +469,10 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 {lastShotResult.landing && (
                   <>
                     <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                      キャリー {lastShotResult.landing.carry.toFixed(1)}y
+                      キャリー {lastShotResult.landing.carry.toFixed(1)}yd
                     </span>
                     <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                      ラン {lastShotResult.landing.roll.toFixed(1)}y
+                      ラン {lastShotResult.landing.roll.toFixed(1)}yd
                     </span>
                     <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
                       着地 X:{lastShotResult.landing.finalX.toFixed(1)} / Y:{lastShotResult.landing.finalY.toFixed(1)}
@@ -524,7 +524,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
                 <span>方向</span>
                 <span>
-                  {aimXOffset > 0 ? `右 ${aimXOffset}y` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}y` : "中央"}
+                  {aimXOffset > 0 ? `右 ${aimXOffset}yd` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}yd` : "中央"}
                 </span>
               </div>
               <input

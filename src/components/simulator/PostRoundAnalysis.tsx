@@ -95,7 +95,7 @@ function RoundClubSummaryTable({
                   <td className="px-1.5 py-2">{item.timesUsed}回</td>
                   <td className="px-1.5 py-2">{item.successes}回</td>
                   <td className="px-1.5 py-2">{item.successRate}%</td>
-                  <td className="rounded-r-xl px-1.5 py-2">{item.avgDistanceAchieved}y</td>
+                  <td className="rounded-r-xl px-1.5 py-2">{item.avgDistanceAchieved}yd</td>
                 </tr>
               ))}
             </tbody>

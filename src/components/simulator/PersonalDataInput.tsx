@@ -187,7 +187,7 @@ export function PersonalDataInput() {
     }
 
     const metersPerSecond = numeric * 0.44704;
-    return `${metersPerSecond.toFixed(1)} m/s`;
+    return `${metersPerSecond.toFixed(1)}`;
   };
 
   const mapCsvClubToSimClubLabel = (clubValue: string): string => {
@@ -599,28 +599,29 @@ export function PersonalDataInput() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         {!isInitialized && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
             データを読み込み中...
           </div>
         )}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-2">
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">シミュレーター設定</p>
             <h1 className="text-2xl font-bold text-slate-900">パーソナルデータ</h1>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Link
               to="/range"
-              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 transition-colors"
             >
               レンジシミュレーターへ
             </Link>
             <Link
               to={appLink}
-              className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
               ホームに戻る
             </Link>
@@ -632,9 +633,9 @@ export function PersonalDataInput() {
             type="button"
             onClick={() => setActiveMode('actual')}
             className={[
-              "rounded-lg border px-3 py-2 text-sm font-medium",
+              "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
               activeMode === 'actual'
-                ? 'border-slate-700 bg-slate-900 text-white'
+                ? 'border-emerald-700 bg-emerald-700 text-white'
                 : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
             ].join(' ')}
           >
@@ -644,7 +645,7 @@ export function PersonalDataInput() {
             type="button"
             onClick={() => setActiveMode('skill')}
             className={[
-              "rounded-lg border px-3 py-2 text-sm font-medium",
+              "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
               activeMode === 'skill'
                 ? 'border-emerald-700 bg-emerald-700 text-white'
                 : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
@@ -674,7 +675,7 @@ export function PersonalDataInput() {
               <div>
                 <h2 className="text-base font-semibold text-slate-900">実測データ読み込み</h2>
                 <p className="text-sm text-slate-600">
-                  Flightscope計測器のショットCSVを読み込み、実際のショットデータを確認します。
+                  FlightscopeのショットCSVを読み込み、実際のショットデータを確認します。
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -749,16 +750,16 @@ export function PersonalDataInput() {
                       <p className="text-lg font-semibold text-slate-900">{shotSummary?.count ?? 0}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500">平均キャリー</p>
-                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgCarry?.toFixed(1) ?? '-'} yd</p>
+                      <p className="text-xs text-slate-500">平均キャリー (yd)</p>
+                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgCarry?.toFixed(1) ?? '-'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500">平均トータル</p>
-                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgTotal?.toFixed(1) ?? '-'} yd</p>
+                      <p className="text-xs text-slate-500">平均トータル (yd)</p>
+                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgTotal?.toFixed(1) ?? '-'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">平均ボールスピード (m/s)</p>
-                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgBall?.toFixed(1) ?? '-'} m/s</p>
+                      <p className="text-lg font-semibold text-slate-900">{shotSummary?.avgBall?.toFixed(1) ?? '-'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">平均スマッシュファクター</p>
@@ -774,8 +775,8 @@ export function PersonalDataInput() {
                         <tr>
                           <th className="px-3 py-2 text-left">ショット</th>
                           <th className="px-3 py-2 text-left">クラブ</th>
-                          <th className="px-3 py-2 text-right">キャリー</th>
-                          <th className="px-3 py-2 text-right">トータル</th>
+                          <th className="px-3 py-2 text-right">キャリー (yd)</th>
+                          <th className="px-3 py-2 text-right">トータル (yd)</th>
                           <th className="px-3 py-2 text-right">ボールスピード (m/s)</th>
                           <th className="px-3 py-2 text-right">左右偏差</th>
                           <th className="px-3 py-2 text-left">ショットタイプ</th>
@@ -787,8 +788,8 @@ export function PersonalDataInput() {
                             <tr key={`${row.club}-${row.Shot}-${index}`} className="border-t border-slate-200">
                               <td className="px-3 py-2">{row.Shot}</td>
                               <td className="px-3 py-2">{row.club}</td>
-                              <td className="px-3 py-2 text-right">{row['Carry (yds)']}</td>
-                              <td className="px-3 py-2 text-right">{row['Total (yds)']}</td>
+                              <td className="px-3 py-2 text-right">{parseShotValue(row['Carry (yds)'])?.toFixed(1) ?? '-'}</td>
+                              <td className="px-3 py-2 text-right">{parseShotValue(row['Total (yds)'])?.toFixed(1) ?? '-'}</td>
                               <td className="px-3 py-2 text-right">{formatBallSpeed(row['Ball (mph)'])}</td>
                               <td className="px-3 py-2 text-right">{formatLateralValue(row['Lateral (yds)'])}</td>
                               <td className="px-3 py-2">{row['Shot Type']}</td>
@@ -818,66 +819,83 @@ export function PersonalDataInput() {
         {activeMode === 'skill' ? (
           <>
             {analysisAdjustedRows.length > 0 && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <p className="font-semibold mb-1 sm:mb-0">分析結果により基本成功率を下げたクラブがあります。</p>
-              <span className="flex items-center gap-2">
-                <span className="text-xs text-slate-700">寄与割合</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={2}
-                  step={0.01}
-                  value={analysisPenaltyWeight}
-                  onChange={e => setAnalysisPenaltyWeight(Number(e.target.value))}
-                  className="w-32 accent-amber-700"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={0.01}
-                  value={analysisPenaltyWeight}
-                  onChange={e => setAnalysisPenaltyWeight(Number(e.target.value))}
-                  className="w-16 border border-slate-300 rounded px-1 py-0.5 text-xs text-right"
-                  style={{ fontSize: '0.85em' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setAnalysisPenaltyWeight(1.0)}
-                  className="ml-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                  style={{ whiteSpace: 'nowrap' }}
-                >
-                  リセット
-                </button>
-              </span>
-            </div>
-            <ul className="mt-2 list-disc pl-5 space-y-1">
-              {analysisAdjustedRows.map((row) => (
-                <li key={`analysis-${row.clubId}`} className="flex items-center gap-2">
-                  <ClubDisplayName
-                    clubType={row.clubType}
-                    number={row.clubNumber}
-                    name={row.clubName}
-                    className="mr-2"
-                  />
-                  <span>
-                    -{(row.analysisPenalty * row.penaltyWeight).toFixed(1)}%（{row.analysisPenaltyReasons.join(" / ")}）
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex-1">
+                    <p className="font-semibold text-amber-900">分析結果により基本成功率を下げたクラブがあります。</p>
+                    <ul className="mt-2 list-disc pl-5 space-y-1">
+                      {analysisAdjustedRows.map((row) => (
+                        <li key={`analysis-${row.clubId}`} className="flex flex-wrap items-baseline gap-2">
+                          <ClubDisplayName
+                            clubType={row.clubType}
+                            number={row.clubNumber}
+                            name={row.clubName}
+                            className="font-medium"
+                          />
+                          <span className="text-amber-800">
+                            -{(row.analysisPenalty * row.penaltyWeight).toFixed(1)}%（{row.analysisPenaltyReasons.join(" / ")}）
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:min-w-[200px] sm:pl-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-700">寄与割合</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.01}
+                        value={analysisPenaltyWeight}
+                        onChange={e => setAnalysisPenaltyWeight(Number(e.target.value))}
+                        className="flex-1 h-2 accent-amber-700"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={2}
+                        step={0.01}
+                        value={analysisPenaltyWeight}
+                        onChange={e => setAnalysisPenaltyWeight(Number(e.target.value))}
+                        className="w-16 border border-slate-300 rounded px-2 py-1 text-xs text-right text-slate-900 focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAnalysisPenaltyWeight(1.0)}
+                      className="self-end rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      リセット
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
 
         <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex-1">
               <h2 className="text-base font-semibold text-emerald-900">プレイヤースキルレベル設定</h2>
-              <p className="text-sm text-emerald-800">
+              <p className="text-sm text-emerald-800 mt-1">
                 現在: {getSkillLabel(playerSkillLevel)} ({playerSkillLevel.toFixed(2)})
               </p>
+              <div className="mt-4 flex items-center gap-3">
+                <span className="w-10 text-xs text-slate-600">0.00</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={playerSkillLevel}
+                  onChange={(event) => void handleSkillLevelChange(Number(event.target.value))}
+                  className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-emerald-200 accent-emerald-600"
+                />
+                <span className="w-10 text-right text-xs text-slate-600">1.00</span>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {SKILL_PRESETS.map((preset) => {
@@ -888,7 +906,7 @@ export function PersonalDataInput() {
                     type="button"
                     onClick={() => void handleSkillLevelChange(preset.value)}
                     className={[
-                      "rounded-md border px-3 py-1.5 text-sm font-medium transition",
+                      "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
                       isActive
                         ? "border-emerald-700 bg-emerald-700 text-white"
                         : "border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-100",
@@ -902,21 +920,6 @@ export function PersonalDataInput() {
               })}
             </div>
           </div>
-
-          <div className="mt-4 flex items-center gap-3">
-            <span className="w-10 text-xs text-slate-600">0.00</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={playerSkillLevel}
-              onChange={(event) => void handleSkillLevelChange(Number(event.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-emerald-200 accent-emerald-600"
-            />
-            <span className="w-10 text-right text-xs text-slate-600">1.00</span>
-          </div>
-
         </section>
 
         <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -1037,17 +1040,18 @@ export function PersonalDataInput() {
           ※ 表示対象は {activeBag?.name ?? 'アクティブバッグ'} のクラブです。
         </p>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-slate-200">
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           >
             デフォルトにリセット
           </button>
         </div>
         </>
         ) : null}
+      </div>
       </div>
     </div>
   );

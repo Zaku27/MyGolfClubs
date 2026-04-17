@@ -49,7 +49,7 @@ function formatGroundHardnessImpact(groundHardness: GroundHardness, roll: number
   const mediumFactor = 0.8 + (75 / 100) * 0.4;
   const baseline = roll * (mediumFactor / currentFactor);
   const delta = roll - baseline;
-  const deltaLabel = delta === 0 ? '0.0y' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}y`;
+  const deltaLabel = delta === 0 ? '0.0yd' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}yd`;
 
   return `Roll ${deltaLabel}`;
 }
@@ -63,7 +63,7 @@ function formatSlopeImpact(
   const carryDiff = (landing.carry ?? 0) - (baselineLanding.carry ?? 0);
   const rollDiff = (landing.roll ?? 0) - (baselineLanding.roll ?? 0);
   const finalXDiff = (landing.finalX ?? 0) - (baselineLanding.finalX ?? 0);
-  const fmt = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}y`;
+  const fmt = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}yd`;
 
   return `C ${fmt(carryDiff)} / R ${fmt(rollDiff)} / X ${fmt(finalXDiff)}`;
 }
@@ -107,10 +107,10 @@ export function RangeSimulationResults({
         <div className="w-full bg-white rounded shadow p-4 mb-4">
           <div className="mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="font-bold text-green-900">セッション結果:</span>
-            <span>平均飛距離: {summary.avg.toFixed(1)} y</span>
-            目標との差:<span className={summary.diff < 0 ? 'text-red-600' : 'text-blue-600'}> {summary.diff > 0 ? '+' : ''}{summary.diff.toFixed(1)} y</span>{/*値がマイナスなら数値の色を赤に。プラスなら青に。プラスなら+符号をつける*/}  
+            <span>平均飛距離: {summary.avg.toFixed(1)} yd</span>
+            目標との差:<span className={summary.diff < 0 ? 'text-red-600' : 'text-blue-600'}> {summary.diff > 0 ? '+' : ''}{summary.diff.toFixed(1)} yd</span>{/*値がマイナスなら数値の色を赤に。プラスなら青に。プラスなら+符号をつける*/}  
             <span>成功率: {(summary.success * 100).toFixed(1)}%</span>
-            <span>目標までの平均距離: {(summary.avgToTargetDistance ?? 0).toFixed(1)} y</span>
+            <span>目標までの平均距離: {(summary.avgToTargetDistance ?? 0).toFixed(1)} yd</span>
           </div>
           <div className="mb-4 rounded border border-green-200 bg-green-50/40 p-2">
             <ShotDispersionChart

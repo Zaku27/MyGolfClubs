@@ -207,7 +207,7 @@ export function Scorecard({ onPlayAgain, onBack }: Props) {
                       <td className="px-1 py-1.5">{club.timesUsed}回</td>
                       <td className="px-1 py-1.5">{club.successes}回</td>
                       <td className="px-1 py-1.5">{club.successRate}%</td>
-                      <td className="px-1 py-1.5">{club.avgDistanceAchieved}y</td>
+                      <td className="px-1 py-1.5">{club.avgDistanceAchieved}yd</td>
                     </tr>
                   ))}
                 </tbody>
