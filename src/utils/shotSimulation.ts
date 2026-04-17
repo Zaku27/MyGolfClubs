@@ -690,10 +690,11 @@ export function simulateShot(
   ].join("|");
   const random = createSeededRandom(simulationSeedBase);
 
-  // Apply power penalty: 2% reduction for every 1% over 100%, excluding putters
+  // Apply power penalty to skill level: 2% reduction for every 1% over 100%, excluding putters
   const powerPenalty = (club.type !== "Putter" && shotPowerPercent > 100)
-    ? (shotPowerPercent - 100) * 2
+    ? (shotPowerPercent - 100) * 0.02
     : 0;
+  const adjustedPlayerSkillLevel = Math.max(0, playerSkillLevel - powerPenalty);
 
   // ── Putter path ────────────────────────────────────────────────────────────
   if (club.type === "Putter") {
@@ -734,15 +735,12 @@ export function simulateShot(
     : getEffectiveSuccessRate(
         club,
         lie,
-        playerSkillLevel,
+        adjustedPlayerSkillLevel,
         personalData,
       );
   
-  // Apply power penalty to effective rate
-  effectiveRate = Math.max(5, effectiveRate - powerPenalty);
-  
   const effectiveSkill = composeEffectiveSkill(
-    playerSkillLevel,
+    adjustedPlayerSkillLevel,
     effectiveRate
   );
   const landingSeed = [
@@ -751,7 +749,7 @@ export function simulateShot(
     effectiveRate,
     windStrength,
     typeof windDirectionDegrees === "number" ? normalizeDegrees(windDirectionDegrees) : "legacy",
-    playerSkillLevel,
+    adjustedPlayerSkillLevel,
     effectiveSkill,
     options.shotIndex ?? 0,
     options.seedNonce ?? "default",

@@ -88,7 +88,7 @@ export function ShotControlPanel({
           </div>
           {shotPowerPercent > 100 && (
             <div className="mt-2 text-[10px] font-medium text-red-600">
-              パワー100%超過：成功率が低下します
+              パワー超過：スキルレベルが低下します
             </div>
           )}
         </div>
