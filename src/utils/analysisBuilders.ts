@@ -269,6 +269,7 @@ export const buildWeightLengthAnalysis = (
 export const buildLoftLengthComparisonAnalysis = (
   clubs: GolfClub[],
   isVisible: ClubVisibilityPredicate,
+  headSpeed: number = 44.5,
 ) => {
   const baseClubs = sortClubsForDisplay(
     clubs.filter(
@@ -280,6 +281,25 @@ export const buildLoftLengthComparisonAnalysis = (
         getClubCategory(club) !== 'putter',
     ),
   ).map(withCategory);
+
+  // Calculate distance ratio based on actual vs estimated distances
+  const clubsWithDistanceData = baseClubs.filter(
+    (club) => club.distance > 0 && club.loftAngle > 0,
+  );
+
+  let distanceRatio = 1.0;
+  if (clubsWithDistanceData.length >= 2) {
+    const ratios = clubsWithDistanceData.map((club) => {
+      const estimated = getEstimatedDistance(club, headSpeed);
+      return estimated > 0 ? club.distance / estimated : 1.0;
+    });
+    // Use median ratio to avoid outliers
+    const sortedRatios = ratios.sort((a, b) => a - b);
+    const midIndex = Math.floor(sortedRatios.length / 2);
+    distanceRatio = sortedRatios[midIndex];
+    // Clamp ratio to reasonable range (0.7 to 1.3)
+    distanceRatio = Math.max(0.7, Math.min(1.3, distanceRatio));
+  }
 
   const visibleBaseClubs = baseClubs.filter(isVisible);
   const regression = getLoftLengthRegression(
@@ -346,7 +366,7 @@ export const buildLoftLengthComparisonAnalysis = (
 
     const loftDiff = source.loftAngle - target.loftAngle;
     projectedGapByClubKey.set(sourceKey, {
-      gap: Math.round(loftDiff * 3.5),
+      gap: Math.round(loftDiff * 3.5 * distanceRatio),
       targetClubType: target.clubType,
       targetNumber: target.number,
     });

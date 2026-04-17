@@ -16,7 +16,6 @@ export interface Recommendation {
   reason: string[];                    // 3つ以内の短い理由
   expectedDistanceGain: number;        // 期待飛距離向上
   expectedAccuracyGain?: number;       // オプションで精度向上
-  priceRange: string;                  // 例: "¥60,000〜¥85,000"
   imageUrl?: string;                   // 将来的に画像URL
 }
 
@@ -25,5 +24,4 @@ export interface Adjustment {
   title: string;
   description: string;
   estimatedEffect: string;             // 例: "飛距離 +8yd 見込み"
-  estimatedCost?: string;
 }

@@ -1,5 +1,6 @@
 import type { CSSProperties, RefObject } from 'react';
 import { getAnalysisClubKey, getClubTypeDisplay } from '../utils/clubUtils';
+import { isDistanceGapNarrow, isDistanceGapWide } from '../utils/analysisUtils';
 import { LoftLegend } from './AnalysisLegends';
 import { AnalysisChartWrapper } from './AnalysisChartWrapper';
 import type { LoftTooltipState } from './analysisTypes';
@@ -67,8 +68,8 @@ export const AnalysisLoftChart: React.FC<AnalysisLoftChartProps> = ({
   onHeadSpeedChange,
 }) => {
   const evaluatedGapClubs = chartClubs.filter((club) => club.projectedDistanceGap != null);
-  const narrowGapClubs = evaluatedGapClubs.filter((club) => (club.projectedDistanceGap ?? 0) < 8);
-  const wideGapClubs = evaluatedGapClubs.filter((club) => (club.projectedDistanceGap ?? 0) > 18);
+  const narrowGapClubs = evaluatedGapClubs.filter((club) => isDistanceGapNarrow(club.projectedDistanceGap));
+  const wideGapClubs = evaluatedGapClubs.filter((club) => isDistanceGapWide(club.projectedDistanceGap));
   const narrowGapSummary = narrowGapClubs.map(formatGapClubSummary).join(' / ');
   const wideGapSummary = wideGapClubs.map(formatGapClubSummary).join(' / ');
 

@@ -21,6 +21,10 @@ export const WEIGHT_NORMAL_BAND_TOLERANCE = 12;
 export const WEIGHT_HEAVY_OUTLIER_THRESHOLD = 15;
 export const WEIGHT_LIGHT_OUTLIER_THRESHOLD = 15;
 
+// Distance gap thresholds (in yards)
+export const DISTANCE_GAP_NARROW_THRESHOLD = 8;
+export const DISTANCE_GAP_WIDE_THRESHOLD = 18;
+
 export const SWING_WEIGHT_FULL_PATTERN = /^([A-F])([0-9](?:\.[0-9])?)$/;
 export const SWING_WEIGHT_LEGACY_PATTERN = /^([0-9](?:\.[0-9])?)$/;
 export const SWING_WEIGHT_BASE_LETTER_CODE = 'A'.charCodeAt(0);

@@ -27,13 +27,6 @@ const IconTrendingUp = ({ className = '' }: { className?: string }) => (
   </svg>
 );
 
-const IconDollarSign = ({ className = '' }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} width="1em" height="1em">
-    <line x1="12" y1="2" x2="12" y2="22" />
-    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-  </svg>
-);
-
 const IconFileDown = ({ className = '' }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} width="1em" height="1em">
     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
@@ -168,7 +161,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
                   ))}
                 </ul>
 
-                {/* 期待効果と価格 */}
+                {/* 期待効果 */}
                 <div className="flex flex-wrap gap-2 pt-2">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
                     +{rec.expectedDistanceGain}yd
@@ -178,10 +171,6 @@ export function SummaryTab({ data }: SummaryTabProps) {
                       精度 +{rec.expectedAccuracyGain}%
                     </span>
                   )}
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
-                    <IconDollarSign className="w-3 h-3 mr-0.5" />
-                    {rec.priceRange}
-                  </span>
                 </div>
 
                 {/* アクションボタン */}
@@ -222,18 +211,12 @@ export function SummaryTab({ data }: SummaryTabProps) {
                     <h3 className="font-semibold text-lg">{adj.title}</h3>
                     <p className="text-sm text-muted-foreground">{adj.description}</p>
 
-                    {/* 効果と費用 */}
+                    {/* 効果 */}
                     <div className="flex flex-wrap gap-3 pt-1">
                       <span className="inline-flex items-center text-sm text-green-600 font-medium">
                         <IconTrendingUp className="w-4 h-4 mr-1" />
                         {adj.estimatedEffect}
                       </span>
-                      {adj.estimatedCost && (
-                        <span className="inline-flex items-center text-sm text-muted-foreground">
-                          <IconDollarSign className="w-4 h-4 mr-1" />
-                          概算: {adj.estimatedCost}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>

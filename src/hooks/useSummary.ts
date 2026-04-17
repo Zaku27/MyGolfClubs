@@ -4,7 +4,7 @@ import type { SummaryData, Recommendation, Adjustment } from '../types/summary';
 import type { GolfClub } from '../types/golf';
 import { buildSwingLengthAnalysis, buildLoftLengthComparisonAnalysis } from '../utils/analysisBuilders';
 import { readStoredNumber } from '../utils/storage';
-import { evaluateSwingLengthSlope, getSwingLengthSlopeMessage } from '../utils/analysisUtils';
+import { evaluateSwingLengthSlope, getSwingLengthSlopeMessage, isDistanceGapNarrow, isDistanceGapWide } from '../utils/analysisUtils';
 import { getClubTypeDisplay } from '../utils/clubUtils';
 
 // Map internal club types to summary category types
@@ -45,13 +45,11 @@ const SAMPLE_RECOMMENDATIONS: Partial<Record<Recommendation['category'], Recomme
       clubName: 'Stealth 2 HD',
       brand: 'TaylorMade',
       reason: ['高MOI設計でミスヒット許容', '軽量シャフトでヘッドスピード向上', 'ドロー志向の重心設計'],
-      priceRange: '¥65,000〜¥85,000',
     },
     {
       clubName: 'G430 Max 10K',
       brand: 'PING',
       reason: ['業界最高MOI値', '極限の直進性', '弾道安定性の向上'],
-      priceRange: '¥75,000〜¥95,000',
     },
   ],
   Fairway: [
@@ -59,7 +57,6 @@ const SAMPLE_RECOMMENDATIONS: Partial<Record<Recommendation['category'], Recomme
       clubName: 'STEALTH 2 FW',
       brand: 'TaylorMade',
       reason: ['深重心で高弾道', 'やさしいミスヒット性能', 'バランスの取れた設計'],
-      priceRange: '¥45,000〜¥60,000',
     },
   ],
   Hybrid: [
@@ -67,7 +64,6 @@ const SAMPLE_RECOMMENDATIONS: Partial<Record<Recommendation['category'], Recomme
       clubName: 'APEX UW',
       brand: 'Callaway',
       reason: ['ユーティリティとウッドの中間', '高い弾道でグリーンを狙える', '多用途な使用シーン'],
-      priceRange: '¥38,000〜¥48,000',
     },
   ],
   Iron: [
@@ -75,7 +71,6 @@ const SAMPLE_RECOMMENDATIONS: Partial<Record<Recommendation['category'], Recomme
       clubName: 'T350',
       brand: 'Titleist',
       reason: ['中空構造で距離と許容性を両立', 'タイトリストらしい打感', 'セット全体の距離ギャップ最適化'],
-      priceRange: '¥120,000〜¥150,000（6本）',
     },
   ],
   Wedge: [
@@ -83,7 +78,6 @@ const SAMPLE_RECOMMENDATIONS: Partial<Record<Recommendation['category'], Recomme
       clubName: 'RTX 6 ZipCore',
       brand: 'Cleveland',
       reason: ['高いスピン性能', '様々なライに対応', 'バンカー脱出力の向上'],
-      priceRange: '¥22,000〜¥28,000',
     },
   ],
   Putter: [
@@ -91,7 +85,6 @@ const SAMPLE_RECOMMENDATIONS: Partial<Record<Recommendation['category'], Recomme
       clubName: 'Phantom X 5.5',
       brand: 'Scotty Cameron',
       reason: ['小ぶりなマレット型', '視認性の高いアライメント', '距離コントロール性能'],
-      priceRange: '¥55,000〜¥65,000',
     },
   ],
 };
@@ -189,7 +182,6 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
           brand: sample.brand,
           reason: sample.reason.slice(0, 3),
           expectedDistanceGain: Math.max(5, Math.min(distanceGap, 25)), // Cap between 5-25 yards
-          priceRange: sample.priceRange,
         });
       }
     });
@@ -228,7 +220,6 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
         title: 'スイングウェイトのトレンド調整',
         description: `長さに対するSWのトレンドから大きく外れるクラブがあります（${outlierNames}${additionalCount ? ' ' + additionalCount : ''}）。他のクラブのトレンドに合わせてSW調整を検討してください。`,
         estimatedEffect: 'スイングフィールの統一、方向性向上',
-        estimatedCost: '¥8,000〜¥15,000/本',
       });
     }
 
@@ -241,7 +232,6 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
         title: 'SW-長さの傾斜最適化',
         description: `現在のSW-長さの傾斜は「${slopeMessage}」です。理想的な傾斜（-0.8〜-1.2）に近づけることで、長いクラブと短いクラブの間で一貫したスイングフィールが得られます。`,
         estimatedEffect: '長短クラブのフィール適正化',
-        estimatedCost: '¥5,000〜¥10,000/本',
       });
     }
 
@@ -257,7 +247,6 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
         title: 'スイングウェイトの確認',
         description: `現在${uniqueSwingWeights.length}種類のスイングウェイト（${uniqueSwingWeights.slice(0, 3).join(', ')}${uniqueSwingWeights.length > 3 ? '...' : ''}）が混在しています。スイングフィールに違和感がないか確認してみてください。`,
         estimatedEffect: 'フィールの確認',
-        estimatedCost: '¥8,000〜¥15,000/本',
       });
     }
 
@@ -276,25 +265,26 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
             title: 'アイアンのライ角最適化',
             description: `アイアンのライ角バラつきが${lieSpread.toFixed(1)}°あります。セット全体で一貫性のあるライ角に調整することで、方向性が向上します。`,
             estimatedEffect: '方向精度 +20% 見込み',
-            estimatedCost: '¥3,000〜¥5,000/本',
           });
         }
       }
     }
 
     // Check for gaps in distance coverage using loft-based projected gaps
+    const headSpeed = readStoredNumber('golfbag-head-speed', 42, { min: 0.1 });
     const { tableClubs: loftLengthTable } = buildLoftLengthComparisonAnalysis(
       bagClubs,
       () => true,
+      headSpeed,
     );
 
-    // Find clubs with large projected distance gaps (same threshold as loft-distance analysis: > 18yd)
+    // Find clubs with large projected distance gaps using common function
     const largeGapClubs = loftLengthTable
-      .filter((club) => club.projectedDistanceGap !== null && club.projectedDistanceGap > 18)
+      .filter((club) => isDistanceGapWide(club.projectedDistanceGap))
       .sort((a, b) => (b.projectedDistanceGap || 0) - (a.projectedDistanceGap || 0));
 
-    // Add adjustments for all large gaps (up to 2)
-    largeGapClubs.slice(0, 2).forEach((club) => {
+    // Add adjustments for all large gaps
+    largeGapClubs.forEach((club) => {
       const gap = club.projectedDistanceGap;
       const clubName = getClubTypeDisplay(club.clubType, club.number || '');
       const targetClub = club.projectedGapTargetClubType && club.projectedGapTargetNumber
@@ -306,6 +296,27 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
         title: `距離ギャップ解消（${clubName}と${targetClub}の間）`,
         description: `ロフト差に基づく予測距離ギャップが${gap}ydあります。中間的なクラブを検討してください。`,
         estimatedEffect: `アプローチ成功率 +25% 見込み`,
+      });
+    });
+
+    // Find clubs with narrow projected distance gaps using common function
+    const narrowGapClubs = loftLengthTable
+      .filter((club) => isDistanceGapNarrow(club.projectedDistanceGap))
+      .sort((a, b) => (a.projectedDistanceGap || 0) - (b.projectedDistanceGap || 0));
+
+    // Add adjustments for all narrow gaps
+    narrowGapClubs.forEach((club) => {
+      const gap = club.projectedDistanceGap;
+      const clubName = getClubTypeDisplay(club.clubType, club.number || '');
+      const targetClub = club.projectedGapTargetClubType && club.projectedGapTargetNumber
+        ? getClubTypeDisplay(club.projectedGapTargetClubType, club.projectedGapTargetNumber)
+        : '';
+
+      adjustments.push({
+        priority: 'medium',
+        title: `距離ギャップの確認（${clubName}と${targetClub}の間）`,
+        description: `ロフト差に基づく予測距離ギャップが${gap}ydと狭いです。距離差が出にくい場合はロフト調整を検討してください。`,
+        estimatedEffect: `距離ギャップ適正化`,
       });
     });
 
@@ -325,7 +336,6 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
             title: 'ウェッジのロフト間隔最適化',
             description: `ウェッジ間の最大ロフト差が${Math.round(maxGap)}°あります。4-6°間隔が理想的です。`,
             estimatedEffect: '100yd以内の精度向上',
-            estimatedCost: '¥20,000〜¥30,000',
           });
         }
       }
@@ -347,7 +357,6 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
             title: 'フェアウェイウッドの長さ間隔',
             description: 'ウッド間の長さ差が0.5インチ未満の組み合わせがあります。距離差が出にくい場合は長さ調整を検討してください。',
             estimatedEffect: '距離ギャップ適正化',
-            estimatedCost: '¥5,000〜¥8,000',
           });
           break;
         }

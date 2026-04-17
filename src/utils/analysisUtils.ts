@@ -6,6 +6,8 @@ import { getAnalysisClubKey, getClubTypeDisplay } from './clubUtils';
 import {
   CATEGORY_VISUAL_CONFIG,
   CLUB_TYPE_CATEGORY_MAP,
+  DISTANCE_GAP_NARROW_THRESHOLD,
+  DISTANCE_GAP_WIDE_THRESHOLD,
   DISTANCE_MODELS,
   SWING_STATUS_COLOR_MAP,
   WEIGHT_NORMAL_BAND_TOLERANCE,
@@ -189,12 +191,24 @@ export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   return Math.round(estimated * 10) / 10;
 };
 
-export const getCategoryColor = (category: ClubCategory) => {
+export const getCategoryColor = (category: ClubCategory): string => {
   return CATEGORY_VISUAL_CONFIG[category].color;
 };
 
-export const getCategoryLabel = (category: ClubCategory) => {
+export const getCategoryLabel = (category: ClubCategory): string => {
   return CATEGORY_VISUAL_CONFIG[category].label;
+};
+
+export const isDistanceGapWide = (gap: number | null): boolean => {
+  return gap !== null && gap > DISTANCE_GAP_WIDE_THRESHOLD;
+};
+
+export const isDistanceGapNarrow = (gap: number | null): boolean => {
+  return gap !== null && gap < DISTANCE_GAP_NARROW_THRESHOLD;
+};
+
+export const isDistanceGapNormal = (gap: number | null): boolean => {
+  return gap !== null && gap >= DISTANCE_GAP_NARROW_THRESHOLD && gap <= DISTANCE_GAP_WIDE_THRESHOLD;
 };
 
 export const getWeightLengthDotRadius = (club: Pick<GolfClub, 'clubType'>) => {
