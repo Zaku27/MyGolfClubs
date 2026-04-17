@@ -14,7 +14,6 @@ import { useBagIdUrlSync } from "../../hooks/useBagIdUrlSync";
 import { toSimClub } from "../../utils/clubSimAdapter";
 import { calculateBaseClubSuccessRate } from "../../utils/calculateSuccessRate";
 import {
-  ANALYSIS_PENALTY_MULTIPLIER,
   getAnalysisAdjustedBaseSuccessRate,
   isWeakClubByAnalysisAdjustedRate,
 } from "../../utils/clubSuccessDisplay";
@@ -145,7 +144,7 @@ export function PersonalDataInput() {
   const [draftByClubId, setDraftByClubId] = useState<Record<string, DraftRow>>({});
   // 分析減点の寄与割合（重み）: 全クラブ共通
   const [analysisPenaltyWeight, setAnalysisPenaltyWeight] = useState(1.0);
-  const [activeMode, setActiveMode] = useState<'skill' | 'actual'>('skill');
+  const [activeMode, setActiveMode] = useState<'skill' | 'actual'>('actual');
   const [shotRows, setShotRows] = useState<ShotRecord[]>([]);
   const [shotSearchText, setShotSearchText] = useState('');
   const [shotLoadError, setShotLoadError] = useState<string | null>(null);
@@ -631,6 +630,18 @@ export function PersonalDataInput() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => setActiveMode('actual')}
+            className={[
+              "rounded-lg border px-3 py-2 text-sm font-medium",
+              activeMode === 'actual'
+                ? 'border-slate-700 bg-slate-900 text-white'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+            ].join(' ')}
+          >
+            実測データ読み込み
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveMode('skill')}
             className={[
               "rounded-lg border px-3 py-2 text-sm font-medium",
@@ -640,18 +651,6 @@ export function PersonalDataInput() {
             ].join(' ')}
           >
             分析ベースのパーソナルデータ
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveMode('actual')}
-            className={[
-              "rounded-lg border px-3 py-2 text-sm font-medium",
-              activeMode === 'actual'
-                ? 'border-slate-700 bg-slate-900 text-white'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-            ].join(' ')}
-          >
-            実測データCSV読み込み
           </button>
         </div>
 
@@ -673,20 +672,20 @@ export function PersonalDataInput() {
           <section className="rounded-xl border border-slate-300 bg-slate-50 p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">実測データCSV読み込み</h2>
+                <h2 className="text-base font-semibold text-slate-900">実測データ読み込み</h2>
                 <p className="text-sm text-slate-600">
-                  計測器のショットCSVを読み込み、実際のショットデータを確認します。
+                  Flightscope計測器のショットCSVを読み込み、実際のショットデータを確認します。
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button
+                {/* <button
                   type="button"
                   className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
                   onClick={handleLoadDefaultCsv}
                   disabled={isLoadingShotData}
                 >
                   /2026-04-11shots.csv を読み込む
-                </button>
+                </button> */}
                 <label className="inline-flex cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
                   ファイル選択
                   <input
@@ -863,7 +862,7 @@ export function PersonalDataInput() {
                     className="mr-2"
                   />
                   <span>
-                    -{(row.analysisPenalty * row.penaltyWeight * ANALYSIS_PENALTY_MULTIPLIER).toFixed(1)}%（{row.analysisPenaltyReasons.join(" / ")}）
+                    -{(row.analysisPenalty * row.penaltyWeight).toFixed(1)}%（{row.analysisPenaltyReasons.join(" / ")}）
                   </span>
                 </li>
               ))}
@@ -983,7 +982,7 @@ export function PersonalDataInput() {
                       {row.adjustedBaseSuccessRate.toFixed(1)}%
                       {row.analysisPenalty > 0 && (
                         <span className="ml-1 text-xs font-normal text-amber-700">
-                          (元 {row.baseSuccessRate.toFixed(1)}% / -{(row.analysisPenalty * row.penaltyWeight * ANALYSIS_PENALTY_MULTIPLIER).toFixed(1)}%)
+                          (元 {row.baseSuccessRate.toFixed(1)}% / -{(row.analysisPenalty * row.penaltyWeight).toFixed(1)}%)
                         </span>
                       )}
                     </td>

@@ -23,9 +23,6 @@ const DEFAULT_SWING_GOOD_TOLERANCE = 1.0;
 const DEFAULT_SWING_ADJUST_THRESHOLD = 1.5;
 const WEAK_CLUB_THRESHOLD = 65;
 
-/** 分析ペナルティポイントに掛ける倍率。ここを変えると全箇所に反映される */
-export const ANALYSIS_PENALTY_MULTIPLIER = 1.5;
-
 function parseUserLieAngleStandards(value: unknown): UserLieAngleStandards {
   if (!value || typeof value !== 'object') {
     return DEFAULT_USER_LIE_ANGLE_STANDARDS;
@@ -135,7 +132,7 @@ export function getAnalysisAdjustedBaseSuccessRate(
   simClub: SimClub,
   analysisPenaltyPoints: number,
 ): number {
-  return Math.max(5, simClub.successRate - analysisPenaltyPoints * ANALYSIS_PENALTY_MULTIPLIER);
+  return Math.max(5, simClub.successRate - analysisPenaltyPoints);
 }
 
 export function isWeakClubByAnalysisAdjustedRate(
