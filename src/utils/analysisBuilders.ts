@@ -102,7 +102,7 @@ export const buildLoftDistanceAnalysis = (
   headSpeed: number,
   isVisible: ClubVisibilityPredicate,
 ) => {
-  const tableClubs = sortClubsForDisplay(
+  const baseClubs = sortClubsForDisplay(
     clubs.filter((club) => club.loftAngle >= 5 && club.loftAngle <= 60),
   ).map((club) => ({
     ...club,
@@ -110,6 +110,61 @@ export const buildLoftDistanceAnalysis = (
     actualDistance: club.distance ?? 0,
     category: getClubCategory(club),
   }));
+
+  const clubsByDescendingLoft = [...baseClubs].sort((a, b) => b.loftAngle - a.loftAngle);
+  const projectedGapByClubKey = new Map<
+    string,
+    {
+      gap: number | null;
+      targetClubType: GolfClub['clubType'] | null;
+      targetNumber: string | null;
+    }
+  >();
+
+  for (let i = 0; i < clubsByDescendingLoft.length; i += 1) {
+    const source = clubsByDescendingLoft[i];
+    const sourceKey = getAnalysisClubKey(source);
+
+    if (source.category === 'driver') {
+      projectedGapByClubKey.set(sourceKey, {
+        gap: null,
+        targetClubType: null,
+        targetNumber: null,
+      });
+      continue;
+    }
+
+    const target = clubsByDescendingLoft.slice(i + 1).find((club) => club.loftAngle < source.loftAngle);
+    if (!target) {
+      projectedGapByClubKey.set(sourceKey, {
+        gap: null,
+        targetClubType: null,
+        targetNumber: null,
+      });
+      continue;
+    }
+
+    const loftDiff = source.loftAngle - target.loftAngle;
+    projectedGapByClubKey.set(sourceKey, {
+      gap: Math.round(loftDiff * 3.5),
+      targetClubType: target.clubType,
+      targetNumber: target.number,
+    });
+  }
+
+  const tableClubs = baseClubs.map((club) => {
+    const projectedGapInfo = projectedGapByClubKey.get(getAnalysisClubKey(club));
+    const projectedDistanceGap = projectedGapInfo?.gap ?? null;
+    const projectedGapTargetClubType = projectedGapInfo?.targetClubType ?? null;
+    const projectedGapTargetNumber = projectedGapInfo?.targetNumber ?? null;
+
+    return {
+      ...club,
+      projectedDistanceGap,
+      projectedGapTargetClubType,
+      projectedGapTargetNumber,
+    };
+  });
 
   const visibility = splitByVisibility(tableClubs, isVisible);
 
@@ -138,14 +193,62 @@ export const buildWeightLengthAnalysis = (
     visibleBaseClubs.length > 0 ? visibleBaseClubs : baseClubs,
   );
 
+  const clubsByDescendingLoft = [...baseClubs].sort((a, b) => b.loftAngle - a.loftAngle);
+  const projectedGapByClubKey = new Map<
+    string,
+    {
+      gap: number | null;
+      targetClubType: GolfClub['clubType'] | null;
+      targetNumber: string | null;
+    }
+  >();
+
+  for (let i = 0; i < clubsByDescendingLoft.length; i += 1) {
+    const source = clubsByDescendingLoft[i];
+    const sourceKey = getAnalysisClubKey(source);
+
+    if (source.category === 'driver') {
+      projectedGapByClubKey.set(sourceKey, {
+        gap: null,
+        targetClubType: null,
+        targetNumber: null,
+      });
+      continue;
+    }
+
+    const target = clubsByDescendingLoft.slice(i + 1).find((club) => club.loftAngle < source.loftAngle);
+    if (!target) {
+      projectedGapByClubKey.set(sourceKey, {
+        gap: null,
+        targetClubType: null,
+        targetNumber: null,
+      });
+      continue;
+    }
+
+    const loftDiff = source.loftAngle - target.loftAngle;
+    projectedGapByClubKey.set(sourceKey, {
+      gap: Math.round(loftDiff * 3.5),
+      targetClubType: target.clubType,
+      targetNumber: target.number,
+    });
+  }
+
   const tableClubs = baseClubs.map((club) => {
     const expectedWeight = getExpectedWeight(club.length, regression);
     const deviation = club.weight - expectedWeight;
+    const projectedGapInfo = projectedGapByClubKey.get(getAnalysisClubKey(club));
+    const projectedDistanceGap = projectedGapInfo?.gap ?? null;
+    const projectedGapTargetClubType = projectedGapInfo?.targetClubType ?? null;
+    const projectedGapTargetNumber = projectedGapInfo?.targetNumber ?? null;
     return {
       ...club,
       expectedWeight,
       deviation,
       weightTrendMessage: getWeightTrendMessage(deviation),
+      projectedDistanceGap,
+      projectedGapTargetClubType,
+      projectedGapTargetNumber,
     };
   });
 

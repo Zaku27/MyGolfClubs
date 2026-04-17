@@ -8,6 +8,9 @@ export type WeightTooltipState = {
     expectedWeight: number;
     deviation: number;
     weightTrendMessage: string;
+    projectedDistanceGap: number | null;
+    projectedGapTargetClubType: GolfClubData['clubType'] | null;
+    projectedGapTargetNumber: string | null;
   };
 };
 
@@ -17,6 +20,9 @@ export type LoftTooltipState = {
   club: GolfClubData & {
     estimatedDistance: number;
     actualDistance: number;
+    projectedDistanceGap: number | null;
+    projectedGapTargetClubType: GolfClubData['clubType'] | null;
+    projectedGapTargetNumber: string | null;
   };
   pointType: 'estimated' | 'actual';
 };

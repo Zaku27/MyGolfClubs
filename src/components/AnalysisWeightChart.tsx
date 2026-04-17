@@ -39,6 +39,19 @@ type AnalysisWeightChartProps = {
   };
 };
 
+const formatGapClubSummary = (club: WeightChartClub): string => {
+  const clubLabel = club.clubType === 'Wedge'
+    ? `Wedge ${club.number}`
+    : getClubTypeDisplay(club.clubType, club.number);
+  const targetLabel = club.projectedGapTargetClubType
+    ? club.projectedGapTargetClubType === 'Wedge'
+      ? `Wedge ${club.projectedGapTargetNumber ?? ''}`.trim()
+      : getClubTypeDisplay(club.projectedGapTargetClubType, club.projectedGapTargetNumber ?? '')
+    : '比較対象なし';
+  const gapLabel = club.projectedDistanceGap == null ? '対象外' : `${club.projectedDistanceGap}yd`;
+  return `${clubLabel} → ${targetLabel} (${gapLabel})`;
+};
+
 export const AnalysisWeightChart: React.FC<AnalysisWeightChartProps> = ({
   hasAnyWeightLengthData,
   hasWeightLengthData,
@@ -61,6 +74,24 @@ export const AnalysisWeightChart: React.FC<AnalysisWeightChartProps> = ({
   formatSignedGrams,
   WEIGHT_CHART_PADDING,
 }) => {
+  const evaluatedGapClubs = weightLengthClubs.filter((club) => club.projectedDistanceGap != null);
+  const narrowGapClubs = evaluatedGapClubs.filter((club) => (club.projectedDistanceGap ?? 0) < 8);
+  const wideGapClubs = evaluatedGapClubs.filter((club) => (club.projectedDistanceGap ?? 0) > 18);
+  const narrowGapSummary = narrowGapClubs.map(formatGapClubSummary).join(' / ');
+  const wideGapSummary = wideGapClubs.map(formatGapClubSummary).join(' / ');
+
+  const gappingAlert =
+    evaluatedGapClubs.length === 0
+      ? '距離ギャップ評価対象クラブがありません（ドライバーのみ、または比較対象なし）。'
+      : narrowGapClubs.length > 0 && wideGapClubs.length > 0
+        ? '距離ギャップに注意が必要な組み合わせがあります。クラブ選択またはロフト設定の見直しを推奨します。'
+      : narrowGapClubs.length > 0
+        ? '距離ギャップが狭い可能性のある組み合わせがあります（8yd未満）。クラブ選択またはロフト設定の見直しを推奨します。'
+        : wideGapClubs.length > 0
+          ? '距離ギャップが広い可能性のある組み合わせがあります（18yd超）。クラブ選択またはロフト設定の見直しを推奨します。'
+          : '距離ギャップは全体として適正範囲内です（8〜18yd）。';
+  const gappingClass = narrowGapClubs.length > 0 || wideGapClubs.length > 0 ? 'alert' : 'ok';
+
   return (
     <div className="analysis-card chart-card weight-length-frame">
       {hasAnyWeightLengthData ? (
@@ -259,6 +290,25 @@ export const AnalysisWeightChart: React.FC<AnalysisWeightChartProps> = ({
           ) : (
             <div className="analysis-empty">表示するクラブを選択してください</div>
           )}
+          <div className="loft-adjust-panel">
+            <div className={`gapping-alert ${gappingClass}`}>
+              <div className="gapping-alert-title">
+                {gappingAlert}
+                <span className="gapping-alert-tooltip" aria-label="距離ギャップの説明">
+                  i
+                  <span className="gapping-alert-tooltip-text">
+                    距離ギャップはロフト差に基づく飛距離差の目安です。目安を確認し、クラブ選択やロフト設定を見直してください。
+                  </span>
+                </span>
+              </div>
+              {narrowGapClubs.length > 0 && (
+                <div className="gapping-alert-detail">狭い候補（該当組み合わせ {narrowGapClubs.length}件）: {narrowGapSummary}</div>
+              )}
+              {wideGapClubs.length > 0 && (
+                <div className="gapping-alert-detail">広い候補（該当組み合わせ {wideGapClubs.length}件）: {wideGapSummary}</div>
+              )}
+            </div>
+          </div>
         </>
       ) : (
         <div className="analysis-empty">クラブがまだ追加されていません</div>
