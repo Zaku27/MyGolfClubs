@@ -4,7 +4,7 @@ import type { SummaryData, Recommendation, Adjustment } from '../types/summary';
 import type { GolfClub } from '../types/golf';
 import { buildSwingLengthAnalysis, buildLoftLengthComparisonAnalysis } from '../utils/analysisBuilders';
 import { readStoredNumber } from '../utils/storage';
-import { evaluateSwingLengthSlope, getSwingLengthSlopeMessage, isDistanceGapNarrow, isDistanceGapWide } from '../utils/analysisUtils';
+import { evaluateSwingLengthSlope, getSwingLengthSlopeMessage, isDistanceGapNarrow, isDistanceGapWide, swingWeightToNumeric } from '../utils/analysisUtils';
 import { getClubTypeDisplay } from '../utils/clubUtils';
 
 // Map internal club types to summary category types
@@ -236,35 +236,47 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     }
 
     // Check for swing weight inconsistencies by club type
-    const clubsByType = bagClubs.reduce(
-      (acc, club) => {
-        if (club.swingWeight && club.swingWeight.length > 0) {
-          if (!acc[club.clubType]) {
-            acc[club.clubType] = [];
-          }
-          acc[club.clubType].push(club.swingWeight);
-        }
-        return acc;
-      },
-      {} as Record<string, string[]>,
+    const clubsWithSwingWeight = bagClubs.filter(
+      (c) => !!c.swingWeight && c.swingWeight.length > 0
     );
 
-    const typesWithMultipleSwingWeights: { type: string; weights: string[] }[] = [];
-    for (const [type, weights] of Object.entries(clubsByType)) {
-      const uniqueWeights = [...new Set(weights)];
-      if (uniqueWeights.length >= 2) {
-        typesWithMultipleSwingWeights.push({ type, weights: uniqueWeights });
+    // Group by club type and find types with multiple swing weight variations
+    const clubTypeSwingWeights = new Map<string, number[]>();
+    for (const club of clubsWithSwingWeight) {
+      const numericSwingWeight = swingWeightToNumeric(club.swingWeight ?? '');
+      if (Number.isFinite(numericSwingWeight)) {
+        const clubType = club.clubType ?? 'Unknown';
+        if (!clubTypeSwingWeights.has(clubType)) {
+          clubTypeSwingWeights.set(clubType, []);
+        }
+        clubTypeSwingWeights.get(clubType)!.push(numericSwingWeight);
       }
     }
 
-    if (typesWithMultipleSwingWeights.length > 0 && swingOutliers.length === 0) {
-      const typeDescriptions = typesWithMultipleSwingWeights
-        .map(({ type, weights }) => `${type}（${weights.join(', ')}）`)
-        .join('、');
+    // Find club types with multiple swing weights that differ by more than 0.1
+    const inconsistentClubTypes: string[] = [];
+    for (const [clubType, swingWeights] of clubTypeSwingWeights.entries()) {
+      if (swingWeights.length < 2) continue;
+      
+      let deviationCount = 0;
+      for (let i = 0; i < swingWeights.length; i++) {
+        for (let j = i + 1; j < swingWeights.length; j++) {
+          if (Math.abs(swingWeights[i] - swingWeights[j]) > 0.1) {
+            deviationCount++;
+          }
+        }
+      }
+      
+      if (deviationCount >= 2) {
+        inconsistentClubTypes.push(clubType);
+      }
+    }
+
+    if (inconsistentClubTypes.length > 0 && swingOutliers.length === 0) {
       adjustments.push({
         priority: 'low',
         title: 'スイングウェイトの確認',
-        description: `${typeDescriptions}で異なるスイングウェイトが混在しています。スイングフィールに違和感がないか確認してみてください。`,
+        description: `${inconsistentClubTypes.join('、')}でスイングウェイトにわずかなバラつきがあります。スイングフィールに違和感がないか確認してみてください。`,
         estimatedEffect: 'フィールの確認',
       });
     }
