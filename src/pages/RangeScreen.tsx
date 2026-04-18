@@ -557,7 +557,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
           penalty: false,
           distanceHit: actualTotalDistance,
           shotQuality,
-          wasSuccessful: shotQuality !== 'poor',
+          wasSuccessful: shotQuality !== 'poor' && shotQuality !== 'misshot',
           effectiveSuccessRate: 100,
           landing: {
             carry: actualCarry,
@@ -599,7 +599,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
       ? 'フラットなので横ブレ影響は標準です。'
       : `傾斜 ${normalizedSlope.slopeAngle}° (${formatSlopeDirectionLabel(normalizedSlope.slopeDirection)}) により、横方向シフトは ${meanSlopeXShift >= 0 ? '+' : ''}${meanSlopeXShift.toFixed(1)}y です。`;
     const estimatedDist = estimatedClubDistance;
-    const diff = Math.round(avg - estimatedDist);
+    const diff = Math.round((avg - estimatedDist) * 10) / 10;
     const avgToTargetDistance = actualModeResults.reduce((sum, result) => {
       const finalX = result.landing?.finalX ?? 0;
       const finalY = result.landing?.finalY ?? 0;
@@ -829,7 +829,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
     // 目安値との差分を計算
     // すべてのモードで共通の推定飛距離を使う
     const estimatedDist = estimatedClubDistance;
-    const diff = Math.round(avg - estimatedDist);
+    const diff = Math.round((avg - estimatedDist) * 10) / 10;
     const avgToTargetDistance =
       shotResults.reduce((sum, result) => {
         const finalX = result.landing?.finalX ?? 0;

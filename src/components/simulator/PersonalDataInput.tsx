@@ -296,13 +296,24 @@ export function PersonalDataInput() {
     await setActualShotRows([], activeBag?.id ?? null);
   };
 
+  const filteredShotRows = useMemo(() => {
+    const normalizedSearch = shotSearchText.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return shotRows;
+    }
+
+    return shotRows.filter((row) => {
+      return row.club.toLowerCase().includes(normalizedSearch);
+    });
+  }, [shotRows, shotSearchText]);
+
   const shotSummary = useMemo(() => {
-    const count = shotRows.length;
+    const count = filteredShotRows.length;
     if (count === 0) {
       return null;
     }
 
-    const accumulators = shotRows.reduce(
+    const accumulators = filteredShotRows.reduce(
       (acc, row) => {
         const carry = parseShotValue(row['Carry (yds)']);
         const total = parseShotValue(row['Total (yds)']);
@@ -354,18 +365,7 @@ export function PersonalDataInput() {
       avgSmash: accumulators.smashCount > 0 ? accumulators.smashSum / accumulators.smashCount : null,
       avgSpin: accumulators.spinCount > 0 ? accumulators.spinSum / accumulators.spinCount : null,
     };
-  }, [shotRows]);
-
-  const filteredShotRows = useMemo(() => {
-    const normalizedSearch = shotSearchText.trim().toLowerCase();
-    if (!normalizedSearch) {
-      return shotRows;
-    }
-
-    return shotRows.filter((row) => {
-      return row.club.toLowerCase().includes(normalizedSearch);
-    });
-  }, [shotRows, shotSearchText]);
+  }, [filteredShotRows]);
 
   const compareSimClubLabel = (a: string, b: string) => {
     const getRank = (label: string) => {
@@ -379,8 +379,8 @@ export function PersonalDataInput() {
       if (/^PW$/i.test(label)) return { rank: 4, value: 0 };
       if (/^GW$/i.test(label)) return { rank: 4, value: 1 };
       if (/^SW$/i.test(label)) return { rank: 4, value: 2 };
-      if (/^Putter$/i.test(label)) return { rank: 5, value: 0 };
-      return { rank: 6, value: 0 };
+      if (/^Putter$/i.test(label)) return { rank: 6, value: 0 };
+      return { rank: 5, value: 0 };
     };
 
     const left = getRank(a);
