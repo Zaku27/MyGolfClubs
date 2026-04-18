@@ -33,6 +33,7 @@ interface ClubListProps {
   onAdd: () => void;
   onReset: () => void;
   onClearAll: () => void;
+  onDeleteAll: () => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onShowAnalysis: () => void;
@@ -63,6 +64,7 @@ export const ClubList: React.FC<ClubListProps> = ({
   onAdd,
   onReset,
   onClearAll,
+  onDeleteAll,
   onExport,
   onImport,
   onShowAnalysis,
@@ -281,7 +283,11 @@ export const ClubList: React.FC<ClubListProps> = ({
               <ResetIcon size={18} />
               <span>初期14本に戻す</span>
             </button>
-            <button className="btn-clearall-clubs" onClick={onClearAll} disabled={loading} title="全削除">
+            <button className="btn-clearall-clubs" onClick={onClearAll} disabled={loading} title="全クラブ削除">
+              <DeleteIcon size={18} />
+              <span>全クラブ削除</span>
+            </button>
+            <button className="btn-clearall-clubs" onClick={onDeleteAll} disabled={loading} title="全削除">
               <DeleteIcon size={18} />
               <span>全削除</span>
             </button>

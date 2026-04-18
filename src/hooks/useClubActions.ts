@@ -20,6 +20,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     initializeDefaults,
     resetToDefaults,
     clearAllClubs,
+    clearAllBags,
     createBag,
     renameBag,
     deleteBag,
@@ -165,6 +166,21 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     });
   }, [openConfirmDialog, clearAllClubs, handleFormCancel]);
 
+  const handleDeleteAll = useCallback((clearAllAccessories: () => void) => {
+    openConfirmDialog({
+      title: '全データの削除',
+      message: 'クラブ、バッグ、アクセサリーの全てのデータを削除して初期状態に戻します。よろしいですか？',
+      confirmLabel: '削除する',
+      cancelLabel: 'キャンセル',
+      onConfirm: async () => {
+        await clearAllClubs();
+        await clearAllBags();
+        clearAllAccessories();
+        handleFormCancel();
+      },
+    });
+  }, [openConfirmDialog, clearAllClubs, clearAllBags, handleFormCancel]);
+
   // Import/Export operations
   const handleImportJSON = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<Omit<AccessoryItem, 'id' | 'createdAt'>[]> => {
     const file = event.target.files?.[0];
@@ -304,6 +320,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     handleFormSubmit,
     handleResetClubs,
     handleClearAllClubs,
+    handleDeleteAll,
 
     // Import/Export
     handleImportJSON,

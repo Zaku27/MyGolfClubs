@@ -313,6 +313,11 @@ export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSetting
     });
   }, []);
 
+  const handleClearAllAccessories = useCallback(() => {
+    setAccessories(DEFAULT_ACCESSORIES);
+    writeStoredJson(ACCESSORY_STORAGE_KEY, DEFAULT_ACCESSORIES);
+  }, []);
+
   return {
     // State
     headSpeed,
@@ -323,7 +328,7 @@ export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSetting
     hiddenAnalysisClubKeys,
     clubListScope,
     accessories,
-    
+
     // Handlers
     handleHeadSpeedChange,
     handleSetLieTypeStandard,
@@ -341,6 +346,7 @@ export const useAppSettings = (activeBag?: GolfBag | null, updateBagSwingSetting
     handleAddAccessory,
     handleUpdateAccessory,
     handleDeleteAccessory,
+    handleClearAllAccessories,
     setAccessories,
   };
 };

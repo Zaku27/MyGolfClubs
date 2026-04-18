@@ -184,6 +184,10 @@ function App() {
     uiState.handleShowFormWithClub(club);
   };
 
+  const handleDeleteAll = () => {
+    clubActions.handleDeleteAll(appSettings.handleClearAllAccessories);
+  };
+
   return (
     <>
       <Helmet>
@@ -274,6 +278,7 @@ function App() {
         handleAddClub={handleAddClub}
         handleResetClubs={clubActions.handleResetClubs}
         handleClearAllClubs={clubActions.handleClearAllClubs}
+        handleDeleteAll={handleDeleteAll}
         handleExportJSON={handleExportJSON}
         handleImportJSON={handleImportJSON}
         handleShowAnalysis={handleShowAnalysis}

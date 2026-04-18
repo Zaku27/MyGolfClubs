@@ -58,6 +58,7 @@ export type AppMainContentProps = {
   handleAddClub: () => void;
   handleResetClubs: () => void;
   handleClearAllClubs: () => void;
+  handleDeleteAll: () => void;
   handleExportJSON: () => void;
   handleImportJSON: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleShowAnalysis: () => void;
@@ -126,6 +127,7 @@ export function AppMainContent({
   handleAddClub,
   handleResetClubs,
   handleClearAllClubs,
+  handleDeleteAll,
   handleExportJSON,
   handleImportJSON,
   handleShowAnalysis,
@@ -226,6 +228,7 @@ export function AppMainContent({
             onAdd={handleAddClub}
             onReset={handleResetClubs}
             onClearAll={handleClearAllClubs}
+            onDeleteAll={handleDeleteAll}
             onExport={handleExportJSON}
             onImport={handleImportJSON}
             onShowAnalysis={handleShowAnalysis}

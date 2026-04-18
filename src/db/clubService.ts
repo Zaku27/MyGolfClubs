@@ -331,6 +331,11 @@ export class ClubService {
     }
   }
 
+  static async deleteAllBags(): Promise<void> {
+    await db.golfBags.clear();
+    await this.setActiveBagId(null);
+  }
+
   static async getActiveBagId(): Promise<number | null> {
     const settings = await db.appSettings.get('app');
     return typeof settings?.activeBagId === 'number' ? settings.activeBagId : null;
