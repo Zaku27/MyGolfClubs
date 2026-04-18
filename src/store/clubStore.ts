@@ -87,7 +87,6 @@ const refreshClubs = async (
 const refreshBags = async (
   set: (partial: Partial<ClubStore>) => void,
 ): Promise<void> => {
-  await ClubService.ensureDefaultBag();
   const [bags, activeBagId] = await Promise.all([
     ClubService.getAllBags(),
     ClubService.getActiveBagId(),
@@ -202,18 +201,8 @@ export const useClubStore = create<ClubStore>((set) => ({
     set({ loading: true, error: null });
     try {
       await ClubService.initializeDefaultClubs();
-      const [clubs, bags, activeBagId] = await Promise.all([
-        ClubService.getAllClubs(),
-        ClubService.getAllBags(),
-        ClubService.getActiveBagId(),
-      ]);
-      set({
-        clubs,
-        bags,
-        activeBagId: activeBagId ?? bags[0]?.id ?? null,
-        loading: false,
-        error: null,
-      });
+      await refreshClubs(set);
+      await refreshBags(set);
     } catch (error) {
       setStoreError(set, error);
     }

@@ -444,7 +444,6 @@ export default function RangeScreen() {
 
   useEffect(() => {
     const initializeScreen = async () => {
-      await initializeDefaults();
       await Promise.all([
         loadClubs(),
         loadBags(),
@@ -455,7 +454,7 @@ export default function RangeScreen() {
     };
 
     void initializeScreen();
-  }, [initializeDefaults, loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel, loadActualShotRows]);
+  }, [loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel, loadActualShotRows]);
 
   useEffect(() => {
     if (clubs.length === 0) {

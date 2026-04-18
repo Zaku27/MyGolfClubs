@@ -5,6 +5,8 @@ import { sortClubsForDisplay } from '../utils/clubSort';
 
 const MAX_BAG_CLUBS = 14;
 
+let isInitializingDefaults = false;
+
 const CLUB_VALUE_DEFAULTS = {
   number: '',
   torque: 0,
@@ -189,18 +191,23 @@ export class ClubService {
 
   static async deleteAllClubs(): Promise<void> {
     await db.clubs.clear();
-    const bags = await db.golfBags.toArray();
-    await Promise.all(
-      bags.map((bag) => db.golfBags.update(bag.id!, createUpdatedBagRecord({ clubIds: [] }))),
-    );
+    isInitializingDefaults = false;
   }
 
   static async initializeDefaultClubs(): Promise<void> {
-    const count = await db.clubs.count();
-    if (count === 0) {
-      await db.clubs.bulkAdd(DEFAULT_CLUBS.map(createClubRecord));
+    if (isInitializingDefaults) {
+      return;
     }
-    await this.ensureDefaultBag();
+    isInitializingDefaults = true;
+    try {
+      const count = await db.clubs.count();
+      if (count === 0) {
+        await db.clubs.bulkAdd(DEFAULT_CLUBS.map(createClubRecord));
+      }
+      await this.ensureDefaultBag();
+    } finally {
+      isInitializingDefaults = false;
+    }
   }
 
   static async resetToDefaults(): Promise<void> {
@@ -312,6 +319,7 @@ export class ClubService {
   static async deleteAllBags(): Promise<void> {
     await db.golfBags.clear();
     await this.setActiveBagId(null);
+    isInitializingDefaults = false;
   }
 
   static async getActiveBagId(): Promise<number | null> {

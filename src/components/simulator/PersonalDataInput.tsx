@@ -427,7 +427,6 @@ export function PersonalDataInput() {
 
   useEffect(() => {
     const init = async () => {
-      await initializeDefaults();
       await Promise.all([
         loadClubs(),
         loadBags(),
@@ -438,7 +437,7 @@ export function PersonalDataInput() {
       setIsInitialized(true);
     };
     void init();
-  }, [initializeDefaults, loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel, loadActualShotRows]);
+  }, [loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel, loadActualShotRows]);
 
   useEffect(() => {
     setShotRows(activeBag?.id != null ? (actualShotRows[String(activeBag.id)] ?? EMPTY_SHOT_RECORDS) as ShotRecord[] : EMPTY_SHOT_RECORDS);

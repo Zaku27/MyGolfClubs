@@ -131,8 +131,8 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
       confirmLabel: '削除する',
       cancelLabel: 'キャンセル',
       onConfirm: async () => {
-        await clearAllClubs();
         await clearAllBags();
+        await clearAllClubs();
         clearAllAccessories();
         handleFormCancel();
       },
@@ -255,9 +255,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
   // Initialize app data
   const initializeApp = useCallback(async () => {
     await initializeDefaults();
-    await loadClubs();
-    await loadBags();
-  }, [initializeDefaults, loadClubs, loadBags]);
+  }, [initializeDefaults]);
 
   return {
     // State
