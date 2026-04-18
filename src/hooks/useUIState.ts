@@ -18,8 +18,6 @@ export const useUIState = () => {
 
   // Form states
   const [editingClub, setEditingClub] = useState<GolfClub | undefined>(undefined);
-  const [showImagePropagationConfirm, setShowImagePropagationConfirm] = useState(false);
-  const [pendingClubData, setPendingClubData] = useState<Omit<GolfClub, 'id'> | Partial<GolfClub> | null>(null);
 
   // Dialog states
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -72,34 +70,14 @@ export const useUIState = () => {
   }, []);
 
   // Form submission handlers
-  const handleFormSubmit = useCallback((clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>) => {
+  const handleFormSubmit = useCallback(() => {
     // This will be handled by the parent component
-    // We just update the state here
-    setPendingClubData(clubData);
   }, []);
 
   const submitClubData = useCallback(async () => {
     // This will be implemented in the parent component
     setShowForm(false);
     setEditingClub(undefined);
-    setShowImagePropagationConfirm(false);
-    setPendingClubData(null);
-  }, []);
-
-  // Image propagation handlers
-  const handleShowImagePropagationConfirm = useCallback((clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>) => {
-    setPendingClubData(clubData);
-    setShowImagePropagationConfirm(true);
-  }, []);
-
-  const handleCancelImagePropagation = useCallback(() => {
-    setShowImagePropagationConfirm(false);
-    setPendingClubData(null);
-  }, []);
-
-  const handleNoPropagation = useCallback(() => {
-    setShowImagePropagationConfirm(false);
-    // Don't clear pendingClubData - let the parent handle submission with propagateSameName = false
   }, []);
 
   // Confirm dialog handlers
@@ -166,8 +144,6 @@ export const useUIState = () => {
     showAnalysis,
     showSimulator,
     editingClub,
-    showImagePropagationConfirm,
-    pendingClubData,
     confirmDialog,
     showCreateBagDialog,
     showRenameBagDialog,
@@ -187,9 +163,6 @@ export const useUIState = () => {
     handleFormCancel,
     handleFormSubmit,
     submitClubData,
-    handleShowImagePropagationConfirm,
-    handleCancelImagePropagation,
-    handleNoPropagation,
     openConfirmDialog,
     closeConfirmDialog,
     handleConfirmDialogConfirm,

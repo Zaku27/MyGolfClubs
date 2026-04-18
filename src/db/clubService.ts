@@ -81,19 +81,6 @@ const createUpdatedClubRecord = (club: Partial<GolfClub>): Partial<GolfClub> => 
   updatedAt: createTimestamp(),
 });
 
-const propagateImageToSameNameClubs = async (
-  name: string,
-  imageData: string[],
-  excludeId?: number,
-): Promise<void> => {
-  const query = db.clubs.where('name').equals(name);
-  if (typeof excludeId === 'number') {
-    await query.and((club) => club.id !== excludeId).modify({ imageData, updatedAt: createTimestamp() });
-  } else {
-    await query.modify({ imageData, updatedAt: createTimestamp() });
-  }
-};
-
 const normalizeBagName = (name: string): string => {
   const trimmed = name.trim();
   return trimmed.length > 0 ? trimmed : 'メインバッグ';
@@ -156,13 +143,10 @@ export class ClubService {
     return club ? normalizeClubRecord(club) : undefined;
   }
 
-  static async createClub(club: Omit<GolfClub, 'id'>, propagateSameName = true): Promise<number> {
+  static async createClub(club: Omit<GolfClub, 'id'>): Promise<number> {
     const newClub = createClubRecord(club);
     const id = await db.clubs.add(newClub);
-    if (propagateSameName && newClub.imageData && newClub.name) {
-      await propagateImageToSameNameClubs(newClub.name, newClub.imageData, id);
-    }
-    
+
     // Automatically add the new club to the active bag
     try {
       const activeBagId = await this.getActiveBagId();
@@ -173,11 +157,11 @@ export class ClubService {
       // If adding to bag fails (e.g., bag is full), log error but don't fail club creation
       console.warn('Failed to add new club to active bag:', error);
     }
-    
+
     return id;
   }
 
-  static async updateClub(id: number, club: Partial<GolfClub>, propagateSameName = true): Promise<number> {
+  static async updateClub(id: number, club: Partial<GolfClub>): Promise<number> {
     const currentClub = await db.clubs.get(id);
     const effectiveClubType = club.clubType ?? currentClub?.clubType;
     const effectiveBounceAngle = club.bounceAngle ?? currentClub?.bounceAngle;
@@ -188,12 +172,6 @@ export class ClubService {
         : {}),
     });
     const result = await db.clubs.update(id, updatedClub);
-    if (propagateSameName && club.imageData != null) {
-      const name = club.name ?? currentClub?.name;
-      if (name) {
-        await propagateImageToSameNameClubs(name, club.imageData, id);
-      }
-    }
     return result;
   }
 

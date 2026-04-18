@@ -65,28 +65,6 @@ function App() {
     );
   }, [clubActions.activeBagClubs, appSettings.hiddenAnalysisClubKeys]);
 
-  // Image propagation confirmation handler
-  const handleConfirmPropagation = async () => {
-    if (!uiState.pendingClubData) {
-      uiState.handleCancelImagePropagation();
-      return;
-    }
-    // Pass true to enable image propagation to other clubs with same name
-    await clubActions.submitClubData(uiState.pendingClubData, uiState.editingClub, true);
-    uiState.handleCancelImagePropagation();
-  };
-
-  // Handle when user chooses not to propagate image
-  const handleNoPropagation = async () => {
-    if (!uiState.pendingClubData) {
-      uiState.handleCancelImagePropagation();
-      return;
-    }
-    // Submit club data without propagation
-    await clubActions.submitClubData(uiState.pendingClubData, uiState.editingClub, false);
-    uiState.handleCancelImagePropagation();
-  };
-
   // Bag management handlers
   const handleCreateBagConfirm = async (bagName: string, imageData?: string) => {
     await clubActions.handleCreateBag(bagName, imageData ? [imageData] : undefined);
@@ -205,11 +183,6 @@ function App() {
       
       <AppDialogs
         error={clubActions.error}
-        showImagePropagationConfirm={uiState.showImagePropagationConfirm}
-        pendingClubData={uiState.pendingClubData}
-        onCancelImagePropagation={uiState.handleCancelImagePropagation}
-        onNoPropagation={handleNoPropagation}
-        onConfirmPropagation={handleConfirmPropagation}
         confirmDialog={uiState.confirmDialog}
         onCloseConfirmDialog={uiState.closeConfirmDialog}
         onConfirmDialogConfirm={uiState.handleConfirmDialogConfirm}

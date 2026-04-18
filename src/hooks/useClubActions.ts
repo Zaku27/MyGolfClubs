@@ -37,7 +37,6 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
   const {
     openConfirmDialog,
     handleFormCancel,
-    handleShowImagePropagationConfirm,
   } = uiState;
 
   const activeBagClubs = useClubStore(selectSortedActiveBagClubs);
@@ -45,41 +44,6 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
   const bags = useClubStore((state) => state.bags);
   const sortedClubs = useClubStore(selectSortedClubsForDisplay);
   const activeBagClubCount = activeBagClubs.length;
-
-  // Helper function to check if image data is the same
-  const isSameImageData = useCallback((a?: string[], b?: string[]): boolean => {
-    if (!a || !b) {
-      return false;
-    }
-    if (a.length !== b.length) {
-      return false;
-    }
-    return a.every((value, index) => value === b[index]);
-  }, []);
-
-  // Helper function to check if we should ask about image propagation
-  const shouldAskImagePropagation = useCallback((
-    clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>,
-    editingClub?: GolfClub | undefined
-  ): boolean => {
-    const name = (clubData.name ?? editingClub?.name)?.trim();
-    if (!name || !clubData.imageData?.length) {
-      return false;
-    }
-
-    const imageChanged = !editingClub || !isSameImageData(clubData.imageData, editingClub.imageData);
-    if (!imageChanged) {
-      return false;
-    }
-
-    const sameNameClubs = sortedClubs.filter((clubItem) => {
-      if (editingClub && editingClub.id) {
-        return clubItem.name === name && clubItem.id !== editingClub.id;
-      }
-      return clubItem.name === name;
-    });
-    return sameNameClubs.length > 0;
-  }, [sortedClubs, isSameImageData]);
 
   // Club CRUD operations
   const handleAddClub = useCallback(() => {
@@ -117,12 +81,11 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
   const submitClubData = useCallback(async (
     clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>,
     editingClub?: GolfClub | undefined,
-    propagateSameName = true,
   ) => {
     if (editingClub && editingClub.id) {
-      await updateClub(editingClub.id, clubData, propagateSameName);
+      await updateClub(editingClub.id, clubData);
     } else {
-      await addClub(clubData as Omit<GolfClub, 'id'>, propagateSameName);
+      await addClub(clubData as Omit<GolfClub, 'id'>);
     }
     handleFormCancel();
   }, [updateClub, addClub, handleFormCancel]);
@@ -131,13 +94,8 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>,
     editingClub?: GolfClub | undefined
   ) => {
-    const askPropagation = shouldAskImagePropagation(clubData, editingClub);
-    if (askPropagation) {
-      handleShowImagePropagationConfirm(clubData);
-      return;
-    }
-    await submitClubData(clubData, editingClub, true);
-  }, [shouldAskImagePropagation, handleShowImagePropagationConfirm, submitClubData]);
+    await submitClubData(clubData, editingClub);
+  }, [submitClubData]);
 
   // Club management operations
   const handleResetClubs = useCallback(() => {
@@ -342,7 +300,6 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
 
     // Utility functions
     submitClubData,
-    shouldAskImagePropagation,
   };
 };
 

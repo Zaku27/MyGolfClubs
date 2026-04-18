@@ -17,8 +17,8 @@ type ClubStoreState = {
 type ClubStoreActions = {
   loadClubs: () => Promise<void>;
   loadBags: () => Promise<void>;
-  addClub: (club: Omit<GolfClub, 'id'>, propagateSameName?: boolean) => Promise<void>;
-  updateClub: (id: number, club: Partial<GolfClub>, propagateSameName?: boolean) => Promise<void>;
+  addClub: (club: Omit<GolfClub, 'id'>) => Promise<void>;
+  updateClub: (id: number, club: Partial<GolfClub>) => Promise<void>;
   deleteClub: (id: number) => Promise<void>;
   initializeDefaults: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
@@ -121,10 +121,10 @@ export const useClubStore = create<ClubStore>((set) => ({
     }
   },
 
-  addClub: async (club, propagateSameName = true) => {
+  addClub: async (club) => {
     set({ error: null });
     try {
-      const id = await ClubService.createClub(club, propagateSameName);
+      const id = await ClubService.createClub(club);
       const timestamp = createTimestamp();
       const newClub: GolfClub = {
         ...club,
@@ -134,19 +134,9 @@ export const useClubStore = create<ClubStore>((set) => ({
       };
       // Refresh bags to include the newly added club
       const bags = await ClubService.getAllBags();
-      
-      // Only propagate if images are added (new clubs always start with no images, so any images are additions)
-      const shouldPropagate = propagateSameName && club.imageData && club.imageData.length > 0 && club.name;
-      
+
       set((state) => ({
-        clubs: [
-          newClub,
-          ...state.clubs.map((c) =>
-            shouldPropagate && c.name === club.name
-              ? { ...c, imageData: club.imageData, updatedAt: timestamp }
-              : c,
-          ),
-        ],
+        clubs: [newClub, ...state.clubs],
         bags,
       }));
     } catch (error) {
@@ -154,35 +144,16 @@ export const useClubStore = create<ClubStore>((set) => ({
     }
   },
 
-  updateClub: async (id, club, propagateSameName = true) => {
+  updateClub: async (id, club) => {
     set({ error: null });
     try {
-      await ClubService.updateClub(id, club, propagateSameName);
+      await ClubService.updateClub(id, club);
       const updatedAt = createTimestamp();
-      set((state) => {
-        const targetClub = state.clubs.find((c) => c.id === id);
-        const nameToMatch = club.name ?? targetClub?.name;
-        const originalImageData = targetClub?.imageData ?? [];
-        const newImageData = club.imageData ?? [];
-        
-        // Only propagate if images were added (new array has more items than original)
-        const shouldPropagate = propagateSameName && 
-          club.imageData != null && 
-          nameToMatch && 
-          newImageData.length > originalImageData.length;
-        
-        return {
-          clubs: state.clubs.map((c) => {
-            if (c.id === id) {
-              return { ...c, ...club, updatedAt };
-            }
-            if (shouldPropagate && c.name === nameToMatch) {
-              return { ...c, imageData: club.imageData, updatedAt };
-            }
-            return c;
-          }),
-        };
-      });
+      set((state) => ({
+        clubs: state.clubs.map((c) =>
+          c.id === id ? { ...c, ...club, updatedAt } : c
+        ),
+      }));
     } catch (error) {
       setStoreError(set, error);
     }

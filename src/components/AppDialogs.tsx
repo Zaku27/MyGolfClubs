@@ -1,14 +1,9 @@
 import { ConfirmationDialog } from './ConfirmationDialog';
 import { BagNameDialog } from './BagNameDialog';
-import type { GolfClub, GolfBag } from '../types/golf';
+import type { GolfBag } from '../types/golf';
 
 export type AppDialogsProps = {
   error?: string | null;
-  showImagePropagationConfirm: boolean;
-  pendingClubData: Omit<GolfClub, 'id'> | Partial<GolfClub> | null;
-  onCancelImagePropagation: () => void;
-  onNoPropagation: () => void;
-  onConfirmPropagation: () => Promise<void>;
   confirmDialog: ConfirmDialogState | null;
   onCloseConfirmDialog: () => void;
   onConfirmDialogConfirm: () => Promise<void>;
@@ -34,11 +29,6 @@ type ConfirmDialogState = {
 
 export function AppDialogs({
   error,
-  showImagePropagationConfirm,
-  pendingClubData,
-  onCancelImagePropagation,
-  onNoPropagation,
-  onConfirmPropagation,
   confirmDialog,
   onCloseConfirmDialog,
   onConfirmDialogConfirm,
@@ -56,32 +46,6 @@ export function AppDialogs({
   return (
     <>
       {error && <div className="error-message">{error}</div>}
-
-      {showImagePropagationConfirm && pendingClubData && (
-        <div className="image-propagation-modal" role="dialog" aria-modal="true">
-          <div
-            className="image-propagation-backdrop"
-            onClick={() => {
-              onCancelImagePropagation();
-            }}
-          />
-          <div className="image-propagation-card">
-            <h3>同じクラブ名称の他のクラブにも画像を反映しますか？</h3>
-            <p>
-              同じクラブ名を持つ他のクラブにも、今回追加した画像を適用します。
-              反映したくない場合は「いいえ」を選択してください。
-            </p>
-            <div className="image-propagation-actions">
-              <button type="button" className="btn-secondary" onClick={() => void onNoPropagation()}>
-                いいえ
-              </button>
-              <button type="button" className="btn-primary" onClick={() => void onConfirmPropagation()}>
-                はい
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <ConfirmationDialog
         open={confirmDialog !== null}
