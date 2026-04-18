@@ -213,6 +213,21 @@ export function PersonalDataInput() {
       return formatSimClubLabel({ type: 'Iron', number: ironMatch[1] });
     }
 
+    // Map "Pitching Wedge" to PW
+    if (/^pitchingwedge$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Wedge', number: 'PW' });
+    }
+
+    // Map "Gap Wedge" to GW
+    if (/^gapwedge$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Wedge', number: 'GW' });
+    }
+
+    // Map "Lob Wedge" to LW
+    if (/^lobwedge$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Wedge', number: 'LW' });
+    }
+
     if (/^(pw|gw|sw)$/i.test(normalized)) {
       return formatSimClubLabel({ type: 'Wedge', number: normalized.toUpperCase() });
     }
