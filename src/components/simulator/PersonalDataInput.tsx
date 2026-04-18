@@ -213,6 +213,12 @@ export function PersonalDataInput() {
       return formatSimClubLabel({ type: 'Iron', number: ironMatch[1] });
     }
 
+    // Map numeric-only club names (e.g., 54, 58, 60) as wedge loft angles
+    const numberMatch = normalized.match(/^(\d+)$/i);
+    if (numberMatch) {
+      return formatSimClubLabel({ type: 'Wedge', number: numberMatch[1] });
+    }
+
     // Map "Pitching Wedge" to PW
     if (/^pitchingwedge$/i.test(normalized)) {
       return formatSimClubLabel({ type: 'Wedge', number: 'PW' });
@@ -226,6 +232,11 @@ export function PersonalDataInput() {
     // Map "Lob Wedge" to LW
     if (/^lobwedge$/i.test(normalized)) {
       return formatSimClubLabel({ type: 'Wedge', number: 'LW' });
+    }
+
+    // Map "Sand Wedge" to SW
+    if (/^sandwedge$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Wedge', number: 'SW' });
     }
 
     if (/^(pw|gw|sw)$/i.test(normalized)) {
