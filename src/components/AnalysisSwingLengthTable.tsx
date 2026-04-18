@@ -68,7 +68,7 @@ export const AnalysisSwingLengthTable = ({
                 <td>{numericToSwingWeightLabel(club.expectedSwingWeight)}</td>
                 <td
                   style={{
-                    color: getSwingLengthPointStyle(club, club.deviationFromTrend).fill,
+                    color: getSwingLengthPointStyle(club, club.deviationFromTrend, 1.5, 2.0).fill,
                     fontWeight: 700,
                   }}
                 >

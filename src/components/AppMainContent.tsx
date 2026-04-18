@@ -100,10 +100,8 @@ export function AppMainContent({
   handleActualDistanceChange,
   hiddenAnalysisClubKeys,
   handleSetAnalysisClubVisible,
-  swingWeightTarget,
   swingGoodTolerance,
   swingAdjustThreshold,
-  handleSetSwingWeightTarget,
   handleSetSwingGoodTolerance,
   handleSetSwingAdjustThreshold,
   handleResetSwingWeightTarget,
@@ -174,10 +172,8 @@ export function AppMainContent({
           onHeadSpeedChange={onHeadSpeedChange}
           hiddenAnalysisClubKeys={hiddenAnalysisClubKeys}
           onSetAnalysisClubVisible={handleSetAnalysisClubVisible}
-          swingWeightTarget={swingWeightTarget}
           swingGoodTolerance={swingGoodTolerance}
           swingAdjustThreshold={swingAdjustThreshold}
-          onSetSwingWeightTarget={handleSetSwingWeightTarget}
           onSetSwingGoodTolerance={handleSetSwingGoodTolerance}
           onSetSwingAdjustThreshold={handleSetSwingAdjustThreshold}
           onResetSwingWeightTarget={handleResetSwingWeightTarget}

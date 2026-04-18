@@ -22,7 +22,6 @@ import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
 import {
   buildLieAngleAnalysis,
-  buildSwingWeightAnalysis,
   buildWeightLengthAnalysis,
 } from "../../utils/analysisBuilders";
 import { classifyWeightDeviation } from "../../utils/analysisRules";
@@ -30,7 +29,7 @@ import {
   DEFAULT_USER_LIE_ANGLE_STANDARDS,
   type UserLieAngleStandards,
 } from "../../types/lieStandards";
-import { readStoredJson, readStoredNumber } from "../../utils/storage";
+import { readStoredJson } from "../../utils/storage";
 import { SKILL_PRESETS, getSkillLabel } from "../../utils/playerSkill";
 
 type DraftRow = {
@@ -66,13 +65,7 @@ type ShotRecord = {
   "Altitude (ft)": string;
 };
 
-const SWING_TARGET_STORAGE_KEY = "golfbag-swing-weight-target";
-const SWING_GOOD_TOLERANCE_STORAGE_KEY = "golfbag-swing-good-tolerance";
-const SWING_ADJUST_THRESHOLD_STORAGE_KEY = "golfbag-swing-adjust-threshold";
 const LIE_STANDARDS_STORAGE_KEY = "golfbag-user-lie-angle-standards";
-const DEFAULT_SWING_TARGET = 2.0;
-const DEFAULT_SWING_GOOD_TOLERANCE = 1.0;
-const DEFAULT_SWING_ADJUST_THRESHOLD = 1.5;
 
 const clamp = (value: number, min: number, max: number): number => {
   if (Number.isNaN(value)) {
@@ -111,7 +104,6 @@ export function PersonalDataInput() {
   const error = useClubStore((state) => state.error);
   const loadClubs = useClubStore((state) => state.loadClubs);
   const loadBags = useClubStore((state) => state.loadBags);
-  const initializeDefaults = useClubStore((state) => state.initializeDefaults);
   const loadPersonalData = useClubStore((state) => state.loadPersonalData);
   const loadPlayerSkillLevel = useClubStore((state) => state.loadPlayerSkillLevel);
   const loadActualShotRows = useClubStore((state) => state.loadActualShotRows);
@@ -120,21 +112,6 @@ export function PersonalDataInput() {
   const setActualShotRows = useClubStore((state) => state.setActualShotRows);
   const actualShotRows = useClubStore((state) => state.actualShotRows);
   const setActiveBag = useClubStore((state) => state.setActiveBag);
-  const swingWeightTarget = readStoredNumber(
-    SWING_TARGET_STORAGE_KEY,
-    DEFAULT_SWING_TARGET,
-    { decimals: 1 },
-  );
-  const swingGoodTolerance = readStoredNumber(
-    SWING_GOOD_TOLERANCE_STORAGE_KEY,
-    DEFAULT_SWING_GOOD_TOLERANCE,
-    { decimals: 1 },
-  );
-  const swingAdjustThreshold = readStoredNumber(
-    SWING_ADJUST_THRESHOLD_STORAGE_KEY,
-    DEFAULT_SWING_ADJUST_THRESHOLD,
-    { decimals: 1 },
-  );
   const userLieAngleStandards = readStoredJson(
     LIE_STANDARDS_STORAGE_KEY,
     DEFAULT_USER_LIE_ANGLE_STANDARDS,
@@ -288,31 +265,6 @@ export function PersonalDataInput() {
     }
 
     return rows;
-  };
-
-  const loadShotCsvText = async (sourceUrl: string) => {
-    setIsLoadingShotData(true);
-    setShotLoadError(null);
-    try {
-      const response = await fetch(sourceUrl);
-      if (!response.ok) {
-        throw new Error(`CSVの取得に失敗しました: ${response.status}`);
-      }
-      const text = await response.text();
-      const rows = parseShotCsvRows(text);
-      setShotRows(rows);
-      await setActualShotRows(rows, activeBag?.id ?? null);
-    } catch (error) {
-      setShotRows([]);
-      await setActualShotRows([], activeBag?.id ?? null);
-      setShotLoadError(`CSV読み込みエラー: ${(error as Error).message}`);
-    } finally {
-      setIsLoadingShotData(false);
-    }
-  };
-
-  const handleLoadDefaultCsv = async () => {
-    await loadShotCsvText('/2026-04-11shots.csv');
   };
 
   const handleImportShotCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {

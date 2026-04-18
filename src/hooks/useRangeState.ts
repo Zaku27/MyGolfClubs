@@ -12,7 +12,6 @@ import type { LandingResult, MonteCarloResult } from '../utils/landingPosition';
 import {
   loadRangeConditionSettings,
   saveRangeConditionSettings,
-  type RangeConditionSettings,
   type GroundHardness,
 } from '../utils/rangeUtils';
 
@@ -62,12 +61,13 @@ function toLandingResult(raw: ShotResult): LandingResult | null {
   if (!landing) return null;
 
   return {
-    finalX: landing.x,
-    finalY: landing.y,
-    carryDistance: landing.carryDistance,
+    finalX: landing.finalX,
+    finalY: landing.finalY,
+    carry: landing.carry,
+    roll: landing.roll,
     totalDistance: landing.totalDistance,
-    deviationFromTarget: landing.deviationFromTarget,
-    shotQuality: landing.shotQuality,
+    lateralDeviation: landing.lateralDeviation,
+    shotQuality: raw.shotQuality,
   };
 }
 

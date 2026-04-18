@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { GolfClub } from '../types/golf';
 import { AnalysisHeader, type AnalysisTab } from './AnalysisHeader';
 import { AnalysisLieChart } from './AnalysisLieChart';
@@ -9,9 +9,6 @@ import { AnalysisLoftTable } from './AnalysisLoftTable';
 import { AnalysisLieTable } from './AnalysisLieTable';
 
 import { AnalysisLoftChart } from './AnalysisLoftChart';
-import { AnalysisLoftLengthChart } from './AnalysisLoftLengthChart';
-import { AnalysisSwingChart } from './AnalysisSwingChart';
-import { AnalysisSwingTable } from './AnalysisSwingTable';
 import { AnalysisSwingLengthChart } from './AnalysisSwingLengthChart';
 import { AnalysisSwingLengthTable } from './AnalysisSwingLengthTable';
 import { AnalysisWeightChart } from './AnalysisWeightChart';
@@ -27,9 +24,7 @@ import {
 import {
   type LieTooltipState,
   type LieLengthTooltipState,
-  type LoftLengthTooltipState,
   type LoftTooltipState,
-  type SwingTooltipState,
   type SwingLengthTooltipState,
   type TooltipBoxSize,
   type WeightTooltipState,
@@ -44,13 +39,11 @@ import {
   LIE_MIN,
   LIE_PADDING,
   LOFT_CHART_PADDING,
-  LOFT_LENGTH_CHART_PADDING,
   MAX_DISTANCE,
   MAX_LOFT,
   MIN_DISTANCE,
   MIN_LOFT,
   SWING_LENGTH_CHART_PADDING,
-  SWING_PADDING,
   WEIGHT_CHART_PADDING,
   WEIGHT_NORMAL_BAND_TOLERANCE,
 } from './analysisConfig';
@@ -62,7 +55,6 @@ import {
   buildSwingLengthTrendPoints,
   createLieChartMappers,
   createLoftChartMappers,
-  createSwingChartMappers,
   createWeightChartMappers,
   formatSignedGrams,
   formatSignedDegrees,
@@ -77,15 +69,12 @@ import {
   getWeightDeviationLabel,
   getWeightPointStyle,
   isAnalysisClubVisible,
-  type ClubCategory,
 } from '../utils/analysisUtils';
 import {
   buildLieAngleAnalysis,
   buildLieLengthAnalysis,
   buildLoftDistanceAnalysis,
-  buildLoftLengthComparisonAnalysis,
   buildSwingLengthAnalysis,
-  buildSwingWeightAnalysis,
   buildWeightLengthAnalysis,
 } from '../utils/analysisBuilders';
 import {
@@ -104,7 +93,6 @@ type AnalysisScreenProps = {
   swingWeightTarget?: number;
   swingGoodTolerance?: number;
   swingAdjustThreshold?: number;
-  onSetSwingWeightTarget?: (value: number) => void;
   onSetSwingGoodTolerance?: (value: number) => void;
   onSetSwingAdjustThreshold?: (value: number) => void;
   onResetSwingWeightTarget?: () => void;
@@ -125,14 +113,8 @@ export const AnalysisScreen = ({
   onHeadSpeedChange,
   hiddenAnalysisClubKeys,
   onSetAnalysisClubVisible,
-  swingWeightTarget,
   swingGoodTolerance,
   swingAdjustThreshold,
-  onSetSwingWeightTarget,
-  onSetSwingGoodTolerance,
-  onSetSwingAdjustThreshold,
-  onResetSwingWeightTarget,
-  onResetSwingThresholds,
   userLieAngleStandards,
   onSetLieTypeStandard,
   onSetLieClubStandard,
@@ -141,28 +123,19 @@ export const AnalysisScreen = ({
   onResetLieStandards,
 }: AnalysisScreenProps) => {
   const [activeTab, setActiveTab] = useState<AnalysisTab>('loftDistance');
-  const [localSwingWeightTarget, setLocalSwingWeightTarget] = useState(swingWeightTarget);
 
   // Get summary data from useSummary hook
   const summaryData = useSummary();
 
-  // Sync local state with DB value when prop changes (bag switch, DB load, etc.)
-  useEffect(() => {
-    setLocalSwingWeightTarget(swingWeightTarget);
-  }, [swingWeightTarget]);
 
   const [showLieSettings, setShowLieSettings] = useState(false);
   const loftChartContainerRef = useRef<HTMLDivElement | null>(null);
-  const loftLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
   const weightChartContainerRef = useRef<HTMLDivElement | null>(null);
-  const swingChartContainerRef = useRef<HTMLDivElement | null>(null);
   const lieChartContainerRef = useRef<HTMLDivElement | null>(null);
   const lieLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
   const swingLengthChartContainerRef = useRef<HTMLDivElement | null>(null);
   const loftTooltipRef = useRef<HTMLDivElement | null>(null);
-  const loftLengthTooltipRef = useRef<HTMLDivElement | null>(null);
   const weightTooltipRef = useRef<HTMLDivElement | null>(null);
-  const swingTooltipRef = useRef<HTMLDivElement | null>(null);
   const lieTooltipRef = useRef<HTMLDivElement | null>(null);
   const lieLengthTooltipRef = useRef<HTMLDivElement | null>(null);
   const swingLengthTooltipRef = useRef<HTMLDivElement | null>(null);
@@ -174,10 +147,7 @@ export const AnalysisScreen = ({
   );
 
   const { tooltip: loftTooltip, setRawTooltip: setLoftTooltip } = useAnalysisTooltip<LoftTooltipState>(isClubVisible);
-  const { tooltip: loftLengthTooltip, setRawTooltip: setLoftLengthTooltip } =
-    useAnalysisTooltip<LoftLengthTooltipState>(isClubVisible);
   const { tooltip: weightTooltip, setRawTooltip: setWeightTooltip } = useAnalysisTooltip<WeightTooltipState>(isClubVisible);
-  const { tooltip: swingTooltip, setRawTooltip: setSwingTooltip } = useAnalysisTooltip<SwingTooltipState>(isClubVisible);
   const { tooltip: lieTooltip, setRawTooltip: setLieTooltip } = useAnalysisTooltip<LieTooltipState>(isClubVisible);
   const { tooltip: lieLengthTooltip, setRawTooltip: setLieLengthTooltip } =
     useAnalysisTooltip<LieLengthTooltipState>(isClubVisible);
@@ -201,23 +171,13 @@ export const AnalysisScreen = ({
     loftChartContainerRef,
     { width: CHART_WIDTH, height: CHART_HEIGHT },
   );
-  const loftLengthChartSize = useResponsiveChartSize(
-    activeTab === 'specComparison',
-    loftLengthChartContainerRef,
-    { width: CHART_WIDTH, height: CHART_HEIGHT },
-  );
   const weightChartSize = useResponsiveChartSize(
-    activeTab === 'weightLength' || activeTab === 'specComparison',
+    activeTab === 'weightLength',
     weightChartContainerRef,
     { width: CHART_WIDTH, height: CHART_HEIGHT },
   );
-  const swingChartSize = useResponsiveChartSize(
-    activeTab === 'swingWeight',
-    swingChartContainerRef,
-    { width: CHART_WIDTH, height: CHART_HEIGHT },
-  );
   const lieChartSize = useResponsiveChartSize(
-    activeTab === 'lieAngle' || activeTab === 'specComparison',
+    activeTab === 'lieAngle',
     lieChartContainerRef,
     { width: CHART_WIDTH, height: CHART_HEIGHT },
   );
@@ -233,9 +193,7 @@ export const AnalysisScreen = ({
   );
 
   const loftTooltipBox: TooltipBoxSize = useTooltipBoxSize(loftTooltip, loftTooltipRef, { width: 200, height: 120 });
-  const loftLengthTooltipBox: TooltipBoxSize = useTooltipBoxSize(loftLengthTooltip, loftLengthTooltipRef, { width: 240, height: 140 });
   const weightTooltipBox: TooltipBoxSize = useTooltipBoxSize(weightTooltip, weightTooltipRef, { width: 200, height: 110 });
-  const swingTooltipBox: TooltipBoxSize = useTooltipBoxSize(swingTooltip, swingTooltipRef, { width: 220, height: 130 });
   const lieTooltipBox: TooltipBoxSize = useTooltipBoxSize(lieTooltip, lieTooltipRef, { width: 200, height: 110 });
   const lieLengthTooltipBox: TooltipBoxSize = useTooltipBoxSize(lieLengthTooltip, lieLengthTooltipRef, { width: 220, height: 130 });
   const swingLengthTooltipBox: TooltipBoxSize = useTooltipBoxSize(swingLengthTooltip, swingLengthTooltipRef, { width: 220, height: 130 });
@@ -247,18 +205,8 @@ export const AnalysisScreen = ({
   } = buildLoftDistanceAnalysis(clubs, headSpeed, isClubVisible);
 
   const loftTicks = [10, 20, 30, 40, 50, 60];
-  const distanceTicks = [0, 50, 100, 150, 200, 250, 300];
+  const distanceTicks = [100, 150, 200, 250];
 
-  const {
-    chartClubs: loftLengthClubs,
-    regression: loftLengthRegression,
-    categoryRegressions: loftLengthCategoryRegressions,
-    bounds: loftLengthBounds,
-    lengthTicks: loftLengthLengthTicks,
-    loftTicks: loftLengthLoftTicks,
-    hasAnyData: hasAnyLoftLengthData,
-    hasVisibleData: hasLoftLengthData,
-  } = buildLoftLengthComparisonAnalysis(clubs, isClubVisible);
 
   const {
     tableClubs: weightLengthTableClubs,
@@ -270,32 +218,6 @@ export const AnalysisScreen = ({
     hasAnyData: hasAnyWeightLengthData,
     hasVisibleData: hasWeightLengthData,
   } = buildWeightLengthAnalysis(clubs, isClubVisible);
-
-  // Sync local state with prop when it changes from outside
-  const effectiveSwingWeightTarget = localSwingWeightTarget ?? swingWeightTarget ?? 2.0;
-
-  const handleLocalSwingWeightTargetChange = useCallback((value: number) => {
-    setLocalSwingWeightTarget(value);
-    onSetSwingWeightTarget?.(value);
-  }, [onSetSwingWeightTarget]);
-
-  const {
-    tableClubs: swingWeightTableClubs,
-    chartClubs: swingWeightClubs,
-    chartMin: swingChartMin,
-    chartMax: swingChartMax,
-    hasAnyData: hasAnySwingWeightData,
-    hasVisibleData: hasSwingWeightData,
-  } = buildSwingWeightAnalysis(
-    clubs,
-    effectiveSwingWeightTarget,
-    swingGoodTolerance ?? 1.5,
-    swingAdjustThreshold ?? 2.0,
-    isClubVisible,
-  );
-
-  const swingTicks = Array.from({ length: Math.ceil(swingChartMax) - Math.floor(swingChartMin) + 1 }, 
-    (_, i) => Math.floor(swingChartMin) + i);
 
   const {
     tableClubs: lieAngleTableClubs,
@@ -336,52 +258,6 @@ export const AnalysisScreen = ({
     },
   );
 
-  const { mapX: mapLoftLengthX, mapY: mapLoftLengthY } = createWeightChartMappers(
-    loftLengthChartSize,
-    LOFT_LENGTH_CHART_PADDING,
-    {
-      minLength: loftLengthBounds.minLength,
-      maxLength: loftLengthBounds.maxLength,
-      minWeight: loftLengthBounds.minLoft,
-      maxWeight: loftLengthBounds.maxLoft,
-    },
-  );
-
-  const loftLengthCategoryRanges = loftLengthClubs.reduce<Partial<Record<ClubCategory, { minLength: number; maxLength: number }>>>(
-    (ranges, club) => {
-      const category = club.category as ClubCategory;
-      const current = ranges[category];
-      if (!current) {
-        ranges[category] = { minLength: club.length, maxLength: club.length };
-      } else {
-        ranges[category] = {
-          minLength: Math.min(current.minLength, club.length),
-          maxLength: Math.max(current.maxLength, club.length),
-        };
-      }
-      return ranges;
-    },
-    {},
-  );
-
-  const loftLengthTrendLines = (Object.entries(loftLengthCategoryRegressions) as [ClubCategory, typeof loftLengthRegression][]).flatMap(
-    ([category, regression]) => {
-      const range = loftLengthCategoryRanges[category];
-      if (!range) return [];
-      const startLength = Math.max(range.minLength, loftLengthBounds.minLength);
-      const endLength = Math.min(range.maxLength, loftLengthBounds.maxLength);
-      return [
-        {
-          category,
-          points: `${mapLoftLengthX(startLength)},${mapLoftLengthY(
-            regression.slope * startLength + regression.intercept,
-          )} ${mapLoftLengthX(endLength)},${mapLoftLengthY(
-            regression.slope * endLength + regression.intercept,
-          )}`,
-        },
-      ];
-    },
-  );
 
   const actualLinePoints = buildActualDistanceLinePoints(chartClubs, mapLoftX, mapLoftY);
 
@@ -447,21 +323,8 @@ export const AnalysisScreen = ({
     ? getTooltipPosition(weightTooltip.x, weightTooltip.y, weightChartSize, weightTooltipBox)
     : null;
 
-  const swingTooltipPos = swingTooltip
-    ? getTooltipPosition(swingTooltip.x, swingTooltip.y, swingChartSize, swingTooltipBox)
-    : null;
-
   const loftTooltipPos = loftTooltip
     ? getTooltipPosition(loftTooltip.x, loftTooltip.y, loftChartSize, loftTooltipBox)
-    : null;
-
-  const loftLengthTooltipPos = loftLengthTooltip
-    ? getTooltipPosition(
-      loftLengthTooltip.x,
-      loftLengthTooltip.y,
-      loftLengthChartSize,
-      loftLengthTooltipBox,
-    )
     : null;
 
   const lieTooltipPos = lieTooltip
@@ -486,13 +349,6 @@ export const AnalysisScreen = ({
     )
     : null;
 
-  const { mapX: mapSwingX, mapY: mapSwingY, barWidth: swingBarWidth } = createSwingChartMappers(
-    swingChartSize,
-    SWING_PADDING,
-    swingChartMin,
-    swingChartMax,
-    swingWeightClubs.length,
-  );
 
   const { mapX: mapLieX, mapY: mapLieY, barWidth: lieBarWidth } = createLieChartMappers(
     lieChartSize,
@@ -565,28 +421,6 @@ export const AnalysisScreen = ({
     />
   );
 
-  const renderSwingChart = () => (
-    <AnalysisSwingChart
-      hasAnySwingWeightData={hasAnySwingWeightData}
-      hasSwingWeightData={hasSwingWeightData}
-      swingGoodTolerance={swingGoodTolerance}
-      swingWeightTarget={effectiveSwingWeightTarget}
-      onSetSwingWeightTarget={handleLocalSwingWeightTargetChange}
-      swingChartContainerRef={swingChartContainerRef}
-      swingChartSize={swingChartSize}
-      swingTicks={swingTicks}
-      mapSwingY={mapSwingY}
-      mapSwingX={mapSwingX}
-      swingBarWidth={swingBarWidth}
-      swingChartMin={swingChartMin}
-      swingWeightClubs={swingWeightClubs}
-      swingAdjustThreshold={swingAdjustThreshold}
-      swingTooltip={swingTooltip}
-      swingTooltipRef={swingTooltipRef}
-      swingTooltipPos={swingTooltipPos}
-      setSwingTooltip={setSwingTooltip}
-    />
-  );
 
   const renderWeightChart = () => (
     <AnalysisWeightChart
@@ -639,48 +473,6 @@ export const AnalysisScreen = ({
     />
   );
 
-  const renderSpecComparisonCharts = () => (
-    <div className="comparison-grid">
-      <div className="comparison-chart-item">
-        <AnalysisLoftLengthChart
-          hasAnyLoftLengthData={hasAnyLoftLengthData}
-          hasLoftLengthData={hasLoftLengthData}
-          loftLengthChartContainerRef={loftLengthChartContainerRef}
-          loftLengthChartSize={loftLengthChartSize}
-          loftLengthTrendLines={loftLengthTrendLines}
-          lengthTicks={loftLengthLengthTicks}
-          loftTicks={loftLengthLoftTicks}
-          mapLoftLengthX={mapLoftLengthX}
-          mapLoftLengthY={mapLoftLengthY}
-          loftLengthClubs={loftLengthClubs}
-          getCategoryColor={getCategoryColor}
-          setLoftLengthTooltip={setLoftLengthTooltip}
-          loftLengthTooltip={loftLengthTooltip}
-          loftLengthTooltipRef={loftLengthTooltipRef}
-          loftLengthTooltipPos={loftLengthTooltipPos}
-          LOFT_LENGTH_CHART_PADDING={LOFT_LENGTH_CHART_PADDING}
-        />
-      </div>
-      <div className="comparison-chart-item">{renderWeightChart()}</div>
-      <div className="comparison-chart-item">
-        <AnalysisLieChart
-          hasAnyLieAngleData={hasAnyLieAngleData}
-          lieAngleClubs={lieAngleClubs}
-          lieChartContainerRef={lieChartContainerRef}
-          lieChartSize={lieChartSize}
-          mapLieX={mapLieX}
-          mapLieY={mapLieY}
-          lieBarWidth={lieBarWidth}
-          goodRangePolygonPoints={goodRangePolygonPoints}
-          standardLieLinePoints={standardLieLinePoints}
-          lieTooltip={lieTooltip}
-          lieTooltipRef={lieTooltipRef}
-          lieTooltipPos={lieTooltipPos}
-          setLieTooltip={setLieTooltip}
-        />
-      </div>
-    </div>
-  );
 
   return (
     <div className="analysis-screen">
@@ -739,21 +531,6 @@ export const AnalysisScreen = ({
             hiddenClubKeySet={hiddenClubKeySet}
             onSetAnalysisClubVisible={onSetAnalysisClubVisible}
           />
-        </>
-      ) : activeTab === 'swingWeight' ? (
-        <>
-          {renderSwingChart()}
-          <AnalysisSwingTable
-            hasAnySwingWeightData={hasAnySwingWeightData}
-            swingWeightTableClubs={swingWeightTableClubs}
-            hiddenClubKeySet={hiddenClubKeySet}
-            onSetAnalysisClubVisible={onSetAnalysisClubVisible}
-            swingWeightTarget={effectiveSwingWeightTarget}
-          />
-        </>
-      ) : activeTab === 'specComparison' ? (
-        <>
-          {renderSpecComparisonCharts()}
         </>
       ) : activeTab === 'swingLength' ? (
         <>

@@ -5,13 +5,10 @@ import {
   getLiePenaltyInfo,
   formatGroundHardnessLabel,
   type GroundHardness,
-  type RangeConditionSettings,
 } from '../../utils/rangeUtils';
 import {
-  convertMpsToMph,
   formatWindDirectionLabel,
   normalizeWindDirection,
-  normalizeWindSpeedMps,
 } from '../../utils/windDirection';
 
 interface RangeCourseConditionsProps {
@@ -53,7 +50,6 @@ export function RangeCourseConditions({
   onCourseConditionToggle,
   onWindReset,
 }: RangeCourseConditionsProps) {
-  const windSpeedMph = useMemo(() => convertMpsToMph(windSpeed), [windSpeed]);
   const windDirectionSummary = useMemo(() => formatWindDirectionLabel(windDirection), [windDirection]);
   
   // Slope display helpers
@@ -77,19 +73,7 @@ export function RangeCourseConditions({
     };
   };
 
-  const formatSlopeDirectionLabel = (direction: number): string => {
-    if (direction === 0) return 'ピン方向上り';
-    if (direction === 90) return '右側上り';
-    if (direction === 180) return 'ピン反対方向上り';
-    if (direction === 270) return '左側上り';
-    if (direction > 0 && direction < 90) return '右前上り';
-    if (direction > 90 && direction < 180) return '右後上り';
-    if (direction > 180 && direction < 270) return '左後上り';
-    return '左前上り';
-  };
-
   const normalizedSlope = normalizeSlopeForDisplay(slopeAngle, slopeDirection);
-  const slopeDirectionLabel = formatSlopeDirectionLabel(normalizedSlope.slopeDirection);
 
   return (
     <>

@@ -39,7 +39,6 @@ import {
   type RangeSeatType,
 } from '../utils/rangePlayerSettings';
 import { ShotControlPanel } from '../components/ShotControlPanel';
-import WindDirectionDial from '../components/WindDirectionDial';
 import { RangeClubSelectionPanel } from '../components/RangeClubSelectionPanel';
 import { RangeSimulationResults } from '../components/RangeSimulationResults';
 import { RangePlayerSettings } from '../components/range/RangePlayerSettings';
@@ -62,14 +61,11 @@ type SimulationOptions = {
 };
 import {
   convertMpsToMph,
-  formatWindDirectionLabel,
   normalizeWindDirection,
   normalizeWindSpeedMps,
 } from '../utils/windDirection';
 import {
   LIE_OPTIONS,
-  SHOT_COUNTS,
-  getLiePenaltyInfo,
   clampAimXOffset,
   formatGroundHardnessLabel,
   type GroundHardness,
@@ -222,28 +218,6 @@ function formatSlopeDirectionLabel(direction: number): string {
   return '左前上り';
 }
 
-function formatSlopeEffectGuide(slopeAngle: number, slopeDirection: number): string {
-  const normalizedSlope = normalizeSlopeForDisplay(slopeAngle, slopeDirection);
-  if (normalizedSlope.slopeAngle === 0) {
-    return 'フラット: キャリー・ラン・横ブレの傾斜補正は入りません。';
-  }
-
-  const direction = normalizedSlope.slopeDirection;
-  const directionLabel = formatSlopeDirectionLabel(direction);
-  let effect = '前後と左右の補正が混在します。';
-
-  if (direction === 0) effect = 'ピン方向が上りになり、キャリーとランは減りやすくなります。';
-  else if (direction === 180) effect = 'ピン方向が下りになり、キャリーとランは伸びやすくなります。';
-  else if (direction === 90) effect = '右側が上りになり、左へ流れやすくなります。';
-  else if (direction === 270) effect = '左側が上りになり、右へ流れやすくなります。';
-  else if (direction > 0 && direction < 90) effect = '右前上りで、キャリーとランが減りつつ左へ流れやすくなります。';
-  else if (direction > 90 && direction < 180) effect = '右後上りで、キャリーとランが伸びつつ左へ流れやすくなります。';
-  else if (direction > 180 && direction < 270) effect = '左後上りで、キャリーとランが伸びつつ右へ流れやすくなります。';
-  else if (direction > 270 && direction < 360) effect = '左前上りで、キャリーとランが減りつつ右へ流れやすくなります。';
-
-  return `${normalizedSlope.slopeAngle}° / ${directionLabel}: ${effect}`;
-}
-
 
 function mapLieUiToGameLie(lie: string): LieType {
   switch (lie) {
@@ -356,7 +330,6 @@ export default function RangeScreen() {
     const bagId = state.activeBagId;
     return bagId != null ? state.actualShotRows[String(bagId)] ?? EMPTY_ACTUAL_SHOT_ROWS : EMPTY_ACTUAL_SHOT_ROWS;
   });
-  const initializeDefaults = useClubStore((state) => state.initializeDefaults);
   const loadClubs = useClubStore((state) => state.loadClubs);
   const loadBags = useClubStore((state) => state.loadBags);
   const loadPersonalData = useClubStore((state) => state.loadPersonalData);
@@ -396,7 +369,6 @@ export default function RangeScreen() {
   const [lastSimulationSeedNonce, setLastSimulationSeedNonce] = useState<string | null>(null);
   const monteCarloResult = useMemo(() => buildMonteCarloResult(results), [results]);
   const personalSkillLevel = storedPlayerSkillLevel;
-  const personalSkillLevelLabel = useMemo(() => getSkillLabel(personalSkillLevel), [personalSkillLevel]);
   const displayedSkillLevel = useMemo(() => seatType === 'robot' ? robotSkillLevel : personalSkillLevel, [seatType, robotSkillLevel, personalSkillLevel]);
   const displayedSkillLabel = useMemo(() => getSkillLabel(displayedSkillLevel), [displayedSkillLevel]);
   const skillLevelName = useMemo(() => `適用スキルレベル ${(displayedSkillLevel * 100).toFixed(0)}% (${displayedSkillLabel})`, [displayedSkillLevel, displayedSkillLabel]);
@@ -433,8 +405,6 @@ export default function RangeScreen() {
   const gameLie = useMemo(() => mapLieUiToGameLie(lie), [lie]);
   // Range  UI input is m/s, but internal calculations use mph for compatibility.
   const windSpeedMph = useMemo(() => convertMpsToMph(windSpeed), [windSpeed]);
-  // Create angle+direction label for display even when closed.
-  const windDirectionSummary = useMemo(() => formatWindDirectionLabel(windDirection), [windDirection]);
 
   // Reset wind direction and speed to initial state.
   const handleResetWind = useCallback(() => {
