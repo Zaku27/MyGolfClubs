@@ -100,6 +100,12 @@
   font-weight: 600;
 }
 
+.headspeed-note {
+  font-size: 11px;
+  color: #8a9a8f;
+  font-weight: 500;
+}
+
 .analysis-card {
   background: #ffffff;
   border: 1px solid var(--border);

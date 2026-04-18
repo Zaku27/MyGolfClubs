@@ -107,6 +107,7 @@ export const AnalysisLoftChart: React.FC<AnalysisLoftChartProps> = ({
             />
             <em>m/s</em>
           </div>
+          <span className="headspeed-note">※推定飛距離の算出用パラメータ</span>
         </label>
       </div>
       <AnalysisChartWrapper

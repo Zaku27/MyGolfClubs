@@ -235,17 +235,36 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       });
     }
 
-    // Check for swing weight inconsistencies (fallback if no length data)
-    const swingWeights = bagClubs
-      .map((c) => c.swingWeight)
-      .filter((sw): sw is string => !!sw && sw.length > 0);
-    const uniqueSwingWeights = [...new Set(swingWeights)];
+    // Check for swing weight inconsistencies by club type
+    const clubsByType = bagClubs.reduce(
+      (acc, club) => {
+        if (club.swingWeight && club.swingWeight.length > 0) {
+          if (!acc[club.clubType]) {
+            acc[club.clubType] = [];
+          }
+          acc[club.clubType].push(club.swingWeight);
+        }
+        return acc;
+      },
+      {} as Record<string, string[]>,
+    );
 
-    if (uniqueSwingWeights.length > 3 && swingOutliers.length === 0) {
+    const typesWithMultipleSwingWeights: { type: string; weights: string[] }[] = [];
+    for (const [type, weights] of Object.entries(clubsByType)) {
+      const uniqueWeights = [...new Set(weights)];
+      if (uniqueWeights.length >= 2) {
+        typesWithMultipleSwingWeights.push({ type, weights: uniqueWeights });
+      }
+    }
+
+    if (typesWithMultipleSwingWeights.length > 0 && swingOutliers.length === 0) {
+      const typeDescriptions = typesWithMultipleSwingWeights
+        .map(({ type, weights }) => `${type}（${weights.join(', ')}）`)
+        .join('、');
       adjustments.push({
         priority: 'low',
         title: 'スイングウェイトの確認',
-        description: `現在${uniqueSwingWeights.length}種類のスイングウェイト（${uniqueSwingWeights.slice(0, 3).join(', ')}${uniqueSwingWeights.length > 3 ? '...' : ''}）が混在しています。スイングフィールに違和感がないか確認してみてください。`,
+        description: `${typeDescriptions}で異なるスイングウェイトが混在しています。スイングフィールに違和感がないか確認してみてください。`,
         estimatedEffect: 'フィールの確認',
       });
     }
