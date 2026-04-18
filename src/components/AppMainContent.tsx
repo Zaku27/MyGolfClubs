@@ -4,144 +4,117 @@ import { AnalysisScreen } from './AnalysisScreen';
 import { AccessoryPanel } from './AccessoryPanel';
 import { GolfBagPanel } from './GolfBagPanel';
 import { SimulatorApp } from './simulator/SimulatorApp';
-import type { AccessoryItem, GolfClub, GolfBag } from '../types/golf';
-import type { UserLieAngleStandards } from '../types/lieStandards';
+import { useAppContext } from '../context/AppContext';
 
 export type AppMainContentProps = {
-  showSimulator: boolean;
-  showForm: boolean;
-  showAnalysis: boolean;
-  editingClub?: GolfClub | undefined;
-  activeBagClubs: GolfClub[];
-  sortedClubs: GolfClub[];
-  activeBagName?: string;
-  activeBagId: number | null;
-  activeBagClubCount: number;
-  activeBagClubIds: number[];
-  activeBag?: GolfBag | undefined;
-  bags: GolfBag[];
-  loading: boolean;
-  clubListScope: 'bag' | 'all';
-  clubNameSearchText: string;
-  clubTypeFilter: 'All' | GolfClub['clubType'];
-  onSearchTextChange: (value: string) => void;
-  onSelectedClubTypeChange: (value: 'All' | GolfClub['clubType']) => void;
-  handleFormSubmit: (clubData: Omit<GolfClub, 'id'> | Partial<GolfClub>) => Promise<void>;
-  handleFormCancel: () => void;
-  handleActualDistanceChange: (id: number, distance: number) => Promise<void>;
-  hiddenAnalysisClubKeys: string[];
-  handleSetAnalysisClubVisible: (clubKey: string, visible: boolean) => void;
-  swingWeightTarget: number;
-  swingGoodTolerance: number;
-  swingAdjustThreshold: number;
-  handleSetSwingWeightTarget: (value: number) => void;
-  handleSetSwingGoodTolerance: (value: number) => void;
-  handleSetSwingAdjustThreshold: (value: number) => void;
-  handleResetSwingWeightTarget: () => void;
-  handleResetSwingThresholds: () => void;
-  userLieAngleStandards: UserLieAngleStandards;
-  handleSetLieTypeStandard: (clubType: string, value: number) => void;
-  handleSetLieClubStandard: (clubName: string, value: number) => void;
-  handleClearLieTypeStandard: (clubType: string) => void;
-  handleClearLieClubStandard: (clubName: string) => void;
-  handleResetLieStandards: () => void;
-  onSelectBag: (bagId: number) => void;
-  onCreateBag: () => void;
+  // Bag management handlers that are defined in App.tsx
   onRenameActiveBag: () => void;
   onDeleteActiveBag: () => void;
   onShiftSelectedBagLeft: () => void;
-  onToggleActiveBagMembership: (club: GolfClub) => void;
-  onSwitchToAllClubs: () => void;
-  onChangeClubListScope: (scope: 'bag' | 'all') => void;
-  handleEditClub: (club: GolfClub) => void;
-  handleDeleteClub: (id: number) => void;
-  handleAddClub: () => void;
-  handleResetClubs: () => void;
-  handleClearAllClubs: () => void;
-  handleDeleteAll: () => void;
-  handleExportJSON: () => void;
-  handleImportJSON: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
-  handleShowAnalysis: () => void;
-  handleBackToList: () => void;
-  handleBackFromSimulator: () => void;
-  handleShowSimulator: () => void;
-  accessories: AccessoryItem[];
-  onAddAccessory: (accessory: Omit<AccessoryItem, 'id' | 'createdAt'>) => void;
-  onUpdateAccessory: (accessory: AccessoryItem) => void;
-  onDeleteAccessory: (id: string) => void;
-  onShiftSelectedAccessoryLeft?: () => void;
+  onShiftSelectedAccessoryLeft: () => void;
   selectedAccessoryId: string | null;
   onAccessorySelect: (id: string | null) => void;
-  headSpeed: number;
-  onHeadSpeedChange: (value: number) => void;
 };
 
 export function AppMainContent({
-  showSimulator,
-  showForm,
-  showAnalysis,
-  editingClub,
-  activeBagClubs,
-  sortedClubs,
-  activeBagName,
-  activeBagId,
-  activeBagClubCount,
-  activeBagClubIds,
-  activeBag,
-  bags,
-  loading,
-  clubListScope,
-  clubNameSearchText,
-  clubTypeFilter,
-  onSearchTextChange,
-  onSelectedClubTypeChange,
-  handleFormSubmit,
-  handleFormCancel,
-  handleActualDistanceChange,
-  hiddenAnalysisClubKeys,
-  handleSetAnalysisClubVisible,
-  swingGoodTolerance,
-  swingAdjustThreshold,
-  handleSetSwingGoodTolerance,
-  handleSetSwingAdjustThreshold,
-  handleResetSwingWeightTarget,
-  handleResetSwingThresholds,
-  userLieAngleStandards,
-  handleSetLieTypeStandard,
-  handleSetLieClubStandard,
-  handleClearLieTypeStandard,
-  handleClearLieClubStandard,
-  handleResetLieStandards,
-  onSelectBag,
-  onCreateBag,
   onRenameActiveBag,
   onDeleteActiveBag,
   onShiftSelectedBagLeft,
-  onToggleActiveBagMembership,
-  onSwitchToAllClubs,
-  onChangeClubListScope,
-  handleEditClub,
-  handleDeleteClub,
-  handleAddClub,
-  handleResetClubs,
-  handleClearAllClubs,
-  handleDeleteAll,
-  handleExportJSON,
-  handleImportJSON,
-  handleShowAnalysis,
-  handleBackToList,
-  handleBackFromSimulator,
-  handleShowSimulator,
-  accessories,
-  onAddAccessory,
-  onUpdateAccessory,
-  onDeleteAccessory,
   onShiftSelectedAccessoryLeft,
   selectedAccessoryId,
   onAccessorySelect,
-  headSpeed,
-  onHeadSpeedChange,
 }: AppMainContentProps) {
+  const { uiState, clubActions, appSettings } = useAppContext();
+
+  const {
+    showSimulator,
+    showForm,
+    showAnalysis,
+    editingClub,
+    clubNameSearchText,
+    clubTypeFilter,
+  } = uiState;
+
+  const {
+    activeBagClubs,
+    sortedClubs,
+    activeBag,
+    bags,
+    loading,
+    activeBagClubCount,
+  } = clubActions;
+
+  const {
+    clubListScope,
+    hiddenAnalysisClubKeys,
+    swingGoodTolerance,
+    swingAdjustThreshold,
+    userLieAngleStandards,
+    accessories,
+    headSpeed,
+    handleSetAnalysisClubVisible,
+    handleSetSwingGoodTolerance,
+    handleSetSwingAdjustThreshold,
+    handleResetSwingWeightTarget,
+    handleResetSwingThresholds,
+    handleSetLieTypeStandard,
+    handleSetLieClubStandard,
+    handleClearLieTypeStandard,
+    handleClearLieClubStandard,
+    handleResetLieStandards,
+    handleChangeClubListScope,
+    handleAddAccessory,
+    handleUpdateAccessory,
+    handleDeleteAccessory,
+    handleHeadSpeedChange,
+  } = appSettings;
+
+  const {
+    handleFormSubmit,
+    handleDeleteClub,
+    handleActualDistanceChange,
+    handleResetClubs,
+    handleClearAllClubs,
+    handleDeleteAll,
+    handleExportJSON,
+    handleImportJSON,
+    setActiveBag,
+    handleToggleActiveBagMembership,
+  } = clubActions;
+
+  const {
+    handleShowForm,
+    handleShowFormWithClub,
+    handleBackToList,
+    handleBackFromSimulator,
+    handleShowAnalysis,
+    handleShowSimulator,
+    handleSearchTextChange,
+    handleSelectedClubTypeChange,
+    handleShowCreateBagDialog,
+    handleFormCancel,
+  } = uiState;
+
+  const activeBagName = activeBag?.name;
+  const activeBagId = activeBag?.id ?? null;
+  const activeBagClubIds = activeBag?.clubIds ?? [];
+
+  const handleDeleteAllWrapper = () => {
+    handleDeleteAll(appSettings.handleClearAllAccessories);
+  };
+
+  const handleExportJSONWrapper = () => {
+    handleExportJSON(clubListScope, accessories);
+  };
+
+  const handleImportJSONWrapper = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const importedAccessories = await handleImportJSON(event);
+    // Restore imported accessories
+    for (const accessory of importedAccessories) {
+      handleAddAccessory(accessory);
+    }
+    handleChangeClubListScope('bag');
+  };
   if (showSimulator) {
     return (
       <SimulatorApp
@@ -169,7 +142,7 @@ export function AppMainContent({
           onBack={handleBackToList}
           onUpdateActualDistance={handleActualDistanceChange}
           headSpeed={headSpeed}
-          onHeadSpeedChange={onHeadSpeedChange}
+          onHeadSpeedChange={handleHeadSpeedChange}
           hiddenAnalysisClubKeys={hiddenAnalysisClubKeys}
           onSetAnalysisClubVisible={handleSetAnalysisClubVisible}
           swingGoodTolerance={swingGoodTolerance}
@@ -192,21 +165,21 @@ export function AppMainContent({
               bags={bags}
               activeBagId={activeBag?.id ?? null}
               activeBagClubCount={activeBagClubCount}
-              onSelectBag={onSelectBag}
-              onCreateBag={onCreateBag}
+              onSelectBag={(bagId) => setActiveBag(bagId)}
+              onCreateBag={handleShowCreateBagDialog}
               onRenameActiveBag={onRenameActiveBag}
               onDeleteActiveBag={onDeleteActiveBag}
               onShiftSelectedBagLeft={onShiftSelectedBagLeft}
               listScope={clubListScope}
-              onChangeListScope={onChangeClubListScope}
+              onChangeListScope={handleChangeClubListScope}
               compact
             />
 
             <AccessoryPanel
               accessories={accessories}
-              onAddAccessory={onAddAccessory}
-              onUpdateAccessory={onUpdateAccessory}
-              onDeleteAccessory={onDeleteAccessory}
+              onAddAccessory={handleAddAccessory}
+              onUpdateAccessory={handleUpdateAccessory}
+              onDeleteAccessory={handleDeleteAccessory}
               onShiftSelectedAccessoryLeft={onShiftSelectedAccessoryLeft}
               selectedAccessoryId={selectedAccessoryId}
               onAccessorySelect={onAccessorySelect}
@@ -217,16 +190,16 @@ export function AppMainContent({
             clubs={clubListScope === 'bag' ? activeBagClubs : sortedClubs}
             searchText={clubNameSearchText}
             selectedClubType={clubTypeFilter}
-            onSearchTextChange={onSearchTextChange}
-            onSelectedClubTypeChange={onSelectedClubTypeChange}
-            onEdit={handleEditClub}
+            onSearchTextChange={handleSearchTextChange}
+            onSelectedClubTypeChange={handleSelectedClubTypeChange}
+            onEdit={handleShowFormWithClub}
             onDelete={handleDeleteClub}
-            onAdd={handleAddClub}
+            onAdd={handleShowForm}
             onReset={handleResetClubs}
             onClearAll={handleClearAllClubs}
-            onDeleteAll={handleDeleteAll}
-            onExport={handleExportJSON}
-            onImport={handleImportJSON}
+            onDeleteAll={handleDeleteAllWrapper}
+            onExport={handleExportJSONWrapper}
+            onImport={handleImportJSONWrapper}
             onShowAnalysis={handleShowAnalysis}
             onShowSimulator={handleShowSimulator}
             activeBagName={activeBagName}
@@ -236,9 +209,9 @@ export function AppMainContent({
             isBagView={clubListScope === 'bag'}
             allClubsCount={sortedClubs.length}
             listScope={clubListScope}
-            onChangeListScope={onChangeClubListScope}
-            onSwitchToAllClubs={onSwitchToAllClubs}
-            onToggleActiveBagMembership={onToggleActiveBagMembership}
+            onChangeListScope={handleChangeClubListScope}
+            onSwitchToAllClubs={() => handleChangeClubListScope('all')}
+            onToggleActiveBagMembership={handleToggleActiveBagMembership}
             loading={loading}
           />
         </>

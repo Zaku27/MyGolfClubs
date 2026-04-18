@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { APP } from './constants/app';
 import { Header } from './components/Header';
 import { AppDialogs } from './components/AppDialogs';
 import { AppMainContent } from './components/AppMainContent';
+import { AppProvider } from './context/AppContext';
 import { useBagIdUrlSync } from './hooks/useBagIdUrlSync';
+import { useClubListScopeAutoSwitch } from './hooks/useClubListScopeAutoSwitch';
 import { useAppSettings } from './hooks/useAppSettings';
 import { useUIState } from './hooks/useUIState';
 import { useClubActions } from './hooks/useClubActions';
+import { useBagHandlers } from './hooks/useBagHandlers';
 import { useClubStore, selectActiveGolfBag } from './store/clubStore';
-import { getAnalysisClubKey } from './utils/clubUtils';
-import type { GolfClub } from './types/golf';
+import { shiftItemLeft } from './utils/imageUtils';
 import './App.css';
 
 function App() {
@@ -19,7 +21,10 @@ function App() {
   const clubActions = useClubActions(uiState);
   const activeBag = useClubStore(selectActiveGolfBag);
   const appSettings = useAppSettings(activeBag, clubActions.updateBagSwingSettings);
-  
+
+  // Bag management handlers
+  const bagHandlers = useBagHandlers(uiState, clubActions, appSettings, activeBag);
+
   // Store data
   const bags = useClubStore((state) => state.bags);
   
@@ -41,133 +46,18 @@ function App() {
   }, [uiState.checkLocationState]);
 
   // Handle club list scope auto-switch
-  useEffect(() => {
-    if (
-      appSettings.clubListScope === 'bag' && 
-      clubActions.activeBagClubCount === 0 && 
-      clubActions.sortedClubs.length > 0 && 
-      bags.length === 1
-    ) {
-      appSettings.handleChangeClubListScope('all');
-    }
-  }, [
-    appSettings.clubListScope,
-    clubActions.activeBagClubCount,
-    clubActions.sortedClubs.length,
-    bags.length,
-    appSettings.handleChangeClubListScope
-  ]);
+  useClubListScopeAutoSwitch(appSettings, clubActions, bags.length);
 
-  // Filter analysis hidden keys for current bag
-  const analysisHiddenKeys = useMemo(() => {
-    return appSettings.hiddenAnalysisClubKeys.filter((clubKey) =>
-      clubActions.activeBagClubs.some((club) => getAnalysisClubKey(club) === clubKey),
-    );
-  }, [clubActions.activeBagClubs, appSettings.hiddenAnalysisClubKeys]);
-
-  // Bag management handlers
-  const handleCreateBagConfirm = async (bagName: string, imageData?: string) => {
-    await clubActions.handleCreateBag(bagName, imageData ? [imageData] : undefined);
-    uiState.handleHideCreateBagDialog();
-    appSettings.handleChangeClubListScope('bag');
-  };
-
-  const handleRenameActiveBag = async () => {
-    if (!activeBag?.id) {
-      return;
-    }
-    uiState.handleShowRenameBagDialog(activeBag.id, activeBag.name, activeBag.imageData?.[0]);
-  };
-
-  const handleRenameBagConfirm = async (bagName: string, imageData?: string) => {
-    if (!uiState.renameBagTargetId) {
-      return;
-    }
-    await clubActions.handleRenameBag(uiState.renameBagTargetId, bagName, imageData ? [imageData] : undefined);
-    uiState.handleHideRenameBagDialog();
-  };
-
-  const handleDeleteActiveBag = async () => {
-    const activeBagId = activeBag?.id;
-    const activeBagName = activeBag?.name ?? 'このバッグ';
-    if (typeof activeBagId !== 'number') {
-      return;
-    }
-    await clubActions.handleDeleteBag(activeBagId, activeBagName);
-  };
-
-  const handleShiftSelectedBagLeft = async () => {
-    if (activeBag?.id != null) {
-      await clubActions.handleMoveBagLeft(activeBag.id);
-    }
-  };
-
-  const handleToggleActiveBagMembership = async (club: GolfClub) => {
-    await clubActions.handleToggleActiveBagMembership(club);
-  };
 
   const [selectedAccessoryId, setSelectedAccessoryId] = useState<string | null>(null);
 
   const handleShiftSelectedAccessoryLeft = () => {
-    if (!selectedAccessoryId) return;
-
-    const currentIndex = appSettings.accessories.findIndex(a => a.id === selectedAccessoryId);
-    if (currentIndex <= 0) return;
-
-    const newAccessories = [...appSettings.accessories];
-    const [movedItem] = newAccessories.splice(currentIndex, 1);
-    newAccessories.splice(currentIndex - 1, 0, movedItem);
-
+    const newAccessories = shiftItemLeft(appSettings.accessories, selectedAccessoryId, a => a.id);
     appSettings.setAccessories(newAccessories);
   };
 
-  const handleFormSubmit = async (clubData: Partial<GolfClub>) => {
-    await clubActions.handleFormSubmit(clubData, uiState.editingClub);
-  };
-
-  const handleExportJSON = () => {
-    clubActions.handleExportJSON(appSettings.clubListScope, appSettings.accessories);
-  };
-
-  const handleImportJSON = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const importedAccessories = await clubActions.handleImportJSON(event);
-    // Restore imported accessories
-    for (const accessory of importedAccessories) {
-      appSettings.handleAddAccessory(accessory);
-    }
-    appSettings.handleChangeClubListScope('bag');
-  };
-
-  const handleShowAnalysis = () => {
-    uiState.handleShowAnalysis();
-  };
-
-  const handleBackToList = () => {
-    uiState.handleBackToList();
-  };
-
-  const handleBackFromSimulator = () => {
-    uiState.handleBackFromSimulator();
-  };
-
-  const handleShowSimulator = () => {
-    uiState.handleShowSimulator();
-  };
-
-  const handleAddClub = () => {
-    uiState.handleShowForm();
-  };
-
-  const handleEditClub = (club: GolfClub) => {
-    uiState.handleShowFormWithClub(club);
-  };
-
-  const handleDeleteAll = () => {
-    clubActions.handleDeleteAll(appSettings.handleClearAllAccessories);
-  };
-
   return (
-    <>
+    <AppProvider uiState={uiState} clubActions={clubActions} appSettings={appSettings}>
       <Helmet>
         <title>{`${APP.short} - ${APP.name}`}</title>
         <meta name="description" content={APP.tagline} />
@@ -192,83 +82,21 @@ function App() {
         renameBagDefaultImageData={uiState.renameBagDefaultImageData}
         bags={bags}
         loading={clubActions.loading}
-        onCreateBagConfirm={handleCreateBagConfirm}
+        onCreateBagConfirm={bagHandlers.handleCreateBagConfirm}
         onCancelCreateBag={uiState.handleHideCreateBagDialog}
-        onRenameBagConfirm={handleRenameBagConfirm}
+        onRenameBagConfirm={bagHandlers.handleRenameBagConfirm}
         onCancelRenameBag={uiState.handleHideRenameBagDialog}
       />
 
       <AppMainContent
-        showSimulator={uiState.showSimulator}
-        showForm={uiState.showForm}
-        showAnalysis={uiState.showAnalysis}
-        editingClub={uiState.editingClub}
-        activeBagClubs={clubActions.activeBagClubs}
-        sortedClubs={clubActions.sortedClubs}
-        activeBagName={activeBag?.name}
-        activeBagId={activeBag?.id ?? null}
-        activeBagClubCount={clubActions.activeBagClubCount}
-        activeBagClubIds={activeBag?.clubIds ?? []}
-        activeBag={activeBag ?? undefined}
-        bags={bags}
-        loading={clubActions.loading}
-        clubListScope={appSettings.clubListScope}
-        clubNameSearchText={uiState.clubNameSearchText}
-        clubTypeFilter={uiState.clubTypeFilter}
-        onSearchTextChange={uiState.handleSearchTextChange}
-        onSelectedClubTypeChange={uiState.handleSelectedClubTypeChange}
-        handleFormSubmit={handleFormSubmit}
-        handleFormCancel={uiState.handleFormCancel}
-        handleActualDistanceChange={clubActions.handleActualDistanceChange}
-        hiddenAnalysisClubKeys={analysisHiddenKeys}
-        handleSetAnalysisClubVisible={appSettings.handleSetAnalysisClubVisible}
-        swingWeightTarget={appSettings.swingWeightTarget}
-        swingGoodTolerance={appSettings.swingGoodTolerance}
-        swingAdjustThreshold={appSettings.swingAdjustThreshold}
-        handleSetSwingWeightTarget={appSettings.handleSetSwingWeightTarget}
-        handleSetSwingGoodTolerance={appSettings.handleSetSwingGoodTolerance}
-        handleSetSwingAdjustThreshold={appSettings.handleSetSwingAdjustThreshold}
-        handleResetSwingWeightTarget={appSettings.handleResetSwingWeightTarget}
-        handleResetSwingThresholds={appSettings.handleResetSwingThresholds}
-        userLieAngleStandards={appSettings.userLieAngleStandards}
-        handleSetLieTypeStandard={appSettings.handleSetLieTypeStandard}
-        handleSetLieClubStandard={appSettings.handleSetLieClubStandard}
-        handleClearLieTypeStandard={appSettings.handleClearLieTypeStandard}
-        handleClearLieClubStandard={appSettings.handleClearLieClubStandard}
-        handleResetLieStandards={appSettings.handleResetLieStandards}
-        onSelectBag={(bagId) => {
-          clubActions.setActiveBag(bagId);
-        }}
-        onCreateBag={uiState.handleShowCreateBagDialog}
-        onRenameActiveBag={handleRenameActiveBag}
-        onDeleteActiveBag={handleDeleteActiveBag}
-        onShiftSelectedBagLeft={handleShiftSelectedBagLeft}
-        onToggleActiveBagMembership={handleToggleActiveBagMembership}
-        onSwitchToAllClubs={() => appSettings.handleChangeClubListScope('all')}
-        onChangeClubListScope={appSettings.handleChangeClubListScope}
-        handleEditClub={handleEditClub}
-        handleDeleteClub={clubActions.handleDeleteClub}
-        handleAddClub={handleAddClub}
-        handleResetClubs={clubActions.handleResetClubs}
-        handleClearAllClubs={clubActions.handleClearAllClubs}
-        handleDeleteAll={handleDeleteAll}
-        handleExportJSON={handleExportJSON}
-        handleImportJSON={handleImportJSON}
-        handleShowAnalysis={handleShowAnalysis}
-        handleBackToList={handleBackToList}
-        handleBackFromSimulator={handleBackFromSimulator}
-        handleShowSimulator={handleShowSimulator}
-        accessories={appSettings.accessories}
-        onAddAccessory={appSettings.handleAddAccessory}
-        onUpdateAccessory={appSettings.handleUpdateAccessory}
-        onDeleteAccessory={appSettings.handleDeleteAccessory}
+        onRenameActiveBag={bagHandlers.handleRenameActiveBag}
+        onDeleteActiveBag={bagHandlers.handleDeleteActiveBag}
+        onShiftSelectedBagLeft={bagHandlers.handleShiftSelectedBagLeft}
         onShiftSelectedAccessoryLeft={handleShiftSelectedAccessoryLeft}
         selectedAccessoryId={selectedAccessoryId}
         onAccessorySelect={setSelectedAccessoryId}
-        headSpeed={appSettings.headSpeed}
-        onHeadSpeedChange={appSettings.handleHeadSpeedChange}
       />
-    </>
+    </AppProvider>
   );
 }
 
