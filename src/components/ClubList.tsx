@@ -287,7 +287,7 @@ export const ClubList: React.FC<ClubListProps> = ({
               <DeleteIcon size={18} />
               <span>全クラブ削除</span>
             </button>
-            <button className="btn-clearall-clubs" onClick={onDeleteAll} disabled={loading} title="全削除">
+            <button className="btn-delete-all" onClick={onDeleteAll} disabled={loading} title="全削除">
               <DeleteIcon size={18} />
               <span>全削除</span>
             </button>
