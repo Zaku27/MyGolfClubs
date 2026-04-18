@@ -958,6 +958,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
             groundHardness={groundHardness}
             slopeAngle={slopeAngle}
             slopeDirection={slopeDirection}
+            seatType={seatType}
           />
         </main>
 

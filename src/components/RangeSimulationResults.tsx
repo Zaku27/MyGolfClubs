@@ -30,6 +30,7 @@ type RangeSimulationResultsProps = {
   groundHardness: GroundHardness;
   slopeAngle: number;
   slopeDirection: number;
+  seatType?: string;
 };
 
 const qualityStatusColor = (shotQuality: string) => {
@@ -81,6 +82,7 @@ export function RangeSimulationResults({
   groundHardness,
   slopeAngle,
   slopeDirection,
+  seatType,
 }: RangeSimulationResultsProps) {
   // Memoize calculations to improve performance
   const memoizedResults = useMemo(() => {
@@ -137,8 +139,8 @@ export function RangeSimulationResults({
                   <th className="px-1 py-0.5">ラン</th>
                   <th className="px-1 py-0.5">左右偏差</th>
                   <th className="px-1 py-0.5">目標までの距離</th>
-                  <th className="px-1 py-0.5">地面影響</th>
-                  <th className="px-1 py-0.5">傾斜影響</th>
+                  {seatType !== 'actual' && <th className="px-1 py-0.5">地面影響</th>}
+                  {seatType !== 'actual' && <th className="px-1 py-0.5">傾斜影響</th>}
                   <th className="px-1 py-0.5">着地点 X</th>
                   <th className="px-1 py-0.5">着地点 Y</th>
                   <th className="px-1 py-0.5">ショット品質</th>
@@ -155,8 +157,8 @@ export function RangeSimulationResults({
                     <td className="px-1 py-0.5 text-center">
                       {r.distanceToTarget?.toFixed(1) ?? '-'}
                     </td>
-                    <td className="px-1 py-0.5 text-center">{r.groundImpact}</td>
-                    <td className="px-1 py-0.5 text-center">{r.slopeImpact}</td>
+                    {seatType !== 'actual' && <td className="px-1 py-0.5 text-center">{r.groundImpact}</td>}
+                    {seatType !== 'actual' && <td className="px-1 py-0.5 text-center">{r.slopeImpact}</td>}
                     <td className="px-1 py-0.5 text-center">{r.landing?.finalX?.toFixed(1) ?? '-'}</td>
                     <td className="px-1 py-0.5 text-center">{r.landing?.finalY?.toFixed(1) ?? '-'}</td>
                     <td className={`px-1 py-0.5 text-center font-bold ${qualityStatusColor(r.shotQuality)}`}>{qualityLabel(r.shotQuality)}</td>
