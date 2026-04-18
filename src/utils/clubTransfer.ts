@@ -1,6 +1,8 @@
 import type { GolfClub, GolfBag, AccessoryItem } from '../types/golf';
 
-type ExportableClub = Omit<GolfClub, 'id' | 'createdAt' | 'updatedAt'>;
+type ExportableClub = Omit<GolfClub, 'id' | 'createdAt' | 'updatedAt'> & {
+  exportId?: string; // Temporary UUID to preserve club identity during import/export
+};
 
 type AllClubsExportPayload = {
   format: 'all-clubs-v1';
@@ -19,7 +21,9 @@ type BagClubsExportPayload = {
   clubs: ExportableClub[];
 };
 
-type ExportableBag = Omit<GolfBag, 'id' | 'createdAt' | 'updatedAt'>;
+type ExportableBag = Omit<GolfBag, 'id' | 'createdAt' | 'updatedAt' | 'clubIds'> & {
+  clubIds: string[]; // Use exportIds (strings) instead of database IDs (numbers)
+};
 
 type ExportableAccessory = Omit<AccessoryItem, 'id' | 'createdAt'>;
 
@@ -34,14 +38,30 @@ type CompleteDataExportPayload = {
   accessories: ExportableAccessory[];
 };
 
-const sanitizeClubForTransfer = (club: GolfClub): ExportableClub => {
-  const { id, createdAt, updatedAt, ...rest } = club;
-  return rest;
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 };
 
-const sanitizeBagForTransfer = (bag: GolfBag): ExportableBag => {
-  const { id, createdAt, updatedAt, ...rest } = bag;
-  return rest;
+const sanitizeClubForTransfer = (club: GolfClub): ExportableClub => {
+  const { id, createdAt, updatedAt, ...rest } = club;
+  return {
+    ...rest,
+    exportId: generateUUID(), // Generate UUID to preserve identity across import/export
+  };
+};
+
+const sanitizeBagForTransfer = (bag: GolfBag, clubExportIdMap: Map<number, string>): ExportableBag => {
+  const { id, createdAt, updatedAt, clubIds, ...rest } = bag;
+  // Convert database club IDs to export IDs
+  const exportClubIds = (clubIds ?? []).map((dbId) => clubExportIdMap.get(dbId)).filter((id): id is string => id != null);
+  return {
+    ...rest,
+    clubIds: exportClubIds, // Store as strings (exportIds) instead of numbers (database IDs)
+  };
 };
 
 const isExportableClubArray = (value: unknown): value is ExportableClub[] => {
@@ -178,14 +198,23 @@ export const downloadCompleteDataAsJson = (
   accessories: AccessoryItem[],
   filename = 'golf_complete_data.json',
 ): void => {
+  // First, sanitize clubs and create mapping from database ID to export ID
+  const sanitizedClubs = clubs.map(sanitizeClubForTransfer);
+  const clubExportIdMap = new Map<number, string>();
+  clubs.forEach((club, index) => {
+    if (club.id != null && sanitizedClubs[index].exportId) {
+      clubExportIdMap.set(club.id, sanitizedClubs[index].exportId!);
+    }
+  });
+
   const payload: CompleteDataExportPayload = {
     format: 'complete-data-v1',
     exportedAt: new Date().toISOString(),
     clubCount: clubs.length,
     bagCount: bags.length,
     accessoryCount: accessories.length,
-    clubs: clubs.map(sanitizeClubForTransfer),
-    bags: bags.map(sanitizeBagForTransfer),
+    clubs: sanitizedClubs,
+    bags: bags.map((bag) => sanitizeBagForTransfer(bag, clubExportIdMap)),
     accessories: accessories.map((acc) => {
       const { id, createdAt, ...rest } = acc;
       return rest;

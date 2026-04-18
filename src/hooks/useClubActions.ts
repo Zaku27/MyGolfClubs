@@ -26,7 +26,6 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     deleteBag,
     setActiveBag,
     toggleClubInActiveBag,
-    replaceActiveBagClubIds,
     updateBagImage,
     updateBagSwingSettings,
     updateBagClubIds,
@@ -148,8 +147,15 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
       const { clubs: importedClubs, bags: importedBags, accessories: importedAccessories } = await readCompleteDataFromJsonFile(file);
 
       await clearAllClubs();
+
+      // Create clubs and build mapping from exportId to new database ID
+      const exportIdToDbIdMap = new Map<string, number>();
       for (const club of importedClubs) {
-        await addClub(club);
+        const { exportId, ...clubData } = club as { exportId?: string; [key: string]: unknown };
+        const newId = await addClub(clubData as Omit<GolfClub, 'id'>);
+        if (exportId && typeof newId === 'number') {
+          exportIdToDbIdMap.set(exportId, newId);
+        }
       }
       await loadClubs();
 
@@ -160,14 +166,31 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
         }
         await loadBags();
 
-        // Update bags with clubIds and other properties
+        // Update bags with translated clubIds and other properties
         const currentBags = useClubStore.getState().bags;
         for (let i = 0; i < importedBags.length && i < currentBags.length; i++) {
           const importedBag = importedBags[i];
           const currentBag = currentBags[i];
           if (currentBag.id) {
-            // Update clubIds
-            await updateBagClubIds(currentBag.id, importedBag.clubIds);
+            // Translate exportIds to database IDs
+            // Handle both new format (string[] exportIds) and old format (number[] database IDs)
+            let translatedClubIds: number[];
+            const clubIds = importedBag.clubIds as unknown;
+            if (Array.isArray(clubIds) && clubIds.length > 0 && typeof clubIds[0] === 'string') {
+              // New format: convert exportIds to database IDs
+              translatedClubIds = (clubIds as string[])
+                .map((exportId) => exportIdToDbIdMap.get(exportId))
+                .filter((id): id is number => id != null);
+            } else {
+              // Old format: use database IDs directly (but filter to ensure they exist)
+              const allClubIds = useClubStore.getState().clubs.map(c => c.id).filter((id): id is number => id != null);
+              translatedClubIds = (clubIds as number[])
+                .filter((id) => allClubIds.includes(id));
+            }
+            
+            // Update clubIds with translated IDs
+            await updateBagClubIds(currentBag.id, translatedClubIds);
+            
             // Update imageData if present
             if (importedBag.imageData) {
               await updateBagImage(currentBag.id, importedBag.imageData);
@@ -183,14 +206,30 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
           }
         }
         await loadBags();
+
+        // Set active bag to first imported bag
+        if (currentBags.length > 0 && currentBags[0].id) {
+          await setActiveBag(currentBags[0].id);
+        }
+      } else {
+        // If no bags were imported, create default bag with first 14 clubs
+        const allClubs = useClubStore.getState().clubs;
+        const first14ClubIds = allClubs
+          .slice(0, 14)
+          .map((club) => club.id)
+          .filter((clubId): clubId is number => typeof clubId === 'number');
+        
+        if (first14ClubIds.length > 0) {
+          await createBag('メインバッグ');
+          await loadBags();
+          const bags = useClubStore.getState().bags;
+          if (bags.length > 0 && bags[0].id) {
+            await updateBagClubIds(bags[0].id, first14ClubIds);
+            await setActiveBag(bags[0].id);
+          }
+        }
       }
 
-      // Set active bag to first imported bag or default
-      const nextClubIds = sortedClubs
-        .slice(0, 14)
-        .map((club) => club.id)
-        .filter((clubId): clubId is number => typeof clubId === 'number');
-      await replaceActiveBagClubIds(nextClubIds);
       alert('インポートが完了しました');
       return importedAccessories;
     } catch (error) {
@@ -199,7 +238,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     }
 
     event.target.value = '';
-  }, [clearAllClubs, addClub, loadClubs, sortedClubs, replaceActiveBagClubIds, createBag, loadBags, updateBagImage, updateBagSwingSettings, updateBagClubIds]);
+  }, [clearAllClubs, addClub, loadClubs, createBag, loadBags, updateBagImage, updateBagSwingSettings, updateBagClubIds, setActiveBag]);
 
   const handleExportJSON = useCallback((_clubListScope: 'bag' | 'all', accessories: AccessoryItem[] = []) => {
     downloadCompleteDataAsJson(sortedClubs, bags, accessories);
