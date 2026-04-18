@@ -152,11 +152,32 @@ export function ShotDispersionChart({
     const standardMaxCarry = Math.max(0, baseStandardDistance * STANDARD_MAX_CARRY_MULTIPLIER);
     const cappedYMax = Math.min(yRange.max, Number(meanPoint.y) + standardMaxCarry);
 
+    const finalYRange = {
+      min: yRange.min,
+      max: Math.max(yRange.min + 1, Math.ceil(cappedYMax)),
+    };
+
+    // X軸のレンジも計算
+    const xRange = calculateAxisRange(xValues, -20, 20);
+
+    // XとY軸のスケールを一致させるために、両方のレンジ幅の最大値を使用
+    const ySpan = finalYRange.max - finalYRange.min;
+    const xSpan = xRange.max - xRange.min;
+    const maxSpan = Math.max(ySpan, xSpan);
+
+    // 各軸の中心を計算
+    const xCenter = (xValues.length > 0 ? (Math.min(...xValues) + Math.max(...xValues)) / 2 : 0);
+    const yCenter = (finalYRange.min + finalYRange.max) / 2;
+    const halfSpan = maxSpan / 2;
+
     return {
-      x: calculateAxisRange(xValues, -20, 20),
+      x: {
+        min: Math.floor(xCenter - halfSpan),
+        max: Math.ceil(xCenter + halfSpan),
+      },
       y: {
-        min: yRange.min,
-        max: Math.max(yRange.min + 1, Math.ceil(cappedYMax)),
+        min: Math.floor(yCenter - halfSpan),
+        max: Math.ceil(yCenter + halfSpan),
       },
     };
   }, [aim?.x, aim?.y, confidenceEllipse.height, confidenceEllipse.width, confidenceEllipse.x, confidenceEllipse.y, meanPoint.x, meanPoint.y, shotPoints, target.x, target.y]);
