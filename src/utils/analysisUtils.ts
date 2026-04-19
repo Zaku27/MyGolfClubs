@@ -1,4 +1,5 @@
 import type { GolfClub, GolfClubData } from '../types/golf';
+import type { Adjustment } from '../types/summary';
 import {
   lieStatusFromDeviation,
 } from '../types/lieStandards';
@@ -13,6 +14,19 @@ import {
   DISTANCE_MODELS,
   SWING_STATUS_COLOR_MAP,
   WEIGHT_NORMAL_BAND_TOLERANCE,
+  DEFAULT_HEAD_SPEED,
+  DRIVER_TO_WOOD_IDEAL_MIN,
+  DRIVER_TO_WOOD_IDEAL_MAX,
+  DRIVER_TO_WOOD_MAX_ACCEPTABLE,
+  WOOD_TO_HYBRID_IDEAL_MIN,
+  WOOD_TO_HYBRID_IDEAL_MAX,
+  WOOD_TO_HYBRID_TOLERANCE,
+  IRON_GAP_IDEAL_MIN,
+  IRON_GAP_IDEAL_MAX,
+  IRON_GAP_TOLERANCE,
+  WEDGE_GAP_IDEAL_MIN,
+  WEDGE_GAP_IDEAL_MAX,
+  WEDGE_GAP_TOLERANCE,
   type ClubCategory,
   type SwingStatus,
 } from './analysisConstants';
@@ -1067,4 +1081,127 @@ export const buildSwingLengthTrendPoints = (
     linePoints,
     bandPoints: `${upper} ${lower}`,
   };
+};
+
+type ClubWithDistance = GolfClub & {
+  effectiveDistance: number;
+};
+
+export const computeGapsAndRecommendations = (clubs: GolfClub[]): Adjustment[] => {
+  const adjustments: Adjustment[] = [];
+
+  // Filter out putters and clubs without necessary data
+  const validClubs = clubs.filter(
+    (club) => club.clubType !== 'Putter' && (club.distance != null || club.loftAngle != null)
+  );
+
+  if (validClubs.length < 2) {
+    return adjustments;
+  }
+
+  // Estimate head speed from clubs if available
+  const estimatedHeadSpeed = estimateHeadSpeedFromClubs(clubs) ?? DEFAULT_HEAD_SPEED;
+
+  // Calculate effective distance for each club (actual or estimated from loft)
+  const clubsWithDistance: ClubWithDistance[] = validClubs.map((club) => ({
+    ...club,
+    effectiveDistance: club.distance != null && club.distance > 0
+      ? club.distance
+      : (club.loftAngle != null ? getEstimatedDistance(club, estimatedHeadSpeed) : 0),
+  }));
+
+  // Filter out clubs with zero effective distance
+  const clubsWithValidDistance = clubsWithDistance.filter((c) => c.effectiveDistance > 0);
+
+  if (clubsWithValidDistance.length < 2) {
+    return adjustments;
+  }
+
+  // Sort by distance descending
+  const sortedClubs = [...clubsWithValidDistance].sort((a, b) => b.effectiveDistance - a.effectiveDistance);
+
+  // Calculate gaps between consecutive clubs
+  for (let i = 0; i < sortedClubs.length - 1; i++) {
+    const currentClub = sortedClubs[i];
+    const nextClub = sortedClubs[i + 1];
+    const gap = Math.round(currentClub.effectiveDistance - nextClub.effectiveDistance);
+
+    if (gap <= 0) continue;
+
+    const currentCategory = getClubCategory(currentClub);
+    const nextCategory = getClubCategory(nextClub);
+
+    // Determine gap category and thresholds
+    let idealMin: number;
+    let idealMax: number;
+    let tolerance: number;
+    let maxAcceptable: number | null = null;
+    let priority: 'high' | 'medium' | 'low';
+
+    // Driver → Wood (3W)
+    if (currentCategory === 'driver' && nextCategory === 'wood') {
+      idealMin = DRIVER_TO_WOOD_IDEAL_MIN;
+      idealMax = DRIVER_TO_WOOD_IDEAL_MAX;
+      maxAcceptable = DRIVER_TO_WOOD_MAX_ACCEPTABLE;
+      tolerance = maxAcceptable - idealMax; // Wide gaps acceptable
+      priority = 'low';
+    }
+    // Wood → Hybrid
+    else if (currentCategory === 'wood' && nextCategory === 'hybrid') {
+      idealMin = WOOD_TO_HYBRID_IDEAL_MIN;
+      idealMax = WOOD_TO_HYBRID_IDEAL_MAX;
+      tolerance = WOOD_TO_HYBRID_TOLERANCE;
+      maxAcceptable = idealMax + tolerance;
+      priority = 'high';
+    }
+    // Iron → Iron
+    else if (currentCategory === 'iron' && nextCategory === 'iron') {
+      idealMin = IRON_GAP_IDEAL_MIN;
+      idealMax = IRON_GAP_IDEAL_MAX;
+      tolerance = IRON_GAP_TOLERANCE;
+      maxAcceptable = idealMax + tolerance;
+      priority = 'high';
+    }
+    // Wedge → Wedge
+    else if (currentCategory === 'wedge' && nextCategory === 'wedge') {
+      idealMin = WEDGE_GAP_IDEAL_MIN;
+      idealMax = WEDGE_GAP_IDEAL_MAX;
+      tolerance = WEDGE_GAP_TOLERANCE;
+      maxAcceptable = idealMax + tolerance;
+      priority = 'high';
+    }
+    // Hybrid → Iron or other transitions
+    else {
+      // Use iron thresholds as default for other transitions
+      idealMin = IRON_GAP_IDEAL_MIN;
+      idealMax = IRON_GAP_IDEAL_MAX;
+      tolerance = IRON_GAP_TOLERANCE;
+      maxAcceptable = idealMax + tolerance;
+      priority = 'medium';
+    }
+
+    const currentClubName = getClubTypeDisplay(currentClub.clubType, currentClub.number || '');
+    const nextClubName = getClubTypeDisplay(nextClub.clubType, nextClub.number || '');
+
+    // Check if gap exceeds max acceptable
+    if (maxAcceptable && gap > maxAcceptable) {
+      adjustments.push({
+        priority,
+        title: `距離ギャップ解消（${currentClubName}と${nextClubName}の間）`,
+        description: `実際の飛距離ギャップが${gap}ydあります（理想：${idealMin}-${idealMax}yd）。中間的なクラブの追加を検討してください。`,
+        estimatedEffect: 'アプローチ成功率 +25% 見込み',
+      });
+    }
+    // Check if gap is below minimum
+    else if (gap < idealMin - tolerance) {
+      adjustments.push({
+        priority: 'medium',
+        title: `距離ギャップの確認（${currentClubName}と${nextClubName}の間）`,
+        description: `実際の飛距離ギャップが${gap}ydと狭いです（理想：${idealMin}-${idealMax}yd）。距離差が出にくい場合はクラブの見直しを検討してください。`,
+        estimatedEffect: '距離ギャップ適正化',
+      });
+    }
+  }
+
+  return adjustments;
 };

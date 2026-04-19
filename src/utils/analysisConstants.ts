@@ -30,6 +30,27 @@ export const DISTANCE_GAP_COEFFICIENT_AT_45 = 3.5;
 export const DISTANCE_GAP_COEFFICIENT_AT_30 = 2.5;
 export const DEFAULT_HEAD_SPEED = 45;
 
+// Distance gap thresholds by club category transition (based on actual distance data)
+// Driver → 3W: 20-30yd ideal, max 35yd OK, wide gaps are acceptable
+export const DRIVER_TO_WOOD_IDEAL_MIN = 20;
+export const DRIVER_TO_WOOD_IDEAL_MAX = 30;
+export const DRIVER_TO_WOOD_MAX_ACCEPTABLE = 35;
+
+// 3W → Hybrid/5W: 15-25yd ideal, ±8yd tolerance, prioritize this
+export const WOOD_TO_HYBRID_IDEAL_MIN = 15;
+export const WOOD_TO_HYBRID_IDEAL_MAX = 25;
+export const WOOD_TO_HYBRID_TOLERANCE = 8;
+
+// Irons (3I-PW): 10-15yd ideal, ±3yd tolerance, most strict
+export const IRON_GAP_IDEAL_MIN = 10;
+export const IRON_GAP_IDEAL_MAX = 15;
+export const IRON_GAP_TOLERANCE = 3;
+
+// Wedges (PW-LW): 8-12yd ideal, ±2yd tolerance, precision priority
+export const WEDGE_GAP_IDEAL_MIN = 8;
+export const WEDGE_GAP_IDEAL_MAX = 12;
+export const WEDGE_GAP_TOLERANCE = 2;
+
 export const SWING_WEIGHT_FULL_PATTERN = /^([A-F])([0-9](?:\.[0-9])?)$/;
 export const SWING_WEIGHT_LEGACY_PATTERN = /^([0-9](?:\.[0-9])?)$/;
 export const SWING_WEIGHT_BASE_LETTER_CODE = 'A'.charCodeAt(0);
