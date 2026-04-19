@@ -861,8 +861,18 @@ export function simulateShot(
   const distanceConditionMultiplier = lieDistanceMultiplier * weakDistanceMultiplier;
 
   const scaledCarry = Math.max(0.1, adjustedLanding.carry * powerMultiplier * distanceConditionMultiplier);
-  const scaledRoll = Math.max(0, adjustedLanding.roll * powerMultiplier * distanceConditionMultiplier);
-  const scaledTotalDistance = Math.max(0.1, scaledCarry + scaledRoll);
+  const scaledRoll = Math.max(0.1, adjustedLanding.roll * powerMultiplier * distanceConditionMultiplier);
+  const scaledTotalDistanceBase = Math.max(0.1, scaledCarry + scaledRoll);
+
+  // 風の影響を適用（headTail風）
+  const headTailWindMph = windComponents.headTail;
+  // mph to yards conversion: 1 mph = 1.46667 yards (approximate for golf ball)
+  const headTailWindYards = headTailWindMph < 0 ? headTailWindMph * 1.5 * 1.46667 : headTailWindMph * 0.8 * 1.46667;
+  // 50ヤード未満では風の影響を減らす
+  const distanceFactor = Math.min(1, scaledTotalDistanceBase / 50);
+  const adjustedHeadTailWindYards = headTailWindYards * distanceFactor;
+  const scaledTotalDistance = scaledTotalDistanceBase + adjustedHeadTailWindYards;
+
   const scaledFinalX = adjustedLanding.finalX * powerMultiplier + lateralWindYards;
   const scaledFinalY = scaledTotalDistance;
   const scaledLateralDeviation = adjustedLanding.lateralDeviation * powerMultiplier + lateralWindYards;

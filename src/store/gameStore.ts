@@ -52,10 +52,27 @@ function createRoundSeedNonce(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function generateWind(random: () => number = Math.random): Pick<ShotContext, "windStrength" | "windDirectionDegrees"> {
+function generateWind(
+  random: () => number = Math.random,
+  previousWindStrength: number | null = null,
+): Pick<ShotContext, "windStrength" | "windDirectionDegrees"> {
   const roll = random();
   if (roll < 0.40) return { windStrength: 0, windDirectionDegrees: 0 };
-  const windStrength = Math.round(5 + random() * 15); // 5–20 mph
+
+  let windStrength: number;
+  if (previousWindStrength === null) {
+    // 最初のホール：5–20 mph、風速が高くなるほど確率が下がる分布（指数分布）
+    const exponentialRoll = -Math.log(random());
+    windStrength = Math.round(5 + exponentialRoll * 3);
+    if (windStrength > 20) windStrength = 20;
+  } else {
+    // 次のホール：前の風速に近い値（±5 mph以内）
+    const minWind = Math.max(0, previousWindStrength - 5);
+    const maxWind = Math.min(25, previousWindStrength + 5);
+    windStrength = Math.round(minWind + random() * (maxWind - minWind));
+  }
+
+  // 風向はランダム（0-359度）
   const windDirectionDegrees = Math.floor(random() * 360);
   return { windStrength, windDirectionDegrees };
 }
@@ -88,6 +105,10 @@ interface GameStoreState {
   /** DBから取得したプレイヤースキルレベル (0-1)。パット確率に使用。 */
   playerSkillLevel: number;
   playMode: "robot" | "bag" | "measured";
+  /** 前のホールの風速（mph）。次のホールで近い値を選ぶために使用。 */
+  previousWindStrength: number | null;
+  /** 実測データモード用のパタースキルレベル (0.5-0.9)。開始時に一回決定。 */
+  measuredModePutterSkillLevel: number | null;
 }
 
 interface GameStoreActions {
@@ -136,9 +157,11 @@ const INITIAL_STATE: GameStoreState = {
   roundSeedNonce: "default",
   playerSkillLevel: 0.5,
   playMode: "bag" as "robot" | "bag" | "measured",
+  previousWindStrength: null,
+  measuredModePutterSkillLevel: null,
 };
 
-function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: number): ShotContext {
+function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: number, previousWindStrength: number | null = null): ShotContext {
   const windRandom = createSeededRandom(`${roundSeedNonce}|hole:${holeIndex}|wind`);
   const targetDistance = hole.targetDistance ?? hole.distanceFromTee;
   return {
@@ -150,7 +173,7 @@ function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: numb
     greenRadius: hole.greenRadius,
     greenPolygon: hole.greenPolygon,
     hazards: hole.hazards ?? [],
-    ...generateWind(windRandom),
+    ...generateWind(windRandom, previousWindStrength),
   };
 }
 
@@ -215,6 +238,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   startRound: (course, bag, playMode = "bag") => {
     const roundSeedNonce = createRoundSeedNonce();
+    const initialContext = buildInitialContext(course[0], roundSeedNonce, 0, null);
+
+    // 実測データモードの場合、パタースキルレベルを0.5～0.9の範囲でランダムに決定
+    const measuredModePutterSkillLevel = playMode === "measured"
+      ? 0.5 + Math.random() * 0.4
+      : null;
+
     set({
       ...INITIAL_STATE,
       phase: "playing",
@@ -223,7 +253,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       playMode,
       roundSeedNonce,
       currentHoleIndex: 0,
-      shotContext: buildInitialContext(course[0], roundSeedNonce, 0),
+      shotContext: initialContext,
+      previousWindStrength: initialContext.windStrength ?? null,
+      measuredModePutterSkillLevel,
     });
     // パット確率用にプレイヤースキルレベルを非同期取得
     ClubService.getPlayerSkillLevel()
@@ -293,8 +325,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // 実測データモード: 実測データからランダムにショットを選択
       // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
       const isPutter = club.type === "Putter";
+      const { measuredModePutterSkillLevel } = get();
       let result;
-      
+
       if (isMeasuredMode && !isPutter) {
         const shots = activeBagId ? actualShotRows[String(activeBagId)] ?? [] : [];
         result = simulateShotFromActualData(club, shotContext, shots, {
@@ -306,9 +339,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       } else {
         result = simulateShot(clubForSimulation, shotContext, {
           personalData: isRobotMode ? undefined : clubPersonalData,
-          playerSkillLevel: isRobotMode
-            ? (isPutter ? playerSkillLevel : 1)
-            : playerSkillLevel,
+          playerSkillLevel: isMeasuredMode && isPutter
+            ? (measuredModePutterSkillLevel ?? 0.5)
+            : isRobotMode
+              ? (isPutter ? playerSkillLevel : 1)
+              : playerSkillLevel,
           forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
           shotPowerPercent,
           aimXOffset,
@@ -412,10 +447,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   advanceHole: () => {
-    const { currentHoleIndex, course, roundSeedNonce } = get();
+    const { currentHoleIndex, course, roundSeedNonce, previousWindStrength } = get();
     const nextIndex = currentHoleIndex + 1;
     if (nextIndex >= course.length) return; // safety guard
 
+    const nextContext = buildInitialContext(course[nextIndex], roundSeedNonce, nextIndex, previousWindStrength);
     set({
       currentHoleIndex: nextIndex,
       phase: "playing",
@@ -423,7 +459,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastShotResult: null,
       selectedClubId: null,
       currentHoleShots: [],
-      shotContext: buildInitialContext(course[nextIndex], roundSeedNonce, nextIndex),
+      shotContext: nextContext,
+      previousWindStrength: nextContext.windStrength ?? null,
     });
   },
 

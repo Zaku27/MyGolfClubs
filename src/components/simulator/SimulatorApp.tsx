@@ -94,7 +94,7 @@ function SetupScreen({
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex flex-col">
       <div className="fixed inset-x-0 top-0 z-20 border-b border-emerald-300 bg-emerald-50/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 text-xs font-semibold tracking-wide text-emerald-800 sm:h-16 sm:gap-4 sm:text-sm">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 text-xs font-semibold tracking-wide text-emerald-800 sm:h-16 sm:gap-4 sm:text-sm">
           <div className="flex items-center gap-3 sm:gap-4">
             <span className="text-sm font-bold text-emerald-900">コースシミュレーター</span>
           </div>

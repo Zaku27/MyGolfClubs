@@ -205,9 +205,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         return scoredClubs.filter((club) => club.type === "Putter");
       }
 
-      // ティーグラウンド以外ではドライバーを除外
+      // ティーグラウンド以外ではドライバーを除外、ラフではWoodも除外
       return scoredClubs
-        .filter((club) => club.type !== "Putter" && (lie === "tee" || club.type !== "Driver"))
+        .filter((club) => club.type !== "Putter" && (lie === "tee" || club.type !== "Driver") && !(lie === "rough" && club.type === "Wood"))
         .slice(0, 5);
     },
     [
@@ -327,7 +327,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 text-emerald-900">
       <div className="fixed inset-x-0 top-0 z-20 border-b border-emerald-300 bg-emerald-50/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 text-xs font-semibold tracking-wide text-emerald-800 sm:h-16 sm:gap-4 sm:text-sm">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 text-xs font-semibold tracking-wide text-emerald-800 sm:h-16 sm:gap-4 sm:text-sm">
           <div className="flex items-center gap-3 sm:gap-4">
             <span>{currentHole.number}H</span>
             <span className="text-emerald-500">|</span>
@@ -379,7 +379,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         onCancel={() => setShowQuitConfirm(false)}
         onConfirm={handleConfirmQuitGame}
       />
-      <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 pb-8 pt-20 sm:px-6 sm:pt-24">
+      <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-8 pt-20 sm:px-6 sm:pt-24">
         {shotInProgress && (
           <div className="fixed inset-0 z-50 cursor-wait bg-black/0 pointer-events-auto" />
         )}
@@ -406,13 +406,13 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             </>
           )}
 
-          <section className="mt-3 rounded-3xl border border-emerald-300 bg-emerald-50/90 px-4 py-5 shadow-sm shadow-emerald-300/30 sm:px-6 sm:py-6">
+          <section className="mt-3 rounded-3xl border border-emerald-300 bg-emerald-50/90 px-4 py-8 shadow-sm shadow-emerald-300/30 sm:px-6 sm:py-10">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-bold tracking-[0.2em] text-emerald-700 sm:text-base">コース情報</h2>
               <span className="text-xs font-medium text-emerald-700">{currentHole.number}H / PAR {currentHole.par}</span>
             </div>
 
-            <div className="mt-4 w-full">
+            <div className="mt-6 w-full">
               <HoleMapCanvas
                 hole={currentHole}
                 landingResults={[]}
@@ -458,13 +458,13 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
 
 
-        <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-6 py-10 text-center shadow-sm shadow-emerald-300/40 sm:px-10 sm:py-14">
-          <p className="text-sm tracking-[0.25em] text-emerald-600">現在の状況</p>
-          <h1 className="mt-4 text-3xl font-extrabold leading-tight text-emerald-900 sm:text-4xl">
+        <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-4 py-6 text-center shadow-sm shadow-emerald-300/40 sm:px-6 sm:py-8">
+          <p className="text-xs tracking-[0.25em] text-emerald-600">現在の状況</p>
+          <h1 className="mt-3 text-2xl font-extrabold leading-tight text-emerald-900 sm:text-3xl">
             ピンまで {remainingDistance}ヤード
           </h1>
-          <p className="mt-6 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStatusLabel}</p>
-          <p className="mt-1 text-lg font-medium text-emerald-800 sm:text-2xl">{currentStrokeLabel}</p>
+          <p className="mt-4 text-base font-medium text-emerald-800 sm:text-lg">{currentStatusLabel}</p>
+          <p className="mt-1 text-base font-medium text-emerald-800 sm:text-lg">{currentStrokeLabel}</p>
 
 
 
@@ -631,9 +631,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
 
         {!isResultActionVisible && (
-          <section className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 sm:mt-8 sm:px-6">
+          <section className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50/90 px-4 py-4 sm:mt-8 sm:px-5 sm:py-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-bold text-emerald-900 sm:text-2xl">
+              <h2 className="text-lg font-bold text-emerald-900 sm:text-xl">
                 {showAllClubs ? `全クラブ (${bag.length}本)` : "おすすめクラブ"}
               </h2>
               {bag.length > recommendedClubs.length && (
