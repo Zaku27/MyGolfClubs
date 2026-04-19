@@ -390,7 +390,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   }
 
   return (
-    <section className="mx-auto mt-4 w-full max-w-2xl rounded-2xl border border-emerald-300 bg-white/80 p-4 shadow-sm shadow-emerald-300/30">
+    <section className="mx-auto mt-4 w-full rounded-2xl border border-emerald-300 bg-white/80 p-4 shadow-sm shadow-emerald-300/30" style={{ maxWidth: '1080px' }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
@@ -422,331 +422,339 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         ))}
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="space-y-1 text-xs font-semibold text-emerald-800">
-          PAR
-          <select
-            value={selectedHole.par}
-            onChange={(event) => {
-              const par = Number(event.target.value) as 3 | 4 | 5;
-              updateHole((hole) => ({ ...hole, par }));
-            }}
-            className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-          >
-            <option value={3}>3</option>
-            <option value={4}>4</option>
-            <option value={5}>5</option>
-          </select>
-        </label>
+      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_380px]">
+        {/* 左側：編集部分 */}
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="space-y-1 text-xs font-semibold text-emerald-800">
+              PAR
+              <select
+                value={selectedHole.par}
+                onChange={(event) => {
+                  const par = Number(event.target.value) as 3 | 4 | 5;
+                  updateHole((hole) => ({ ...hole, par }));
+                }}
+                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+              >
+                <option value={3}>3</option>
+                <option value={4}>4</option>
+                <option value={5}>5</option>
+              </select>
+            </label>
 
-        <label className="space-y-1 text-xs font-semibold text-emerald-800">
-          距離 (yd)
-          <input
-            type="number"
-            min={30}
-            max={700}
-            value={distanceInputValue}
-            onChange={(event) => {
-              const raw = event.target.value;
-              setDistanceInputValue(raw);
+            <label className="space-y-1 text-xs font-semibold text-emerald-800">
+              距離 (yd)
+              <input
+                type="number"
+                min={30}
+                max={700}
+                value={distanceInputValue}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  setDistanceInputValue(raw);
 
-              const parsed = Number(raw);
-              if (raw.trim() === "" || Number.isNaN(parsed)) {
-                return;
-              }
+                  const parsed = Number(raw);
+                  if (raw.trim() === "" || Number.isNaN(parsed)) {
+                    return;
+                  }
 
-              const distance = Math.max(30, Math.min(700, parsed));
-              updateHole((hole) => ({ ...hole, distanceFromTee: distance, targetDistance: distance }));
-            }}
-            className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-          />
-        </label>
+                  const distance = Math.max(30, Math.min(700, parsed));
+                  updateHole((hole) => ({ ...hole, distanceFromTee: distance, targetDistance: distance }));
+                }}
+                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+              />
+            </label>
 
-        <label className="space-y-1 text-xs font-semibold text-emerald-800">
-          グリーン半径 (yd)
-          <input
-            type="number"
-            min={6}
-            max={25}
-            value={selectedHole.greenRadius ?? 12}
-            onChange={(event) => {
-              const radius = Math.max(6, Math.min(25, Number(event.target.value) || 12));
-              updateHole((hole) => ({ ...hole, greenRadius: radius, greenPolygon: undefined }));
-            }}
-            className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-          />
-        </label>
-      </div>
-
-      <div className="mt-4 w-full max-w-screen-md">
-        <HoleMapCanvas
-          hole={selectedHole}
-          landingResults={[]}
-          showTrajectories={false}
-          editable
-          allowDynamicScale={distanceInputValue.trim().length === 0}
-          currentHoleKey={selectedHole.number}
-          selectedHazardId={selectedHazardId}
-          onSelectHazardId={setSelectedHazardId}
-          onSelectHoleArea={() => setSelectedHazardId(null)}
-          onHazardsChange={updateSelectedHoleHazards}
-          onGreenPolygonChange={(greenPolygon) => {
-            updateHole((hole) => ({ ...hole, greenPolygon }));
-          }}
-          onCanvasClick={handleCanvasClick}
-          onCanvasDoubleClick={handleCanvasDoubleClick}
-        />
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-bold text-emerald-900">地面条件</h3>
-            <p className="text-xs text-emerald-700">選択中: {selectedHazard ? 'ハザード' : 'フェアウェイ'}</p>
+            <label className="space-y-1 text-xs font-semibold text-emerald-800">
+              グリーン半径 (yd)
+              <input
+                type="number"
+                min={6}
+                max={25}
+                value={selectedHole.greenRadius ?? 12}
+                onChange={(event) => {
+                  const radius = Math.max(6, Math.min(25, Number(event.target.value) || 12));
+                  updateHole((hole) => ({ ...hole, greenRadius: radius, greenPolygon: undefined }));
+                }}
+                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+              />
+            </label>
           </div>
-          <span className="rounded-full border border-emerald-300 bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-800">
-            背景をクリックするとフェアウェイを選択
-          </span>
+
+          <div className="w-full">
+            <HoleMapCanvas
+              hole={selectedHole}
+              landingResults={[]}
+              showTrajectories={false}
+              editable
+              allowDynamicScale={distanceInputValue.trim().length === 0}
+              currentHoleKey={selectedHole.number}
+              selectedHazardId={selectedHazardId}
+              onSelectHazardId={setSelectedHazardId}
+              onSelectHoleArea={() => setSelectedHazardId(null)}
+              onHazardsChange={updateSelectedHoleHazards}
+              onGreenPolygonChange={(greenPolygon) => {
+                updateHole((hole) => ({ ...hole, greenPolygon }));
+              }}
+              onCanvasClick={handleCanvasClick}
+              onCanvasDoubleClick={handleCanvasDoubleClick}
+            />
+          </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <label className="space-y-1 text-xs font-semibold text-emerald-800">
-            地面硬さ
-            <select
-              value={selectedGroundCondition.hardness}
-              onChange={(event) => {
-                const hardness = event.target.value as GroundCondition['hardness'];
-                updateGroundCondition((condition) => ({ ...condition, hardness }));
-              }}
-              className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-            >
-              <option value="soft">柔らかい</option>
-              <option value="medium">普通</option>
-              <option value="firm">硬い</option>
-            </select>
-          </label>
-
-          <label className="space-y-1 text-xs font-semibold text-emerald-800">
-            上り方向
-            <input
-              type="range"
-              min={0}
-              max={359}
-              step={1}
-              value={normalizedSlope.slopeDirection}
-              onChange={(event) => {
-                const slopeDirection = Number(event.target.value);
-                updateGroundCondition((condition) => ({
-                  ...condition,
-                  slopeDirection: toStoredSlopeDirection(condition.slopeAngle, slopeDirection),
-                }));
-              }}
-              className="w-full cursor-pointer"
-            />
-            <div className="text-right text-[11px] text-emerald-700">{normalizedSlope.slopeDirection}°</div>
-          </label>
-
-          <label className="space-y-1 text-xs font-semibold text-emerald-800">
-            傾斜角度
-            <input
-              type="range"
-              min={0}
-              max={45}
-              step={1}
-              value={normalizedSlope.slopeAngle}
-              onChange={(event) => {
-                const slopeAngle = Number(event.target.value);
-                updateGroundCondition((condition) => ({ ...condition, slopeAngle }));
-              }}
-              className="w-full cursor-pointer"
-            />
-            <div className="text-right text-[11px] text-emerald-700">
-              {normalizedSlope.slopeAngle === 0 ? 'フラット' : `${normalizedSlope.slopeAngle}°`}
+        {/* 右側：地面条件・ハザード */}
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-emerald-900">地面条件</h3>
+                <p className="text-xs text-emerald-700">選択中: {selectedHazard ? 'ハザード' : 'フェアウェイ'}</p>
+              </div>
+              <span className="rounded-full border border-emerald-300 bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-800">
+                背景をクリックするとフェアウェイを選択
+              </span>
             </div>
-          </label>
-        </div>
 
-        <p className="mt-3 text-xs leading-relaxed text-emerald-800">{formatSlopeGuide(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection)}</p>
-      </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                地面硬さ
+                <select
+                  value={selectedGroundCondition.hardness}
+                  onChange={(event) => {
+                    const hardness = event.target.value as GroundCondition['hardness'];
+                    updateGroundCondition((condition) => ({ ...condition, hardness }));
+                  }}
+                  className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                >
+                  <option value="soft">柔らかい</option>
+                  <option value="medium">普通</option>
+                  <option value="firm">硬い</option>
+                </select>
+              </label>
 
-      <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-bold text-emerald-900">ハザード</h3>
+              <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                上り方向
+                <input
+                  type="range"
+                  min={0}
+                  max={359}
+                  step={1}
+                  value={normalizedSlope.slopeDirection}
+                  onChange={(event) => {
+                    const slopeDirection = Number(event.target.value);
+                    updateGroundCondition((condition) => ({
+                      ...condition,
+                      slopeDirection: toStoredSlopeDirection(condition.slopeAngle, slopeDirection),
+                    }));
+                  }}
+                  className="w-full cursor-pointer"
+                />
+                <div className="text-right text-[11px] text-emerald-700">{normalizedSlope.slopeDirection}°</div>
+              </label>
+
+              <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                傾斜角度
+                <input
+                  type="range"
+                  min={0}
+                  max={45}
+                  step={1}
+                  value={normalizedSlope.slopeAngle}
+                  onChange={(event) => {
+                    const slopeAngle = Number(event.target.value);
+                    updateGroundCondition((condition) => ({ ...condition, slopeAngle }));
+                  }}
+                  className="w-full cursor-pointer"
+                />
+                <div className="text-right text-[11px] text-emerald-700">
+                  {normalizedSlope.slopeAngle === 0 ? 'フラット' : `${normalizedSlope.slopeAngle}°`}
+                </div>
+              </label>
+            </div>
+
+            <p className="mt-3 text-xs leading-relaxed text-emerald-800">{formatSlopeGuide(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection)}</p>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={addBaregroundHazard}
-            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
-          >
-            ベアグラウンド
-          </button>
-          <button
-            type="button"
-            onClick={addHazard}
-            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
-          >
-            OB
-          </button>
-          <button
-            type="button"
-            onClick={addRoughHazard}
-            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
-          >
-            ラフ
-          </button>
-          <button
-            type="button"
-            onClick={addLargeRoughHazard}
-            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
-          >
-            ラフ大
-          </button>
-          <button
-            type="button"
-            onClick={addSmallBunkerHazard}
-            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
-          >
-            バンカー
-          </button>
-          <button
-            type="button"
-            onClick={addDefaultPolygonHazard}
-            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
-          >
-            バンカー大
-          </button>
-          <button
-            type="button"
-            onClick={addLargePolygonHazard}
-            className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
-          >
-            ウォーター
-          </button>
-          <button
-            type="button"
-            onClick={addExtraLargeWaterHazard}
-            className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
-          >
-            ウォーター大
-          </button>
-          <button
-            type="button"
-            onClick={deleteSelectedHazard}
-            disabled={!selectedHazard || selectedHazard?.locked}
-            className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-900 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            選択ハザード削除
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!selectedHazard) return;
-              updateSelectedHazard((hazard) => ({ ...hazard, locked: !hazard.locked }));
-            }}
-            disabled={!selectedHazard}
-            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-100"
-          >
-            {selectedHazard?.locked ? '🔒 解除' : '🔒 ロック'}
-          </button>
-          <button
-            type="button"
-            onClick={deleteAllHazards}
-            className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-900 hover:bg-rose-100"
-          >
-            すべてのハザードを削除
-          </button>
-        </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-emerald-900">ハザード</h3>
+              </div>
+            </div>
 
-        <p className="mt-3 text-xs text-emerald-700">ハザードはドラッグで移動、四隅ハンドルでリサイズできます。</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={addBaregroundHazard}
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+              >
+                ベアグラウンド
+              </button>
+              <button
+                type="button"
+                onClick={addHazard}
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+              >
+                OB
+              </button>
+              <button
+                type="button"
+                onClick={addRoughHazard}
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+              >
+                ラフ
+              </button>
+              <button
+                type="button"
+                onClick={addLargeRoughHazard}
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+              >
+                ラフ大
+              </button>
+              <button
+                type="button"
+                onClick={addSmallBunkerHazard}
+                className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
+              >
+                バンカー
+              </button>
+              <button
+                type="button"
+                onClick={addDefaultPolygonHazard}
+                className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100"
+              >
+                バンカー大
+              </button>
+              <button
+                type="button"
+                onClick={addLargePolygonHazard}
+                className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
+              >
+                ウォーター
+              </button>
+              <button
+                type="button"
+                onClick={addExtraLargeWaterHazard}
+                className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
+              >
+                ウォーター大
+              </button>
+              <button
+                type="button"
+                onClick={deleteSelectedHazard}
+                disabled={!selectedHazard || selectedHazard?.locked}
+                className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-900 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                選択ハザード削除
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedHazard) return;
+                  updateSelectedHazard((hazard) => ({ ...hazard, locked: !hazard.locked }));
+                }}
+                disabled={!selectedHazard}
+                className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-100"
+              >
+                {selectedHazard?.locked ? '🔒 解除' : '🔒 ロック'}
+              </button>
+              <button
+                type="button"
+                onClick={deleteAllHazards}
+                className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-900 hover:bg-rose-100"
+              >
+                すべてのハザードを削除
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-emerald-700">ハザードはドラッグで移動、四隅ハンドルでリサイズできます。</p>
+          </div>
+
+          {selectedHazard && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                  種別
+                  <select
+                    value={selectedHazard.type}
+                    onChange={(event) => {
+                      const type = event.target.value as HazardType;
+                      updateSelectedHazard((hazard) => ({
+                        ...hazard,
+                        type,
+                        penaltyStrokes: getPenaltyStrokesByType(type),
+                        name: buildHazardName(type, hazard.xCenter, hazard.width),
+                      }));
+                    }}
+                    className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                  >
+                    {Object.entries(HAZARD_TYPE_LABEL).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                {/* polygon以外のみ編集UIを表示 */}
+                {selectedHazard.shape !== "polygon" && (
+                  <>
+                    <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                      中心X
+                      <input
+                        type="number"
+                        value={Math.round(selectedHazard.xCenter)}
+                        onChange={(event) => {
+                          const next = Number(event.target.value) || 0;
+                          updateSelectedHazard((hazard) => ({
+                            ...hazard,
+                            xCenter: next,
+                            name: buildHazardName(hazard.type, next, hazard.width),
+                          }));
+                        }}
+                        className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                      />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                      幅
+                      <input
+                        type="number"
+                        min={6}
+                        value={Math.max(6, Math.round(selectedHazard.width))}
+                        onChange={(event) => {
+                          const next = Math.max(6, Number(event.target.value) || 6);
+                          updateSelectedHazard((hazard) => ({
+                            ...hazard,
+                            width: next,
+                            name: buildHazardName(hazard.type, hazard.xCenter, next),
+                          }));
+                        }}
+                        className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                      />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold text-emerald-800">
+                      奥行き
+                      <input
+                        type="number"
+                        min={6}
+                        value={Math.max(6, Math.round(selectedHazard.yBack - selectedHazard.yFront))}
+                        onChange={(event) => {
+                          const next = Math.max(6, Number(event.target.value) || 6);
+                          updateSelectedHazard((hazard) => ({
+                            ...hazard,
+                            yBack: hazard.yFront + next,
+                          }));
+                        }}
+                        className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {showPreview && selectedHole && (
         <CourseInfoPreview hole={selectedHole} onClose={() => setShowPreview(false)} />
-      )}
-
-      {selectedHazard && (
-        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm shadow-emerald-200/30">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <label className="space-y-1 text-xs font-semibold text-emerald-800">
-              種別
-              <select
-                value={selectedHazard.type}
-                onChange={(event) => {
-                  const type = event.target.value as HazardType;
-                  updateSelectedHazard((hazard) => ({
-                    ...hazard,
-                    type,
-                    penaltyStrokes: getPenaltyStrokesByType(type),
-                    name: buildHazardName(type, hazard.xCenter, hazard.width),
-                  }));
-                }}
-                className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-              >
-                {Object.entries(HAZARD_TYPE_LABEL).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </label>
-            {/* polygon以外のみ編集UIを表示 */}
-            {selectedHazard.shape !== "polygon" && (
-              <>
-                <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                  中心X
-                  <input
-                    type="number"
-                    value={Math.round(selectedHazard.xCenter)}
-                    onChange={(event) => {
-                      const next = Number(event.target.value) || 0;
-                      updateSelectedHazard((hazard) => ({
-                        ...hazard,
-                        xCenter: next,
-                        name: buildHazardName(hazard.type, next, hazard.width),
-                      }));
-                    }}
-                    className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                  幅
-                  <input
-                    type="number"
-                    min={6}
-                    value={Math.max(6, Math.round(selectedHazard.width))}
-                    onChange={(event) => {
-                      const next = Math.max(6, Number(event.target.value) || 6);
-                      updateSelectedHazard((hazard) => ({
-                        ...hazard,
-                        width: next,
-                        name: buildHazardName(hazard.type, hazard.xCenter, next),
-                      }));
-                    }}
-                    className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold text-emerald-800">
-                  奥行き
-                  <input
-                    type="number"
-                    min={6}
-                    value={Math.max(6, Math.round(selectedHazard.yBack - selectedHazard.yFront))}
-                    onChange={(event) => {
-                      const next = Math.max(6, Number(event.target.value) || 6);
-                      updateSelectedHazard((hazard) => ({
-                        ...hazard,
-                        yBack: hazard.yFront + next,
-                      }));
-                    }}
-                    className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
-                  />
-                </label>
-              </>
-            )}
-          </div>
-        </div>
       )}
     </section>
   );
