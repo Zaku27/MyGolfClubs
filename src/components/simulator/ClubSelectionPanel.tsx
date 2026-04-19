@@ -53,6 +53,7 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
   );
 
   const isRobot = playMode === "robot";
+  const isMeasuredMode = playMode === "measured";
   const effectiveSuccessRates = new Map<string, number>();
   const estimatedDistances = new Map<string, number>();
   for (const club of sorted) {
@@ -126,7 +127,7 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
                         推奨
                       </span>
                     )}
-                    {!isPutter && tag === "best" && !isOnGreen && (
+                    {!isPutter && tag === "best" && !isOnGreen && !(lie === "rough" && club.type === "Wood") && (
                       <span className="text-xs bg-green-500/30 text-green-300 border border-green-600/50 rounded px-1.5 py-0.5 leading-none">
                         ◎ 届く
                       </span>
@@ -149,7 +150,9 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
                 {estimatedDistance}
                 <span className="text-xs text-green-500 font-normal">yd</span>
               </div>
-              <div className="text-xs text-green-500">{effectiveRate.toFixed(1)}%</div>
+              {!isMeasuredMode && (
+                <div className="text-xs text-green-500">{effectiveRate.toFixed(1)}%</div>
+              )}
             </div>
           </button>
         );

@@ -126,6 +126,13 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     const windMps = (strength * 0.44704).toFixed(1);
     return `${windMps} m/s`;
   };
+  const getWindColorClass = (strength: number) => {
+    if (!strength) return "";
+    // 低: 0-8 mph, 中: 9-14 mph, 高: 15+ mph
+    if (strength <= 8) return "";
+    if (strength <= 14) return "text-yellow-600";
+    return "text-red-600";
+  };
 
   const getWindArrowRotation = (direction?: number) => {
     if (typeof direction !== "number") return 0;
@@ -425,7 +432,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 傾斜: {formatSlopeLabel(courseCondition.slopeAngle, courseCondition.slopeDirection)}
               </span>
               <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm flex items-center gap-2">
-                <span>風: {formatWindDetail(windStrength)}</span>
+                <span className={getWindColorClass(windStrength)}>風: {formatWindDetail(windStrength)}</span>
                 {windStrength > 0 && (
                   <span
                     className="inline-block"
@@ -737,7 +744,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 傾斜: {formatSlopeLabel(courseCondition.slopeAngle, courseCondition.slopeDirection)}
               </span>
               <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm flex items-center gap-2">
-                <span>風: {formatWindDetail(windStrength)}</span>
+                <span className={getWindColorClass(windStrength)}>風: {formatWindDetail(windStrength)}</span>
                 {windStrength > 0 && (
                   <span
                     className="inline-block"

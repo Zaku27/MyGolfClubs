@@ -11,7 +11,7 @@ import type { ClubPersonalData } from "../types/golf";
 import { calculateBaseClubSuccessRate } from "./calculateSuccessRate";
 import { ClubService } from "../db/clubService";
 import { estimateTheoreticalDistance } from "./distanceEstimation";
-import { calculateLandingOutcome, applyGroundCondition } from "./landingPosition";
+import { calculateLandingOutcome, applyGroundCondition, classifyShotQualityByTargetError } from "./landingPosition";
 import {
   assessLanding,
   buildDetailedShotMessage,
@@ -1016,13 +1016,36 @@ export function simulateShotFromActualData(
   
   // クラブの実測データを取得
   const clubLabel = formatSimClubLabel(club);
-  const clubShots = actualShotRows.filter((row) => row.club === clubLabel);
-  
+  let clubShots = actualShotRows.filter((row) => row.club === clubLabel);
+
   if (clubShots.length === 0) {
     // 実測データがない場合は通常のシミュレーションにフォールバック
     return simulateShot(club, context, options);
   }
-  
+
+  // ラフに入っている場合、excellent品質のデータを除外
+  if (lie === "rough") {
+    const parseShotValue = (value: string): number | null => {
+      const withoutDirection = value.replace(/[RL]/gi, '').trim();
+      const normalized = withoutDirection.replace(/,/g, '').replace(/ /g, '').trim();
+      const numeric = Number(normalized);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    const nonExcellentShots = clubShots.filter((shot) => {
+      const carry = parseShotValue(shot['Carry (yds)']);
+      const lateral = parseShotValue(shot['Lateral (yds)']);
+      if (carry === null) return true; // パースできない場合は除外しない
+      const qualityResult = classifyShotQualityByTargetError(carry, carry, lateral ?? 0);
+      return qualityResult.quality !== "excellent";
+    });
+
+    // 除外後のデータがある場合はそれを使用、ない場合は全データを使用
+    if (nonExcellentShots.length > 0) {
+      clubShots = nonExcellentShots;
+    }
+  }
+
   // シードベースの乱数生成器を作成（ゲームごとに異なるショットを選択するため）
   const shotSelectionSeedBase = [
     club.id,
@@ -1036,7 +1059,7 @@ export function simulateShotFromActualData(
     "shot-selection",
   ].join("|");
   const shotSelectionRng = createSeededRandom(shotSelectionSeedBase);
-  
+
   // ランダムに1つのショットを選択（シードベースの乱数を使用）
   const randomIndex = Math.floor(shotSelectionRng() * clubShots.length);
   const selectedShot = clubShots[randomIndex];
@@ -1058,20 +1081,32 @@ export function simulateShotFromActualData(
   const total = parseShotValue(selectedShot['Total (yds)'], 'Total (yds)') ?? carry;
   const roll = total - carry;
   const lateral = parseShotValue(selectedShot['Lateral (yds)'], 'Lateral (yds)') ?? 0;
-  
+
+  // 実測データの生の値で品質を評価（ライ補正前の値を使用）
+  // ラフに入った後のショットでも、実測データの本来の品質を評価する
+  const qualityResult = classifyShotQualityByTargetError(
+    carry,
+    carry,
+    lateral
+  );
+  const shotQuality = qualityResult.quality;
+
   // パワーとライを適用
   const lieMultiplier = getLieDistanceMultiplier(lie, club.type);
-  const weakDistanceMultiplier = isWeakClub(club) 
+  const weakDistanceMultiplier = isWeakClub(club)
     ? (club.successRate < 60 ? 0.9 : 0.95)
     : 1.0;
-  
+
   const adjustedCarry = Math.max(0.1, carry * powerMultiplier * lieMultiplier * weakDistanceMultiplier);
   const adjustedRoll = Math.max(0, roll * powerMultiplier * lieMultiplier * weakDistanceMultiplier);
   const adjustedTotal = adjustedCarry + adjustedRoll;
   
   // 風の影響を適用
   const windYards = getWindYards(windStrength, windDirectionDegrees);
-  const finalTotalDistance = adjustedTotal + windYards;
+  // 50ヤード未満では風の影響を減らす
+  const distanceFactor = Math.min(1, adjustedTotal / 50);
+  const adjustedWindYards = windYards * distanceFactor;
+  const finalTotalDistance = adjustedTotal + adjustedWindYards;
   
   // 横風の影響を計算（通常のシミュレーションと同様）
   const windComponents =
@@ -1088,7 +1123,7 @@ export function simulateShotFromActualData(
   
   // 通常のシミュレーションと同様の補正を適用
   // landingPosition.ts の applyGroundCondition と同様のロジック
-  const lateralDeviation = lateral;
+  const lateralDeviation = lateral * powerMultiplier;
   const dispersionMultiplier = 1.0; // 実測データなので分散補正は不要（固定値）
   const adjustedLateralDeviation = lateralDeviation * dispersionMultiplier;
   
@@ -1253,7 +1288,7 @@ export function simulateShotFromActualData(
     lie: newLie,
     penalty,
     distanceHit: Math.round(finalTotalDistance),
-    shotQuality: "average",
+    shotQuality,
     wasSuccessful: landedHazard ? false : true,
     effectiveSuccessRate: 100,
     landing,
