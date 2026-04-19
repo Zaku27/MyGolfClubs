@@ -132,7 +132,7 @@ export function AppMainContent({
       {showForm ? (
         <ClubForm
           club={editingClub}
-          onSubmit={handleFormSubmit}
+          onSubmit={(clubData) => handleFormSubmit(clubData, editingClub)}
           onCancel={handleFormCancel}
           isLoading={loading}
         />

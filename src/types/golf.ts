@@ -19,7 +19,7 @@ export interface GolfClub {
   bounceAngle?: number; // degrees (Wedge only)
   shaftType: string; // e.g., "Steel", "Graphite"
   torque: number; // トルク（小数1桁）
-  condition?: '先調子' | '先中調子' | '中調子' | '中元調子' | '手元調子'; // 調子（省略可）
+  condition?: '先調子' | '先中調子' | '中調子' | '中元調子' | '元調子'; // 調子（省略可）
   flex?: 'S' | 'SR' | 'R' | 'A' | 'L'; // フレックス（パターは不要）
   distance: number; // 飛距離（小数1桁）
   notes: string;

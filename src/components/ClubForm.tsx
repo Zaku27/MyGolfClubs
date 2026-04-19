@@ -23,10 +23,10 @@ interface ClubFormProps {
 
 type ClubFormData = Omit<GolfClub, 'id' | 'clubType' | 'lengthStandard' | 'lengthAdjustment' | 'lieStandard' | 'lieAdjustment'> & {
   clubType: ClubCategory | '';
-  lengthStandard: number;
-  lengthAdjustment: number;
-  lieStandard: number;
-  lieAdjustment: number;
+  lengthStandard?: number;
+  lengthAdjustment?: number;
+  lieStandard?: number;
+  lieAdjustment?: number;
   imageData: string[];
 };
 
@@ -70,15 +70,20 @@ const toFormData = (source?: GolfClub): ClubFormData => {
 
   const derivedStandard = source.lengthStandard ?? source.length;
   const derivedAdjustment = source.lengthAdjustment ?? 0;
-  const derivedLieStandard = source.lieStandard ?? source.lieAngle;
-  const derivedLieAdjustment = source.lieAdjustment ?? 0;
 
   // Ensure total values are consistent with breakdown values
   // If lengthStandard is not available, use source.length directly as total
-  const calculatedLength = source.lengthStandard != null 
-    ? derivedStandard + derivedAdjustment 
+  const calculatedLength = source.lengthStandard != null
+    ? derivedStandard + derivedAdjustment
     : source.length;
-  const calculatedLieAngle = derivedLieStandard + derivedLieAdjustment;
+
+  // For lie angle, use lieStandard/lieAdjustment if they exist
+  // Otherwise, use lieAngle directly
+  const derivedLieStandard = source.lieStandard;
+  const derivedLieAdjustment = source.lieAdjustment;
+  const calculatedLieAngle = source.lieStandard != null && source.lieAdjustment != null
+    ? source.lieStandard + source.lieAdjustment
+    : source.lieAngle;
 
   return {
     clubType: source.clubType,
@@ -96,6 +101,7 @@ const toFormData = (source?: GolfClub): ClubFormData => {
     bounceAngle: source.clubType === 'Wedge' ? source.bounceAngle : undefined,
     shaftType: source.shaftType,
     torque: source.torque,
+    condition: source.condition,
     flex: source.flex,
     distance: source.distance,
     notes: source.notes,
@@ -139,9 +145,9 @@ export const ClubForm: React.FC<ClubFormProps> = ({
   const toggleLieBreakdown = () => {
     setShowLieBreakdown((prev) => {
       if (!prev) {
-        // 内訳を開く: 既存の標準ライ角と調整値を保持
+        // 内訳を開く: 新規クラブの場合のみ初期化、既存クラブは現在の値を保持
         setFormData((fd) => {
-          if (fd.lieStandard === 0 && fd.lieAdjustment === 0 && fd.lieAngle > 0) {
+          if (!club && fd.lieStandard === 0 && fd.lieAdjustment === 0 && fd.lieAngle > 0) {
             return { ...fd, lieStandard: fd.lieAngle, lieAdjustment: 0 };
           }
           return fd;
@@ -200,34 +206,38 @@ export const ClubForm: React.FC<ClubFormProps> = ({
     setFormData((prev) => {
       if (name === 'lengthStandard' || name === 'lengthAdjustment') {
         const val = parseFloat(value) || 0;
-        const std = name === 'lengthStandard' ? val : prev.lengthStandard;
-        const adj = name === 'lengthAdjustment' ? val : prev.lengthAdjustment;
+        const std = name === 'lengthStandard' ? val : (prev.lengthStandard ?? 0);
+        const adj = name === 'lengthAdjustment' ? val : (prev.lengthAdjustment ?? 0);
         const newLength = std + adj;
-        
+
         // 新規クラブで調整値が0の場合は内訳を閉じる
         if (!club && adj === 0) {
           setShowLengthBreakdown(false);
         }
-        
+
         return { ...prev, [name]: val, length: newLength, lengthStandard: std };
       }
       if (name === 'lieStandard' || name === 'lieAdjustment') {
         const val = parseFloat(value) || 0;
-        const std = name === 'lieStandard' ? val : prev.lieStandard;
-        const adj = name === 'lieAdjustment' ? val : prev.lieAdjustment;
+        const std = name === 'lieStandard' ? val : (prev.lieStandard ?? 0);
+        const adj = name === 'lieAdjustment' ? val : (prev.lieAdjustment ?? 0);
         const newLieAngle = std + adj;
-        
-        // 調整値が0の場合は内訳を閉じる
-        if (adj === 0) {
+
+        // 新規クラブで調整値が0の場合は内訳を閉じる
+        if (!club && adj === 0) {
           setShowLieBreakdown(false);
         }
-        
-        return { ...prev, [name]: val, lieAngle: newLieAngle };
+
+        return { ...prev, [name]: val, lieAngle: newLieAngle, lieStandard: std };
       }
       if (name === 'length') {
         const val = parseFloat(value) || 0;
         // When user enters length directly, update total length
         return { ...prev, length: val };
+      }
+      if (name === 'lieAngle') {
+        const val = parseFloat(value) || 0;
+        return { ...prev, lieAngle: val };
       }
       if (name.includes('Angle') || name === 'weight') {
         return { ...prev, [name]: parseFloat(value) || 0 };
@@ -342,9 +352,13 @@ export const ClubForm: React.FC<ClubFormProps> = ({
         name: formData.name,
         number: normalizeClubNumberForPreset(selectedClubType, formData.number),
         length: formData.length,
+        lengthStandard: showLengthBreakdown ? formData.lengthStandard : undefined,
+        lengthAdjustment: showLengthBreakdown ? formData.lengthAdjustment : undefined,
         weight: formData.weight,
         swingWeight: selectedClubType === 'Putter' ? '' : formData.swingWeight.trim(),
         lieAngle: formData.lieAngle,
+        lieStandard: showLieBreakdown ? formData.lieStandard : undefined,
+        lieAdjustment: showLieBreakdown ? formData.lieAdjustment : undefined,
         loftAngle: formData.loftAngle,
         bounceAngle: selectedClubType === 'Wedge' ? formData.bounceAngle : undefined,
         shaftType: formData.shaftType,
@@ -637,7 +651,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
           {showLieBreakdown ? (
             <div className="lie-breakdown-inputs">
               <div className="lie-breakdown-field">
-                <span className="lie-breakdown-label">標準ライ角(カタログ)</span>
+                <span className="lie-breakdown-label">標準ライ角</span>
                 <input
                   type="number"
                   name="lieStandard"
@@ -663,7 +677,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               <span className="lie-op">=</span>
               <div className="lie-total">
                 <span className="lie-total-label">合計</span>
-                <div className="lie-total-value">{formData.lieAngle || 0}</div>
+                <div className="lie-total-value">{(formData.lieStandard || 0) + (formData.lieAdjustment || 0)}</div>
               </div>
               <span className="form-help-text lie-breakdown-note">標準ライ角に対する調整値を入力すると、合計がライ角として保存されます。</span>
             </div>
@@ -764,7 +778,7 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               <option value="先中調子">先中調子</option>
               <option value="中調子">中調子</option>
               <option value="中元調子">中元調子</option>
-              <option value="手元調子">手元調子</option>
+              <option value="元調子">元調子</option>
             </select>
           </div>
         )}
