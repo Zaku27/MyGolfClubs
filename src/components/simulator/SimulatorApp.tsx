@@ -275,15 +275,21 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
   
   const actualShotRows = useClubStore((state) => state.actualShotRows);
   const activeBagId = useClubStore((state) => state.activeBagId);
+  const loadActualShotRows = useClubStore((state) => state.loadActualShotRows);
   const bagSimClubs = bagSource.map(toSimClub);
+
+  // 実測データをロード
+  useEffect(() => {
+    loadActualShotRows();
+  }, [loadActualShotRows]);
   const measuredSource = useMemo(() => {
     if (!activeBagId) return [];
     return filterClubsWithActualShots(bagSimClubs, actualShotRows[String(activeBagId)] ?? []);
   }, [activeBagId, actualShotRows, bagSimClubs]);
 
   const storedCustomCourses = loadStoredCustomCourse();
-  const [selectedCourseId, setSelectedCourseId] = useState<string>(() => storedCustomCourses.selectedCourseId);
   const selectableCourses = buildSelectableCourses(storedCustomCourses.courses);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(() => storedCustomCourses.selectedCourseId);
   const selectedCourse = selectableCourses.find((course) => course.id === selectedCourseId) ?? selectableCourses[0];
 
   const handleStart = (holes: Hole[], mode: "bag" | "robot" | "measured") => {

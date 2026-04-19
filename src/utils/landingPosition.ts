@@ -282,7 +282,7 @@ function sampleStandardNormal(rng: () => number): number {
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
-function sampleTruncatedNormal(rng: () => number, sigma: number, maxSigma = 1.5): number {
+export function sampleTruncatedNormal(rng: () => number, sigma: number, maxSigma = 1.5): number {
   const value = sampleStandardNormal(rng);
   const clipped = Math.max(-maxSigma, Math.min(maxSigma, value));
   return clipped * sigma;

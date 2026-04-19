@@ -22,6 +22,7 @@ import {
   resolvePenaltyRelief,
   distanceToPinFromLanding,
 } from "./shotOutcome";
+import { sampleTruncatedNormal } from "./landingPosition";
 import { formatSimClubLabel } from "./simClubLabel";
 /**
  * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
@@ -1022,21 +1023,41 @@ export function simulateShotFromActualData(
     return simulateShot(club, context, options);
   }
   
-  // ランダムに1つのショットを選択
-  const randomIndex = Math.floor(Math.random() * clubShots.length);
+  // シードベースの乱数生成器を作成（ゲームごとに異なるショットを選択するため）
+  const shotSelectionSeedBase = [
+    club.id,
+    club.avgDistance,
+    remainingDistance,
+    lie,
+    windStrength,
+    typeof windDirectionDegrees === "number" ? normalizeDegrees(windDirectionDegrees) : "legacy",
+    options.shotIndex ?? 0,
+    options.seedNonce ?? "default",
+    "shot-selection",
+  ].join("|");
+  const shotSelectionRng = createSeededRandom(shotSelectionSeedBase);
+  
+  // ランダムに1つのショットを選択（シードベースの乱数を使用）
+  const randomIndex = Math.floor(shotSelectionRng() * clubShots.length);
   const selectedShot = clubShots[randomIndex];
   
   // 実測データから数値をパース
-  const parseShotValue = (value: string): number | null => {
-    const normalized = value.replace(/,/g, '').replace(/ /g, '').trim();
+  const parseShotValue = (value: string, fieldName: string): number | null => {
+    // 方向指示子（R/L）を削除
+    const withoutDirection = value.replace(/[RL]/gi, '').trim();
+    const normalized = withoutDirection.replace(/,/g, '').replace(/ /g, '').trim();
     const numeric = Number(normalized);
-    return Number.isFinite(numeric) ? numeric : null;
+    const result = Number.isFinite(numeric) ? numeric : null;
+    if (result === null) {
+      console.warn(`[simulateShotFromActualData] Failed to parse ${fieldName}: "${value}"`);
+    }
+    return result;
   };
   
-  const carry = parseShotValue(selectedShot['Carry (yds)']) ?? club.avgDistance;
-  const total = parseShotValue(selectedShot['Total (yds)']) ?? carry;
+  const carry = parseShotValue(selectedShot['Carry (yds)'], 'Carry (yds)') ?? club.avgDistance;
+  const total = parseShotValue(selectedShot['Total (yds)'], 'Total (yds)') ?? carry;
   const roll = total - carry;
-  const lateral = parseShotValue(selectedShot['Lateral (yds)']) ?? 0;
+  const lateral = parseShotValue(selectedShot['Lateral (yds)'], 'Lateral (yds)') ?? 0;
   
   // パワーとライを適用
   const lieMultiplier = getLieDistanceMultiplier(lie, club.type);
@@ -1052,19 +1073,88 @@ export function simulateShotFromActualData(
   const windYards = getWindYards(windStrength, windDirectionDegrees);
   const finalTotalDistance = adjustedTotal + windYards;
   
+  // 横風の影響を計算（通常のシミュレーションと同様）
+  const windComponents =
+    typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)
+      ? getWindComponentsRelativeToShotDirection(
+          windStrength,
+          windDirectionDegrees,
+          context.originX,
+          context.originY,
+          context.targetDistance,
+        )
+      : { headTail: 0, crossWind: 0 };
+  const lateralWindYards = windComponents.crossWind * 0.9;
+  
+  // 通常のシミュレーションと同様の補正を適用
+  // landingPosition.ts の applyGroundCondition と同様のロジック
+  const lateralDeviation = lateral;
+  const dispersionMultiplier = 1.0; // 実測データなので分散補正は不要（固定値）
+  const adjustedLateralDeviation = lateralDeviation * dispersionMultiplier;
+  
+  // 傾斜によるシフトを計算（landingPosition.ts と同様）
+  const groundHardnessValue = context.groundHardness ?? mapGroundHardnessByLie(lie);
+  const groundCondition: GroundCondition = {
+    hardness: groundHardnessValue >= 85 ? "firm" : groundHardnessValue <= 65 ? "soft" : "medium",
+    slopeAngle: context.groundSlopeAngle ?? 0,
+    slopeDirection: context.groundSlopeDirection ?? 0,
+  };
+  
+  // 傾斜シフトの計算
+  const slopeAngle = groundCondition.slopeAngle;
+  const slopeDirection = groundCondition.slopeDirection;
+  const normalizedSlopeDirection = normalizeDegrees(slopeDirection);
+  const slopeRad = (normalizedSlopeDirection * Math.PI) / 180;
+  const crossSlopeComponent = Math.abs(Math.sin(slopeRad)); // 横傾斜成分
+  const slopeStrength = slopeAngle;
+  
+  // ランダムシードベースの乱数生成
+  const simulationSeedBase = [
+    club.id,
+    club.avgDistance,
+    remainingDistance,
+    lie,
+    windStrength,
+    typeof windDirectionDegrees === "number" ? normalizeDegrees(windDirectionDegrees) : "legacy",
+    options.shotIndex ?? 0,
+    options.seedNonce ?? "default",
+  ].join("|");
+  const rng = createSeededRandom(simulationSeedBase);
+  
+  // 横傾斜は常に「高い側から低い側」へ流れるよう、符号は方向からのみ決める
+  const slopeShiftMagnitude = Math.abs(
+    sampleTruncatedNormal(rng, slopeStrength * (0.2 + Math.abs(crossSlopeComponent) * 0.25), 1.0),
+  );
+  const slopeShift = slopeShiftMagnitude * -2 * crossSlopeComponent;
+  
+  // finalX を計算（landingPosition.ts と同様のロジック）
+  const baseFinalX = lateral;
+  const aimOffset = options.aimXOffset ?? 0;
+  const finalXWithoutWind = baseFinalX + aimOffset + (adjustedLateralDeviation - lateralDeviation) + slopeShift;
+  const finalX = finalXWithoutWind + lateralWindYards;
+  
   // 着地位置を計算
   const landing = {
     carry: Math.round(adjustedCarry * 10) / 10,
     roll: Math.round(adjustedRoll * 10) / 10,
     totalDistance: Math.round(finalTotalDistance * 10) / 10,
-    lateralDeviation: Math.round(lateral * 10) / 10,
-    finalX: Math.round(lateral * 10) / 10,
+    lateralDeviation: Math.round(lateralDeviation * 10) / 10,
+    finalX: Math.round(finalX * 10) / 10,
     finalY: Math.round(finalTotalDistance * 10) / 10,
     trajectoryPoints: [
       { x: 0, y: 0, z: 0 },
-      { x: lateral, y: finalTotalDistance, z: 0 },
+      { x: finalXWithoutWind, y: finalTotalDistance, z: 0 },
     ],
   };
+  
+  // trajectoryPointsの横風ドリフトを補正（通常のシミュレーションと同様）
+  if (landing.trajectoryPoints && landing.trajectoryPoints.length > 0) {
+    landing.trajectoryPoints = landing.trajectoryPoints.map((point) => ({
+      x: Math.round((point.x + lateralWindYards * (Math.max(0, point.y) / Math.max(1, finalTotalDistance))) * 10) / 10,
+      y: point.y,
+      z: point.z ?? 0,
+    }));
+  }
   
   // 絶対座標での着地位置
   const absoluteLanding = getAbsoluteLandingPoint(
