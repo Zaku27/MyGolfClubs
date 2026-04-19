@@ -22,6 +22,7 @@ import {
   resolvePenaltyRelief,
   distanceToPinFromLanding,
 } from "./shotOutcome";
+import { formatSimClubLabel } from "./simClubLabel";
 /**
  * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
  * @returns Promise<number> 0.0〜1.0（なければ0.5）
@@ -982,6 +983,189 @@ export function simulateShot(
     shotQuality,
     wasSuccessful: landedHazard ? false : isGoodShot,
     effectiveSuccessRate: effectiveRate,
+    landing,
+    finalOutcome,
+    penaltyStrokes,
+    penaltyDropOrigin,
+    origin: { x: context.originX, y: context.originY },
+  };
+}
+
+/**
+ * 実測データモード用のショットシミュレーション
+ * 実測データからランダムに1つのショットを選択し、その結果を返す
+ */
+export function simulateShotFromActualData(
+  club: SimClub,
+  context: ShotContext,
+  actualShotRows: Array<Record<string, string>>,
+  options: SimulationOptions = {},
+): ShotResult {
+  const {
+    remainingDistance,
+    lie,
+    windStrength = 0,
+    windDirectionDegrees,
+    greenRadius = DEFAULT_GREEN_RADIUS,
+    hazards = [],
+  } = context;
+  
+  const shotPowerPercent = Math.max(0, Math.min(110, options.shotPowerPercent ?? 100));
+  const powerMultiplier = shotPowerPercent / 100;
+  
+  // クラブの実測データを取得
+  const clubLabel = formatSimClubLabel(club);
+  const clubShots = actualShotRows.filter((row) => row.club === clubLabel);
+  
+  if (clubShots.length === 0) {
+    // 実測データがない場合は通常のシミュレーションにフォールバック
+    return simulateShot(club, context, options);
+  }
+  
+  // ランダムに1つのショットを選択
+  const randomIndex = Math.floor(Math.random() * clubShots.length);
+  const selectedShot = clubShots[randomIndex];
+  
+  // 実測データから数値をパース
+  const parseShotValue = (value: string): number | null => {
+    const normalized = value.replace(/,/g, '').replace(/ /g, '').trim();
+    const numeric = Number(normalized);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+  
+  const carry = parseShotValue(selectedShot['Carry (yds)']) ?? club.avgDistance;
+  const total = parseShotValue(selectedShot['Total (yds)']) ?? carry;
+  const roll = total - carry;
+  const lateral = parseShotValue(selectedShot['Lateral (yds)']) ?? 0;
+  
+  // パワーとライを適用
+  const lieMultiplier = getLieDistanceMultiplier(lie, club.type);
+  const weakDistanceMultiplier = isWeakClub(club) 
+    ? (club.successRate < 60 ? 0.9 : 0.95)
+    : 1.0;
+  
+  const adjustedCarry = Math.max(0.1, carry * powerMultiplier * lieMultiplier * weakDistanceMultiplier);
+  const adjustedRoll = Math.max(0, roll * powerMultiplier * lieMultiplier * weakDistanceMultiplier);
+  const adjustedTotal = adjustedCarry + adjustedRoll;
+  
+  // 風の影響を適用
+  const windYards = getWindYards(windStrength, windDirectionDegrees);
+  const finalTotalDistance = adjustedTotal + windYards;
+  
+  // 着地位置を計算
+  const landing = {
+    carry: Math.round(adjustedCarry * 10) / 10,
+    roll: Math.round(adjustedRoll * 10) / 10,
+    totalDistance: Math.round(finalTotalDistance * 10) / 10,
+    lateralDeviation: Math.round(lateral * 10) / 10,
+    finalX: Math.round(lateral * 10) / 10,
+    finalY: Math.round(finalTotalDistance * 10) / 10,
+    trajectoryPoints: [
+      { x: 0, y: 0, z: 0 },
+      { x: lateral, y: finalTotalDistance, z: 0 },
+    ],
+  };
+  
+  // 絶対座標での着地位置
+  const absoluteLanding = getAbsoluteLandingPoint(
+    context.originX,
+    context.originY,
+    context.targetDistance,
+    landing.finalX,
+    landing.finalY,
+  );
+  
+  // 着地判定
+  const assessment = assessLanding(
+    absoluteLanding.x,
+    absoluteLanding.y,
+    context.targetDistance,
+    hazards,
+    greenRadius,
+    context.greenPolygon,
+    landing.trajectoryPoints?.map((point) =>
+      getAbsoluteLandingPoint(context.originX, context.originY, context.targetDistance, point.x, point.y),
+    ),
+  );
+  
+  let { geometricRemainingDistance: geometricRemaining, hazard: landedHazard, isOnGreen } = assessment;
+  let newRemaining = geometricRemaining;
+  
+  // ホールアウト判定
+  if (newRemaining === 0 && !landedHazard) {
+    const holeOutChance = getNonPutterHoleOutChance(remainingDistance, "average");
+    const holedOut = Math.random() < holeOutChance;
+    if (!holedOut) {
+      newRemaining = 1 + Math.floor(Math.random() * 3);
+    }
+  }
+  
+  // ペナルティ判定
+  const penaltyStrokes = determinePenaltyStrokes(landedHazard);
+  const penalty = penaltyStrokes > 0;
+  
+  let newLie: LieType;
+  let finalOutcome: ShotResult["finalOutcome"];
+  let penaltyDropOrigin: { x: number; y: number } | undefined;
+  
+  if (landedHazard?.type === "water") {
+    const relief = resolvePenaltyRelief("water", lie, remainingDistance, newRemaining, landedHazard.penaltyStrokes ?? 3);
+    penaltyDropOrigin = getWaterHazardDropOrigin(landedHazard, absoluteLanding, landing.trajectoryPoints?.map((point) =>
+      getAbsoluteLandingPoint(context.originX, context.originY, context.targetDistance, point.x, point.y),
+    ));
+    newRemaining = Math.round(distanceToPinFromLanding(context.targetDistance, penaltyDropOrigin.x, penaltyDropOrigin.y));
+    newLie = relief.newLie;
+    finalOutcome = "water";
+  } else if (landedHazard?.type === "ob") {
+    const relief = resolvePenaltyRelief("ob", lie, remainingDistance, newRemaining, landedHazard.penaltyStrokes ?? 3);
+    newRemaining = relief.newRemaining;
+    newLie = relief.newLie;
+    finalOutcome = "ob";
+  } else if (landedHazard?.type === "bunker") {
+    newLie = "bunker";
+    finalOutcome = "bunker";
+  } else if (landedHazard?.type === "rough") {
+    newLie = "rough";
+    finalOutcome = "rough";
+  } else if (landedHazard?.type === "semirough") {
+    newLie = "semirough";
+    finalOutcome = "rough";
+  } else if (landedHazard?.type === "bareground") {
+    newLie = "bareground";
+    finalOutcome = "rough";
+  } else if (isOnGreen || newRemaining === 0) {
+    newLie = "green";
+    finalOutcome = "green";
+  } else {
+    newLie = "fairway";
+    finalOutcome = "fairway";
+  }
+  
+  // メッセージ構築
+  const clubDisplayName = `${club.name}${club.number ? " " + club.number : ""}`;
+  const nextShotAdvice = buildNextShotAdvice(finalOutcome, newLie);
+  const message = buildDetailedShotMessage({
+    qualityLabel: "実測データ",
+    clubLabel: clubDisplayName,
+    actualDistance: Math.round(finalTotalDistance),
+    finalOutcome,
+    newRemainingDistance: newRemaining,
+    lieLabel: LIE_LABELS[newLie],
+    hazard: landedHazard,
+    penaltyStrokes,
+  });
+  
+  return {
+    newRemainingDistance: newRemaining,
+    outcomeMessage: message,
+    nextShotAdvice,
+    strokesAdded: 1 + penaltyStrokes,
+    lie: newLie,
+    penalty,
+    distanceHit: Math.round(finalTotalDistance),
+    shotQuality: "average",
+    wasSuccessful: landedHazard ? false : true,
+    effectiveSuccessRate: 100,
     landing,
     finalOutcome,
     penaltyStrokes,

@@ -10,7 +10,7 @@ import type {
   GamePhase,
   HoleSummary,
 } from "../types/game";
-import { simulateShot, getAbsoluteLandingPoint, projectAlongLineToPin } from "../utils/shotSimulation";
+import { simulateShot, simulateShotFromActualData, getAbsoluteLandingPoint, projectAlongLineToPin } from "../utils/shotSimulation";
 import { buildClubUsageStats } from "../utils/roundAnalysis";
 import { formatSimClubDisplayName } from "../utils/simClubLabel";
 import { ClubService } from "../db/clubService";
@@ -87,11 +87,11 @@ interface GameStoreState {
   roundSeedNonce: string;
   /** DBから取得したプレイヤースキルレベル (0-1)。パット確率に使用。 */
   playerSkillLevel: number;
-  playMode: "robot" | "bag";
+  playMode: "robot" | "bag" | "measured";
 }
 
 interface GameStoreActions {
-  startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag") => void;
+  startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag" | "measured") => void;
   selectClub: (clubId: string) => void;
   setShotPowerPercent: (powerPercent: number) => void;
   setAimXOffset: (aimXOffset: number) => void;
@@ -135,7 +135,7 @@ const INITIAL_STATE: GameStoreState = {
   goodShotStreak: 0,
   roundSeedNonce: "default",
   playerSkillLevel: 0.5,
-  playMode: "bag",
+  playMode: "bag" as "robot" | "bag" | "measured",
 };
 
 function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: number): ShotContext {
@@ -269,7 +269,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     setTimeout(() => {
       const isRobotMode = playMode === "robot";
+      const isMeasuredMode = playMode === "measured";
       const allClubs = useClubStore.getState().clubs;
+      const actualShotRows = useClubStore.getState().actualShotRows;
+      const activeBagId = useClubStore.getState().activeBagId;
+      
       const analysisPenaltyByClubId = buildAnalysisPenaltyByClubId(allClubs);
       const analysisPenaltyPoints = analysisPenaltyByClubId[club.id] ?? 0;
       const adjustedBaseSuccessRate = getAnalysisAdjustedBaseSuccessRate(
@@ -286,20 +290,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
             isWeakClub: treatedAsWeakClub,
           };
 
+      // 実測データモード: 実測データからランダムにショットを選択
       // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
       const isPutter = club.type === "Putter";
-      const result = simulateShot(clubForSimulation, shotContext, {
-        personalData: isRobotMode ? undefined : clubPersonalData,
-        playerSkillLevel: isRobotMode
-          ? (isPutter ? playerSkillLevel : 1)
-          : playerSkillLevel,
-        forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
-        shotPowerPercent,
-        aimXOffset,
-        useStoredDistance: !isRobotMode,
-        shotIndex: currentHoleShots.length,
-        seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
-      });
+      let result;
+      
+      if (isMeasuredMode && !isPutter) {
+        const shots = activeBagId ? actualShotRows[String(activeBagId)] ?? [] : [];
+        result = simulateShotFromActualData(club, shotContext, shots, {
+          shotPowerPercent,
+          aimXOffset,
+          shotIndex: currentHoleShots.length,
+          seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
+        });
+      } else {
+        result = simulateShot(clubForSimulation, shotContext, {
+          personalData: isRobotMode ? undefined : clubPersonalData,
+          playerSkillLevel: isRobotMode
+            ? (isPutter ? playerSkillLevel : 1)
+            : playerSkillLevel,
+          forceEffectiveSuccessRate: isRobotMode && !isPutter ? 100 : undefined,
+          shotPowerPercent,
+          aimXOffset,
+          useStoredDistance: !isRobotMode,
+          shotIndex: currentHoleShots.length,
+          seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
+        });
+      }
       const newHoleStrokes = holeStrokes + result.strokesAdded;
       const streakAfterShot = result.wasSuccessful ? goodShotStreak + 1 : 0;
       const shotLog: ShotLog = {

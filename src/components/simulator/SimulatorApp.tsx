@@ -1,13 +1,15 @@
-import type { Hole } from "../../types/game";
+import type { Hole, SimClub } from "../../types/game";
 import type { GolfClub } from "../../types/golf";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useGameStore } from "../../store/gameStore";
+import { useClubStore } from "../../store/clubStore";
 import { toSimClub } from "../../utils/clubSimAdapter";
 import { COURSE_1HOLE, COURSE_3HOLES, COURSE_9HOLES, COURSE_18HOLES } from "../../data/defaultCourses";
 import { cloneCourse } from "../../utils/courseGenerator";
 import { loadStoredCustomCourse, type CustomCoursePreset } from "./CustomCourseEditorScreen";
 import { HoleView } from "./HoleView";
+import { filterClubsWithActualShots } from "../../utils/actualShotFilter";
 
 import { Scorecard } from "./Scorecard";
 
@@ -21,12 +23,14 @@ interface Props {
 
 const SIMULATOR_PLAY_MODE_STORAGE_KEY = "golfbag-simulator-play-mode-v1";
 
-function loadStoredSimulatorPlayMode(): "bag" | "robot" {
+function loadStoredSimulatorPlayMode(): "bag" | "robot" | "measured" {
   if (typeof window === "undefined") {
     return "bag";
   }
   const raw = window.localStorage.getItem(SIMULATOR_PLAY_MODE_STORAGE_KEY);
-  return raw === "robot" ? "robot" : "bag";
+  if (raw === "robot") return "robot";
+  if (raw === "measured") return "measured";
+  return "bag";
 }
 
 interface SelectableCourse {
@@ -59,25 +63,27 @@ function SetupScreen({
   onBack,
   bagClubCount,
   robotClubCount,
+  measuredClubCount,
   activeBagName,
   bagId,
   courses,
   selectedCourse,
   onChangeSelectedCourse,
 }: {
-  onStart: (holes: Hole[], mode: "bag" | "robot") => void;
+  onStart: (holes: Hole[], mode: "bag" | "robot" | "measured") => void;
   onBack: () => void;
   bagClubCount: number;
   robotClubCount: number;
+  measuredClubCount: number;
   activeBagName?: string;
   bagId?: number | null;
   courses: SelectableCourse[];
   selectedCourse: SelectableCourse;
   onChangeSelectedCourse: (courseId: string) => void;
 }) {
-  const [playMode, setPlayMode] = useState<"bag" | "robot">(() => loadStoredSimulatorPlayMode());
+  const [playMode, setPlayMode] = useState<"bag" | "robot" | "measured">(() => loadStoredSimulatorPlayMode());
   const bagQuery = typeof bagId === 'number' ? `?bagId=${bagId}` : '';
-  const clubCount = playMode === "robot" ? robotClubCount : bagClubCount;
+  const clubCount = playMode === "robot" ? robotClubCount : playMode === "measured" ? measuredClubCount : bagClubCount;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -86,13 +92,42 @@ function SetupScreen({
   }, [playMode]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex flex-col items-center justify-center p-6 gap-6">
+    <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex flex-col">
+      <div className="fixed inset-x-0 top-0 z-20 border-b border-emerald-300 bg-emerald-50/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 text-xs font-semibold tracking-wide text-emerald-800 sm:h-16 sm:gap-4 sm:text-sm">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <span className="text-sm font-bold text-emerald-900">コースシミュレーター</span>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link
+              to={`/range${bagQuery}`}
+              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
+            >
+              レンジに戻る
+            </Link>
+            <Link
+              to={`/personal-data${bagQuery}`}
+              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
+            >
+              パーソナルデータ
+            </Link>
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
+            >
+              ホームに戻る
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col items-center justify-center flex-1 p-6 gap-6 pt-20">
       <div className="text-center">
         <h1 className="text-3xl font-black text-emerald-900 tracking-tight">
           コースシミュレーター
         </h1>
         <p className="text-emerald-700 mt-1 text-sm">
-          クラブ選択と戦略でスコアを目指せ
+          クラブ選択と戦略でコースを攻略
         </p>
       </div>
 
@@ -131,38 +166,60 @@ function SetupScreen({
             コースエディタでマイコースを作成・編集
           </Link>
         </div>
-        <div className="rounded-xl border border-emerald-200 bg-white/80 p-3">
+        <div className="rounded-xl border border-emerald-200 bg-white/80 p-4">
           <p className="text-xs font-bold tracking-[0.12em] text-emerald-700">プレーモード</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-1 gap-2">
             <button
               type="button"
               onClick={() => setPlayMode("bag")}
               className={[
-                "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                "rounded-lg border px-4 py-3 text-sm font-semibold transition flex items-center justify-between gap-3",
                 playMode === "bag"
-                  ? "border-emerald-700 bg-emerald-700 text-white"
+                  ? "border-emerald-700 bg-emerald-700 text-white shadow-lg shadow-emerald-300/50"
                   : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
               ].join(" ")}
             >
-              ゴルフバッグ
+              <span>🏌️ ゴルフバッグ</span>
+              <span className="text-xs opacity-80">{bagClubCount}本</span>
             </button>
             <button
               type="button"
               onClick={() => setPlayMode("robot")}
               className={[
-                "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                "rounded-lg border px-4 py-3 text-sm font-semibold transition flex items-center justify-between gap-3",
                 playMode === "robot"
-                  ? "border-sky-700 bg-sky-700 text-white"
+                  ? "border-sky-700 bg-sky-700 text-white shadow-lg shadow-sky-300/50"
                   : "border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100",
               ].join(" ")}
             >
-              ロボット
+              <span>🤖 ロボット</span>
+              <span className="text-xs opacity-80">{robotClubCount}本</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlayMode("measured")}
+              disabled={measuredClubCount === 0}
+              className={[
+                "rounded-lg border px-4 py-3 text-sm font-semibold transition flex items-center justify-between gap-3",
+                playMode === "measured"
+                  ? "border-amber-700 bg-amber-700 text-white shadow-lg shadow-amber-300/50"
+                  : measuredClubCount === 0
+                    ? "border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100",
+              ].join(" ")}
+            >
+              <span>📊 実測データ</span>
+              <span className="text-xs opacity-80">{measuredClubCount}本</span>
             </button>
           </div>
-          <p className="mt-2 text-xs text-emerald-700">
+          <p className="mt-3 text-xs text-emerald-700 leading-relaxed">
             {playMode === "bag"
               ? `個人データを使い、${activeBagName ?? "選択中バッグ"}でプレーします。`
-              : "ロボット設定で全クラブを使ってプレーします。"}
+              : playMode === "robot"
+              ? "ロボット設定で全クラブを使ってプレーします。"
+              : measuredClubCount === 0
+              ? "実測データが登録されていません。パーソナルデータ画面でCSVをインポートしてください。"
+              : "実測データからランダムにショットを選択してプレーします。"}
           </p>
         </div>
 
@@ -201,26 +258,7 @@ function SetupScreen({
           {selectedCourse.holes.length}ホールでプレー
         </button>
       </div>
-
-
-      <button
-        onClick={onBack}
-        className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
-      >
-        ← ホームに戻る
-      </button>
-      <Link
-        to={`/range${bagQuery}`}
-        className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
-      >
-        レンジシミュレーターに戻る
-      </Link>
-      <Link
-        to={`/personal-data${bagQuery}`}
-        className="text-emerald-700 hover:text-emerald-900 text-sm underline transition-colors"
-      >
-        パーソナルデータを調整
-      </Link>
+    </div>
     </div>
   );
 }
@@ -234,15 +272,28 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
   const [showDetailedScorecard, setShowDetailedScorecard] = useState(false);
   const bagSource = selectedClubs;
   const robotSource = allClubs;
+  
+  const actualShotRows = useClubStore((state) => state.actualShotRows);
+  const activeBagId = useClubStore((state) => state.activeBagId);
+  const bagSimClubs = bagSource.map(toSimClub);
+  const measuredSource = useMemo(() => {
+    if (!activeBagId) return [];
+    return filterClubsWithActualShots(bagSimClubs, actualShotRows[String(activeBagId)] ?? []);
+  }, [activeBagId, actualShotRows, bagSimClubs]);
 
   const storedCustomCourses = loadStoredCustomCourse();
   const [selectedCourseId, setSelectedCourseId] = useState<string>(() => storedCustomCourses.selectedCourseId);
   const selectableCourses = buildSelectableCourses(storedCustomCourses.courses);
   const selectedCourse = selectableCourses.find((course) => course.id === selectedCourseId) ?? selectableCourses[0];
 
-  const handleStart = (holes: Hole[], mode: "bag" | "robot") => {
-    const source = mode === "robot" ? robotSource : bagSource;
-    const bag = source.map(toSimClub);
+  const handleStart = (holes: Hole[], mode: "bag" | "robot" | "measured") => {
+    let bag: SimClub[];
+    if (mode === "measured") {
+      bag = measuredSource;
+    } else {
+      const source = mode === "robot" ? robotSource : bagSource;
+      bag = source.map(toSimClub);
+    }
     setShowDetailedScorecard(false);
     startRound(cloneCourse(holes), bag, mode);
   };
@@ -254,6 +305,7 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
         onBack={onBack}
         bagClubCount={bagSource.length}
         robotClubCount={robotSource.length}
+        measuredClubCount={measuredSource.length}
         activeBagName={activeBagName}
         bagId={bagId}
         courses={selectableCourses}

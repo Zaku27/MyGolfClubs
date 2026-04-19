@@ -317,8 +317,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             <span>PAR {currentHole.par}</span>
             <span className="text-emerald-500">|</span>
             <span>{currentHole.distanceFromTee}ヤード</span>
-            <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-sky-800">
-              {playMode === "robot" ? "ロボットプレイ中" : "ゴルフバッグプレイ中"}
+            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-bold tracking-[0.08em]", playMode === "robot" ? "border-sky-300 bg-sky-50 text-sky-800" : playMode === "measured" ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-300 bg-emerald-50 text-emerald-800"].join(" ")}>
+              {playMode === "robot" ? "ロボットプレイ中" : playMode === "measured" ? "実測データプレイ中" : "ゴルフバッグプレイ中"}
             </span>
             {playMode === "robot" && (
               <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-sky-800">
@@ -333,6 +333,13 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             {showScoreDisplay && (
               <span className="font-semibold text-emerald-900">スコア {scoreLabel}</span>
             )}
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
+            >
+              ホームに戻る
+            </button>
             <button
               type="button"
               onClick={handleQuitGame}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { APP } from './constants/app';
-import { Header } from './components/Header';
+import { AppHeader } from './components/Header';
 import { AppDialogs } from './components/AppDialogs';
 import { AppMainContent } from './components/AppMainContent';
 import { AppProvider } from './context/AppContext';
@@ -69,7 +69,7 @@ function App() {
         <meta name="twitter:description" content={APP.tagline} />
       </Helmet>
       
-      <Header />
+      <AppHeader showSimulator={uiState.showSimulator} />
       
       <AppDialogs
         error={clubActions.error}
