@@ -253,7 +253,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       }
     }
 
-    // Find club types with multiple swing weights that differ by more than 0.1
+    // Find club types with multiple swing weights that differ by more than 0.3
     const inconsistentClubTypes: string[] = [];
     for (const [clubType, swingWeights] of clubTypeSwingWeights.entries()) {
       if (swingWeights.length < 2) continue;
@@ -261,7 +261,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       let deviationCount = 0;
       for (let i = 0; i < swingWeights.length; i++) {
         for (let j = i + 1; j < swingWeights.length; j++) {
-          if (Math.abs(swingWeights[i] - swingWeights[j]) > 0.1) {
+          if (Math.abs(swingWeights[i] - swingWeights[j]) > 0.3) {
             deviationCount++;
           }
         }
