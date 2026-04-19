@@ -180,7 +180,7 @@ function buildYardBounds(
   }, 0);
 
   const baseMaxY = Math.max(targetDistance, maxHazardY, maxLandingY, 1);
-  const maxYardY = baseMaxY * 1.1;
+  const maxYardY = baseMaxY * 1.06;
 
   const maxHazardX = hazards.reduce((max, hazard) => {
     const half = hazard.width / 2;
@@ -357,7 +357,7 @@ function drawShot(
   context.beginPath();
   context.arc(landingX, landingY, 4.5, 0, Math.PI * 2);
   context.fill();
-  context.strokeStyle = "rgba(255,255,255,0.9)";
+  context.strokeStyle = "#000000";
   context.lineWidth = 1.5;
   context.stroke();
 }

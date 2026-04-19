@@ -5,7 +5,6 @@ import { useClubStore } from "../../store/clubStore";
 import { estimateBaseDistance } from "../../utils/shotSimulation";
 import { getSkillLabel } from "../../utils/playerSkill";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
-import { formatWindDirectionLabel } from "../../utils/windDirection";
 import { CompactScorecard } from "./Scorecard";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 import { loadRangePlayerSettings } from "../../utils/rangePlayerSettings";
@@ -121,10 +120,18 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     hardness === "soft" ? "柔らかい" : hardness === "firm" ? "硬い" : "普通";
   const formatSlopeLabel = (angle: number, direction: number) =>
     angle === 0 ? "フラット" : `${Math.abs(angle)}° / ${direction}°`;
-  const formatWindDetail = (strength: number, direction?: number) => {
+  const formatWindDetail = (strength: number) => {
     if (!strength) return "風なし";
-    const directionLabel = typeof direction === "number" ? formatWindDirectionLabel(direction) : "不明";
-    return `${strength} mph ${directionLabel}`;
+    // mph to m/s conversion: 1 mph = 0.44704 m/s
+    const windMps = (strength * 0.44704).toFixed(1);
+    return `${windMps} m/s`;
+  };
+
+  const getWindArrowRotation = (direction?: number) => {
+    if (typeof direction !== "number") return 0;
+    // 0° = 北（上）、90° = 東（右）、180° = 南（下）、270° = 西（左）
+    // CSSのrotationは時計回りなので、そのまま使用
+    return direction;
   };
 
   const { remainingDistance, lie, windStrength = 0, windDirectionDegrees } = shotContext;
@@ -191,7 +198,10 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         return scoredClubs.filter((club) => club.type === "Putter");
       }
 
-      return scoredClubs.filter((club) => club.type !== "Putter").slice(0, 5);
+      // ティーグラウンド以外ではドライバーを除外
+      return scoredClubs
+        .filter((club) => club.type !== "Putter" && (lie === "tee" || club.type !== "Driver"))
+        .slice(0, 5);
     },
     [
       bag,
@@ -325,9 +335,11 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 ヘッドスピード {robotHeadSpeed.toFixed(1)} m/s
               </span>
             )}
-            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-emerald-900">
-              適用スキルレベル {(displayedSkillLevel * 100).toFixed(0)}% ({displayedSkillLabel})
-            </span>
+            {playMode !== "measured" && (
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-emerald-900">
+                適用スキルレベル {(displayedSkillLevel * 100).toFixed(0)}% ({displayedSkillLabel})
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             {showScoreDisplay && (
@@ -412,8 +424,16 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
                 傾斜: {formatSlopeLabel(courseCondition.slopeAngle, courseCondition.slopeDirection)}
               </span>
-              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
-                風: {formatWindDetail(windStrength, windDirectionDegrees)}
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm flex items-center gap-2">
+                <span>風: {formatWindDetail(windStrength)}</span>
+                {windStrength > 0 && (
+                  <span
+                    className="inline-block"
+                    style={{ transform: `rotate(${getWindArrowRotation(windDirectionDegrees)}deg)` }}
+                  >
+                    ↑
+                  </span>
+                )}
               </span>
             </div>
           </section>
@@ -657,9 +677,11 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                       )}
                     </div>
                     <p className="mt-2 text-sm text-emerald-700">推定飛距離: {(estimatedDistanceByClub.get(club.id) ?? 0).toFixed(1)}ヤード</p>
-                    <p className="mt-1 text-sm text-emerald-700">
-                      クラブ成功率: {effectiveRate}%
-                    </p>
+                    {playMode !== "measured" && (
+                      <p className="mt-1 text-sm text-emerald-700">
+                        クラブ成功率: {effectiveRate}%
+                      </p>
+                    )}
                     {todayRate !== null && (
                       <p className="mt-1 text-xs text-emerald-700">
                         今日の成功: {todayStats?.successes}/{todayStats?.attempts}本 ({todayRate}%)
@@ -714,8 +736,16 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
                 傾斜: {formatSlopeLabel(courseCondition.slopeAngle, courseCondition.slopeDirection)}
               </span>
-              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm">
-                風: {formatWindDetail(windStrength, windDirectionDegrees)}
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 sm:px-4 sm:text-sm flex items-center gap-2">
+                <span>風: {formatWindDetail(windStrength)}</span>
+                {windStrength > 0 && (
+                  <span
+                    className="inline-block"
+                    style={{ transform: `rotate(${getWindArrowRotation(windDirectionDegrees)}deg)` }}
+                  >
+                    ↑
+                  </span>
+                )}
               </span>
             </div>
           </section>
