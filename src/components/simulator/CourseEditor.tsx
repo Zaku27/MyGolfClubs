@@ -192,7 +192,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       yBack: bounds.yBack,
       xCenter: bounds.xCenter,
       penaltyStrokes: getPenaltyStrokesByType(type),
-      groundCondition: { ...DEFAULT_GROUND_CONDITION },
+      groundCondition: { ...DEFAULT_GROUND_CONDITION, hardness: (type === "rough" || type === "bunker") ? "soft" : "medium" },
       name: buildHazardName(type, centerX, radiusX * 2),
     };
     updateHole((hole) => ({
@@ -251,7 +251,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       yBack: bounds.yBack,
       xCenter: bounds.xCenter,
       penaltyStrokes: 0,
-      groundCondition: { ...DEFAULT_GROUND_CONDITION },
+      groundCondition: { ...DEFAULT_GROUND_CONDITION, hardness: "soft" },
       name: buildHazardName("bunker", bounds.xCenter, bounds.width),
     };
 
@@ -636,10 +636,21 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
           <button
             type="button"
             onClick={deleteSelectedHazard}
-            disabled={!selectedHazard}
+            disabled={!selectedHazard || selectedHazard?.locked}
             className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
             選択ハザード削除
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!selectedHazard) return;
+              updateSelectedHazard((hazard) => ({ ...hazard, locked: !hazard.locked }));
+            }}
+            disabled={!selectedHazard}
+            className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-100"
+          >
+            {selectedHazard?.locked ? '🔒 解除' : '🔒 ロック'}
           </button>
           <button
             type="button"

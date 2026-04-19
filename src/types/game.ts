@@ -38,6 +38,7 @@ export interface Hazard {
   };
   groundCondition?: GroundCondition;
   name?: string;
+  locked?: boolean; // ハザードを編集不可にするフラグ
 }
 
 export type GroundHardness = "soft" | "medium" | "firm";

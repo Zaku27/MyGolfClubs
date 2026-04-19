@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
-import type { Hole, Hazard } from "../../types/game";
+import type { Hole, Hazard, HazardType } from "../../types/game";
 import type { LandingResult } from "../../utils/landingPosition";
-import { buildAutoHazardName, buildHazardDisplayName } from "../../utils/shotOutcome";
+import { buildAutoHazardName } from "../../utils/shotOutcome";
 import { getHazardStyle } from "./hazardStyle";
 import { drawPolygon } from "./drawPolygon";
 import { drawRectangle } from "./drawRectangle";
@@ -105,18 +105,29 @@ const COURSE_WIDTH_YARDS = 400;
 const DEFAULT_GREEN_RADIUS = 12;
 const GREEN_SELECTION_ID = "__green__";
 const GREEN_POLYGON_SIDES = 20;
+
+const HAZARD_TYPE_LABEL: Record<HazardType, string> = {
+  bunker: "バンカー",
+  water: "ウォーター",
+  ob: "OB",
+  rough: "ラフ",
+  semirough: "セミラフ",
+  bareground: "ベアグラウンド",
+};
 const MIN_HAZARD_WIDTH = 8;
 const MIN_HAZARD_DEPTH = 6;
 const EDITABLE_Y_AXIS_OFFSET_YARDS = 25;
 const EDITABLE_HAZARD_MAX_X = 200;
 
-function buildRegularPolygonPoints(centerX: number, centerY: number, radius: number, sides: number) {
+function buildRegularPolygonPoints(centerX: number, centerY: number, radius: number, sides: number, irregularity: number = 0) {
   const points: Point2D[] = [];
+  const amount = Math.max(0, Math.min(irregularity, 0.3));
   for (let index = 0; index < sides; index += 1) {
     const angle = (2 * Math.PI * index) / sides - Math.PI / 2;
+    const randomRatio = 1 + (Math.random() * 2 - 1) * amount;
     points.push({
-      x: centerX + radius * Math.cos(angle),
-      y: centerY + radius * Math.sin(angle),
+      x: centerX + radius * randomRatio * Math.cos(angle),
+      y: centerY + radius * randomRatio * Math.sin(angle),
     });
   }
   return points;
@@ -168,7 +179,7 @@ function buildYardBounds(
     return Math.max(max, shot.landing.y, pathMaxY);
   }, 0);
 
-  const baseMaxY = Math.max(targetDistance + 150, maxHazardY, maxLandingY, 1);
+  const baseMaxY = Math.max(targetDistance, maxHazardY, maxLandingY, 1);
   const maxYardY = baseMaxY * 1.1;
 
   const maxHazardX = hazards.reduce((max, hazard) => {
@@ -447,7 +458,7 @@ export function HoleMapCanvas({
     if (Array.isArray(initialPoints) && initialPoints.length >= 3) {
       return initialPoints.map((point) => ({ x: point.x, y: point.y }));
     }
-    return buildRegularPolygonPoints(0, hole.targetDistance ?? hole.distanceFromTee, hole.greenRadius ?? DEFAULT_GREEN_RADIUS, GREEN_POLYGON_SIDES);
+    return buildRegularPolygonPoints(0, hole.targetDistance ?? hole.distanceFromTee, hole.greenRadius ?? DEFAULT_GREEN_RADIUS, GREEN_POLYGON_SIDES, 0.1);
   });
   const panStartRef = useRef<Point2D | null>(null);
   const initialOffsetRef = useRef<Point2D>({ x: 0, y: 0 });
@@ -524,7 +535,7 @@ export function HoleMapCanvas({
       return;
     }
 
-    setGreenPolygon(buildRegularPolygonPoints(0, targetDistance, greenRadius, GREEN_POLYGON_SIDES));
+    setGreenPolygon(buildRegularPolygonPoints(0, targetDistance, greenRadius, GREEN_POLYGON_SIDES, 0.1));
   }, [targetDistance, greenRadius, hole.number, hole.greenPolygon]);
 
   useEffect(() => {
@@ -911,17 +922,6 @@ export function HoleMapCanvas({
 
     context.restore();
 
-    // センターライン(ティー→ピン)を点線で描き、基準軸をわかりやすくする。
-    context.save();
-    context.setLineDash([6, 6]);
-    context.strokeStyle = "rgba(22, 101, 52, 0.55)";
-    context.lineWidth = 1.5;
-    context.beginPath();
-    context.moveTo(teeX, teeY);
-    context.lineTo(pinX, pinY);
-    context.stroke();
-    context.restore();
-
     // ハザード描画: rough / bareground / ob / bunker を先に描画し、water は最後に描く。
     const sortedHazards = [...hazards].sort((a, b) => {
       const orderA = HAZARD_TEXTURE_ORDER.indexOf(resolveHazardTextureType(a.type));
@@ -929,31 +929,118 @@ export function HoleMapCanvas({
       return orderA - orderB;
     });
 
+    // ポリゴンの重なりによる色の二重適用を防ぐため、タイプごとにグループ化して描画
+    // OBは他のタイプと重なった場合、色が二重にならないように最後に不透明で描画
+    const hazardsByType = new Map<string, typeof sortedHazards>();
+    const obHazards: typeof sortedHazards = [];
     for (const hazard of sortedHazards) {
       if (hazard.type === "water") continue;
-      const style = getHazardStyle(hazard.type);
-      const textureKey = resolveHazardTextureType(hazard.type);
-      const pattern = shouldUseTextures ? createTexturePattern(context, textureKey) : null;
-      const isPolygon = hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3;
-      const shouldHidePolygonStroke = isPolygon && !editable;
+      if (hazard.type === "ob") {
+        obHazards.push(hazard);
+        continue;
+      }
+      const type = hazard.type;
+      if (!hazardsByType.has(type)) {
+        hazardsByType.set(type, []);
+      }
+      hazardsByType.get(type)!.push(hazard);
+    }
 
+    for (const [type, typeHazards] of hazardsByType) {
+      const style = getHazardStyle(type as Hazard["type"]);
+      const textureKey = resolveHazardTextureType(type);
+      const pattern = shouldUseTextures ? createTexturePattern(context, textureKey) : null;
+
+      // オフスクリーンキャンバスを作成して、同じタイプのハザードをまとめて描画
+      const offscreenCanvas = document.createElement('canvas');
+      offscreenCanvas.width = canvas.width;
+      offscreenCanvas.height = canvas.height;
+      const offscreenCtx = offscreenCanvas.getContext('2d');
+      if (!offscreenCtx) continue;
+
+      offscreenCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      offscreenCtx.translate(viewport.offsetX, viewport.offsetY);
+      offscreenCtx.scale(viewport.scale, viewport.scale);
+
+      // RGBA色から不透明色を抽出（アルファを1.0に設定）
+      const opaqueFill = style.fill.replace(/[\d.]+\)$/, '1)');
+
+      for (const hazard of typeHazards) {
+        const isPolygon = hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3;
+        const shouldHidePolygonStroke = isPolygon && !editable;
+
+        offscreenCtx.save();
+        if (pattern) {
+          offscreenCtx.fillStyle = pattern;
+          offscreenCtx.globalAlpha = 1;
+        } else {
+          offscreenCtx.fillStyle = opaqueFill;
+        }
+        offscreenCtx.strokeStyle = shouldHidePolygonStroke ? "transparent" : style.stroke;
+        offscreenCtx.lineWidth = shouldHidePolygonStroke ? 0 : 1.5;
+
+        if (isPolygon) {
+          drawPolygon(offscreenCtx, hazard, yardToPxX, yardToPxY);
+        } else {
+          drawRectangle(offscreenCtx, hazard, yardToPxX, yardToPxY);
+        }
+        offscreenCtx.restore();
+      }
+
+      // オフスクリーンキャンバスをメインキャンバスに合成
       context.save();
       if (pattern) {
-        context.fillStyle = pattern;
         context.globalAlpha = 0.94;
       } else {
-        context.fillStyle = style.fill;
+        // 元の色のアルファ値を抽出して適用
+        const alphaMatch = style.fill.match(/[\d.]+\)$/);
+        const alpha = alphaMatch ? parseFloat(alphaMatch[0]) : 0.5;
+        context.globalAlpha = alpha;
       }
-      context.strokeStyle = shouldHidePolygonStroke ? "transparent" : style.stroke;
-      context.lineWidth = shouldHidePolygonStroke ? 0 : 1.5;
-
-      if (isPolygon) {
-        drawPolygon(context, hazard, yardToPxX, yardToPxY);
-      } else {
-        drawRectangle(context, hazard, yardToPxX, yardToPxY);
-      }
+      context.drawImage(offscreenCanvas, 0, 0);
       context.restore();
-      drawObBoundaryMarkers(context, hazard, yardToPxX, yardToPxY);
+
+      // 境界線マーカーを描画
+      for (const hazard of typeHazards) {
+        drawObBoundaryMarkers(context, hazard, yardToPxX, yardToPxY);
+      }
+    }
+
+    // OBハザードを最後に不透明で描画（他のハザードと重なっても色が二重にならないように）
+    if (obHazards.length > 0) {
+      const obStyle = getHazardStyle("ob");
+      const obOffscreenCanvas = document.createElement('canvas');
+      obOffscreenCanvas.width = canvas.width;
+      obOffscreenCanvas.height = canvas.height;
+      const obOffscreenCtx = obOffscreenCanvas.getContext('2d');
+      if (obOffscreenCtx) {
+        obOffscreenCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        obOffscreenCtx.translate(viewport.offsetX, viewport.offsetY);
+        obOffscreenCtx.scale(viewport.scale, viewport.scale);
+
+        for (const hazard of obHazards) {
+          const isPolygon = hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3;
+          const shouldHidePolygonStroke = isPolygon && !editable;
+
+          obOffscreenCtx.save();
+          obOffscreenCtx.fillStyle = obStyle.fill.replace(/[\d.]+\)$/, '1)');
+          obOffscreenCtx.strokeStyle = shouldHidePolygonStroke ? "transparent" : obStyle.stroke;
+          obOffscreenCtx.lineWidth = shouldHidePolygonStroke ? 0 : 1.5;
+
+          if (isPolygon) {
+            drawPolygon(obOffscreenCtx, hazard, yardToPxX, yardToPxY);
+          } else {
+            drawRectangle(obOffscreenCtx, hazard, yardToPxX, yardToPxY);
+          }
+          obOffscreenCtx.restore();
+        }
+
+        // OBは不透明で描画
+        context.save();
+        context.globalAlpha = 1;
+        context.drawImage(obOffscreenCanvas, 0, 0);
+        context.restore();
+      }
     }
 
     // ピン周囲のグリーン領域を 30 辺のポリゴンで描画。
@@ -975,7 +1062,7 @@ export function HoleMapCanvas({
       context.globalAlpha = 0.94;
       context.fill();
     } else {
-      context.fillStyle = "rgba(187, 247, 208, 0.72)";
+      context.fillStyle = "rgba(34, 197, 94, 0.85)";
       context.fill();
     }
     if (editable) {
@@ -1421,18 +1508,27 @@ export function HoleMapCanvas({
       </div>
       {editable && (
         <div className="pointer-events-none absolute inset-0">
-          {hazards.map((hazard) => {
+          {[...hazards].sort((a, b) => {
+            // Unlocked hazards should appear on top (rendered last)
+            if (a.locked && !b.locked) return -1;
+            if (!a.locked && b.locked) return 1;
+            return 0;
+          }).map((hazard) => {
             const box = metricToPx(hazard);
             if (!box) {
               return null;
             }
 
             const isSelected = selectedHazardId === hazard.id;
+            const isLocked = hazard.locked ?? false;
             const baseClass = isSelected
               ? "border-emerald-900 bg-emerald-300/20"
-              : "border-transparent bg-transparent";
+              : isLocked
+                ? "border-slate-500 bg-slate-300/20"
+                : "border-transparent bg-transparent";
 
             const startDrag = (event: React.PointerEvent<HTMLElement>, mode: DragMode | "vertex", handleOrIndex?: ResizeHandle | number) => {
+              if (isLocked) return;
               if (dragState) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1457,12 +1553,13 @@ export function HoleMapCanvas({
             return (
               <div
                 key={hazard.id}
-                className={`pointer-events-auto absolute border-2 ${baseClass}`}
+                className={`absolute border-2 pointer-events-auto ${baseClass}`}
                 style={{
                   left: `${box.left}px`,
                   top: `${box.top}px`,
                   width: `${box.width}px`,
                   height: `${box.height}px`,
+                  zIndex: isLocked ? 0 : 10,
                 }}
                 onPointerDown={(event) => startDrag(event, "move")}
                 onClick={(event) => {
@@ -1470,14 +1567,15 @@ export function HoleMapCanvas({
                   onSelectHazardId?.(hazard.id);
                 }}
               >
-                {isSelected && (
+                {(isSelected || isLocked) && (
+                  <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
+                    {isLocked ? '🔒 ' : ''}{HAZARD_TYPE_LABEL[hazard.type]}
+                  </div>
+                )}
+                {isSelected && !isLocked && (
                   <>
-                    <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
-                      {buildHazardDisplayName(hazard)}
-                    </div>
                     {hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3 ? (
                       hazard.points.map((pt, idx) => {
-                        // 頂点座標をcanvas座標に変換
                         const px = yardToPxX(pt.x);
                         const py = yardToPxY(pt.y);
                         return (

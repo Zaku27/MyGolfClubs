@@ -46,10 +46,12 @@ const clipPathRenderers = {
   },
 };
 
-function buildGreenPolygonPoints(cx: number, cy: number, radius: number, sides: number) {
+function buildGreenPolygonPoints(cx: number, cy: number, radius: number, sides: number, irregularity: number = 0) {
+  const amount = Math.max(0, Math.min(irregularity, 0.3));
   return Array.from({ length: sides }, (_, index) => {
     const angle = (2 * Math.PI * index) / sides - Math.PI / 2;
-    return `${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`;
+    const randomRatio = 1 + (Math.random() * 2 - 1) * amount;
+    return `${cx + radius * randomRatio * Math.cos(angle)},${cy + radius * randomRatio * Math.sin(angle)}`;
   }).join(" ");
 }
 
@@ -121,6 +123,7 @@ export const GolfCourseMap = ({ hole, extraInfo }: GolfCourseMapProps) => {
                     VIEWBOX_HEIGHT - Math.min(hole.greenRadius ?? 0, VIEWBOX_HEIGHT / 4) - 40,
                     hole.greenRadius ?? 0,
                     GREEN_POLYGON_SIDES,
+                    0.1,
                   )}
                 />
               </clipPath>
