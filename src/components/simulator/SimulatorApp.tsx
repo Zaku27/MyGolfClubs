@@ -64,6 +64,7 @@ function SetupScreen({
   bagClubCount,
   robotClubCount,
   measuredClubCount,
+  measuredPlayableClubCount,
   activeBagName,
   bagId,
   courses,
@@ -75,6 +76,7 @@ function SetupScreen({
   bagClubCount: number;
   robotClubCount: number;
   measuredClubCount: number;
+  measuredPlayableClubCount: number;
   activeBagName?: string;
   bagId?: number | null;
   courses: SelectableCourse[];
@@ -198,12 +200,12 @@ function SetupScreen({
             <button
               type="button"
               onClick={() => setPlayMode("measured")}
-              disabled={measuredClubCount === 0}
+              disabled={measuredPlayableClubCount === 0}
               className={[
                 "rounded-lg border px-4 py-3 text-sm font-semibold transition flex items-center justify-between gap-3",
                 playMode === "measured"
                   ? "border-amber-700 bg-amber-700 text-white shadow-lg shadow-amber-300/50"
-                  : measuredClubCount === 0
+                  : measuredPlayableClubCount === 0
                     ? "border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100",
               ].join(" ")}
@@ -217,8 +219,8 @@ function SetupScreen({
               ? `個人データを使い、${activeBagName ?? "選択中バッグ"}でプレーします。`
               : playMode === "robot"
               ? "ロボット設定で全クラブを使ってプレーします。"
-              : measuredClubCount === 0
-              ? "実測データが登録されていません。パーソナルデータ画面でCSVをインポートしてください。"
+              : measuredPlayableClubCount === 0
+              ? "パター以外の実測データが登録されていません。パーソナルデータ画面でCSVをインポートしてください。"
               : "実測データからランダムにショットを選択してプレーします。"}
           </p>
         </div>
@@ -287,6 +289,9 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
     return filterClubsWithActualShots(bagSimClubs, actualShotRows[String(activeBagId)] ?? []);
   }, [activeBagId, actualShotRows, bagSimClubs]);
 
+  // 実測データモードでプレー可能なクラブ数（パター以外をカウント）
+  const measuredPlayableClubCount = measuredSource.filter(club => club.type !== "Putter").length;
+
   const storedCustomCourses = loadStoredCustomCourse();
   const selectableCourses = buildSelectableCourses(storedCustomCourses.courses);
   const [selectedCourseId, setSelectedCourseId] = useState<string>(() => storedCustomCourses.selectedCourseId);
@@ -312,6 +317,7 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
         bagClubCount={bagSource.length}
         robotClubCount={robotSource.length}
         measuredClubCount={measuredSource.length}
+        measuredPlayableClubCount={measuredPlayableClubCount}
         activeBagName={activeBagName}
         bagId={bagId}
         courses={selectableCourses}
