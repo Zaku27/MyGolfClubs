@@ -1,11 +1,29 @@
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
 import type { GolfBag, GolfClub, ClubPersonalData } from '../types/golf';
+import type { ClubUsageStat, HoleScore } from '../types/game';
+import type { KeyRoundStats } from '../utils/roundAnalysis';
 
 interface AppSettings {
   id: 'app';
   playerSkillLevel: number;
   activeBagId?: number;
+}
+
+export interface RoundHistory {
+  id?: number;
+  completedAt: string;
+  courseName: string;
+  courseHoleCount: number;
+  playMode: 'bag' | 'robot' | 'measured';
+  bagId?: number;
+  totalScore: number;
+  totalPar: number;
+  perHoleResults: HoleScore[];
+  clubUsageStats: ClubUsageStat[];
+  keyStats: Pick<KeyRoundStats, 'totalStrokes' | 'girPercent' | 'fairwayHitPercent' | 'puttsPerHole'>;
+  isFavorite: boolean;
+  roundSeedNonce: string;
 }
 
 export class GolfBagDatabase extends Dexie {
@@ -14,6 +32,7 @@ export class GolfBagDatabase extends Dexie {
   personalData!: Table<ClubPersonalData>;
   actualShotRows!: Table<{ bagId: number; rows: Array<Record<string, string>> }>;
   appSettings!: Table<AppSettings>;
+  roundHistory!: Table<RoundHistory>;
 
   constructor() {
     super('golfbag-db');
@@ -146,6 +165,15 @@ export class GolfBagDatabase extends Dexie {
           bag.swingWeightTarget = bag.swingWeightTarget + 30;
         }
       });
+    });
+    // v10: add roundHistory table for storing round statistics
+    this.version(10).stores({
+      clubs: '++id, name',
+      golfBags: '++id, name, createdAt',
+      personalData: 'clubId',
+      actualShotRows: 'bagId',
+      appSettings: 'id',
+      roundHistory: '++id, completedAt, playMode, isFavorite, bagId',
     });
   }
 }

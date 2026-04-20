@@ -10,6 +10,7 @@ import { cloneCourse } from "../../utils/courseGenerator";
 import { loadStoredCustomCourse, type CustomCoursePreset } from "./CustomCourseEditorScreen";
 import { HoleView } from "./HoleView";
 import { filterClubsWithActualShots } from "../../utils/actualShotFilter";
+import { PostRoundAnalysis } from "./PostRoundAnalysis";
 
 import { Scorecard } from "./Scorecard";
 
@@ -101,6 +102,12 @@ function SetupScreen({
             <span className="text-sm font-bold text-emerald-900">コースシミュレーター</span>
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
+            <Link
+              to={`/round-history${bagQuery}`}
+              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
+            >
+              統計
+            </Link>
             <Link
               to={`/range${bagQuery}`}
               className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
@@ -270,6 +277,7 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
     phase,
     startRound,
     resetGame,
+    playMode,
   } = useGameStore();
   const [showDetailedScorecard, setShowDetailedScorecard] = useState(false);
   const bagSource = selectedClubs;
@@ -335,6 +343,19 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
           onBack={() => { setShowDetailedScorecard(false); resetGame(); onBack(); }}
         />
       </div>
+    );
+  }
+
+  if (phase === "round_complete") {
+    return (
+      <PostRoundAnalysis
+        onPlayAnotherRound={() => { setShowDetailedScorecard(false); resetGame(); }}
+        onViewDetailedScorecard={() => { setShowDetailedScorecard(true); }}
+        onBackToMenu={() => { resetGame(); onBack(); }}
+        courseName={selectedCourse?.name}
+        bagId={bagId}
+        playMode={playMode}
+      />
     );
   }
 

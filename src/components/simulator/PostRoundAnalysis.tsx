@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useGameStore } from "../../store/gameStore";
 import {
   buildInsights,
@@ -6,11 +6,15 @@ import {
   estimatePredictedScore,
   getPerformanceSummary,
 } from "../../utils/roundAnalysis";
+import { RoundHistoryService } from "../../db/roundHistoryService";
 
 interface Props {
   onPlayAnotherRound: () => void;
   onViewDetailedScorecard: () => void;
   onBackToMenu: () => void;
+  courseName?: string;
+  bagId?: number | null;
+  playMode?: 'bag' | 'robot' | 'measured';
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
@@ -43,13 +47,13 @@ function ClubStatList({
                 <span className={`text-sm font-bold ${accentClass}`}>{club.successRate}%</span>
               </div>
               <p className="mt-1 text-xs text-emerald-300">
-                Used {club.timesUsed} times | Avg distance {club.avgDistanceAchieved} yds
+                {club.timesUsed}回使用 | 平均飛距離 {club.avgDistanceAchieved}yd
               </p>
             </div>
           ))
         ) : (
           <p className="rounded-xl border border-emerald-700/35 bg-emerald-900/30 px-3 py-3 text-sm text-emerald-300">
-            No round data available.
+            ラウンドデータがありません。
           </p>
         )}
       </div>
@@ -110,8 +114,12 @@ export function PostRoundAnalysis({
   onPlayAnotherRound,
   onViewDetailedScorecard,
   onBackToMenu,
+  courseName,
+  bagId,
+  playMode,
 }: Props) {
-  const { finalScore, perHoleResults, clubUsageStats, course, roundShots } = useGameStore();
+  const { finalScore, perHoleResults, clubUsageStats, course, roundShots, roundSeedNonce } = useGameStore();
+  const [skipSave, setSkipSave] = useState(false);
 
   const analysis = useMemo(() => {
     const totalPar = perHoleResults.reduce((sum, hole) => sum + hole.par, 0);
@@ -154,24 +162,53 @@ export function PostRoundAnalysis({
     };
   }, [clubUsageStats, course, finalScore, perHoleResults, roundShots]);
 
+  // ラウンド保存ハンドラー
+  const handleSaveAndNavigate = async (callback: () => void) => {
+    if (!skipSave) {
+      try {
+        await RoundHistoryService.saveRound({
+          courseName: courseName || '不明なコース',
+          courseHoleCount: course.length,
+          playMode: playMode || 'bag',
+          bagId: bagId ?? undefined,
+          totalScore: analysis.final,
+          totalPar: analysis.totalPar,
+          perHoleResults: perHoleResults,
+          clubUsageStats: clubUsageStats,
+          keyStats: {
+            totalStrokes: analysis.keyStats.totalStrokes,
+            girPercent: analysis.keyStats.girPercent,
+            fairwayHitPercent: analysis.keyStats.fairwayHitPercent,
+            puttsPerHole: analysis.keyStats.puttsPerHole,
+          },
+          isFavorite: false,
+          roundSeedNonce: roundSeedNonce,
+        });
+      } catch (error) {
+        console.error('Failed to save round:', error);
+      }
+    }
+    callback();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-950 via-green-900 to-green-950 px-4 py-6 text-emerald-50 sm:px-6 sm:py-8">
       <div className="mx-auto w-full max-w-5xl space-y-5 sm:space-y-6">
         <header className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 px-5 py-6 shadow-2xl shadow-emerald-950/40 sm:px-7 sm:py-7">
-          <p className="text-xs uppercase tracking-[0.24em] text-emerald-300">Round Complete</p>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">Round Analysis</h1>
+          <p className="text-xs uppercase tracking-[0.24em] text-emerald-300">ラウンド完了</p>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">ラウンド分析</h1>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">Final Score</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">最終スコア</p>
               <p className="mt-2 text-5xl font-black leading-none text-emerald-50">{analysis.final}</p>
-              <p className="mt-2 text-sm text-emerald-200">PAR {analysis.totalPar}</p>
+              <p className="mt-2 text-sm text-emerald-200">パー {analysis.totalPar}</p>
             </div>
 
             <div className="rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">Overall Result</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">全体結果</p>
               <p className="mt-2 text-xl font-bold text-emerald-50">
-                {analysis.final} (Predicted {analysis.predicted.predicted} +- {analysis.predicted.variance})
+                {analysis.final} (予測 {analysis.predicted.predicted} ± {analysis.predicted.variance})
               </p>
               <p className={`mt-3 text-base font-bold ${analysis.performance.toneClass}`}>
                 {analysis.performance.label}
@@ -183,22 +220,22 @@ export function PostRoundAnalysis({
         </header>
 
         <section className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 p-5 sm:p-6">
-          <h2 className="text-xl font-bold text-emerald-50">Key Stats</h2>
+          <h2 className="text-xl font-bold text-emerald-50">主要統計</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Total Strokes" value={String(analysis.keyStats.totalStrokes)} />
-            <StatCard label="Greens in Regulation" value={`${analysis.keyStats.girPercent}%`} />
-            <StatCard label="Fairways Hit" value={`${analysis.keyStats.fairwayHitPercent}%`} />
-            <StatCard label="Putts per Hole" value={analysis.keyStats.puttsPerHole.toFixed(2)} />
+            <StatCard label="総ストローク数" value={String(analysis.keyStats.totalStrokes)} />
+            <StatCard label="GIR" value={`${analysis.keyStats.girPercent}%`} />
+            <StatCard label="フェアウェイキープ" value={`${analysis.keyStats.fairwayHitPercent}%`} />
+            <StatCard label="パット数/ホール" value={analysis.keyStats.puttsPerHole.toFixed(2)} />
           </div>
         </section>
 
         <section className="grid gap-4 lg:grid-cols-2">
-          <ClubStatList title="Top 3 Best Clubs" items={analysis.bestClubs} accentClass="text-emerald-300" />
-          <ClubStatList title="Top 3 Struggling Clubs" items={analysis.strugglingClubs} accentClass="text-rose-300" />
+          <ClubStatList title="ベストクラブTOP3" items={analysis.bestClubs} accentClass="text-emerald-300" />
+          <ClubStatList title="苦戦クラブTOP3" items={analysis.strugglingClubs} accentClass="text-rose-300" />
         </section>
 
         <section className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 p-5 sm:p-6">
-          <h2 className="text-xl font-bold text-emerald-50">Insights & Suggestions</h2>
+          <h2 className="text-xl font-bold text-emerald-50">分析と提案</h2>
           <ul className="mt-3 space-y-2">
             {analysis.insights.map((insight) => (
               <li
@@ -211,28 +248,41 @@ export function PostRoundAnalysis({
           </ul>
         </section>
 
-        <footer className="grid gap-3 pb-4 sm:grid-cols-3">
-          <button
-            type="button"
-            onClick={onPlayAnotherRound}
-            className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
-          >
-            Play Another Round
-          </button>
-          <button
-            type="button"
-            onClick={onViewDetailedScorecard}
-            className="rounded-xl border border-emerald-400/60 bg-emerald-900/40 px-4 py-3 text-sm font-bold text-emerald-100 transition hover:border-emerald-300"
-          >
-            View Detailed Scorecard
-          </button>
-          <button
-            type="button"
-            onClick={onBackToMenu}
-            className="rounded-xl border border-emerald-700/70 bg-transparent px-4 py-3 text-sm font-bold text-emerald-300 transition hover:border-emerald-400 hover:text-emerald-100"
-          >
-            Back to Menu
-          </button>
+        <footer className="space-y-4 pb-4">
+          {/* 統計保存チェックボックス */}
+          <label className="flex items-center justify-center gap-2 text-sm text-emerald-200">
+            <input
+              type="checkbox"
+              checked={skipSave}
+              onChange={(e) => setSkipSave(e.target.checked)}
+              className="h-4 w-4 rounded border-emerald-500 bg-emerald-900 text-emerald-500 focus:ring-emerald-500"
+            />
+            統計に保存しない
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => handleSaveAndNavigate(onPlayAnotherRound)}
+              className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+            >
+              もう一度プレー
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveAndNavigate(onViewDetailedScorecard)}
+              className="rounded-xl border border-emerald-400/60 bg-emerald-900/40 px-4 py-3 text-sm font-bold text-emerald-100 transition hover:border-emerald-300"
+            >
+              詳細スコアカードを見る
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveAndNavigate(onBackToMenu)}
+              className="rounded-xl border border-emerald-700/70 bg-transparent px-4 py-3 text-sm font-bold text-emerald-300 transition hover:border-emerald-400 hover:text-emerald-100"
+            >
+              メニューに戻る
+            </button>
+          </div>
         </footer>
       </div>
     </div>
