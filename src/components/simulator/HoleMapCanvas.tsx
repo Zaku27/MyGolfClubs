@@ -97,6 +97,9 @@ const HAZARD_TEXTURE_ORDER: TextureKey[] = [
   "water",
 ];
 
+const TEE_GROUND_WIDTH = 20;
+const TEE_GROUND_HEIGHT = 30;
+const TEE_GROUND_CORNER_RADIUS = 2;
 const MIN_CANVAS_HEIGHT = 280;
 const COURSE_WIDTH_YARDS = 400;
 const DEFAULT_GREEN_RADIUS = 12;
@@ -377,6 +380,45 @@ function drawHighlightPoint(
   context.fill();
   context.stroke();
   context.restore();
+}
+
+function drawRoundedRectangle(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const topBump = Math.min(6, width * 0.03, height * 0.05);
+  const bottomBump = topBump * 0.8;
+  const sideBump = Math.min(4, width * 0.02, height * 0.04);
+  const centerY = y + height / 2;
+  const rightX = x + width;
+  const bottomMidX = x + width * 0.5;
+
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.lineTo(x + width * 0.55, y);
+  context.quadraticCurveTo(bottomMidX, y - topBump, x + width - r, y);
+  context.quadraticCurveTo(rightX, y, rightX, y + r);
+  context.lineTo(rightX, centerY - 8);
+  context.quadraticCurveTo(rightX + sideBump, centerY, rightX, centerY + 8);
+  context.lineTo(rightX, y + height - r);
+  context.quadraticCurveTo(rightX, y + height, x + width - r, y + height);
+  context.lineTo(x + width * 0.45, y + height);
+  context.quadraticCurveTo(bottomMidX, y + height + bottomBump, x + r, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - r);
+  context.lineTo(x, centerY + 8);
+  context.quadraticCurveTo(x - sideBump, centerY, x, centerY - 8);
+  context.lineTo(x, y + r);
+  context.quadraticCurveTo(x, y, x + r, y);
+  context.closePath();
+  context.fill();
+  if (context.lineWidth > 0 && context.strokeStyle !== "transparent") {
+    context.stroke();
+  }
 }
 
 export function HoleMapCanvas({
@@ -783,6 +825,38 @@ export function HoleMapCanvas({
       context.fillRect(padding.left, padding.top, drawWidth, drawHeight);
     }
 
+    const teeGroundLeft = yardToPxX(-TEE_GROUND_WIDTH / 2);
+    const teeGroundRight = yardToPxX(TEE_GROUND_WIDTH / 2);
+    const teeGroundTop = yardToPxY(TEE_GROUND_HEIGHT / 2);
+    const teeGroundBottom = yardToPxY(-TEE_GROUND_HEIGHT / 2);
+    const teeGroundWidthPx = teeGroundRight - teeGroundLeft;
+    const teeGroundHeightPx = teeGroundBottom - teeGroundTop;
+    const teeGroundPattern = shouldUseTextures ? createTexturePattern(context, "teeground") : null;
+
+    context.save();
+    if (teeGroundPattern) {
+      context.fillStyle = teeGroundPattern;
+      context.globalAlpha = 0.92;
+    } else {
+      context.fillStyle = "rgba(187, 247, 208, 0.72)";
+    }
+    if (editable) {
+      context.strokeStyle = "rgba(16, 185, 129, 0.85)";
+      context.lineWidth = 1.2;
+    } else {
+      context.strokeStyle = "transparent";
+      context.lineWidth = 0;
+    }
+    drawRoundedRectangle(
+      context,
+      teeGroundLeft,
+      teeGroundTop,
+      teeGroundWidthPx,
+      teeGroundHeightPx,
+      Math.min(TEE_GROUND_CORNER_RADIUS * yardScale, teeGroundWidthPx / 2, teeGroundHeightPx / 2),
+    );
+    context.restore();
+
     context.save();
     context.lineWidth = 1;
     context.font = "11px sans-serif";
@@ -1161,7 +1235,7 @@ export function HoleMapCanvas({
   const updateHazardByDrag = (state: DragState, clientX: number, clientY: number) => {
     const metrics = metricsRef.current;
     if (!metrics) return;
-    const yardPerPx = 1 / metrics.yardScale;
+    const yardPerPx = 1 / (metrics.yardScale * viewport.scale);
     const deltaX = (clientX - state.startClientX) * yardPerPx;
     const deltaY = -(clientY - state.startClientY) * yardPerPx;
 
@@ -1377,7 +1451,7 @@ export function HoleMapCanvas({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
-  }, [dragState, hazards]);
+  }, [dragState, hazards, viewport]);
 
   // --- ポリゴン作成用canvasクリックイベント ---
   const convertScreenPointToYardPoint = (event: React.MouseEvent<HTMLCanvasElement>) => {
