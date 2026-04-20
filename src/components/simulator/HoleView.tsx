@@ -553,32 +553,30 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         {/* ショット操作グループ */}
         <section className={["mt-8 w-full max-w-md mx-auto flex flex-col gap-5", isGreenLie || (selectedClub?.type === "Putter") ? "items-center" : "items-stretch", "lg:max-w-none lg:flex-row lg:items-center"].join(" ")}>
           {/* 狙い調整スライダー */}
-          {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
-            <div className={["w-full rounded-xl border px-3 py-3 lg:flex-1", selectedClub && !isResultActionVisible ? "border-sky-400/80 bg-sky-50/90" : "border-sky-300/70 bg-sky-50/80"].join(" ")}>
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
-                <span>方向</span>
-                <span>
-                  {aimXOffset > 0 ? `右 ${aimXOffset}yd` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}yd` : "中央"}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={-50}
-                max={50}
-                step={1}
-                value={aimXOffset}
-                onChange={e => setAimXOffset(Number(e.target.value))}
-                className={["h-1.5 w-full appearance-none rounded-full", selectedClub && !isResultActionVisible ? "cursor-pointer bg-sky-200 accent-sky-600" : "cursor-not-allowed bg-sky-100 accent-sky-300"].join(" ")}
-                aria-label="方向"
-                disabled={!selectedClub || isResultActionVisible}
-              />
-              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-sky-700">
-                <span>左 50y</span>
-                <span>中央</span>
-                <span>右 50y</span>
-              </div>
+          <div className={["w-full rounded-xl border px-3 py-3 lg:flex-1", selectedClub && !isResultActionVisible && !isGreenLie && selectedClub.type !== "Putter" ? "border-sky-400/80 bg-sky-50/90" : "border-sky-300/70 bg-sky-50/80"].join(" ")}>
+            <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-sky-800">
+              <span>方向</span>
+              <span>
+                {aimXOffset > 0 ? `右 ${aimXOffset}yd` : aimXOffset < 0 ? `左 ${Math.abs(aimXOffset)}yd` : "中央"}
+              </span>
             </div>
-          ) : null}
+            <input
+              type="range"
+              min={-50}
+              max={50}
+              step={1}
+              value={aimXOffset}
+              onChange={e => setAimXOffset(Number(e.target.value))}
+              className={["h-1.5 w-full appearance-none rounded-full", selectedClub && !isResultActionVisible && !isGreenLie && selectedClub.type !== "Putter" ? "cursor-pointer bg-sky-200 accent-sky-600" : "cursor-not-allowed bg-sky-100 accent-sky-300"].join(" ")}
+              aria-label="方向"
+              disabled={!selectedClub || isResultActionVisible || isGreenLie || selectedClub?.type === "Putter"}
+            />
+            <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-sky-700">
+              <span>左 50y</span>
+              <span>中央</span>
+              <span>右 50y</span>
+            </div>
+          </div>
 
           {/* ショットボタン */}
           <button
@@ -602,30 +600,28 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           </button>
 
           {/* パワー調整スライダー */}
-          {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
-            <div className={["w-full rounded-xl border px-3 py-3 lg:flex-1", selectedClub && !isResultActionVisible ? "border-emerald-400/80 bg-emerald-100/90" : "border-emerald-300/70 bg-emerald-100/70"].join(" ")}>
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-emerald-800">
-                <span>パワー</span>
-                <span>{shotPowerPercent}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={110}
-                step={1}
-                value={shotPowerPercent}
-                onChange={e => setShotPowerPercent(Number(e.target.value))}
-                className={["h-1.5 w-full appearance-none rounded-full", selectedClub && !isResultActionVisible ? "cursor-pointer bg-emerald-200 accent-emerald-600" : "cursor-not-allowed bg-emerald-100 accent-emerald-300"].join(" ")}
-                aria-label="ショットパワー"
-                disabled={!selectedClub || isResultActionVisible}
-              />
-              <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
-                <span>0%</span>
-
-                <span>110%</span>
-              </div>
+          <div className={["w-full rounded-xl border px-3 py-3 lg:flex-1", selectedClub && !isResultActionVisible && !isGreenLie && selectedClub.type !== "Putter" ? "border-emerald-400/80 bg-emerald-100/90" : "border-emerald-300/70 bg-emerald-100/70"].join(" ")}>
+            <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-[0.08em] text-emerald-800">
+              <span>パワー</span>
+              <span>{shotPowerPercent}%</span>
             </div>
-          ) : null}
+            <input
+              type="range"
+              min={0}
+              max={110}
+              step={1}
+              value={shotPowerPercent}
+              onChange={e => setShotPowerPercent(Number(e.target.value))}
+              className={["h-1.5 w-full appearance-none rounded-full", selectedClub && !isResultActionVisible && !isGreenLie && selectedClub.type !== "Putter" ? "cursor-pointer bg-emerald-200 accent-emerald-600" : "cursor-not-allowed bg-emerald-100 accent-emerald-300"].join(" ")}
+              aria-label="ショットパワー"
+              disabled={!selectedClub || isResultActionVisible || isGreenLie || selectedClub?.type === "Putter"}
+            />
+            <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
+              <span>0%</span>
+
+              <span>110%</span>
+            </div>
+          </div>
 
         </section>
 
