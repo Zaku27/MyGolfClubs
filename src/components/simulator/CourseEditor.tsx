@@ -23,6 +23,7 @@ const HAZARD_TYPE_LABEL: Record<HazardType, string> = {
   rough: "ラフ",
   semirough: "セミラフ",
   bareground: "ベアグラウンド",
+  teeground: "ティーグラウンド",
 };
 
 function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number) {
@@ -166,10 +167,11 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     if (!selectedHole) return;
     const holeLength = selectedHole.targetDistance ?? selectedHole.distanceFromTee;
     const centerX = xCenterOverride ?? 0;
+    const cappedRadiusY = Math.min(radiusY, 100);
     const centerY = yFrontOverride !== undefined
-      ? yFrontOverride + radiusY
+      ? yFrontOverride + cappedRadiusY
       : Math.max(10, Math.round(holeLength * 0.35)) + 9;
-    const points = buildDefaultPolygonPoints(centerX, centerY, radiusX, radiusY, sides, irregularity);
+    const points = buildDefaultPolygonPoints(centerX, centerY, radiusX, cappedRadiusY, sides, irregularity);
     const bounds = {
       x: Math.min(...points.map((p) => p.x)),
       y: Math.min(...points.map((p) => p.y)),
@@ -352,6 +354,11 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     addPolygonHazard(12, 100, 12, "bareground", -75, 0, 0.12);
   };
 
+  const addTeeGroundHazard = () => {
+    if (!selectedHole) return;
+    addPolygonHazard(12, 12, 12, "teeground", 0, 0, 0.12);
+  };
+
   const addRoughHazard = () => {
     if (!selectedHole) return;
     addPolygonHazard(12.5, 75, 8, "rough", -40, 0, 0.1);
@@ -422,7 +429,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         ))}
       </div>
 
-      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* 左側：編集部分 */}
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
@@ -583,6 +590,13 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={addTeeGroundHazard}
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+              >
+                ティーグランド
+              </button>
               <button
                 type="button"
                 onClick={addBaregroundHazard}
