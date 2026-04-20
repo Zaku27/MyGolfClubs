@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
-import type { Hole, Hazard, HazardType } from "../../types/game";
+import type { Hole, Hazard } from "../../types/game";
 import type { LandingResult } from "../../utils/landingPosition";
 import { buildAutoHazardName } from "../../utils/shotOutcome";
 import { getHazardStyle } from "./hazardStyle";
@@ -97,8 +97,8 @@ const HAZARD_TEXTURE_ORDER: TextureKey[] = [
   "water",
 ];
 
-const TEE_GROUND_WIDTH = 20;
-const TEE_GROUND_HEIGHT = 30;
+const TEE_GROUND_WIDTH = 12;
+const TEE_GROUND_HEIGHT = 18;
 const TEE_GROUND_CORNER_RADIUS = 2;
 const MIN_CANVAS_HEIGHT = 280;
 const COURSE_WIDTH_YARDS = 400;
@@ -106,15 +106,6 @@ const DEFAULT_GREEN_RADIUS = 12;
 const GREEN_SELECTION_ID = "__green__";
 const GREEN_POLYGON_SIDES = 20;
 
-const HAZARD_TYPE_LABEL: Record<HazardType, string> = {
-  bunker: "バンカー",
-  water: "ウォーター",
-  ob: "OB",
-  rough: "ラフ",
-  semirough: "セミラフ",
-  bareground: "ベアグラウンド",
-  teeground: "ティーグラウンド",
-};
 const MIN_HAZARD_WIDTH = 8;
 const MIN_HAZARD_DEPTH = 6;
 const EDITABLE_HAZARD_MAX_X = 200;
@@ -501,9 +492,9 @@ export function HoleMapCanvas({
       hazards,
       useExtendedYAxis ? [] : absoluteShots,
     );
-    const editableYOffset = targetDistance * 0.12;
-    const minYardY = (editable || useExtendedYAxis) ? -editableYOffset : -15;
-    const effectiveMaxYardY = (editable || useExtendedYAxis) ? editableYOffset : (useExtendedYAxis ? Math.min(maxYardY, targetDistance + 80) : maxYardY);
+    const EDITABLE_Y_AXIS_OFFSET_YARDS = 25;
+    const minYardY = (editable || useExtendedYAxis) ? -EDITABLE_Y_AXIS_OFFSET_YARDS : -TEE_GROUND_HEIGHT / 2;
+    const effectiveMaxYardY = maxYardY;
     const yardRange = effectiveMaxYardY - minYardY;
     const yardScale = Math.min(drawWidth / (halfYardX * 2), drawHeight / yardRange);
     const offsetX = padding.left + (drawWidth - halfYardX * 2 * yardScale) / 2;
@@ -1568,11 +1559,6 @@ export function HoleMapCanvas({
                   onSelectHazardId?.(hazard.id);
                 }}
               >
-                {(isSelected || isLocked) && (
-                  <div className="pointer-events-none absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded bg-emerald-950/75 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-white">
-                    {isLocked ? '🔒 ' : ''}{HAZARD_TYPE_LABEL[hazard.type]}
-                  </div>
-                )}
                 {isSelected && !isLocked && (
                   <>
                     {hazard.shape === "polygon" && Array.isArray(hazard.points) && hazard.points.length >= 3 ? (

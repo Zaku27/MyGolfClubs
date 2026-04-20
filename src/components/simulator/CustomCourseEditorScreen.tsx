@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import type { Hole } from "../../types/game";
 import { CourseEditor } from "./CourseEditor";
@@ -103,7 +103,7 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
 
     const raw = hole as Partial<Hole>;
     const par = raw.par === 3 || raw.par === 4 || raw.par === 5 ? raw.par : 4;
-    const distance = Math.max(80, Math.min(700, Number(raw.distanceFromTee) || 360));
+    const distance = Number(raw.distanceFromTee) || 360;
     const greenRadius = Math.max(6, Math.min(25, Number(raw.greenRadius) || 12));
     const hazards = Array.isArray(raw.hazards)
       ? raw.hazards
@@ -350,13 +350,6 @@ export function CustomCourseEditorScreen() {
 
   const selectedCustomCourseIndex = savedCustomCourses.findIndex((course) => course.id === selectedCustomCourseId);
 
-  useEffect(() => {
-    writeStoredJson(CUSTOM_COURSE_STORAGE_KEY, {
-      selectedCourseId: selectedCustomCourseId,
-      courses: savedCustomCourses,
-    } satisfies CustomCourseStorage);
-  }, [savedCustomCourses, selectedCustomCourseId]);
-
   const handleChangeHoleCount = (holeCount: 1 | 3 | 9 | 18) => {
     setCustomHoleCount(holeCount);
     const randomized = generateRandomCourse(holeCount);
@@ -392,18 +385,25 @@ export function CustomCourseEditorScreen() {
   const handleSaveOverwrite = () => {
     const name = createUniqueCourseName(customNameInput, savedCustomCourses, selectedCustomCourseId);
 
-    setSavedCustomCourses((prev) => prev.map((course) => {
-      if (course.id !== selectedCustomCourseId) {
-        return course;
-      }
+    setSavedCustomCourses((prev) => {
+      const next = prev.map((course) => {
+        if (course.id !== selectedCustomCourseId) {
+          return course;
+        }
 
-      return {
-        ...course,
-        name,
-        holeCount: customHoleCount,
-        course: cloneCourse(customCourse),
-      };
-    }));
+        return {
+          ...course,
+          name,
+          holeCount: customHoleCount,
+          course: cloneCourse(customCourse),
+        };
+      });
+      writeStoredJson(CUSTOM_COURSE_STORAGE_KEY, {
+        selectedCourseId: selectedCustomCourseId,
+        courses: next,
+      } satisfies CustomCourseStorage);
+      return next;
+    });
     setCustomNameInput(name);
   };
 

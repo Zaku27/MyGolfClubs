@@ -14,7 +14,7 @@ export interface SimClub {
 }
 
 // ─── Hazard model ─────────────────────────────────────────────────────────────
-export type HazardType = "bunker" | "water" | "ob" | "rough" | "semirough" | "bareground" | "teeground";
+export type HazardType = "bunker" | "water" | "ob" | "rough" | "semirough" | "bareground";
 export type HazardShape = "rectangle" | "polygon";
 
 export interface Hazard {

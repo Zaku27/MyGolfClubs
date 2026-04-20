@@ -23,7 +23,6 @@ const HAZARD_TYPE_LABEL: Record<HazardType, string> = {
   rough: "ラフ",
   semirough: "セミラフ",
   bareground: "ベアグラウンド",
-  teeground: "ティーグラウンド",
 };
 
 function normalizeSlopeForDisplay(slopeAngle: number, slopeDirection: number) {
@@ -113,7 +112,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
   const [polygonCreationMode, setPolygonCreationMode] = useState(false);
   const [polygonDraftPoints, setPolygonDraftPoints] = useState<Array<{ x: number; y: number }>>([]);
-  const [distanceInputValue, setDistanceInputValue] = useState<string>(() => holes[0]?.distanceFromTee.toString() ?? "");
+  const [distanceInputValue, setDistanceInputValue] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
 
   const safeHoleIndex = Math.max(0, Math.min(selectedHoleIndex, holes.length - 1));
@@ -122,7 +121,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   useEffect(() => {
     if (!selectedHole) return;
     setDistanceInputValue(String(selectedHole.distanceFromTee));
-  }, [selectedHole?.number, selectedHole?.distanceFromTee]);
+  }, [safeHoleIndex, selectedHole?.distanceFromTee]);
 
   const selectedHazard = useMemo(
     () => selectedHole?.hazards?.find((hazard) => hazard.id === selectedHazardId) ?? null,
@@ -354,14 +353,9 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     addPolygonHazard(12, 100, 12, "bareground", -75, 0, 0.12);
   };
 
-  const addTeeGroundHazard = () => {
-    if (!selectedHole) return;
-    addPolygonHazard(12, 12, 12, "teeground", 0, 0, 0.12);
-  };
-
   const addRoughHazard = () => {
     if (!selectedHole) return;
-    addPolygonHazard(12.5, 75, 8, "rough", -40, 0, 0.1);
+    addPolygonHazard(12.5, 60, 10, "rough", -40, 0, 0.1);
   };
 
   const addLargeRoughHazard = () => {
@@ -457,15 +451,18 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
                 max={700}
                 value={distanceInputValue}
                 onChange={(event) => {
+                  setDistanceInputValue(event.target.value);
+                }}
+                onBlur={(event) => {
                   const raw = event.target.value;
-                  setDistanceInputValue(raw);
-
                   const parsed = Number(raw);
                   if (raw.trim() === "" || Number.isNaN(parsed)) {
+                    setDistanceInputValue(String(selectedHole?.distanceFromTee ?? ""));
                     return;
                   }
 
                   const distance = Math.max(30, Math.min(700, parsed));
+                  setDistanceInputValue(String(distance));
                   updateHole((hole) => ({ ...hole, distanceFromTee: distance, targetDistance: distance }));
                 }}
                 className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5"
@@ -590,13 +587,6 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={addTeeGroundHazard}
-                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
-              >
-                ティーグランド
-              </button>
               <button
                 type="button"
                 onClick={addBaregroundHazard}

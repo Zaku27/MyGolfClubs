@@ -591,7 +591,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               }
             }}
             className={[
-              "w-full max-w-xs lg:flex-1 rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
+              "w-full max-w-xs lg:w-48 rounded-2xl px-4 py-8 text-2xl font-black tracking-[0.08em] transition",
               "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/70",
               selectedClub && !shotInProgress && !isResultActionVisible
                 ? "bg-emerald-600 text-white shadow-lg shadow-emerald-300/70 hover:bg-emerald-500"
