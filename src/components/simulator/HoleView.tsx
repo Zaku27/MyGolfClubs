@@ -551,7 +551,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         {/* おすすめクラブセクション ...existing code... */}
 
         {/* ショット操作グループ */}
-        <section className="mt-8 w-full max-w-md mx-auto flex flex-col gap-5 items-stretch lg:max-w-none lg:flex-row lg:items-center">
+        <section className={["mt-8 w-full max-w-md mx-auto flex flex-col gap-5", isGreenLie || (selectedClub?.type === "Putter") ? "items-center" : "items-stretch", "lg:max-w-none lg:flex-row lg:items-center"].join(" ")}>
           {/* 狙い調整スライダー */}
           {!isGreenLie && (!selectedClub?.type || selectedClub.type !== "Putter") ? (
             <div className={["w-full rounded-xl border px-3 py-3 lg:flex-1", selectedClub && !isResultActionVisible ? "border-sky-400/80 bg-sky-50/90" : "border-sky-300/70 bg-sky-50/80"].join(" ")}>

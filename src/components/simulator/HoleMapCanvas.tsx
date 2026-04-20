@@ -502,7 +502,7 @@ export function HoleMapCanvas({
       useExtendedYAxis ? [] : absoluteShots,
     );
     const minYardY = (editable || useExtendedYAxis) ? -EDITABLE_Y_AXIS_OFFSET_YARDS : -TEE_GROUND_HEIGHT / 2;
-    const effectiveMaxYardY = maxYardY;
+    const effectiveMaxYardY = useExtendedYAxis ? Math.min(maxYardY, targetDistance + 80) : maxYardY;
     const yardRange = effectiveMaxYardY - minYardY;
     const yardScale = Math.min(drawWidth / (halfYardX * 2), drawHeight / yardRange);
     const offsetX = padding.left + (drawWidth - halfYardX * 2 * yardScale) / 2;
