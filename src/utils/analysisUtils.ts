@@ -155,14 +155,47 @@ export const getClubCategoryByType = (clubType: string): ClubCategory => {
 export const getClubCategory = (club: GolfClub): ClubCategory =>
   getClubCategoryByType(club.clubType ?? '');
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 定数・設定値
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 低ロフトペナルティ関連定数 */
 const LOW_LOFT_PENALTY_LIMIT = 18;
 const LOW_LOFT_PENALTY_REFERENCE = 10.5;
 const LOW_LOFT_MAX_PENALTY = 20;
 const LOW_LOFT_SPEED_RELIEF = 0.14;
+const LOW_LOFT_SPEED_RELIEF_THRESHOLD = 30;
+
+/** ドライバーブースト関連定数 */
 const DRIVER_BOOST_RAMP_START = 43;
 const DRIVER_BOOST_RAMP_END = 45;
 const DRIVER_BOOST_AT_45 = 10.5;
 const DRIVER_BOOST_ABOVE_45_PER_SPEED = 4;
+
+/** 重さ回帰分析定数 */
+const WEIGHT_REGRESSION_FALLBACK_SLOPE = -8;
+const WEIGHT_REGRESSION_FALLBACK_INTERCEPT = 620;
+const WEIGHT_REGRESSION_MIN_SLOPE = -1;
+const WEIGHT_DOT_RADIUS_DRIVER_PUTTER = 6.5;
+const WEIGHT_DOT_RADIUS_DEFAULT = 5.8;
+
+/** ロフト回帰分析定数 */
+const LOFT_REGRESSION_FALLBACK_SLOPE = -7.2;
+const LOFT_REGRESSION_FALLBACK_INTERCEPT = 86;
+const LOFT_REGRESSION_MIN_SLOPE = -4;
+const LOFT_REGRESSION_MAX_SLOPE = -10;
+
+/** ライ角回帰分析定数 */
+const LIE_REGRESSION_FALLBACK_SLOPE = -1.4;
+const LIE_REGRESSION_FALLBACK_INTERCEPT = 72;
+const LIE_REGRESSION_MIN_SLOPE = -0.5;
+const LIE_REGRESSION_MAX_SLOPE = -2.5;
+
+/** 推定計算定数 */
+const ESTIMATION_REFERENCE_HEAD_SPEED = 44.5;
+const ESTIMATION_MIN_HEAD_SPEED_FOR_BOOST = 30;
+const ESTIMATION_CLAMP_MIN = 0;
+const ESTIMATION_CLAMP_MAX = 1;
 
 export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
   // 44.5m/sで調整した値を基準に、他ヘッドスピードでも自然に追従させる
@@ -171,10 +204,10 @@ export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
 
   const model = DISTANCE_MODELS[category];
 
-  // 標準式: base + (headSpeed - 44.5) * speedCoeff + (loftAngle - 標準値) * loftCoeff
+  // 標準式: base + (headSpeed - reference) * speedCoeff + (loftAngle - 標準値) * loftCoeff
   let estimated =
     model.base +
-    (headSpeed - 44.5) * model.speedCoeff +
+    (headSpeed - ESTIMATION_REFERENCE_HEAD_SPEED) * model.speedCoeff +
     (loftAngle - model.standardLoft) * model.loftCoeff;
 
   // ドライバー限定ではなく、低ロフト帯全体へ緩やかに効く補正
@@ -187,14 +220,14 @@ export const getEstimatedDistance = (club: GolfClub, headSpeed: number) => {
       1,
     );
     const loftPenalty = LOW_LOFT_MAX_PENALTY * loftRatio * loftRatio;
-    const speedRelief = Math.max(0, headSpeed - 30) * LOW_LOFT_SPEED_RELIEF * loftRatio * loftRatio;
+    const speedRelief = Math.max(0, headSpeed - LOW_LOFT_SPEED_RELIEF_THRESHOLD) * LOW_LOFT_SPEED_RELIEF * loftRatio * loftRatio;
     estimated -= loftPenalty;
     estimated += speedRelief;
   }
 
   if (category === 'driver' && headSpeed > DRIVER_BOOST_RAMP_START) {
     const rampRange = DRIVER_BOOST_RAMP_END - DRIVER_BOOST_RAMP_START;
-    const rampRatio = clamp((headSpeed - DRIVER_BOOST_RAMP_START) / rampRange, 0, 1);
+    const rampRatio = clamp((headSpeed - DRIVER_BOOST_RAMP_START) / rampRange, ESTIMATION_CLAMP_MIN, ESTIMATION_CLAMP_MAX);
     const rampBoost = DRIVER_BOOST_AT_45 * rampRatio * rampRatio;
     const highSpeedBoost =
       headSpeed > DRIVER_BOOST_RAMP_END
@@ -247,7 +280,7 @@ export const estimateHeadSpeedFromClubs = (clubs: GolfClub[]): number | null => 
     const distance = club.distance ?? 0;
 
     const headSpeed =
-      (distance - model.base - (loftAngle - model.standardLoft) * model.loftCoeff) / model.speedCoeff + 44.5;
+      (distance - model.base - (loftAngle - model.standardLoft) * model.loftCoeff) / model.speedCoeff + ESTIMATION_REFERENCE_HEAD_SPEED;
 
     if (Number.isFinite(headSpeed) && headSpeed > 20 && headSpeed < 70) {
       headSpeeds.push(headSpeed);
@@ -283,20 +316,19 @@ export const getWeightLengthDotRadius = (club: Pick<GolfClub, 'clubType'>) => {
     normalizedType === 'DRIVER' ||
     normalizedType === 'PUTTER'
   ) {
-    return 7;
+    return WEIGHT_DOT_RADIUS_DRIVER_PUTTER;
   }
 
-  return 5.8;
+  return WEIGHT_DOT_RADIUS_DEFAULT;
 };
 
 const getWeightFallbackRegression = (
   anchorLength: number,
   anchorWeight: number,
 ): WeightRegression => {
-  const slope = -8;
   return {
-    slope,
-    intercept: anchorWeight - slope * anchorLength,
+    slope: WEIGHT_REGRESSION_FALLBACK_SLOPE,
+    intercept: anchorWeight - WEIGHT_REGRESSION_FALLBACK_SLOPE * anchorLength,
   };
 };
 
@@ -304,7 +336,7 @@ export const getWeightRegression = (
   clubs: Pick<GolfClub, 'length' | 'weight'>[],
 ): WeightRegression => {
   if (clubs.length === 0) {
-    return { slope: -8, intercept: 620 };
+    return { slope: WEIGHT_REGRESSION_FALLBACK_SLOPE, intercept: WEIGHT_REGRESSION_FALLBACK_INTERCEPT };
   }
 
   const meanLength = clubs.reduce((sum, club) => sum + club.length, 0) / clubs.length;
@@ -324,7 +356,7 @@ export const getWeightRegression = (
   }
 
   const slope = numerator / denominator;
-  if (slope >= -1) {
+  if (slope >= WEIGHT_REGRESSION_MIN_SLOPE) {
     return getWeightFallbackRegression(meanLength, meanWeight);
   }
 
@@ -341,10 +373,9 @@ const getLoftLengthFallbackRegression = (
   anchorLength: number,
   anchorLoft: number,
 ): WeightRegression => {
-  const slope = -7.2;
   return {
-    slope,
-    intercept: anchorLoft - slope * anchorLength,
+    slope: LOFT_REGRESSION_FALLBACK_SLOPE,
+    intercept: anchorLoft - LOFT_REGRESSION_FALLBACK_SLOPE * anchorLength,
   };
 };
 
@@ -352,7 +383,7 @@ export const getLoftLengthRegression = (
   clubs: Pick<GolfClub, 'length' | 'loftAngle'>[],
 ): WeightRegression => {
   if (clubs.length === 0) {
-    return { slope: -7.2, intercept: 86 };
+    return { slope: LOFT_REGRESSION_FALLBACK_SLOPE, intercept: LOFT_REGRESSION_FALLBACK_INTERCEPT };
   }
 
   const meanLength = clubs.reduce((sum, club) => sum + club.length, 0) / clubs.length;
@@ -371,7 +402,7 @@ export const getLoftLengthRegression = (
   }
 
   const slope = numerator / denominator;
-  if (!Number.isFinite(slope) || slope > -4 || slope < -10) {
+  if (!Number.isFinite(slope) || slope > LOFT_REGRESSION_MIN_SLOPE || slope < LOFT_REGRESSION_MAX_SLOPE) {
     return getLoftLengthFallbackRegression(meanLength, meanLoft);
   }
 
@@ -419,10 +450,9 @@ const getLieLengthFallbackRegression = (
   anchorLength: number,
   anchorLieAngle: number,
 ): WeightRegression => {
-  const slope = -0.9;
   return {
-    slope,
-    intercept: anchorLieAngle - slope * anchorLength,
+    slope: LIE_REGRESSION_FALLBACK_SLOPE,
+    intercept: anchorLieAngle - LIE_REGRESSION_FALLBACK_SLOPE * anchorLength,
   };
 };
 
@@ -430,7 +460,7 @@ export const getLieLengthRegression = (
   clubs: Pick<GolfClub, 'length' | 'lieAngle'>[],
 ): WeightRegression => {
   if (clubs.length === 0) {
-    return { slope: -0.9, intercept: 96 };
+    return { slope: LIE_REGRESSION_FALLBACK_SLOPE, intercept: LIE_REGRESSION_FALLBACK_INTERCEPT };
   }
 
   const meanLength = clubs.reduce((sum, club) => sum + club.length, 0) / clubs.length;
@@ -450,7 +480,7 @@ export const getLieLengthRegression = (
   }
 
   const slope = numerator / denominator;
-  if (!Number.isFinite(slope) || slope > -0.15 || slope < -2.8) {
+  if (!Number.isFinite(slope) || slope > LIE_REGRESSION_MIN_SLOPE || slope < LIE_REGRESSION_MAX_SLOPE) {
     return getLieLengthFallbackRegression(meanLength, meanLieAngle);
   }
 

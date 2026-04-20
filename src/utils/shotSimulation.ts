@@ -24,6 +24,160 @@ import {
 } from "./shotOutcome";
 import { sampleTruncatedNormal } from "./landingPosition";
 import { formatSimClubLabel } from "./simClubLabel";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 定数・設定値
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 弱いクラブの効果スケール */
+const WEAK_CLUB_EFFECT_SCALE = 0.5;
+
+/** パワーペナルティ係数（100%超過ごとのスキル低下率） */
+const POWER_PENALTY_PER_PERCENT = 0.02;
+
+/** 風のmph→yards変換係数 */
+const WIND_MPH_TO_YARDS = 1.46667;
+
+/** 横風の影響係数 */
+const CROSS_WIND_FACTOR = 0.9;
+
+/** ショートショット時の風影響削減閾値（ヤード） */
+const SHORT_SHOT_WIND_THRESHOLD = 50;
+
+/** 風の向き風/追い風係数 */
+const HEAD_WIND_FACTOR = 1.5;
+const TAIL_WIND_FACTOR = 0.8;
+
+/** パター以外のホールアウト確率 */
+const HOLE_OUT_CHANCES: Record<string, Partial<Record<ShotQuality, number>>> = {
+  short: { excellent: 0.08, good: 0.03, average: 0.01 },
+  medium: { excellent: 0.03, good: 0.01, average: 0.005 },
+  long: { excellent: 0.01, good: 0.004, average: 0.002 },
+  veryLong: { excellent: 0.001 },
+};
+
+/** ニアカップ残距離（shotQualityごと） */
+const NEAR_CUP_DISTANCES: Record<ShotQuality | "other", { min: number; range: number }> = {
+  excellent: { min: 1, range: 2 },
+  good: { min: 1, range: 4 },
+  average: { min: 2, range: 5 },
+  misshot: { min: 3, range: 6 },
+  poor: { min: 3, range: 6 },
+  other: { min: 3, range: 6 },
+};
+
+/** スキルレベルによる距離倍率（最小〜最大） */
+const SKILL_DISTANCE_RANGE = { min: 0.92, max: 1.08 };
+
+/** 有効成功率の範囲 */
+const SUCCESS_RATE_BOUNDS = { min: 15, max: 95 };
+
+/** パット基礎成功率（距離ごと） */
+const PUTT_BASE_CHANCES = [
+  { maxDist: 3, chance: 0.96 },
+  { maxDist: 5, chance: 0.77 },
+  { maxDist: 8, chance: 0.50 },
+  { maxDist: 10, chance: 0.40 },
+  { maxDist: 15, chance: 0.23 },
+  { maxDist: 20, chance: 0.15 },
+  { maxDist: 30, chance: 0.07 },
+];
+
+/** 弱いクラブの閾値 */
+const WEAK_CLUB_THRESHOLD = 65;
+const VERY_WEAK_CLUB_THRESHOLD = 60;
+
+/** 弱いクラブの距離ペナルティ */
+const WEAK_DISTANCE_PENALTY = {
+  normal: 0.10,
+  severe: 0.14,
+};
+
+/** ショットパワーの上限 */
+const MAX_SHOT_POWER_PERCENT = 110;
+
+/** ショット品質ラベル */
+export const QUALITY_LABELS: Record<ShotQuality, string> = {
+  excellent: "会心の一打！",
+  good: "ナイスショット！",
+  average: "まずまず",
+  misshot: "大きく外した...",
+  poor: "ミス気味...",
+};
+
+/** ライタイプラベル */
+export const LIE_LABELS: Record<LieType, string> = {
+  tee: "ティー",
+  fairway: "フェアウェイ",
+  semirough: "セミラフ",
+  rough: "ラフ",
+  bareground: "ベアグラウンド",
+  bunker: "バンカー",
+  green: "グリーン",
+};
+
+/** ライごとの距離倍率 */
+const LIE_DISTANCE_MULTIPLIERS: Record<LieType, number> = {
+  tee: 1.0,
+  fairway: 0.98,
+  semirough: 0.9,
+  rough: 0.82,
+  bareground: 0.6,
+  bunker: 0.5,
+  green: 1.0,
+};
+
+/** バンカーでのウェッジの距離倍率 */
+const BUNKER_WEDGE_MULTIPLIER = 0.7;
+
+/** ライごとの成功率ペナルティ */
+const LIE_SUCCESS_PENALTIES: Partial<Record<LieType, number>> = {
+  semirough: 8,
+  rough: 12,
+  bareground: 18,
+  bunker: 20,
+};
+
+/** スキルレベルごとのハザード回復係数 */
+const HAZARD_RECOVERY_FACTORS = [
+  { threshold: 0.35, factor: 0.4 },
+  { threshold: 0.65, factor: 0.7 },
+  { threshold: 1.0, factor: 0.95 },
+];
+
+/** 地面の硬さマッピング */
+const GROUND_HARDNESS_BY_LIE: Record<LieType, number> = {
+  bunker: 20,
+  bareground: 35,
+  rough: 45,
+  semirough: 60,
+  fairway: 75,
+  tee: 78,
+  green: 85,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 型定義
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface SimulationOptions {
+  personalData?: ClubPersonalData;
+  playerSkillLevel?: number;
+  forceEffectiveSuccessRate?: number;
+  shotPowerPercent?: number;
+  headSpeed?: number;
+  useTheoretical?: boolean;
+  shotIndex?: number;
+  seedNonce?: string;
+  useStoredDistance?: boolean;
+  aimXOffset?: number;
+  isPractice?: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// プレイヤースキル取得
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /**
  * 個人データ（DB）からプレイヤースキルレベルを取得する非同期関数
  * @returns Promise<number> 0.0〜1.0（なければ0.5）
@@ -37,20 +191,9 @@ export async function fetchPlayerSkillLevelFromPersonalData(): Promise<number> {
   }
 }
 
-interface SimulationOptions {
-  personalData?: ClubPersonalData;
-  playerSkillLevel?: number;
-  forceEffectiveSuccessRate?: number;
-  shotPowerPercent?: number;
-  headSpeed?: number;
-  useTheoretical?: boolean;
-  shotIndex?: number;
-  seedNonce?: string;
-  useStoredDistance?: boolean;
-  aimXOffset?: number;
-}
-
-const WEAK_CLUB_EFFECT_SCALE = 0.5;
+// ═══════════════════════════════════════════════════════════════════════════════
+// 乱数・シード関連ユーティリティ
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function hashSeed(seed: string): number {
   let hash = 2166136261;
@@ -71,6 +214,21 @@ function createSeededRandom(seed: string): () => number {
     value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 座標・ジオメトリ計算
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 値を範囲内に制限 */
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+/** 角度を0-360度に正規化 */
+function normalizeDegrees(degrees: number): number {
+  const normalized = Math.round(degrees) % 360;
+  return (normalized + 360) % 360;
 }
 
 export function getAbsoluteLandingPoint(
@@ -132,9 +290,9 @@ function getHazardRectangleBounds(hazard: Hazard) {
   };
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// ハザード関連計算
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function calculateSegmentHazardBoundaryIntersection(
   hazard: Hazard,
@@ -247,26 +405,21 @@ export function getWaterHazardDropOrigin(
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 function getLieDistanceMultiplier(lie: LieType, clubType: string): number {
-  switch (lie) {
-    case "tee":        return 1.00;
-    case "fairway":    return 0.98;
-    case "semirough":  return 0.90;
-    case "rough":      return 0.82;
-    case "bareground": return 0.60;
-    case "bunker":     return clubType === "Wedge" ? 0.70 : 0.50;
-    case "green":      return 1.00; // putter path handles this separately
-    default:           return 0.95;
+  const baseMultiplier = LIE_DISTANCE_MULTIPLIERS[lie] ?? 0.95;
+  // バンカーでウェッジの場合は別倍率
+  if (lie === "bunker" && clubType === "Wedge") {
+    return BUNKER_WEDGE_MULTIPLIER;
   }
+  return baseMultiplier;
 }
 
 export function getLieDistanceMultiplierValue(lie: LieType, clubType: string): number {
   return getLieDistanceMultiplier(lie, clubType);
 }
 
-function normalizeDegrees(degrees: number): number {
-  const normalized = Math.round(degrees) % 360;
-  return (normalized + 360) % 360;
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// 風計算
+// ═══════════════════════════════════════════════════════════════════════════════
 
 // 風向(0=北へ, 180=南へ)から風の世界座標成分を返す。
 // 本プロジェクトでは角度を「その方角へ吹く風」として扱う。
@@ -318,14 +471,16 @@ function getWindYards(
 ): number {
   if (typeof windDirectionDegrees === "number" && Number.isFinite(windDirectionDegrees)) {
     const componentMph = getHeadTailWindComponentMph(strength, windDirectionDegrees);
-    return componentMph < 0 ? componentMph * 1.5 : componentMph * 0.8;
+    return componentMph < 0
+      ? componentMph * HEAD_WIND_FACTOR
+      : componentMph * TAIL_WIND_FACTOR;
   }
   return 0;
 }
 
 
 function isWeakClub(club: SimClub): boolean {
-  return club.isWeakClub === true || club.successRate < 65;
+  return club.isWeakClub === true || club.successRate < WEAK_CLUB_THRESHOLD;
 }
 
 function clampSkillLevel(playerSkillLevel?: number): number {
@@ -334,7 +489,7 @@ function clampSkillLevel(playerSkillLevel?: number): number {
 
 function getSkillDistanceMultiplier(playerSkillLevel?: number): number {
   const skillLevel = clampSkillLevel(playerSkillLevel);
-  return 0.92 + skillLevel * 0.16;
+  return SKILL_DISTANCE_RANGE.min + skillLevel * (SKILL_DISTANCE_RANGE.max - SKILL_DISTANCE_RANGE.min);
 }
 
 function resolveBaseDistanceWithTheoretical(
@@ -412,7 +567,7 @@ export function estimateShotDistance(
   const lieMultiplier = getLieDistanceMultiplier(context.lie, club.type);
   const windYards = getWindYards(context.windStrength ?? 7, context.windDirectionDegrees);
   const weakDistancePenaltyBase = isWeakClub(club)
-    ? (club.successRate < 60 ? 0.14 : 0.10)
+    ? (club.successRate < VERY_WEAK_CLUB_THRESHOLD ? WEAK_DISTANCE_PENALTY.severe : WEAK_DISTANCE_PENALTY.normal)
     : 0;
   const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
 
@@ -438,6 +593,10 @@ export function estimateShotDistance(
   return Math.max(5, Math.round(expected * 10) / 10);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 成功率・スキル計算
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /** Effective success rate after personal data, lie, and risk adjustments. */
 function getEffectiveSuccessRate(
   club: SimClub,
@@ -452,47 +611,30 @@ function getEffectiveSuccessRate(
     isWeakClub: weakClub,
     playerSkillLevel,
   });
-  if (lie === "semirough") rate -= 8;
-  if (lie === "rough")     rate -= 12;
-  if (lie === "bareground") rate -= 18;
-  if (lie === "bunker")    rate -= 20;
+  // ライによる成功率ペナルティ適用
+  const liePenalty = LIE_SUCCESS_PENALTIES[lie];
+  if (liePenalty) rate -= liePenalty;
+
   if (weakClub) {
-    const weakPenaltyBase = club.successRate < 60 ? 16 : 14;
+    const weakPenaltyBase = club.successRate < VERY_WEAK_CLUB_THRESHOLD ? 16 : 14;
     rate -= weakPenaltyBase * WEAK_CLUB_EFFECT_SCALE;
   }
-  return Math.max(15, Math.min(95, rate));
+  return clamp(rate, SUCCESS_RATE_BOUNDS.min, SUCCESS_RATE_BOUNDS.max);
 }
 
 function getNonPutterHoleOutChance(remainingDistance: number, shotQuality: ShotQuality): number {
-  if (remainingDistance <= 20) {
-    if (shotQuality === "excellent") return 0.08;
-    if (shotQuality === "good") return 0.03;
-    if (shotQuality === "average") return 0.01;
-    return 0;
-  }
+  const chances =
+    remainingDistance <= 20 ? HOLE_OUT_CHANCES.short
+    : remainingDistance <= 40 ? HOLE_OUT_CHANCES.medium
+    : remainingDistance <= 80 ? HOLE_OUT_CHANCES.long
+    : HOLE_OUT_CHANCES.veryLong;
 
-  if (remainingDistance <= 40) {
-    if (shotQuality === "excellent") return 0.03;
-    if (shotQuality === "good") return 0.01;
-    if (shotQuality === "average") return 0.005;
-    return 0;
-  }
-
-  if (remainingDistance <= 80) {
-    if (shotQuality === "excellent") return 0.01;
-    if (shotQuality === "good") return 0.004;
-    if (shotQuality === "average") return 0.002;
-    return 0;
-  }
-
-  return shotQuality === "excellent" ? 0.001 : 0;
+  return chances[shotQuality] ?? 0;
 }
 
 function getNearCupLeaveDistance(shotQuality: ShotQuality, random: () => number): number {
-  if (shotQuality === "excellent") return 1 + Math.floor(random() * 2); // 1-2y
-  if (shotQuality === "good") return 1 + Math.floor(random() * 4); // 1-4y
-  if (shotQuality === "average") return 2 + Math.floor(random() * 5); // 2-6y
-  return 3 + Math.floor(random() * 6); // 3-8y
+  const dist = NEAR_CUP_DISTANCES[shotQuality] ?? NEAR_CUP_DISTANCES.other;
+  return dist.min + Math.floor(random() * dist.range);
 }
 
 function mapWindToLanding(
@@ -516,20 +658,14 @@ function mapWindToLanding(
 }
 
 function mapGroundHardnessByLie(lie: LieType): number {
-  if (lie === "bunker") return 20;
-  if (lie === "bareground") return 35;
-  if (lie === "semirough") return 60;
-  if (lie === "rough") return 45;
-  if (lie === "fairway") return 75;
-  if (lie === "tee") return 78;
-  if (lie === "green") return 85;
-  return 60;
+  return GROUND_HARDNESS_BY_LIE[lie] ?? 60;
 }
 
 function getHazardRecoveryFactor(playerSkillLevel: number): number {
-  const skill = Math.max(0, Math.min(1, playerSkillLevel));
-  if (skill < 0.35) return 0.4;
-  if (skill < 0.65) return 0.7;
+  const skill = clamp(playerSkillLevel, 0, 1);
+  for (const { threshold, factor } of HAZARD_RECOVERY_FACTORS) {
+    if (skill < threshold) return factor;
+  }
   return 0.95;
 }
 
@@ -560,8 +696,8 @@ function getEffectiveLieDistanceMultiplier(
  * 分布モデルへ直接渡して、表示成功率と体感を近づける。
  */
 function normalizeEffectiveRateToSkill(rate: number): number {
-  const normalized = (rate - 15) / 80;
-  return Math.max(0, Math.min(1, normalized));
+  const normalized = (rate - SUCCESS_RATE_BOUNDS.min) / (SUCCESS_RATE_BOUNDS.max - SUCCESS_RATE_BOUNDS.min);
+  return clamp(normalized, 0, 1);
 }
 
 /**
@@ -582,20 +718,9 @@ export function composeEffectiveSkill(
   return Math.max(0, Math.min(1, normalized));
 }
 
-export const LIE_LABELS: Record<LieType, string> = {
-  tee: "ティー", fairway: "フェアウェイ", semirough: "セミラフ", rough: "ラフ",
-  bareground: "ベアグラウンド", bunker: "バンカー", green: "グリーン",
-};
-
-const QUALITY_LABELS: Record<ShotQuality, string> = {
-  excellent: "会心の一打！",
-  good:      "ナイスショット！",
-  average:   "まずまず",
-  misshot:   "大きく外した...",
-  poor:      "ミス気味...",
-};
-
-// ─── Putting ──────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// パットシミュレーション
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function simulatePutt(
   remaining: number,
@@ -617,19 +742,18 @@ function simulatePutt(
     };
   }
 
-  // 距離ごとの基礎成功率
-  let baseChance: number;
-  if      (remaining <=  3) baseChance = 0.96;
-  else if (remaining <=  5) baseChance = 0.77;
-  else if (remaining <=  8) baseChance = 0.50;
-  else if (remaining <= 10) baseChance = 0.40;
-  else if (remaining <= 15) baseChance = 0.23;
-  else if (remaining <= 20) baseChance = 0.15;
-  else if (remaining <= 30) baseChance = 0.07;
-  else                      baseChance = 0.03;
+  // 距離ごとの基礎成功率を取得
+  let baseChance = 0.03; // デフォルト: 30ヤード超
+  for (const { maxDist, chance } of PUTT_BASE_CHANCES) {
+    if (remaining <= maxDist) {
+      baseChance = chance;
+      break;
+    }
+  }
 
   // スキルレベルを反映（最低50%保証）
-  let makeChance = baseChance * (0.5 + 0.5 * playerSkillLevel);
+  const minSkillMultiplier = 0.5;
+  let makeChance = baseChance * (minSkillMultiplier + (1 - minSkillMultiplier) * playerSkillLevel);
   makeChance = Math.min(0.98, makeChance);
 
   if (random() < makeChance) {
@@ -660,7 +784,75 @@ function simulatePutt(
   };
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// シミュレーションシード・コンテキスト構築
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface SimulationContext {
+  seed: string;
+  random: () => number;
+  playerSkillLevel: number;
+  adjustedPlayerSkillLevel: number;
+  shotPowerPercent: number;
+  powerMultiplier: number;
+  effectiveRate: number;
+  effectiveSkill: number;
+}
+
+function buildSimulationContext(
+  club: SimClub,
+  context: ShotContext,
+  options: SimulationOptions,
+): SimulationContext {
+  const playerSkillLevel = options.playerSkillLevel ?? 0.5;
+  const shotPowerPercent = clamp(options.shotPowerPercent ?? 100, 0, MAX_SHOT_POWER_PERCENT);
+  const powerMultiplier = shotPowerPercent / 100;
+
+  // パワーペナルティ計算（100%超過でスキル低下）
+  const powerPenalty = (club.type !== "Putter" && shotPowerPercent > 100)
+    ? (shotPowerPercent - 100) * POWER_PENALTY_PER_PERCENT
+    : 0;
+  const adjustedPlayerSkillLevel = Math.max(0, playerSkillLevel - powerPenalty);
+
+  const simulationSeedBase = [
+    club.id,
+    club.avgDistance,
+    context.remainingDistance,
+    context.lie,
+    context.windStrength ?? 7,
+    typeof context.windDirectionDegrees === "number"
+      ? normalizeDegrees(context.windDirectionDegrees)
+      : "legacy",
+    playerSkillLevel,
+    options.shotIndex ?? 0,
+    options.seedNonce ?? "default",
+  ].join("|");
+
+  const random = createSeededRandom(simulationSeedBase);
+
+  // 有効成功率の計算
+  const forcedEffectiveRate = options.forceEffectiveSuccessRate;
+  const effectiveRate = typeof forcedEffectiveRate === "number"
+    ? clamp(Math.round(forcedEffectiveRate), 0, 100)
+    : getEffectiveSuccessRate(club, context.lie, adjustedPlayerSkillLevel, options.personalData);
+
+  const effectiveSkill = composeEffectiveSkill(adjustedPlayerSkillLevel, effectiveRate);
+
+  return {
+    seed: simulationSeedBase,
+    random,
+    playerSkillLevel,
+    adjustedPlayerSkillLevel,
+    shotPowerPercent,
+    powerMultiplier,
+    effectiveRate,
+    effectiveSkill,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// メインシミュレーション関数
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function simulateShot(
   club: SimClub,
@@ -675,28 +867,17 @@ export function simulateShot(
     greenRadius = DEFAULT_GREEN_RADIUS,
     hazards = [],
   } = context;
-  const playerSkillLevel = options.playerSkillLevel ?? 0.5;
-  const shotPowerPercent = Math.max(0, Math.min(110, options.shotPowerPercent ?? 100));
-  const powerMultiplier = shotPowerPercent / 100;
-  const { personalData } = options;
-  const simulationSeedBase = [
-    club.id,
-    club.avgDistance,
-    remainingDistance,
-    lie,
-    windStrength,
-    typeof windDirectionDegrees === "number" ? normalizeDegrees(windDirectionDegrees) : "legacy",
-    playerSkillLevel,
-    options.shotIndex ?? 0,
-    options.seedNonce ?? "default",
-  ].join("|");
-  const random = createSeededRandom(simulationSeedBase);
 
-  // Apply power penalty to skill level: 2% reduction for every 1% over 100%, excluding putters
-  const powerPenalty = (club.type !== "Putter" && shotPowerPercent > 100)
-    ? (shotPowerPercent - 100) * 0.02
-    : 0;
-  const adjustedPlayerSkillLevel = Math.max(0, playerSkillLevel - powerPenalty);
+  // シミュレーションコンテキスト構築
+  const simContext = buildSimulationContext(club, context, options);
+  const {
+    random,
+    playerSkillLevel,
+    adjustedPlayerSkillLevel,
+    powerMultiplier,
+    effectiveRate,
+    effectiveSkill,
+  } = simContext;
 
   // ── Putter path ────────────────────────────────────────────────────────────
   if (club.type === "Putter") {
@@ -730,21 +911,7 @@ export function simulateShot(
     };
   }
 
-  // ── Success/quality roll ────────────────────────────────────────────────────
-  const forcedEffectiveRate = options.forceEffectiveSuccessRate;
-  let effectiveRate = typeof forcedEffectiveRate === "number"
-    ? Math.max(0, Math.min(100, Math.round(forcedEffectiveRate)))
-    : getEffectiveSuccessRate(
-        club,
-        lie,
-        adjustedPlayerSkillLevel,
-        personalData,
-      );
-  
-  const effectiveSkill = composeEffectiveSkill(
-    adjustedPlayerSkillLevel,
-    effectiveRate
-  );
+  // ── Landing calculation ────────────────────────────────────────────────────
   const landingSeed = [
     club.id,
     remainingDistance,
@@ -842,7 +1009,7 @@ export function simulateShot(
           context.targetDistance,
         )
       : { headTail: 0, crossWind: 0 };
-  const lateralWindYards = windComponents.crossWind * 0.9;
+  const lateralWindYards = windComponents.crossWind * CROSS_WIND_FACTOR;
 
   const lieDistanceMultiplier = getEffectiveLieDistanceMultiplier(
     lie,
@@ -855,7 +1022,7 @@ export function simulateShot(
     hazards,
   );
   const weakDistancePenaltyBase = isWeakClub(club)
-    ? (club.successRate < 60 ? 0.14 : 0.10)
+    ? (club.successRate < VERY_WEAK_CLUB_THRESHOLD ? WEAK_DISTANCE_PENALTY.severe : WEAK_DISTANCE_PENALTY.normal)
     : 0;
   const weakDistanceMultiplier = 1 - weakDistancePenaltyBase * WEAK_CLUB_EFFECT_SCALE;
   const distanceConditionMultiplier = lieDistanceMultiplier * weakDistanceMultiplier;
@@ -866,10 +1033,11 @@ export function simulateShot(
 
   // 風の影響を適用（headTail風）
   const headTailWindMph = windComponents.headTail;
-  // mph to yards conversion: 1 mph = 1.46667 yards (approximate for golf ball)
-  const headTailWindYards = headTailWindMph < 0 ? headTailWindMph * 1.5 * 1.46667 : headTailWindMph * 0.8 * 1.46667;
-  // 50ヤード未満では風の影響を減らす
-  const distanceFactor = Math.min(1, scaledTotalDistanceBase / 50);
+  const headTailWindYards = headTailWindMph < 0
+    ? headTailWindMph * HEAD_WIND_FACTOR * WIND_MPH_TO_YARDS
+    : headTailWindMph * TAIL_WIND_FACTOR * WIND_MPH_TO_YARDS;
+  // ショートショットでは風の影響を減らす
+  const distanceFactor = Math.min(1, scaledTotalDistanceBase / SHORT_SHOT_WIND_THRESHOLD);
   const adjustedHeadTailWindYards = headTailWindYards * distanceFactor;
   const scaledTotalDistance = scaledTotalDistanceBase + adjustedHeadTailWindYards;
 
@@ -1103,9 +1271,10 @@ export function simulateShotFromActualData(
 
   // パワーとライを適用
   const lieMultiplier = getLieDistanceMultiplier(lie, club.type);
-  const weakDistanceMultiplier = isWeakClub(club)
-    ? (club.successRate < 60 ? 0.9 : 0.95)
-    : 1.0;
+  const weakDistancePenalty = isWeakClub(club)
+    ? (club.successRate < VERY_WEAK_CLUB_THRESHOLD ? WEAK_DISTANCE_PENALTY.severe : WEAK_DISTANCE_PENALTY.normal)
+    : 0;
+  const weakDistanceMultiplier = 1 - weakDistancePenalty * WEAK_CLUB_EFFECT_SCALE;
 
   const adjustedCarry = Math.max(0.1, carry * powerMultiplier * lieMultiplier * weakDistanceMultiplier);
   const adjustedRoll = Math.max(0, roll * powerMultiplier * lieMultiplier * weakDistanceMultiplier);
@@ -1113,8 +1282,8 @@ export function simulateShotFromActualData(
   
   // 風の影響を適用
   const windYards = getWindYards(windStrength, windDirectionDegrees);
-  // 50ヤード未満では風の影響を減らす
-  const distanceFactor = Math.min(1, adjustedTotal / 50);
+  // ショートショットでは風の影響を減らす
+  const distanceFactor = Math.min(1, adjustedTotal / SHORT_SHOT_WIND_THRESHOLD);
   const adjustedWindYards = windYards * distanceFactor;
   const finalTotalDistance = adjustedTotal + adjustedWindYards;
   
@@ -1129,7 +1298,7 @@ export function simulateShotFromActualData(
           context.targetDistance,
         )
       : { headTail: 0, crossWind: 0 };
-  const lateralWindYards = windComponents.crossWind * 0.9;
+  const lateralWindYards = windComponents.crossWind * CROSS_WIND_FACTOR;
   
   // 通常のシミュレーションと同様の補正を適用
   // landingPosition.ts の applyGroundCondition と同様のロジック

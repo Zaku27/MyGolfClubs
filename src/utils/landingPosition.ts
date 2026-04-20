@@ -81,22 +81,149 @@ type DispersionProfile = {
   effectiveSkill: number;
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 定数・設定値
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** ヘッドスピードデフォルト値 (m/s) */
 const DEFAULT_HEAD_SPEED = 44.5;
+
+/** キャリーチューニング係数 */
 const GLOBAL_CARRY_TUNING = 1;
+
+/** スキルカーブのべき乗（1より大きいほど低スキルで分散が増える） */
 const DISPERSION_SKILL_CURVE_POWER = 1.8;
+const MISHIT_SKILL_CURVE_POWER = 1.7;
+
+/** 低スキル回避関連定数 */
 const LOW_SKILL_NEAR_TARGET_RADIUS = 15;
 const LOW_SKILL_AVOID_START_SKILL = 0.45;
 const LOW_SKILL_AVOID_FULL_SKILL = 0.15;
-const MAX_GROUND_SLOPE_ANGLE = 60; // 極端な斜面を避けるための上限
+const LOW_SKILL_AVOID_BASE_CHANCE = 0.65;
+const LOW_SKILL_AVOID_VARIANCE = 0.35;
+
+/** 傾斜関連定数 */
+const MAX_GROUND_SLOPE_ANGLE = 60;
+const SLOPE_NORMALIZATION_DIVISOR = 45;
+const SLOPE_STRENGTH_MAX = 1;
+
+/** 地面硬さ倍率 */
 const HARDNESS_MULTIPLIER_BY_TYPE: Record<GroundCondition["hardness"], number> = {
   firm: 1.35,
   medium: 1.0,
   soft: 0.65,
 };
-const MAX_SLOPE_DISPERSION_BONUS = 0.35; // 斜面が強いほど次のショットのブレが増す
+
+/** 傾斜による分散増加倍率 */
+const MAX_SLOPE_DISPERSION_BONUS = 0.35;
+const SLOPE_DISPERSION_PARALLEL_WEIGHT = 0.4;
+const SLOPE_DISPERSION_CROSS_WEIGHT = 0.6;
+
+/** 地面条件によるミスヒット補正 */
 const SOFT_GROUND_MISHIT_BONUS = 0.06;
-const UPHILL_MISHIT_BONUS_PER_DEGREE = 0.0025; // 10度で約0.025
+const UPHILL_MISHIT_BONUS_PER_DEGREE = 0.0025;
+const UPHILL_MISHIT_BONUS_MAX = 0.12;
+
+/** キャリーマルチプライヤー係数 */
+const CARRY_SLOPE_FACTOR = 0.08;
+const CARRY_MULTIPLIER_MIN = 0.9;
+const CARRY_MULTIPLIER_MAX = 1.1;
+
+/** ロールマルチプライヤー係数 */
+const ROLL_SLOPE_FACTOR = 0.22;
+const ROLL_MULTIPLIER_MIN = 0.4;
+const ROLL_MULTIPLIER_MAX = 1.7;
+const MIN_CARRY_FOR_ADJUSTMENT = 0.1;
+const MIN_ROLL_FOR_ADJUSTMENT = 0;
+
+/** 傾斜シフト係数 */
+const SLOPE_SHIFT_BASE_MULTIPLIER = 0.2;
+const SLOPE_SHIFT_CROSS_MULTIPLIER = 0.25;
+const SLOPE_SHIFT_TRUNCATED_SIGMA = 1.0;
+const SLOPE_SHIFT_LATERAL_FACTOR = -2;
+
+/** スキル正規化定数 */
+const SKILL_SCALE_THRESHOLD = 1;
+const SKILL_DIVISOR_FOR_PERCENTAGE = 100;
+
+/** 分散プロファイル定数 */
+const MIN_CARRY_SIGMA = 1;
+const MIN_LATERAL_SIGMA = 1;
+const MISHIT_PROBABILITY_MIN = 0.003;
+const MISHIT_PROBABILITY_MAX = 0.40;
+const SKILL_COMPONENT_COUNT = 3;
+const EFFECTIVE_SKILL_MIN = 0;
+const EFFECTIVE_SKILL_MAX = 1;
+
+/** ショット品質評価係数 */
+const CARRY_Z_WEIGHT = 1.1;
+const LATERAL_Z_WEIGHT = 0.75;
+const POOR_QUALITY_THRESHOLD = 1.6;
+const EPSILON_FOR_Z_CALCULATION = 1e-6;
+
+/** 地面硬さ→係数変換 */
+const GROUND_HARDNESS_MIN = 0;
+const GROUND_HARDNESS_MAX = 100;
+const GROUND_FACTOR_BASE = 0.8;
+const GROUND_FACTOR_RANGE = 0.4;
+
+/** シードプレフィックス */
 const GROUND_CONDITION_SEED_PREFIX = "ground-condition";
+
+/** Box-Muller変換用定数 */
+const BOX_MULLER_EPSILON = 1e-9;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// クラブ別定数
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** クラブ別基本ロール率定義 */
+interface RollRateConfig {
+  byNumber?: Record<number, number> & { default: number };
+  byLoft?: { threshold: number; high: number; low: number };
+  byToken?: Record<string, number>;
+  defaultLoft: number;
+  defaultRate: number;
+}
+
+const BASE_ROLL_RATES: Record<string, RollRateConfig | number> = {
+  Driver: 0.09,
+  Wood: {
+    byNumber: { 3: 0.085, 5: 0.075, 7: 0.065, default: 0.055 },
+    byLoft: { threshold: 16, high: 0.08, low: 0.065 },
+    defaultLoft: 15,
+    defaultRate: 0.055,
+  },
+  Hybrid: {
+    byNumber: { 3: 0.075, 4: 0.068, 5: 0.06, default: 0.052 },
+    byLoft: { threshold: 21, high: 0.07, low: 0.058 },
+    defaultLoft: 22,
+    defaultRate: 0.052,
+  },
+  Iron: {
+    byNumber: { 4: 0.06, 6: 0.052, 8: 0.042, default: 0.032 },
+    byLoft: { threshold: 28, high: 0.052, low: 0.038 },
+    defaultLoft: 30,
+    defaultRate: 0.032,
+  },
+  Wedge: {
+    byToken: { LW: 0.012, SW: 0.016, GW: 0.02, AW: 0.02, PW: 0.024 },
+    byLoft: { threshold: 56, high: 0.014, low: 0.022 },
+    defaultLoft: 50,
+    defaultRate: 0.022,
+  },
+  Putter: 0.01,
+};
+
+/** クラブ別最大ロール率（キャリーに対する比率） */
+const MAX_ROLL_RATES: Record<string, number> = {
+  Driver: 0.16,
+  Wood: 0.13,
+  Hybrid: 0.11,
+  Iron: 0.08,
+  Wedge: 0.05,
+  default: 0.03,
+};
 
 /**
  * 値を最小〜最大の範囲へ丸めるための共通関数。
@@ -116,8 +243,8 @@ function randomInRange(rng: () => number, min: number, max: number): number {
  * スキル値のスケールが 0〜1 でも 0〜100 でも扱えるように正規化する。
  */
 function normalizeSkillValue(raw: number): number {
-  if (raw <= 1) return clamp(raw, 0, 1);
-  return clamp(raw / 100, 0, 1);
+  if (raw <= SKILL_SCALE_THRESHOLD) return clamp(raw, 0, 1);
+  return clamp(raw / SKILL_DIVISOR_FOR_PERCENTAGE, 0, 1);
 }
 
 function roundTo(value: number, digits: number): number {
@@ -221,7 +348,7 @@ export function applyGroundCondition(
   const normalizedSlope = normalizeGroundSlope(ground);
   const adjustedSlopeAngle = normalizedSlope.slopeAngle;
   const slopeAngleRad = (adjustedSlopeAngle * Math.PI) / 180;
-  const slopeStrength = Math.min(1, Math.abs(adjustedSlopeAngle) / 45);
+  const slopeStrength = Math.min(SLOPE_STRENGTH_MAX, Math.abs(adjustedSlopeAngle) / SLOPE_NORMALIZATION_DIVISOR);
   const slopeDirectionRad = (normalizedSlope.slopeDirection * Math.PI) / 180;
 
   // 0度はピン方向uphillのため、+値ほどキャリーが減る。
@@ -229,22 +356,22 @@ export function applyGroundCondition(
   // 90度は右uphillのため、横方向（左右）への影響に使う。
   const crossSlopeComponent = slopeStrength * Math.sin(slopeDirectionRad);
 
-  const carryMultiplier = clamp(1 - forwardSlopeComponent * 0.08, 0.9, 1.1);
-  const rollMultiplier = clamp(hardnessMultiplier * Math.cos(slopeAngleRad) * (1 - forwardSlopeComponent * 0.22), 0.4, 1.7);
-  const adjustedCarry = Math.max(0.1, landingResult.carry * carryMultiplier);
-  const adjustedRoll = Math.max(0, landingResult.roll * rollMultiplier);
+  const carryMultiplier = clamp(1 - forwardSlopeComponent * CARRY_SLOPE_FACTOR, CARRY_MULTIPLIER_MIN, CARRY_MULTIPLIER_MAX);
+  const rollMultiplier = clamp(hardnessMultiplier * Math.cos(slopeAngleRad) * (1 - forwardSlopeComponent * ROLL_SLOPE_FACTOR), ROLL_MULTIPLIER_MIN, ROLL_MULTIPLIER_MAX);
+  const adjustedCarry = Math.max(MIN_CARRY_FOR_ADJUSTMENT, landingResult.carry * carryMultiplier);
+  const adjustedRoll = Math.max(MIN_ROLL_FOR_ADJUSTMENT, landingResult.roll * rollMultiplier);
 
-  const dispersionMultiplier = 1 + slopeStrength * MAX_SLOPE_DISPERSION_BONUS * (0.4 + Math.abs(crossSlopeComponent) * 0.6);
+  const dispersionMultiplier = 1 + slopeStrength * MAX_SLOPE_DISPERSION_BONUS * (SLOPE_DISPERSION_PARALLEL_WEIGHT + Math.abs(crossSlopeComponent) * SLOPE_DISPERSION_CROSS_WEIGHT);
   const mishitRateBonus =
     (ground.hardness === "soft" ? SOFT_GROUND_MISHIT_BONUS : 0) +
-    (adjustedSlopeAngle > 0 ? Math.min(0.12, adjustedSlopeAngle * UPHILL_MISHIT_BONUS_PER_DEGREE) : 0);
+    (adjustedSlopeAngle > 0 ? Math.min(UPHILL_MISHIT_BONUS_MAX, adjustedSlopeAngle * UPHILL_MISHIT_BONUS_PER_DEGREE) : 0);
 
   const adjustedLateralDeviation = landingResult.lateralDeviation * dispersionMultiplier;
   // 横傾斜は常に「高い側から低い側」へ流れるよう、符号は方向からのみ決める。
   const slopeShiftMagnitude = Math.abs(
-    sampleTruncatedNormal(rng, slopeStrength * (0.2 + Math.abs(crossSlopeComponent) * 0.25), 1.0),
+    sampleTruncatedNormal(rng, slopeStrength * (SLOPE_SHIFT_BASE_MULTIPLIER + Math.abs(crossSlopeComponent) * SLOPE_SHIFT_CROSS_MULTIPLIER), SLOPE_SHIFT_TRUNCATED_SIGMA),
   );
-  const slopeShift = slopeShiftMagnitude * -2 * crossSlopeComponent;
+  const slopeShift = slopeShiftMagnitude * SLOPE_SHIFT_LATERAL_FACTOR * crossSlopeComponent;
   const finalX = landingResult.finalX + (adjustedLateralDeviation - landingResult.lateralDeviation) + slopeShift;
   const finalY = Math.max(0, adjustedCarry + adjustedRoll);
   const totalDistance = finalY;
@@ -277,7 +404,7 @@ export function applyGroundCondition(
  * Box-Muller 法で平均0・標準偏差1の正規乱数を作る。
  */
 function sampleStandardNormal(rng: () => number): number {
-  const u1 = Math.max(1e-9, rng());
+  const u1 = Math.max(BOX_MULLER_EPSILON, rng());
   const u2 = rng();
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
@@ -352,14 +479,14 @@ function buildDispersionProfile(club: ClubData, skillLevel: SkillLevel): Dispers
   const carrySigma = base.carrySigmaHigh - (base.carrySigmaHigh - base.carrySigmaLow) * carrySkillCurve;
   const lateralSigma = base.lateralSigmaHigh - (base.lateralSigmaHigh - base.lateralSigmaLow) * lateralSkillCurve;
   // 上級者では大ミス発生率を急減、初心者では発生率を高める非線形カーブ。
-  const mishitSkillCurve = Math.pow(clamp(mishitSkill01, 0, 1), 1.7);
+  const mishitSkillCurve = Math.pow(clamp(mishitSkill01, 0, 1), MISHIT_SKILL_CURVE_POWER);
   const mishitProbability = base.mishitHigh - (base.mishitHigh - base.mishitLow) * mishitSkillCurve;
-  const effectiveSkill = clamp((skill01 + mishitSkill01 + sideSkill01) / 3, 0, 1);
+  const effectiveSkill = clamp((skill01 + mishitSkill01 + sideSkill01) / SKILL_COMPONENT_COUNT, EFFECTIVE_SKILL_MIN, EFFECTIVE_SKILL_MAX);
 
   return {
-    carrySigma: Math.max(1, carrySigma),
-    lateralSigma: Math.max(1, lateralSigma),
-    mishitProbability: clamp(mishitProbability, 0.003, 0.40),
+    carrySigma: Math.max(MIN_CARRY_SIGMA, carrySigma),
+    lateralSigma: Math.max(MIN_LATERAL_SIGMA, lateralSigma),
+    mishitProbability: clamp(mishitProbability, MISHIT_PROBABILITY_MIN, MISHIT_PROBABILITY_MAX),
     effectiveSkill,
   };
 }
@@ -399,17 +526,17 @@ function classifyQualityByOutcome(
   profile: DispersionProfile,
 ): { quality: ShotQuality; metrics: ShotQualityMetrics } {
   const carryDelta = carry - expectedCarry;
-  const rawCarryZ = Math.abs(carryDelta) / Math.max(1e-6, profile.carrySigma);
+  const rawCarryZ = Math.abs(carryDelta) / Math.max(EPSILON_FOR_Z_CALCULATION, profile.carrySigma);
   // Driverは「飛びすぎ」を原則ネガティブ評価しない。
   // 方向性ミスは lateral 側で評価し、距離上振れ単体では品質を落としにくくする。
   const carryZ = clubType === "Driver" && carryDelta > 0 ? 0 : rawCarryZ;
-  const lateralZ = Math.abs(lateralDeviation) / Math.max(1e-6, profile.lateralSigma);
+  const lateralZ = Math.abs(lateralDeviation) / Math.max(EPSILON_FOR_Z_CALCULATION, profile.lateralSigma);
   // 横ブレだけで poor へ落ちすぎると「Missなのに距離はGood相当」が増えるため、
   // 距離誤差をやや重く、横ブレをやや軽く評価する。
-  const weightedCarry = carryZ * 1.1;
-  const weightedLateral = lateralZ * 0.75;
+  const weightedCarry = carryZ * CARRY_Z_WEIGHT;
+  const weightedLateral = lateralZ * LATERAL_Z_WEIGHT;
   const score = Math.max(weightedCarry, weightedLateral);
-  const poorThreshold = 1.6;
+  const poorThreshold = POOR_QUALITY_THRESHOLD;
 
   const decisiveAxis: ShotQualityMetrics["decisiveAxis"] =
     Math.abs(weightedCarry - weightedLateral) < 0.05
@@ -462,7 +589,7 @@ function applyLowSkillTargetAvoidance(
   }
 
   // 低スキルほど発動率を高め、15y以内の着弾を起こしにくくする。
-  const avoidChance = 0.65 + avoidanceStrength * 0.35;
+  const avoidChance = LOW_SKILL_AVOID_BASE_CHANCE + avoidanceStrength * LOW_SKILL_AVOID_VARIANCE;
   if (rng() > avoidChance) {
     return { carry, lateralDeviation };
   }
@@ -499,52 +626,38 @@ function extractClubNumber(numberText: string): number | null {
  */
 function getRollRateByClub(club: Pick<GolfClub, "clubType" | "number" | "loftAngle">): number {
   const clubType = club.clubType;
+  const config = BASE_ROLL_RATES[clubType];
+
+  // 単純な数値の場合はそのまま返す（Driver, Putter）
+  if (typeof config === "number") return config;
+
   const clubNumber = extractClubNumber(club.number ?? "");
 
-  // 一般的な弾道データの目安（通常コンディション）に合わせた基準値。
-  // Driver: carryの約5〜12%、Wood/Hybrid: 約4〜10%、Iron: 約2〜7%、Wedge: 約1〜4%。
-  if (clubType === "Driver") return 0.09;
-
-  if (clubType === "Wood") {
-    if (clubNumber !== null) {
-      if (clubNumber <= 3) return 0.085;
-      if (clubNumber <= 5) return 0.075;
-      if (clubNumber <= 7) return 0.065;
-      return 0.055;
+  // 番手による判定
+  if (clubNumber !== null && config.byNumber) {
+    for (const [num, rate] of Object.entries(config.byNumber)) {
+      if (num !== "default" && clubNumber <= Number(num)) return rate;
     }
-    return (club.loftAngle ?? 15) <= 16 ? 0.08 : 0.065;
+    return config.byNumber.default;
   }
 
-  if (clubType === "Hybrid") {
-    if (clubNumber !== null) {
-      if (clubNumber <= 3) return 0.075;
-      if (clubNumber <= 4) return 0.068;
-      if (clubNumber <= 5) return 0.06;
-      return 0.052;
-    }
-    return (club.loftAngle ?? 22) <= 21 ? 0.07 : 0.058;
-  }
-
-  if (clubType === "Iron") {
-    if (clubNumber !== null) {
-      if (clubNumber <= 4) return 0.06;
-      if (clubNumber <= 6) return 0.052;
-      if (clubNumber <= 8) return 0.042;
-      return 0.032;
-    }
-    return (club.loftAngle ?? 30) <= 28 ? 0.052 : 0.038;
-  }
-
-  if (clubType === "Wedge") {
+  // クラブ名トークンによる判定（Wedge専用）
+  if (config.byToken) {
     const token = (club.number ?? "").trim().toUpperCase();
-    if (token.includes("LW")) return 0.012;
-    if (token.includes("SW")) return 0.016;
-    if (token.includes("GW") || token.includes("AW")) return 0.02;
-    if (token.includes("PW")) return 0.024;
-    return (club.loftAngle ?? 50) >= 56 ? 0.014 : 0.022;
+    for (const [key, rate] of Object.entries(config.byToken)) {
+      if (token.includes(key)) return rate;
+    }
   }
 
-  return 0.01;
+  // ロフト角による判定
+  if (config.byLoft) {
+    const loft = club.loftAngle ?? config.defaultLoft;
+    return clubType === "Wedge"
+      ? loft >= config.byLoft.threshold ? config.byLoft.high : config.byLoft.low
+      : loft <= config.byLoft.threshold ? config.byLoft.high : config.byLoft.low;
+  }
+
+  return config.defaultRate;
 }
 
 /**
@@ -557,9 +670,9 @@ function calculateRollDistance(
   executionQuality: ShotQuality,
 ): number {
   const baseRollRate = getRollRateByClub(club);
-  const groundHardness01 = clamp(groundHardness, 0, 100) / 100;
-  // 地面硬さの影響は過大になりやすいため、0.8〜1.2の狭い範囲で制御する。
-  const groundFactor = 0.8 + groundHardness01 * 0.4;
+  const groundHardness01 = clamp(groundHardness, GROUND_HARDNESS_MIN, GROUND_HARDNESS_MAX) / GROUND_HARDNESS_MAX;
+  // 地面硬さの影響は過大になりやすいため、狭い範囲で制御する。
+  const groundFactor = GROUND_FACTOR_BASE + groundHardness01 * GROUND_FACTOR_RANGE;
 
   const qualityFactor =
     executionQuality === "excellent"
@@ -576,18 +689,7 @@ function calculateRollDistance(
 
   // 実装を安定させるため、クラブごとに roll/carry の上限を設定する。
   // これにより異常な長ラン（特に低ロフト時）を抑制できる。
-  const maxRollRateByClub =
-    club.clubType === "Driver"
-      ? 0.16
-      : club.clubType === "Wood"
-        ? 0.13
-        : club.clubType === "Hybrid"
-          ? 0.11
-          : club.clubType === "Iron"
-            ? 0.08
-            : club.clubType === "Wedge"
-              ? 0.05
-              : 0.03;
+  const maxRollRateByClub = MAX_ROLL_RATES[club.clubType] ?? MAX_ROLL_RATES.default;
 
   const maxRoll = carry * maxRollRateByClub;
   return Math.min(rawRoll, maxRoll);
@@ -602,8 +704,8 @@ function estimateCarryFromTotalDistance(
   groundHardness: number,
 ): number {
   const baseRollRate = getRollRateByClub(club);
-  const groundHardness01 = clamp(groundHardness, 0, 100) / 100;
-  const groundFactor = 0.8 + groundHardness01 * 0.4;
+  const groundHardness01 = clamp(groundHardness, GROUND_HARDNESS_MIN, GROUND_HARDNESS_MAX) / GROUND_HARDNESS_MAX;
+  const groundFactor = GROUND_FACTOR_BASE + groundHardness01 * GROUND_FACTOR_RANGE;
   const typicalQualityFactor = 0.98; // average品質寄り
 
   const effectiveRollRate = Math.max(0, baseRollRate * groundFactor * typicalQualityFactor);
