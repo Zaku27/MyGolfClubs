@@ -16,6 +16,7 @@ export interface AggregateStats {
   worstScore: number | null;
   worstScoreTotalPar: number | null;
   avgScore: number | null;
+  avgTotalPar: number | null;
   avgToPar: number | null;
   avgGirPercent: number | null;
   avgFairwayHitPercent: number | null;
@@ -111,6 +112,7 @@ export const RoundHistoryService = {
         worstScore: null,
         worstScoreTotalPar: null,
         avgScore: null,
+        avgTotalPar: null,
         avgToPar: null,
         avgGirPercent: null,
         avgFairwayHitPercent: null,
@@ -129,6 +131,8 @@ export const RoundHistoryService = {
     console.log('getAggregateStats:', { bestScore, worstScore, bestRound, worstRound, targetRounds });
     
     const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+
+    const avgTotalPar = Math.round(targetRounds.reduce((a, b) => a + b.totalPar, 0) / targetRounds.length);
 
     const toPars = targetRounds.map((r) => r.totalScore - r.totalPar);
     const avgToPar = Number((toPars.reduce((a, b) => a + b, 0) / toPars.length).toFixed(1));
@@ -151,6 +155,7 @@ export const RoundHistoryService = {
       worstScore,
       worstScoreTotalPar: worstRound?.totalPar ?? null,
       avgScore,
+      avgTotalPar,
       avgToPar,
       avgGirPercent,
       avgFairwayHitPercent,

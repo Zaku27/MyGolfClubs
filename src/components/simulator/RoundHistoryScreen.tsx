@@ -244,17 +244,16 @@ export function RoundHistoryScreen({ bagId }: Props) {
               <StatCard
                 label="ベストスコア"
                 value={stats.bestScore !== null && stats.bestScoreTotalPar !== null && !isNaN(stats.bestScore) && !isNaN(stats.bestScoreTotalPar) ? toParString(stats.bestScore, stats.bestScoreTotalPar) : (stats.bestScore?.toString() ?? '-')}
-                subValue={stats.bestScore !== null ? stats.bestScore.toString() : undefined}
+                subValue={stats.bestScore !== null && stats.bestScoreTotalPar !== null ? `ストローク${stats.bestScore}/Par${stats.bestScoreTotalPar}` : undefined}
               />
               <StatCard
                 label="ワーストスコア"
                 value={stats.worstScore !== null && stats.worstScoreTotalPar !== null && !isNaN(stats.worstScore) && !isNaN(stats.worstScoreTotalPar) ? toParString(stats.worstScore, stats.worstScoreTotalPar) : (stats.worstScore?.toString() ?? '-')}
-                subValue={stats.worstScore !== null ? stats.worstScore.toString() : undefined}
+                subValue={stats.worstScore !== null && stats.worstScoreTotalPar !== null ? `ストローク${stats.worstScore}/Par${stats.worstScoreTotalPar}` : undefined}
               />
               <StatCard
                 label="平均スコア"
                 value={stats.avgToPar !== null && stats.avgToPar !== undefined ? (stats.avgToPar > 0 ? `+${stats.avgToPar}` : stats.avgToPar.toString()) : (stats.avgScore?.toString() ?? '-')}
-                subValue={stats.avgScore !== null ? stats.avgScore.toString() : undefined}
               />
               <StatCard
                 label="GIR平均"
@@ -289,6 +288,7 @@ export function RoundHistoryScreen({ bagId }: Props) {
                     <th className="px-3 py-2">日付</th>
                     <th className="px-3 py-2">コース</th>
                     <th className="px-3 py-2">モード</th>
+                    <th className="px-3 py-2 text-right">Par</th>
                     <th className="px-3 py-2 text-right">ストローク</th>
                     <th className="px-3 py-2 text-right">スコア</th>
                     <th className="px-3 py-2 text-center">お気に入り</th>
@@ -309,6 +309,9 @@ export function RoundHistoryScreen({ bagId }: Props) {
                         <span className="rounded-full bg-emerald-900/50 px-2 py-1 text-xs text-emerald-300">
                           {PLAY_MODE_LABELS[round.playMode]}
                         </span>
+                      </td>
+                      <td className="px-3 py-3 text-right text-emerald-200">
+                        {round.totalPar}
                       </td>
                       <td className="px-3 py-3 text-right font-bold text-emerald-50">
                         {round.totalScore}
