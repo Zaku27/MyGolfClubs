@@ -513,52 +513,60 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               </div>
             )}
 
-            <div className="mb-4 rounded-3xl border border-emerald-200 bg-emerald-100 px-4 py-6 text-center shadow-sm shadow-emerald-100/80">
-              <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">{shotResultTitle}</div>
-
-              {/* 評価バッジ */}
-              <div
-                className="mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 font-bold text-white shadow-md"
-                style={{ backgroundColor: evaluation.color }}
-              >
-                <span className="text-lg">{evaluation.icon}</span>
-                <span>{evaluation.label}</span>
-              </div>
-
-              {/* 評価スコアプログレスバー */}
-              <div className="mt-3 mx-auto max-w-[200px]">
-                <div className="flex items-center justify-between text-xs text-emerald-700 mb-1">
-                  <span>ショット評価</span>
-                  <span>{evaluation.score}点</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-emerald-200 overflow-hidden">
+            <div className="mb-4 rounded-3xl border border-emerald-200 bg-emerald-100 px-4 py-4 shadow-sm shadow-emerald-100/80">
+              {/* 横方向レイアウト */}
+              <div className="flex items-center gap-4">
+                {/* 左側：評価と結果 */}
+                <div className="flex-shrink-0">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 mb-2">{shotResultTitle}</div>
+                  {/* 評価バッジ */}
                   <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${evaluation.score}%`,
-                      backgroundColor: evaluation.color,
-                    }}
-                  />
+                    className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-bold text-white shadow-md"
+                    style={{ backgroundColor: evaluation.color }}
+                  >
+                    <span className="text-base">{evaluation.icon}</span>
+                    <span className="text-sm">{evaluation.label}</span>
+                  </div>
+                </div>
+
+                {/* 中央：評価スコアプログレスバー */}
+                <div className="flex-shrink-0 w-32">
+                  <div className="flex items-center justify-between text-xs text-emerald-700 mb-1">
+                    <span>評価</span>
+                    <span className="font-bold">{evaluation.score}点</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-emerald-200 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${evaluation.score}%`,
+                        backgroundColor: evaluation.color,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* 右側：結果情報 */}
+                <div className="flex-1 text-left">
+                  <div className="text-xl font-bold text-emerald-900">
+                    {resultOutcomeLabel}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-semibold text-emerald-800">{resultDistanceLabel}</span>
+                    {lastShotResult.penaltyStrokes > 0 && (
+                      <span className="text-xs text-rose-700">罰打 +{lastShotResult.penaltyStrokes}</span>
+                    )}
+                    {showGreenRemaining && (
+                      <span className="text-xs text-sky-800">残り {lastShotResult.newRemainingDistance}ヤード</span>
+                    )}
+                  </div>
+                  {hazardFeedbackMessage && (
+                    <p className="mt-1 text-xs text-emerald-700">{hazardFeedbackMessage}</p>
+                  )}
                 </div>
               </div>
-
-              <div className="mt-3 text-2xl font-bold text-emerald-900">
-                {resultOutcomeLabel}
-              </div>
-              {lastShotResult.penaltyStrokes > 0 && (
-                <p className="mt-2 text-sm text-rose-700">罰打 +{lastShotResult.penaltyStrokes}</p>
-              )}
-              <p className="mt-2 text-lg font-semibold text-emerald-800">
-                {resultDistanceLabel}
-              </p>
-              {showGreenRemaining && (
-                <p className="mt-2 text-sm text-sky-800">残り {lastShotResult.newRemainingDistance}ヤード</p>
-              )}
-              {hazardFeedbackMessage && (
-                <p className="mt-3 text-sm text-emerald-700">{hazardFeedbackMessage}</p>
-              )}
               {lastShotResult.nextShotAdvice && (
-                <p className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                <p className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
                   {lastShotResult.nextShotAdvice}
                 </p>
               )}

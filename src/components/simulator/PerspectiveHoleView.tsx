@@ -58,7 +58,7 @@ const OUTCOME_COLORS: Record<string, string> = {
   rough: "#65a30d",
   bunker: "#fbbf24",
   water: "#3b82f6",
-  ob: "#ef4444",
+  ob: "#22c55e",
   green: "#34d399",
 };
 
@@ -265,7 +265,7 @@ export function PerspectiveHoleView({
       case "semirough":
         return "#65a30d";
       case "ob":
-        return "#ef4444";
+        return "#22c55e";
       default:
         return "#9ca3af";
     }
@@ -299,6 +299,12 @@ export function PerspectiveHoleView({
             <stop offset="70%" stopColor="#22c55e" /> {/* 遠景は暗め */}
             <stop offset="100%" stopColor="#16a34a" /> {/* 最遠は濃緑 */}
           </linearGradient>
+          {/* グリーンのリアルなグラデーション */}
+          <radialGradient id="greenGradient" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#4ade80" /> {/* 中心は明るい */}
+            <stop offset="50%" stopColor="#22c55e" /> {/* 中間 */}
+            <stop offset="100%" stopColor="#16a34a" /> {/* 端は暗い */}
+          </radialGradient>
           {/* 草のテクスチャパターン */}
           <pattern id="grassPattern" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
             <circle cx="1" cy="1" r="0.5" fill="#22c55e" opacity="0.3"/>
@@ -354,34 +360,34 @@ export function PerspectiveHoleView({
         <path
           d={`
             M -20 ${perspective.distanceToY(0)}
-            L ${50 - 50} ${perspective.distanceToY(0)}
-            L ${50 - 20} ${perspective.distanceToY(targetDistance)}
+            L 0 ${perspective.distanceToY(0)}
+            L 30 ${perspective.distanceToY(targetDistance)}
             L -20 ${perspective.distanceToY(targetDistance)}
             Z
             M 120 ${perspective.distanceToY(0)}
-            L ${50 + 50} ${perspective.distanceToY(0)}
-            L ${50 + 20} ${perspective.distanceToY(targetDistance)}
+            L 100 ${perspective.distanceToY(0)}
+            L 70 ${perspective.distanceToY(targetDistance)}
             L 120 ${perspective.distanceToY(targetDistance)}
             Z
           `}
-          fill="#15803d"
-          opacity="0.6"
+          fill="#65a30d"
+          opacity="0.8"
         />
         <path
           d={`
             M -20 ${perspective.distanceToY(0)}
-            L ${50 - 50} ${perspective.distanceToY(0)}
-            L ${50 - 20} ${perspective.distanceToY(targetDistance)}
+            L 0 ${perspective.distanceToY(0)}
+            L 30 ${perspective.distanceToY(targetDistance)}
             L -20 ${perspective.distanceToY(targetDistance)}
             Z
             M 120 ${perspective.distanceToY(0)}
-            L ${50 + 50} ${perspective.distanceToY(0)}
-            L ${50 + 20} ${perspective.distanceToY(targetDistance)}
+            L 100 ${perspective.distanceToY(0)}
+            L 70 ${perspective.distanceToY(targetDistance)}
             L 120 ${perspective.distanceToY(targetDistance)}
             Z
           `}
           fill="url(#grassPattern)"
-          opacity="0.3"
+          opacity="0.5"
         />
 
         {/* 遠景の木 */}
@@ -503,15 +509,57 @@ export function PerspectiveHoleView({
           fill="url(#greenGradient)"
           filter="url(#deepShadow)"
         />
-        {/* グリーンの傾斜表現（斜めストライプ） */}
+        {/* グリーンの芝テクスチャ */}
         <ellipse
           cx={50}
           cy={greenRect.y + greenRect.height / 2}
           rx={greenRect.width / 2}
           ry={greenRect.height / 2}
-          fill="url(#slopePattern)"
-          opacity="0.4"
+          fill="url(#grassPattern)"
+          opacity="0.3"
         />
+        {/* カップ（ホール） */}
+        <ellipse
+          cx={50}
+          cy={greenRect.y + greenRect.height / 2}
+          rx={greenRect.width / 12}
+          ry={greenRect.height / 10}
+          fill="#1a1a1a"
+          filter="url(#shadow)"
+        />
+        {/* カップの縁 */}
+        <ellipse
+          cx={50}
+          cy={greenRect.y + greenRect.height / 2}
+          rx={greenRect.width / 12}
+          ry={greenRect.height / 10}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="0.2"
+          opacity="0.3"
+        />
+        {/* ピン（旗） */}
+        <g>
+          {/* 旗竿 */}
+          <line
+            x1={50}
+            y1={greenRect.y + greenRect.height / 2}
+            x2={50}
+            y2={greenRect.y + greenRect.height / 2 - greenRect.height * 0.8}
+            stroke="#ffffff"
+            strokeWidth="0.3"
+            filter="url(#shadow)"
+          />
+          {/* 旗 */}
+          <path
+            d={`M 50 ${greenRect.y + greenRect.height / 2 - greenRect.height * 0.8}
+               L ${50 + greenRect.width * 0.3} ${greenRect.y + greenRect.height / 2 - greenRect.height * 0.6}
+               L 50 ${greenRect.y + greenRect.height / 2 - greenRect.height * 0.4}
+               Z`}
+            fill="#ef4444"
+            filter="url(#shadow)"
+          />
+        </g>
         {/* グリーンのハイライト */}
         <ellipse
           cx={50}
@@ -691,28 +739,34 @@ export function PerspectiveHoleView({
           opacity="0.5"
         />
 
-        {/* 統合パネル（ピンまでの距離・ライ・打数） */}
+        {/* 距離表示パネル */}
         <g>
           {/* パネル背景 */}
-          <rect x="2" y="2" width="65" height="18" rx="4" fill="rgba(255,255,255,0.95)" filter="url(#shadow)" />
+          <rect x="2" y="2" width="40" height="18" rx="4" fill="rgba(255,255,255,0.95)" filter="url(#shadow)" />
           {/* パネルの装飾ライン */}
-          <rect x="2" y="2" width="65" height="18" rx="4" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          <rect x="2" y="2" width="40" height="18" rx="4" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
           {/* タイトル */}
-          <text x="5" y="6.5" fontSize="3.5" fill="#065f46" fontWeight="bold" opacity="0.8">PIN TO</text>
+          <text x="5" y="6.5" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
           {/* 距離値 */}
-          <text x="29" y="11" textAnchor="middle" fontSize="8" fill="#065f46" fontWeight="bold">
+          <text x="38" y="12" textAnchor="end" fontSize="8" fill="#065f46" fontWeight="bold">
             {remainingDistance}Y
-          </text>
-          {/* ライ表示（右上） */}
-          <text x="63" y="6.5" textAnchor="end" fontSize="3.5" fill={LIE_COLORS[lie]} fontWeight="bold">
-            {lie.toUpperCase()}
           </text>
           {/* 打数情報（あれば） */}
           {strokeLabel && (
-            <text x="29" y="16.5" textAnchor="middle" fontSize="4" fill="#065f46" fontWeight="bold">
+            <text x="38" y="16.5" textAnchor="end" fontSize="4" fill="#065f46" fontWeight="bold">
               {strokeLabel}
             </text>
           )}
+        </g>
+
+        {/* ライ表示パネル（別個） */}
+        <g>
+          {/* パネル背景 */}
+          <rect x="76" y="2" width="22" height="9" rx="2" fill={LIE_COLORS[lie]} opacity="0.85" filter="url(#shadow)" />
+          {/* ライラベル */}
+          <text x="87" y="9" textAnchor="middle" fontSize="4" fill="white" fontWeight="bold">
+            {lie.toUpperCase()}
+          </text>
         </g>
 
         {/* ピンまでの距離マーカー（フェアウェイ上） */}
