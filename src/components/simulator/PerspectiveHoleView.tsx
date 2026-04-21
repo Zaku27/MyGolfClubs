@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Hole, ShotContext, LieType } from "../../types/game";
+import type { Hole, ShotContext, LieType, HazardType } from "../../types/game";
 
 interface Props {
   hole: Hole;
@@ -12,8 +12,36 @@ interface Props {
       finalY: number;
     };
   } | null;
+  strokeLabel?: string;
   className?: string;
 }
+
+// ハザード位置の型定義
+interface RectangleHazardPosition {
+  type: HazardType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scale: number;
+  shape: "rectangle";
+  pathData?: undefined;
+  bbox?: undefined;
+}
+
+interface PolygonHazardPosition {
+  type: HazardType;
+  pathData: string;
+  bbox: { x: number; y: number; width: number; height: number };
+  scale: number;
+  shape: "polygon";
+  x?: undefined;
+  y?: undefined;
+  width?: undefined;
+  height?: undefined;
+}
+
+type HazardPosition = RectangleHazardPosition | PolygonHazardPosition;
 
 const LIE_COLORS: Record<LieType, string> = {
   tee: "#10b981",      // emerald-500
@@ -39,6 +67,7 @@ export function PerspectiveHoleView({
   shotContext,
   aimXOffset,
   lastShotResult,
+  strokeLabel,
   className = "",
 }: Props) {
   const { remainingDistance, lie, originX, originY, targetDistance } = shotContext;
@@ -117,12 +146,12 @@ export function PerspectiveHoleView({
     return { x, y, scale, outcome: lastShotResult.finalOutcome };
   }, [lastShotResult, perspective]);
 
-  // フェアウェイの描画パス生成
+  // フェアウェイの描画パス生成（横幅広げた版）
   const fairwayPath = useMemo(() => {
     const startY = perspective.distanceToY(0);
     const endY = perspective.distanceToY(targetDistance);
-    const startWidth = 80;
-    const endWidth = 30;
+    const startWidth = 100; // 広げた（80→100）
+    const endWidth = 40;    // 広げた（30→40）
 
     // 台形のフェアウェイ
     return `
@@ -148,11 +177,13 @@ export function PerspectiveHoleView({
     };
   }, [targetDistance, perspective]);
 
-  // ハザードの位置計算
-  const hazardPositions = useMemo(() => {
+  // ハザードの位置計算（長方形とポリゴンの両方に対応）
+  const hazardPositions = useMemo<HazardPosition[]>(() => {
     if (!hole.hazards) return [];
 
-    return hole.hazards.map((hazard) => {
+    return hole.hazards.map<HazardPosition | null>((hazard) => {
+      // ラフ/セミラフタイプのハザードはパースペクティブビューでは表示しない（ラフエリアとして別途描画）
+      if (hazard.type === "rough" || hazard.type === "semirough") return null;
       const frontY = perspective.distanceToY(hazard.yFront);
       const backY = perspective.distanceToY(hazard.yBack);
       const midDistance = (hazard.yFront + hazard.yBack) / 2;
@@ -169,9 +200,45 @@ export function PerspectiveHoleView({
           width,
           height,
           scale,
+          shape: "rectangle" as const,
+        };
+      } else if (hazard.shape === "polygon" && hazard.points && hazard.points.length >= 3) {
+        // 地平線（空と地面の境界）を取得
+        const horizonY = perspective.horizonY;
+
+        // ポリゴンのパースペクティブ変換（地平線を超えないようにクリップ）
+        const transformedPoints = hazard.points.map((point) => ({
+          x: perspective.xToScreenX(point.x, point.y),
+          y: Math.max(perspective.distanceToY(point.y), horizonY), // 地平線より上には行かない
+        }));
+
+        // SVG path 文字列を生成
+        const pathData = transformedPoints
+          .map((pt, i) => `${i === 0 ? "M" : "L"} ${pt.x} ${pt.y}`)
+          .join(" ") + " Z";
+
+        // バウンディングボックスを計算（地平線以下の部分のみ）
+        const xs = transformedPoints.map((p) => p.x);
+        const ys = transformedPoints.map((p) => p.y);
+        const bbox = {
+          x: Math.min(...xs),
+          y: Math.max(Math.min(...ys), horizonY), // 地平線より上は含めない
+          width: Math.max(...xs) - Math.min(...xs),
+          height: Math.max(...ys) - Math.max(Math.min(...ys), horizonY),
+        };
+
+        // 全ての頂点が地平線より上にある場合は描画しない
+        if (bbox.height <= 0) return null;
+
+        return {
+          type: hazard.type,
+          pathData,
+          bbox,
+          scale,
+          shape: "polygon" as const,
         };
       } else {
-        // ポリゴンの簡易表示（バウンディングボックス風）
+        // フォールバック：バウンディングボックス表示
         const x = perspective.xToScreenX(hazard.xCenter - hazard.width / 2, midDistance);
         const width = hazard.width * scale * 0.8;
         const height = Math.abs(backY - frontY);
@@ -182,10 +249,10 @@ export function PerspectiveHoleView({
           width,
           height,
           scale,
-          isPolygon: true,
+          shape: "rectangle" as const,
         };
       }
-    });
+    }).filter((h): h is HazardPosition => h !== null);
   }, [hole.hazards, perspective]);
 
   const hazardColor = (type: string): string => {
@@ -207,85 +274,289 @@ export function PerspectiveHoleView({
   return (
     <div className={`relative w-full overflow-hidden rounded-xl bg-gradient-to-b from-sky-100 to-emerald-50 ${className}`}>
       <svg
-        viewBox="0 0 100 100"
+        viewBox="-20 0 140 100"
         preserveAspectRatio="xMidYMid meet"
         className="w-full h-full"
         style={{ minHeight: "200px" }}
       >
         {/* 背景：空と地面 */}
         <defs>
+          {/* 空のグラデーション - 時間帯に応じて変化 */}
           <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#e0f2fe" />
-            <stop offset="100%" stopColor="#f0fdf4" />
+            <stop offset="0%" stopColor="#0ea5e9" /> {/* 空の青 */}
+            <stop offset="50%" stopColor="#7dd3fc" /> {/* 明るい青 */}
+            <stop offset="100%" stopColor="#f0fdf4" /> {/* 地平線近くの明るさ */}
           </linearGradient>
+          {/* 地平線の霞み */}
+          <linearGradient id="horizonHaze" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.6" />
+          </linearGradient>
+          {/* フェアウェイの質感向上グラデーション */}
           <linearGradient id="fairwayGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#86efac" />
-            <stop offset="100%" stopColor="#4ade80" />
+            <stop offset="0%" stopColor="#4ade80" /> {/* 近い方は濃い緑 */}
+            <stop offset="30%" stopColor="#86efac" /> {/* 中間 */}
+            <stop offset="70%" stopColor="#22c55e" /> {/* 遠景は暗め */}
+            <stop offset="100%" stopColor="#16a34a" /> {/* 最遠は濃緑 */}
           </linearGradient>
+          {/* 草のテクスチャパターン */}
+          <pattern id="grassPattern" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="0.5" fill="#22c55e" opacity="0.3"/>
+            <circle cx="3" cy="2" r="0.3" fill="#16a34a" opacity="0.2"/>
+            <circle cx="2" cy="3" r="0.4" fill="#4ade80" opacity="0.2"/>
+          </pattern>
+          {/* グリーンの傾斜表示パターン */}
+          <pattern id="slopePattern" x="0" y="0" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="3" stroke="#059669" strokeWidth="0.5" opacity="0.3"/>
+          </pattern>
+          <pattern id="slopePatternReverse" x="0" y="0" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+            <line x1="0" y1="0" x2="0" y2="3" stroke="#059669" strokeWidth="0.5" opacity="0.3"/>
+          </pattern>
+          {/* 木のシルエットパターン */}
+          <pattern id="treePattern" x="0" y="0" width="10" height="15" patternUnits="userSpaceOnUse">
+            <ellipse cx="5" cy="8" rx="3" ry="5" fill="#166534" opacity="0.4"/>
+            <circle cx="5" cy="5" r="2.5" fill="#15803d" opacity="0.5"/>
+          </pattern>
+          {/* バンカーの砂テクスチャ */}
+          <pattern id="sandPattern" x="0" y="0" width="2" height="2" patternUnits="userSpaceOnUse">
+            <circle cx="0.5" cy="0.5" r="0.3" fill="#d97706" opacity="0.2"/>
+            <circle cx="1.5" cy="1.5" r="0.3" fill="#b45309" opacity="0.15"/>
+          </pattern>
+          {/* ウォーターの波紋パターン */}
+          <pattern id="waterPattern" x="0" y="0" width="6" height="4" patternUnits="userSpaceOnUse">
+            <path d="M0 2 Q1.5 1, 3 2 Q4.5 3, 6 2" stroke="#60a5fa" strokeWidth="0.3" fill="none" opacity="0.4"/>
+          </pattern>
           <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#34d399" />
             <stop offset="100%" stopColor="#10b981" />
           </linearGradient>
-          <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0.5" dy="0.5" stdDeviation="0.5" floodOpacity="0.3" />
+          {/* より深みのあるシャドウ */}
+          <filter id="shadow" x="-100%" y="-100%" width="300%" height="300%">
+            <feDropShadow dx="1" dy="1" stdDeviation="1" floodOpacity="0.4" />
+          </filter>
+          <filter id="deepShadow" x="-100%" y="-100%" width="300%" height="300%">
+            <feDropShadow dx="2" dy="3" stdDeviation="2" floodOpacity="0.5" />
+          </filter>
+          {/* 奥行きブラー効果 */}
+          <filter id="distanceBlur" x="0" y="0" width="100%" height="100%">
+            <feGaussianBlur stdDeviation="0.5" />
           </filter>
         </defs>
 
-        {/* 背景 */}
-        <rect width="100" height="100" fill="url(#skyGradient)" />
+        {/* 背景 - viewBox全体をカバー */}
+        <rect x="-20" width="140" height="100" fill="url(#skyGradient)" />
 
-        {/* フェアウェイ */}
-        <path d={fairwayPath} fill="url(#fairwayGradient)" opacity="0.8" />
+        {/* フェアウェイ - 草のテクスチャを重ねる */}
+        <path d={fairwayPath} fill="url(#fairwayGradient)" opacity="0.9" />
+        <path d={fairwayPath} fill="url(#grassPattern)" opacity="0.4" />
 
-        {/* ハザード */}
+        {/* ラフエリア（フェアウェイの外側） - フェアウェイ端に接続し、外側は垂直 */}
+        <path
+          d={`
+            M -20 ${perspective.distanceToY(0)}
+            L ${50 - 50} ${perspective.distanceToY(0)}
+            L ${50 - 20} ${perspective.distanceToY(targetDistance)}
+            L -20 ${perspective.distanceToY(targetDistance)}
+            Z
+            M 120 ${perspective.distanceToY(0)}
+            L ${50 + 50} ${perspective.distanceToY(0)}
+            L ${50 + 20} ${perspective.distanceToY(targetDistance)}
+            L 120 ${perspective.distanceToY(targetDistance)}
+            Z
+          `}
+          fill="#15803d"
+          opacity="0.6"
+        />
+        <path
+          d={`
+            M -20 ${perspective.distanceToY(0)}
+            L ${50 - 50} ${perspective.distanceToY(0)}
+            L ${50 - 20} ${perspective.distanceToY(targetDistance)}
+            L -20 ${perspective.distanceToY(targetDistance)}
+            Z
+            M 120 ${perspective.distanceToY(0)}
+            L ${50 + 50} ${perspective.distanceToY(0)}
+            L ${50 + 20} ${perspective.distanceToY(targetDistance)}
+            L 120 ${perspective.distanceToY(targetDistance)}
+            Z
+          `}
+          fill="url(#grassPattern)"
+          opacity="0.3"
+        />
+
+        {/* 遠景の木 */}
+        <g opacity="0.5" filter="url(#distanceBlur)">
+          <ellipse cx="15" cy={perspective.distanceToY(targetDistance * 0.8)} rx="4" ry="6" fill="#166534" />
+          <ellipse cx="85" cy={perspective.distanceToY(targetDistance * 0.75)} rx="5" ry="7" fill="#15803d" />
+          <ellipse cx="25" cy={perspective.distanceToY(targetDistance * 0.85)} rx="3" ry="5" fill="#166534" />
+          <ellipse cx="75" cy={perspective.distanceToY(targetDistance * 0.9)} rx="4" ry="6" fill="#15803d" />
+          <ellipse cx="10" cy={perspective.distanceToY(targetDistance * 0.7)} rx="3" ry="4" fill="#166534" />
+          <ellipse cx="90" cy={perspective.distanceToY(targetDistance * 0.65)} rx="3" ry="4" fill="#15803d" />
+        </g>
+
+        {/* ハザード - 立体的な表現（長方形とポリゴンの両方に対応） */}
         {hazardPositions.map((hazard, index) => (
           <g key={index}>
-            <rect
-              x={hazard.x}
-              y={hazard.y}
-              width={hazard.width}
-              height={hazard.height}
-              fill={hazardColor(hazard.type)}
-              opacity={0.6}
-              rx={hazard.isPolygon ? 2 : 0}
-            />
-            {/* ハザードラベル */}
-            <text
-              x={hazard.x + hazard.width / 2}
-              y={hazard.y + hazard.height / 2}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="3"
-              fill="white"
-              fontWeight="bold"
-              style={{ textShadow: "0.3px 0.3px 0.5px rgba(0,0,0,0.5)" }}
-            >
-              {hazard.type === "water" ? "W" : hazard.type === "bunker" ? "B" : "R"}
-            </text>
+            {hazard.shape === "polygon" && hazard.pathData ? (
+              <>
+                {/* ポリゴンハザードの縁（立体的効果） */}
+                <path
+                  d={hazard.pathData}
+                  fill="rgba(0,0,0,0.3)"
+                  transform="translate(0.3, 0.3)"
+                />
+                {/* ポリゴンハザード本体 */}
+                <path
+                  d={hazard.pathData}
+                  fill={hazardColor(hazard.type)}
+                  opacity={hazard.type === "water" ? 0.85 : 0.75}
+                  filter={hazard.type === "bunker" ? "url(#shadow)" : undefined}
+                />
+                {/* ウォーターの波紋パターン */}
+                {hazard.type === "water" && (
+                  <path d={hazard.pathData} fill="url(#waterPattern)" opacity="0.5" />
+                )}
+                {/* バンカーの砂テクスチャ */}
+                {hazard.type === "bunker" && (
+                  <path d={hazard.pathData} fill="url(#sandPattern)" opacity="0.6" />
+                )}
+                {/* ポリゴンのハイライト縁 */}
+                <path
+                  d={hazard.pathData}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.3)"
+                  strokeWidth="0.2"
+                />
+              </>
+            ) : hazard.shape === "rectangle" && typeof hazard.x === "number" ? (
+              <>
+                {/* 長方形ハザードの縁（立体的効果） */}
+                <rect
+                  x={hazard.x + 0.3}
+                  y={hazard.y + 0.3}
+                  width={hazard.width}
+                  height={hazard.height}
+                  fill="rgba(0,0,0,0.3)"
+                />
+                {/* 長方形ハザード本体 */}
+                <rect
+                  x={hazard.x}
+                  y={hazard.y}
+                  width={hazard.width}
+                  height={hazard.height}
+                  fill={hazardColor(hazard.type)}
+                  opacity={hazard.type === "water" ? 0.85 : 0.75}
+                  filter={hazard.type === "bunker" ? "url(#shadow)" : undefined}
+                />
+                {/* ウォーターの波紋パターン */}
+                {hazard.type === "water" && (
+                  <rect
+                    x={hazard.x}
+                    y={hazard.y}
+                    width={hazard.width}
+                    height={hazard.height}
+                    fill="url(#waterPattern)"
+                    opacity="0.5"
+                  />
+                )}
+                {/* バンカーの砂テクスチャ */}
+                {hazard.type === "bunker" && (
+                  <rect
+                    x={hazard.x}
+                    y={hazard.y}
+                    width={hazard.width}
+                    height={hazard.height}
+                    fill="url(#sandPattern)"
+                    opacity="0.6"
+                  />
+                )}
+                {/* 長方形のハイライト縁 */}
+                <rect
+                  x={hazard.x}
+                  y={hazard.y}
+                  width={hazard.width}
+                  height={hazard.height}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.3)"
+                  strokeWidth="0.2"
+                />
+              </>
+            ) : null}
           </g>
         ))}
 
-        {/* グリーン */}
+        {/* グリーン - フリンジ（縁） */}
+        <ellipse
+          cx={50}
+          cy={greenRect.y + greenRect.height / 2}
+          rx={greenRect.width / 2 + 1.5}
+          ry={greenRect.height / 2 + 0.8}
+          fill="#065f46"
+          opacity="0.6"
+        />
+        {/* グリーン本体 */}
         <ellipse
           cx={50}
           cy={greenRect.y + greenRect.height / 2}
           rx={greenRect.width / 2}
           ry={greenRect.height / 2}
           fill="url(#greenGradient)"
-          filter="url(#shadow)"
+          filter="url(#deepShadow)"
+        />
+        {/* グリーンの傾斜表現（斜めストライプ） */}
+        <ellipse
+          cx={50}
+          cy={greenRect.y + greenRect.height / 2}
+          rx={greenRect.width / 2}
+          ry={greenRect.height / 2}
+          fill="url(#slopePattern)"
+          opacity="0.4"
+        />
+        {/* グリーンのハイライト */}
+        <ellipse
+          cx={50}
+          cy={greenRect.y + greenRect.height / 2 - 0.3}
+          rx={greenRect.width / 2 - 1}
+          ry={greenRect.height / 2 - 0.5}
+          fill="none"
+          stroke="rgba(255,255,255,0.2)"
+          strokeWidth="0.3"
         />
 
-        {/* ピン */}
+        {/* ピン - よりリアルな表現 */}
         <g transform={`translate(${pinPosition.x}, ${pinPosition.y})`}>
-          {/* ピンフラッグ */}
-          <line x1="0" y1="0" x2="0" y2="-4" stroke="#1f2937" strokeWidth="0.3" />
-          <polygon
-            points="0,-4 3,-3 0,-2"
-            fill="#ef4444"
-            filter="url(#shadow)"
+          {/* ピンの影 */}
+          <ellipse
+            cx="0.8"
+            cy="0.5"
+            rx="2"
+            ry="1"
+            fill="rgba(0,0,0,0.3)"
           />
-          {/* ホール */}
-          <circle cx="0" cy="0" r="0.8" fill="#1f2937" />
+          {/* ホール（カップ） */}
+          <ellipse cx="0" cy="0.2" rx="1.2" ry="0.6" fill="#1f2937" />
+          <ellipse cx="0" cy="0.1" rx="0.8" ry="0.4" fill="#0f172a" />
+          {/* ピンスティック */}
+          <line x1="0" y1="0" x2="0" y2="-5" stroke="#1f2937" strokeWidth="0.4" strokeLinecap="round" />
+          {/* ピンのハイライト */}
+          <line x1="-0.1" y1="-0.5" x2="-0.1" y2="-4.5" stroke="#4b5563" strokeWidth="0.15" />
+          {/* フラッグ */}
+          <g filter="url(#shadow)">
+            {/* フラッグのポール部分 */}
+            <circle cx="0" cy="-5" r="0.3" fill="#1f2937" />
+            {/* フラッグ布 - 布の揺れを表現 */}
+            <path
+              d="M 0 -4.8 Q 2 -4.5, 3 -4 Q 2 -3.5, 0 -3.2 Z"
+              fill="#ef4444"
+            />
+            {/* フラッグのハイライト */}
+            <path
+              d="M 0.3 -4.6 Q 1.5 -4.3, 2.2 -4 Q 1.5 -3.7, 0.3 -3.4"
+              stroke="#f87171"
+              strokeWidth="0.2"
+              fill="none"
+            />
+          </g>
         </g>
 
         {/* 前回ショットの着地点マーカー */}
@@ -303,60 +574,107 @@ export function PerspectiveHoleView({
           </g>
         )}
 
-        {/* ボール */}
+        {/* ボール - よりリアルな表現 */}
         <g transform={`translate(${ballPosition.x}, ${ballPosition.y})`}>
-          {/* ボールの影 */}
+          {/* ボールの影（奥行きを出す） */}
           <ellipse
-            cx="0.5"
-            cy="0.5"
-            rx={1.5 * ballPosition.scale}
-            ry={0.8 * ballPosition.scale}
-            fill="rgba(0,0,0,0.2)"
+            cx="0.8"
+            cy="0.8"
+            rx={1.8 * ballPosition.scale}
+            ry={1 * ballPosition.scale}
+            fill="rgba(0,0,0,0.25)"
+            filter="url(#distanceBlur)"
           />
           {/* ボール本体 */}
           <circle
-            r={1.2 * ballPosition.scale}
+            r={1.3 * ballPosition.scale}
             fill="white"
-            stroke="#1f2937"
-            strokeWidth="0.2"
-            filter="url(#shadow)"
+            stroke="#374151"
+            strokeWidth="0.15"
+            filter="url(#deepShadow)"
           />
-          {/* ライの色インジケーター */}
+          {/* ボールのディンプル（テクスチャ） */}
           <circle
-            r={0.8 * ballPosition.scale}
+            r={1.1 * ballPosition.scale}
+            fill="none"
+            stroke="#e5e7eb"
+            strokeWidth="0.1"
+            strokeDasharray="0.3,0.2"
+          />
+          {/* ボールのハイライト（立体感） */}
+          <ellipse
+            cx={-0.4 * ballPosition.scale}
+            cy={-0.4 * ballPosition.scale}
+            rx={0.5 * ballPosition.scale}
+            ry={0.3 * ballPosition.scale}
+            fill="rgba(255,255,255,0.8)"
+          />
+          {/* ライの色インジケーター（半透明リング） */}
+          <circle
+            r={1 * ballPosition.scale}
+            fill="none"
+            stroke={LIE_COLORS[lie]}
+            strokeWidth={0.4 * ballPosition.scale}
+            opacity="0.9"
+          />
+          <circle
+            r={0.6 * ballPosition.scale}
             fill={LIE_COLORS[lie]}
-            opacity="0.8"
+            opacity="0.3"
           />
         </g>
 
-        {/* 狙い点マーカー */}
+        {/* 狙い点マーカー - より洗練されたデザイン */}
         <g transform={`translate(${aimPosition.x}, ${aimPosition.y})`}>
-          {/* 十字マーカー */}
-          <line
-            x1={-2 * aimPosition.scale}
-            y1="0"
-            x2={2 * aimPosition.scale}
-            y2="0"
-            stroke="#ef4444"
-            strokeWidth="0.4"
-            opacity="0.8"
-          />
-          <line
-            x1="0"
-            y1={-2 * aimPosition.scale}
-            x2="0"
-            y2={2 * aimPosition.scale}
-            stroke="#ef4444"
-            strokeWidth="0.4"
-            opacity="0.8"
-          />
-          {/* 狙い点リング */}
+          {/* 外側リング（影） */}
           <circle
-            r={2.5 * aimPosition.scale}
+            r={3.2 * aimPosition.scale}
+            fill="none"
+            stroke="rgba(0,0,0,0.2)"
+            strokeWidth="0.4"
+          />
+          {/* 外側リング */}
+          <circle
+            r={3 * aimPosition.scale}
             fill="none"
             stroke="#ef4444"
             strokeWidth="0.3"
-            strokeDasharray="1,0.5"
+            opacity="0.7"
+          />
+          {/* 十字マーカー */}
+          <line
+            x1={-2.5 * aimPosition.scale}
+            y1="0"
+            x2={2.5 * aimPosition.scale}
+            y2="0"
+            stroke="#ef4444"
+            strokeWidth={0.4 * aimPosition.scale}
+            opacity="0.9"
+            strokeLinecap="round"
+          />
+          <line
+            x1="0"
+            y1={-2.5 * aimPosition.scale}
+            x2="0"
+            y2={2.5 * aimPosition.scale}
+            stroke="#ef4444"
+            strokeWidth={0.4 * aimPosition.scale}
+            opacity="0.9"
+            strokeLinecap="round"
+          />
+          {/* 中心ドット */}
+          <circle
+            r={0.6 * aimPosition.scale}
+            fill="#ef4444"
+            opacity="0.9"
+          />
+          {/* インナーリング */}
+          <circle
+            r={1.8 * aimPosition.scale}
+            fill="none"
+            stroke="#f87171"
+            strokeWidth="0.2"
+            strokeDasharray="0.8,0.4"
             opacity="0.6"
           />
         </g>
@@ -373,28 +691,43 @@ export function PerspectiveHoleView({
           opacity="0.5"
         />
 
-        {/* 距離表示 */}
-        <text
-          x="5"
-          y="8"
-          fontSize="4"
-          fill="#065f46"
-          fontWeight="bold"
-        >
-          {remainingDistance}yd
-        </text>
+        {/* 統合パネル（ピンまでの距離・ライ・打数） */}
+        <g>
+          {/* パネル背景 */}
+          <rect x="2" y="2" width="65" height="18" rx="4" fill="rgba(255,255,255,0.95)" filter="url(#shadow)" />
+          {/* パネルの装飾ライン */}
+          <rect x="2" y="2" width="65" height="18" rx="4" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          {/* タイトル */}
+          <text x="5" y="6.5" fontSize="3.5" fill="#065f46" fontWeight="bold" opacity="0.8">PIN TO</text>
+          {/* 距離値 */}
+          <text x="29" y="11" textAnchor="middle" fontSize="8" fill="#065f46" fontWeight="bold">
+            {remainingDistance}Y
+          </text>
+          {/* ライ表示（右上） */}
+          <text x="63" y="6.5" textAnchor="end" fontSize="3.5" fill={LIE_COLORS[lie]} fontWeight="bold">
+            {lie.toUpperCase()}
+          </text>
+          {/* 打数情報（あれば） */}
+          {strokeLabel && (
+            <text x="29" y="16.5" textAnchor="middle" fontSize="4" fill="#065f46" fontWeight="bold">
+              {strokeLabel}
+            </text>
+          )}
+        </g>
 
-        {/* ライ表示 */}
-        <text
-          x="95"
-          y="8"
-          textAnchor="end"
-          fontSize="3"
-          fill="#065f46"
-          fontWeight="bold"
-        >
-          {lie.toUpperCase()}
-        </text>
+        {/* ピンまでの距離マーカー（フェアウェイ上） */}
+        {[50, 100, 150].map((markerDist) => {
+          if (markerDist > targetDistance) return null;
+          const markerY = perspective.distanceToY(targetDistance - markerDist);
+          return (
+            <g key={markerDist}>
+              {/* 距離ライン */}
+              <line x1="25" y1={markerY} x2="75" y2={markerY} stroke="rgba(255,255,255,0.5)" strokeWidth="0.3" strokeDasharray="2,2" />
+              {/* 距離ラベル */}
+              <text x="50" y={markerY - 1} textAnchor="middle" fontSize="2.5" fill="rgba(255,255,255,0.7)" fontWeight="bold">{markerDist}yd</text>
+            </g>
+          );
+        })}
       </svg>
     </div>
   );

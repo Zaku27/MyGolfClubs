@@ -463,39 +463,18 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
 
 
-        <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-4 py-6 text-center shadow-sm shadow-emerald-300/40 sm:px-6 sm:py-8">
-          <p className="text-xs tracking-[0.25em] text-emerald-600">現在の状況</p>
-          <h1 className="mt-3 text-2xl font-extrabold leading-tight text-emerald-900 sm:text-3xl">
-            ピンまで {remainingDistance}ヤード
-          </h1>
-          <p className="mt-4 text-base font-medium text-emerald-800 sm:text-lg">{currentStatusLabel}</p>
-          <p className="mt-1 text-base font-medium text-emerald-800 sm:text-lg">{currentStrokeLabel}</p>
-
+        <section className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-emerald-300 bg-emerald-50/90 px-4 py-6 shadow-sm shadow-emerald-300/40 sm:px-6 sm:py-8">
           {/* 3Dパースペクティブビュー */}
-          <div className="mt-6 w-full max-w-md">
+          <div className="w-full max-w-4xl">
             <PerspectiveHoleView
               hole={currentHole}
               shotContext={shotContext}
               aimXOffset={aimXOffset}
               lastShotResult={lastShotResult}
-              className="h-48 sm:h-56"
+              strokeLabel={currentStrokeLabel}
+              className="h-72 sm:h-80"
             />
           </div>
-
-          {/* グリーン上での自動パットボタン */}
-          {isGreenLie && hasTakenFirstPutt && lastShotResult && lastShotResult.newRemainingDistance > 0 && (
-            <div className="mt-4">
-              <button
-                onClick={executeAutoPutts}
-                disabled={shotInProgress}
-                className="rounded-xl bg-sky-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-sky-300/50 transition hover:bg-sky-400 disabled:opacity-50"
-              >
-                残りのパットを自動で打つ ({currentHolePutts}パット目)
-              </button>
-            </div>
-          )}
-
-
 
         {/* ショット結果表示（インライン） */}
         {lastShotResult && (() => {
@@ -666,8 +645,21 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           </div>
           );
         })()}
+
+        {/* グリーン上での自動パットボタン（結果パネルの下） */}
+        {isGreenLie && hasTakenFirstPutt && lastShotResult && lastShotResult.newRemainingDistance > 0 && (
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={executeAutoPutts}
+              disabled={shotInProgress}
+              className="rounded-xl bg-sky-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-sky-300/50 transition hover:bg-sky-400 disabled:opacity-50"
+            >
+              残りのパットを自動で打つ ({currentHolePutts}パット目)
+            </button>
+          </div>
+        )}
         </section>
-        
+
         {/* おすすめクラブセクション ...existing code... */}
 
         {/* ショット操作グループ */}

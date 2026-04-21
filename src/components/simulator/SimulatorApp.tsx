@@ -130,7 +130,7 @@ function SetupScreen({
           </div>
         </div>
       </div>
-      <div className="flex flex-col items-center justify-center flex-1 p-6 gap-6 pt-20">
+      <div className="flex flex-col items-center justify-center flex-1 p-6 gap-6 pt-10">
       <div className="text-center">
         <h1 className="text-3xl font-black text-emerald-900 tracking-tight">
           コースシミュレーター
