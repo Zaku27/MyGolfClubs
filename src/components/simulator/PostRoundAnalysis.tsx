@@ -26,6 +26,13 @@ function StatCard({ label, value }: { label: string; value: string }) {
   );
 }
 
+function toParString(score: number, par: number): string {
+  const diff = score - par;
+  if (diff === 0) return 'E';
+  if (diff > 0) return `+${diff}`;
+  return `${diff}`;
+}
+
 function ClubStatList({
   title,
   items,
@@ -201,8 +208,8 @@ export function PostRoundAnalysis({
           <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">最終スコア</p>
-              <p className="mt-2 text-5xl font-black leading-none text-emerald-50">{analysis.final}</p>
-              <p className="mt-2 text-sm text-emerald-200">パー {analysis.totalPar}</p>
+              <p className="mt-2 text-5xl font-black leading-none text-emerald-50">{toParString(analysis.final, analysis.totalPar)}</p>
+              <p className="mt-2 text-sm text-emerald-200">ストローク{analysis.final}/パー{analysis.totalPar}</p>
             </div>
 
             <div className="rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">

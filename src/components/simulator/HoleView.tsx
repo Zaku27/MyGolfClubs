@@ -14,6 +14,8 @@ import {
 } from "../../utils/clubSuccessDisplay";
 import type { LandingResult } from "../../utils/landingPosition";
 import { HoleMapCanvas } from "./HoleMapCanvas";
+import { PerspectiveHoleView } from "./PerspectiveHoleView";
+import { evaluateShotResult, getScoreCelebration } from "../../utils/shotResultEvaluation";
 
 type LandingHistoryItem = {
   origin: { x: number; y: number };
@@ -77,6 +79,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     playMode,
     playerSkillLevel,
     shotInProgress,
+    currentHolePutts,
+    hasTakenFirstPutt,
+    executeAutoPutts,
   } = useGameStore();
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [showMobileScorecard, setShowMobileScorecard] = useState(false);
@@ -466,14 +471,99 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           <p className="mt-4 text-base font-medium text-emerald-800 sm:text-lg">{currentStatusLabel}</p>
           <p className="mt-1 text-base font-medium text-emerald-800 sm:text-lg">{currentStrokeLabel}</p>
 
+          {/* 3Dパースペクティブビュー */}
+          <div className="mt-6 w-full max-w-md">
+            <PerspectiveHoleView
+              hole={currentHole}
+              shotContext={shotContext}
+              aimXOffset={aimXOffset}
+              lastShotResult={lastShotResult}
+              className="h-48 sm:h-56"
+            />
+          </div>
+
+          {/* グリーン上での自動パットボタン */}
+          {isGreenLie && hasTakenFirstPutt && lastShotResult && lastShotResult.newRemainingDistance > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={executeAutoPutts}
+                disabled={shotInProgress}
+                className="rounded-xl bg-sky-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-sky-300/50 transition hover:bg-sky-400 disabled:opacity-50"
+              >
+                残りのパットを自動で打つ ({currentHolePutts}パット目)
+              </button>
+            </div>
+          )}
+
 
 
         {/* ショット結果表示（インライン） */}
-        {lastShotResult && (
+        {lastShotResult && (() => {
+          // 結果評価を計算
+          const isPutter = lastShotClub?.type === "Putter";
+          const evaluation = evaluateShotResult(
+            lastShotResult.finalOutcome,
+            lastShotResult.shotQuality,
+            lastShotResult.wasSuccessful,
+            lastShotResult.newRemainingDistance,
+            isPutter,
+          );
+
+          // ホール完了時のスコア演出
+          const scoreCelebration = isHoleComplete && currentHole
+            ? getScoreCelebration(holeStrokes, currentHole.par)
+            : null;
+
+          return (
           <div className="mt-8 w-full max-w-md mx-auto rounded-2xl border border-emerald-300 bg-emerald-50/95 p-5 shadow-xl shadow-emerald-300/40">
+            {/* スコア演出バナー（ホール完了時） */}
+            {scoreCelebration && (
+              <div className={`mb-4 rounded-2xl px-4 py-4 text-center ${scoreCelebration.bgClass} ${scoreCelebration.animationClass}`}>
+                <div className="text-3xl mb-1">{scoreCelebration.emoji}</div>
+                <div className={`text-xl font-black ${scoreCelebration.textClass}`}>
+                  {scoreCelebration.label}
+                </div>
+                <div className={`text-sm font-semibold mt-1 ${scoreCelebration.textClass} opacity-80`}>
+                  {holeStrokes}打 / PAR {currentHole.par}
+                </div>
+                {currentHolePutts > 0 && (
+                  <div className={`text-xs mt-1 ${scoreCelebration.textClass} opacity-70`}>
+                    パット {currentHolePutts} 回
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="mb-4 rounded-3xl border border-emerald-200 bg-emerald-100 px-4 py-6 text-center shadow-sm shadow-emerald-100/80">
               <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">{shotResultTitle}</div>
-              <div className="mt-3 text-3xl font-bold text-emerald-900">
+
+              {/* 評価バッジ */}
+              <div
+                className="mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 font-bold text-white shadow-md"
+                style={{ backgroundColor: evaluation.color }}
+              >
+                <span className="text-lg">{evaluation.icon}</span>
+                <span>{evaluation.label}</span>
+              </div>
+
+              {/* 評価スコアプログレスバー */}
+              <div className="mt-3 mx-auto max-w-[200px]">
+                <div className="flex items-center justify-between text-xs text-emerald-700 mb-1">
+                  <span>ショット評価</span>
+                  <span>{evaluation.score}点</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-emerald-200 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${evaluation.score}%`,
+                      backgroundColor: evaluation.color,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 text-2xl font-bold text-emerald-900">
                 {resultOutcomeLabel}
               </div>
               {lastShotResult.penaltyStrokes > 0 && (
@@ -497,7 +587,14 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
             {showShotBadges && (
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-emerald-800">
-                <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
+                <span
+                  className="rounded-full px-3 py-1"
+                  style={{
+                    backgroundColor: evaluation.bgColor,
+                    color: evaluation.color,
+                    border: `1px solid ${evaluation.color}`,
+                  }}
+                >
                   {SHOT_QUALITY_LABEL[lastShotResult.shotQuality] ?? lastShotResult.shotQuality}
                 </span>
                 {lastShotResult.landing && (
@@ -508,30 +605,52 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                     <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
                       ラン {lastShotResult.landing.roll.toFixed(1)}yd
                     </span>
-                    <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                      着地 X:{lastShotResult.landing.finalX.toFixed(1)} / Y:{lastShotResult.landing.finalY.toFixed(1)}
-                    </span>
                   </>
                 )}
               </div>
             )}
+
+            {/* 自動パット結果の詳細表示 */}
+            {lastShotResult.autoPuttResult && (
+              <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+                <p className="text-sm font-bold text-sky-800 mb-2">自動パット結果</p>
+                <div className="space-y-1">
+                  {lastShotResult.autoPuttResult.puttDetails.map((detail) => (
+                    <div key={detail.puttNumber} className="flex items-center justify-between text-xs">
+                      <span className="text-sky-700">
+                        {detail.puttNumber}パット目: {detail.fromDistance.toFixed(1)}yd
+                      </span>
+                      <span className={detail.success ? "text-emerald-600 font-semibold" : "text-amber-600"}>
+                        {detail.success ? "成功" : `残り ${detail.remainingAfterPutt.toFixed(1)}yd`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm font-bold text-sky-800 mt-2 text-right">
+                  合計 {currentHolePutts} パット
+                </p>
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-2">
               {lastShotResult.confidenceBoostApplied && (
                 <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
                   勢いボーナス適用
                 </span>
               )}
-              {!lastShotResult.confidenceBoostApplied && confidenceBoost > 0 && (
+              {!lastShotResult.confidenceBoostApplied && confidenceBoost > 0 && !isHoleComplete && (
                 <span className="rounded-full border border-lime-300/70 bg-lime-100 px-3 py-1 text-lime-800">
                   次の1打 +{confidenceBoost}%
                 </span>
               )}
+            </div>
 
             {/* 続ける/次のホールへ/スコアカードを見るボタン */}
             <div className="mt-4">
               {phase === "hole_complete" ? (
                 <button
                   onClick={useGameStore.getState().advanceHole}
-                  className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+                  className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white transition hover:bg-emerald-400"
                 >
                   次のホールへ
                 </button>
@@ -545,7 +664,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               ) : null}
             </div>
           </div>
-        )}
+          );
+        })()}
         </section>
         
         {/* おすすめクラブセクション ...existing code... */}

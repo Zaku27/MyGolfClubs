@@ -21,6 +21,7 @@ import {
   getAnalysisAdjustedBaseSuccessRate,
   isWeakClubByAnalysisAdjustedRate,
 } from "../utils/clubSuccessDisplay";
+import { simulateAutoPutts } from "../utils/shotResultEvaluation";
 
 // ─── Wind generation ──────────────────────────────────────────────────────────
 
@@ -109,6 +110,10 @@ interface GameStoreState {
   previousWindStrength: number | null;
   /** 実測データモード用のパタースキルレベル (0.5-0.9)。開始時に一回決定。 */
   measuredModePutterSkillLevel: number | null;
+  /** 現在のホールで使用したパット数 */
+  currentHolePutts: number;
+  /** グリーン上で最初のパットを済ませたか */
+  hasTakenFirstPutt: boolean;
 }
 
 interface GameStoreActions {
@@ -119,6 +124,8 @@ interface GameStoreActions {
   takeShot: () => void;
   advanceHole: () => void;
   resetGame: () => void;
+  /** 自動パットを実行（グリーン上で最初のパット後にカップインまで） */
+  executeAutoPutts: () => void;
 }
 
 type GameStore = GameStoreState & GameStoreActions;
@@ -159,6 +166,8 @@ const INITIAL_STATE: GameStoreState = {
   playMode: "bag" as "robot" | "bag" | "measured",
   previousWindStrength: null,
   measuredModePutterSkillLevel: null,
+  currentHolePutts: 0,
+  hasTakenFirstPutt: false,
 };
 
 function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: number, previousWindStrength: number | null = null): ShotContext {
@@ -256,6 +265,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       shotContext: initialContext,
       previousWindStrength: initialContext.windStrength ?? null,
       measuredModePutterSkillLevel,
+      currentHolePutts: 0,
+      hasTakenFirstPutt: false,
     });
     // パット確率用にプレイヤースキルレベルを非同期取得
     ClubService.getPlayerSkillLevel()
@@ -291,6 +302,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       playerSkillLevel,
       playMode,
       roundSeedNonce,
+      currentHolePutts,
+      hasTakenFirstPutt,
     } = get();
 
     if (!selectedClubId) return;
@@ -354,6 +367,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
       const newHoleStrokes = holeStrokes + result.strokesAdded;
       const streakAfterShot = result.wasSuccessful ? goodShotStreak + 1 : 0;
+      const wasOnGreenBefore = shotContext.lie === "green";
+      const isFirstPuttOnGreen = isPutter && wasOnGreenBefore;
+
       const shotLog: ShotLog = {
         holeNumber: course[currentHoleIndex].number,
         clubId: club.id,
@@ -368,6 +384,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         shotQuality: result.shotQuality,
         wasWeakClub: isRobotMode ? false : treatedAsWeakClub,
       };
+
+      // パットカウント更新
+      const puttsAdded = isPutter ? 1 : 0;
+      const newPuttCount = currentHolePutts + puttsAdded;
+      const newHasTakenFirstPutt = hasTakenFirstPutt || isFirstPuttOnGreen;
+
       const nextHoleShots = [...currentHoleShots, shotLog];
       const nextRoundShots = [...roundShots, shotLog];
 
@@ -377,7 +399,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const holeSummary = buildHoleSummary(currentHole, nextHoleShots, nextRoundShots);
         const newScores: HoleScore[] = [
           ...scores,
-          { holeNumber: currentHole.number, par: currentHole.par, strokes: newHoleStrokes },
+          { holeNumber: currentHole.number, par: currentHole.par, strokes: newHoleStrokes, putts: newPuttCount },
         ];
         const isRoundComplete = currentHoleIndex >= course.length - 1;
         const clubUsageStats = isRoundComplete ? buildClubUsageStats(nextRoundShots, bag) : [];
@@ -402,6 +424,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           holeSummaries: [...holeSummaries, holeSummary],
           goodShotStreak: streakAfterShot,
           shotInProgress: false,
+          currentHolePutts: newPuttCount,
+          hasTakenFirstPutt: newHasTakenFirstPutt,
         });
       } else {
         // ── Still playing ──
@@ -441,6 +465,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           roundShots: nextRoundShots,
           goodShotStreak: streakAfterShot,
           shotInProgress: false,
+          currentHolePutts: newPuttCount,
+          hasTakenFirstPutt: newHasTakenFirstPutt,
         });
       }
     }, 0);
@@ -461,6 +487,119 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentHoleShots: [],
       shotContext: nextContext,
       previousWindStrength: nextContext.windStrength ?? null,
+      currentHolePutts: 0,
+      hasTakenFirstPutt: false,
+    });
+  },
+
+  executeAutoPutts: () => {
+    const {
+      currentHolePutts,
+      shotContext,
+      holeStrokes,
+      course,
+      currentHoleIndex,
+      scores,
+      currentHoleShots,
+      roundShots,
+      goodShotStreak,
+      holeSummaries,
+      playerSkillLevel,
+      bag,
+    } = get();
+
+    // 残り距離が0なら何もしない
+    if (shotContext.remainingDistance === 0) return;
+
+    // グリーン上でない場合は何もしない
+    if (shotContext.lie !== "green") return;
+
+    // パットシミュレーション実行
+    const puttResult = simulateAutoPutts(
+      shotContext.remainingDistance,
+      playerSkillLevel,
+      5, // 最大5パットまで
+    );
+
+    const currentHole = course[currentHoleIndex];
+    const totalPutts = currentHolePutts + puttResult.putts;
+    const strokesAdded = puttResult.putts;
+    const newHoleStrokes = holeStrokes + strokesAdded;
+
+    // パットログを生成
+    let remainingDistance = shotContext.remainingDistance;
+    const newShotLogs: ShotLog[] = [];
+
+    for (const detail of puttResult.puttDetails) {
+      const puttLog: ShotLog = {
+        holeNumber: currentHole.number,
+        clubId: bag.find((c) => c.type === "Putter")?.id ?? "putter",
+        clubLabel: "パター",
+        success: detail.success,
+        distanceHit: detail.fromDistance - detail.remainingAfterPutt,
+        distanceBeforeShot: remainingDistance,
+        distanceAfterShot: detail.remainingAfterPutt,
+        strokeNumber: holeStrokes + newShotLogs.length + 1,
+        lieBefore: "green",
+        lieAfter: "green",
+        shotQuality: detail.success ? "good" : "average",
+        wasWeakClub: false,
+      };
+      newShotLogs.push(puttLog);
+      remainingDistance = detail.remainingAfterPutt;
+    }
+
+    const nextHoleShots = [...currentHoleShots, ...newShotLogs];
+    const nextRoundShots = [...roundShots, ...newShotLogs];
+
+    // ホール完了処理
+    const holeSummary = buildHoleSummary(currentHole, nextHoleShots, nextRoundShots);
+    const newScores: typeof scores = [
+      ...scores,
+      { holeNumber: currentHole.number, par: currentHole.par, strokes: newHoleStrokes, putts: totalPutts },
+    ];
+    const isRoundComplete = currentHoleIndex >= course.length - 1;
+    const clubUsageStats = isRoundComplete ? buildClubUsageStats(nextRoundShots, bag) : [];
+    const finalScore = isRoundComplete
+      ? newScores.reduce((sum, hole) => sum + hole.strokes, 0)
+      : null;
+
+    set({
+      holeStrokes: newHoleStrokes,
+      lastShotResult: {
+        newRemainingDistance: 0,
+        outcomeMessage: "カップイン（自動パット）",
+        strokesAdded,
+        lie: "green",
+        penalty: false,
+        distanceHit: puttResult.puttDetails.reduce((sum, d) => sum + (d.fromDistance - d.remainingAfterPutt), 0),
+        shotQuality: puttResult.success ? "good" : "average",
+        wasSuccessful: puttResult.success,
+        effectiveSuccessRate: 100,
+        finalOutcome: "green",
+        penaltyStrokes: 0,
+        autoPuttResult: puttResult,
+      } as unknown as ShotResult,
+      scores: newScores,
+      perHoleResults: newScores,
+      clubUsageStats,
+      finalScore,
+      phase: isRoundComplete ? "round_complete" : "hole_complete",
+      selectedClubId: null,
+      shotPowerPercent: 100,
+      aimXOffset: 0,
+      currentHoleShots: nextHoleShots,
+      roundShots: nextRoundShots,
+      lastHoleSummary: holeSummary,
+      holeSummaries: [...holeSummaries, holeSummary],
+      goodShotStreak: goodShotStreak + (puttResult.success ? 1 : 0),
+      shotInProgress: false,
+      currentHolePutts: totalPutts,
+      hasTakenFirstPutt: true,
+      shotContext: {
+        ...shotContext,
+        remainingDistance: 0,
+      },
     });
   },
 

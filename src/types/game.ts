@@ -124,6 +124,18 @@ export interface ShotResult {
   penaltyDropOrigin?: { x: number; y: number };
   origin?: { x: number; y: number };
   confidenceBoostApplied?: boolean;
+  /** 自動パット結果（グリーン上で最初のパット後に自動実行された場合） */
+  autoPuttResult?: {
+    putts: number;
+    success: boolean;
+    finalDistance: number;
+    puttDetails: Array<{
+      puttNumber: number;
+      fromDistance: number;
+      success: boolean;
+      remainingAfterPutt: number;
+    }>;
+  };
 }
 
 export interface ShotLog {
@@ -162,6 +174,7 @@ export interface HoleScore {
   holeNumber: number;
   par: number;
   strokes: number;
+  putts?: number;
 }
 
 // ─── Overall game state ───────────────────────────────────────────────────────

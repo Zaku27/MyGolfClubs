@@ -244,12 +244,12 @@ export function RoundHistoryScreen({ bagId }: Props) {
               <StatCard
                 label="ベストスコア"
                 value={stats.bestScore !== null && stats.bestScoreTotalPar !== null && !isNaN(stats.bestScore) && !isNaN(stats.bestScoreTotalPar) ? toParString(stats.bestScore, stats.bestScoreTotalPar) : (stats.bestScore?.toString() ?? '-')}
-                subValue={stats.bestScore !== null && stats.bestScoreTotalPar !== null ? `ストローク${stats.bestScore}/Par${stats.bestScoreTotalPar}` : undefined}
+                subValue={stats.bestScore !== null && stats.bestScoreTotalPar !== null ? `ストローク${stats.bestScore}/パー${stats.bestScoreTotalPar}` : undefined}
               />
               <StatCard
                 label="ワーストスコア"
                 value={stats.worstScore !== null && stats.worstScoreTotalPar !== null && !isNaN(stats.worstScore) && !isNaN(stats.worstScoreTotalPar) ? toParString(stats.worstScore, stats.worstScoreTotalPar) : (stats.worstScore?.toString() ?? '-')}
-                subValue={stats.worstScore !== null && stats.worstScoreTotalPar !== null ? `ストローク${stats.worstScore}/Par${stats.worstScoreTotalPar}` : undefined}
+                subValue={stats.worstScore !== null && stats.worstScoreTotalPar !== null ? `ストローク${stats.worstScore}/パー${stats.worstScoreTotalPar}` : undefined}
               />
               <StatCard
                 label="平均スコア"
