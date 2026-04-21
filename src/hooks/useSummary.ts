@@ -353,6 +353,105 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       }
     }
 
+    // Condition (調子) analysis
+    const clubsWithCondition = bagClubs.filter((c) => c.condition && c.condition.length > 0);
+
+    // 互換性のない組み合わせを定義
+    const INCOMPATIBLE_CONDITION_PAIRS: Array<[string, string]> = [
+      ['先調子', '元調子'],
+      ['先中調子', '中元調子'],
+      ['先調子', '中元調子'],
+      ['元調子', '先中調子'],
+    ];
+
+    // カテゴリ内のバラつき検出（優先度高）
+    const categoryConditions = new Map<GolfClub['clubType'], Set<string>>();
+    const categoryLabelMap: Record<GolfClub['clubType'], string> = {
+      Driver: 'ドライバー',
+      Wood: 'ウッド',
+      Hybrid: 'ハイブリッド',
+      Iron: 'アイアン',
+      Wedge: 'ウェッジ',
+      Putter: 'パター',
+    };
+
+    for (const club of clubsWithCondition) {
+      const clubType = club.clubType;
+      if (!categoryConditions.has(clubType)) {
+        categoryConditions.set(clubType, new Set());
+      }
+      categoryConditions.get(clubType)!.add(club.condition!);
+    }
+
+    // カテゴリ内で2種類以上の調子がある場合、警告を追加
+    for (const [clubType, conditions] of categoryConditions.entries()) {
+      if (conditions.size >= 2) {
+        const conditionList = Array.from(conditions).join('、');
+        adjustments.push({
+          priority: 'high',
+          title: `${categoryLabelMap[clubType]}の調子統一`,
+          description: `${categoryLabelMap[clubType]}内で調子にバラつきがあります（${conditionList}）。同じ調子に統一することでスイングフィールが一貫します。`,
+          estimatedEffect: 'スイングフィールの統一、方向性向上',
+        });
+      }
+    }
+
+    // 互換性のない組み合わせ検出（優先度中）
+    const driverWoodConditions = clubsWithCondition
+      .filter((c) => c.clubType === 'Driver' || c.clubType === 'Wood')
+      .map((c) => c.condition!)
+      .filter((cond) => cond);
+    
+    const ironWedgeConditions = clubsWithCondition
+      .filter((c) => c.clubType === 'Iron' || c.clubType === 'Wedge')
+      .map((c) => c.condition!)
+      .filter((cond) => cond);
+
+    if (driverWoodConditions.length > 0 && ironWedgeConditions.length > 0) {
+      const uniqueDriverWood = [...new Set(driverWoodConditions)];
+      const uniqueIronWedge = [...new Set(ironWedgeConditions)];
+
+      for (const dwCond of uniqueDriverWood) {
+        for (const iwCond of uniqueIronWedge) {
+          if (INCOMPATIBLE_CONDITION_PAIRS.some(([a, b]) => 
+            (a === dwCond && b === iwCond) || (a === iwCond && b === dwCond)
+          )) {
+            adjustments.push({
+              priority: 'medium',
+              title: '調子の互換性確認',
+              description: `ドライバー/ウッドの${dwCond}とアイアン/ウェッジの${iwCond}は相性が悪い組み合わせです。いずれかのグループの調子変更を検討してください。`,
+              estimatedEffect: 'スイングリズムの統一',
+            });
+            break;
+          }
+        }
+      }
+    }
+
+    // 全体のバラつき検出（優先度低）
+    const allConditions = clubsWithCondition.map((c) => c.condition!);
+    const uniqueConditions = [...new Set(allConditions)];
+
+    if (uniqueConditions.length >= 2) {
+      // カテゴリ内バラつきや互換性チェックで既に警告が出ていないか確認
+      const hasHighPriorityConditionWarning = adjustments.some(
+        (adj) => adj.priority === 'high' && adj.title.includes('調子統一')
+      );
+      const hasMediumPriorityConditionWarning = adjustments.some(
+        (adj) => adj.priority === 'medium' && adj.title.includes('調子の互換性確認')
+      );
+
+      if (!hasHighPriorityConditionWarning && !hasMediumPriorityConditionWarning) {
+        const conditionList = uniqueConditions.join('、');
+        adjustments.push({
+          priority: 'low',
+          title: '調子の確認',
+          description: `バッグ内に複数の調子が混在しています（${conditionList}）。スイングフィールに違和感がないか確認してみてください。`,
+          estimatedEffect: 'フィールの確認',
+        });
+      }
+    }
+
     // Sort adjustments by priority
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     adjustments.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
