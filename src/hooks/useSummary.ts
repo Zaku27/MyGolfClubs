@@ -4,7 +4,7 @@ import type { SummaryData, Recommendation, Adjustment } from '../types/summary';
 import type { GolfClub } from '../types/golf';
 import { buildSwingLengthAnalysis } from '../utils/analysisBuilders';
 import { readStoredNumber } from '../utils/storage';
-import { computeGapsAndRecommendations, evaluateSwingLengthSlope, getSwingLengthSlopeMessage, swingWeightToNumeric } from '../utils/analysisUtils';
+import { computeGapsAndRecommendations, evaluateSwingLengthSlope, getSwingLengthSlopeMessage, swingWeightToNumeric, estimateHeadSpeedFromClubs, checkFlexCompatibility } from '../utils/analysisUtils';
 import { getClubTypeDisplay } from '../utils/clubUtils';
 
 // Map internal club types to summary category types
@@ -304,6 +304,11 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     // Check for gaps in distance coverage using actual distance data
     const gapRecommendations = computeGapsAndRecommendations(bagClubs);
     adjustments.push(...gapRecommendations);
+
+    // Check shaft flex compatibility based on estimated head speed
+    const estimatedHeadSpeed = estimateHeadSpeedFromClubs(bagClubs);
+    const flexAdjustments = checkFlexCompatibility(bagClubs, estimatedHeadSpeed);
+    adjustments.push(...flexAdjustments);
 
     // Loft/spin optimization for wedges
     const wedges = bagClubs.filter((c) => c.clubType === 'Wedge');

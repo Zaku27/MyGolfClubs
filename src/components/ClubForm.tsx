@@ -742,11 +742,13 @@ export const ClubForm: React.FC<ClubFormProps> = ({
               value={formData.flex}
               onChange={handleChange}
             >
-              <option value="S">S</option>
-              <option value="SR">SR</option>
-              <option value="R">R</option>
-              <option value="A">A</option>
+              <option value="R2">R2</option>
               <option value="L">L</option>
+              <option value="A">A</option>
+              <option value="R">R</option>
+              <option value="SR">SR</option>
+              <option value="S">S</option>
+              <option value="X">X</option>
             </select>
           </div>
         )}

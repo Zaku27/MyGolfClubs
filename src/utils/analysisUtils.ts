@@ -307,6 +307,115 @@ export const calculateDistanceGapCoefficient = (headSpeed: number): number => {
   return a * headSpeed + b;
 };
 
+/**
+ * ヘッドスピードから推奨フレックスを判定
+ * @param headSpeed ヘッドスピード（m/s）
+ * @returns 推奨フレックスの配列
+ */
+export const getRecommendedFlexFromHeadSpeed = (headSpeed: number): string[] => {
+  if (headSpeed < 38) {
+    return ['R2', 'L', 'A'];
+  } else if (headSpeed < 42) {
+    return ['R', 'SR'];
+  } else if (headSpeed < 46) {
+    return ['S'];
+  } else {
+    return ['X'];
+  }
+};
+
+/**
+ * フレックスの順序（柔らかい→硬い）
+ */
+const FLEX_ORDER = ['R2', 'L', 'A', 'R', 'SR', 'S', 'X'];
+
+/**
+ * フレックスの順序インデックスを取得
+ */
+const getFlexOrderIndex = (flex: string): number => {
+  const index = FLEX_ORDER.indexOf(flex);
+  return index === -1 ? -1 : index;
+};
+
+/**
+ * フレックスの差（絶対値）を計算
+ */
+const getFlexDifference = (flex1: string, flex2: string): number => {
+  const index1 = getFlexOrderIndex(flex1);
+  const index2 = getFlexOrderIndex(flex2);
+  if (index1 === -1 || index2 === -1) return 999;
+  return Math.abs(index1 - index2);
+};
+
+/**
+ * クラブのフレックスが推奨フレックスから外れているか判定
+ * @param currentFlex 現在のフレックス
+ * @param recommendedFlexes 推奨フレックスの配列
+ * @returns 適合していない場合true
+ */
+export const isFlexMismatch = (
+  currentFlex: string | undefined,
+  recommendedFlexes: string[]
+): boolean => {
+  if (!currentFlex) return false;
+  return !recommendedFlexes.includes(currentFlex);
+};
+
+/**
+ * クラブセットのフレックス適合性をチェックし、調整提案を生成
+ * @param clubs クラブセット
+ * @param headSpeed ヘッドスピード（m/s）
+ * @returns フレックス適合警告のAdjustment配列
+ */
+export const checkFlexCompatibility = (
+  clubs: GolfClub[],
+  headSpeed: number | null
+): Adjustment[] => {
+  if (headSpeed === null) return [];
+
+  const recommendedFlexes = getRecommendedFlexFromHeadSpeed(headSpeed);
+  const adjustments: Adjustment[] = [];
+
+  // フレックスが設定されているクラブを抽出
+  const clubsWithFlex = clubs.filter(
+    (c) => c.flex && c.clubType !== 'Putter'
+  );
+
+  if (clubsWithFlex.length === 0) return [];
+
+  // 推奨フレックスから外れているクラブをチェック
+  const mismatchedClubs = clubsWithFlex.filter((c) =>
+    isFlexMismatch(c.flex, recommendedFlexes)
+  );
+
+  if (mismatchedClubs.length === 0) return [];
+
+  // ミスマッチの程度を判定
+  const mismatchedFlexes = [...new Set(mismatchedClubs.map((c) => c.flex))];
+
+  // フレックスの差を計算して優先度を判定
+  let maxFlexDifference = 0;
+  for (const currentFlex of mismatchedFlexes) {
+    if (!currentFlex) continue;
+    for (const recommendedFlex of recommendedFlexes) {
+      const diff = getFlexDifference(currentFlex, recommendedFlex);
+      maxFlexDifference = Math.max(maxFlexDifference, diff);
+    }
+  }
+
+  // 差が1以下ならmedium、それ以上ならhigh
+  const priority = maxFlexDifference <= 1 ? 'medium' : 'high';
+
+  adjustments.push({
+    priority,
+    title: 'シャフトフレックスの適合性確認',
+    description: `ヘッドスピード ${headSpeed.toFixed(1)}m/s の推奨フレックスは「${recommendedFlexes.join('/')}」ですが、${mismatchedClubs.length}本のクラブ（${mismatchedFlexes.join('、')}）が推奨範囲外です。フレックスが合わないと飛距離や方向性に影響します。`,
+    estimatedEffect: '飛距離・方向性の向上',
+  });
+
+  return adjustments;
+};
+
 export const getWeightLengthDotRadius = (club: Pick<GolfClub, 'clubType'>) => {
   const normalizedType = (club.clubType ?? '').toUpperCase();
   if (
