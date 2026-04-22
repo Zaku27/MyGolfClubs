@@ -1,0 +1,79 @@
+## mainのみのワークフロー（GitHub Flow）
+
+### 基本的な流れ
+
+```bash
+# 1. 最新のmainを取得
+git checkout main
+git pull origin main
+
+# 2. featureブランチ作成
+git checkout -b feature/機能名
+
+# 3. 開発＆コミット
+# ファイル編集
+git add .
+git commit -m "機能の説明"
+
+# 4. プッシュ
+git push origin feature/機能名
+
+# 5. GitHubでPull Request作成
+# （ブラウザで操作）
+
+# 6. レビュー後、mainにマージ
+# （GitHubで操作）
+
+# 7. mainの最新を取得
+git checkout main
+git pull origin main
+
+# 8. featureブランチ削除
+git branch -d feature/機能名
+```
+
+### バグ修正の場合
+
+```bash
+# 1. mainで直接修正（小さなバグの場合）
+git checkout main
+git pull origin main
+# 修正
+git commit -am "バグ修正"
+git push origin main
+
+# またはfeatureブランチで修正（大きな修正の場合）
+git checkout -b fix/バグ名
+# 修正
+git push origin fix/バグ名
+# Pull Request作成＆マージ
+```
+
+### 開発中にmainが更新された場合
+
+```bash
+# featureブランチでmainの最新を取り込み
+git checkout feature/機能名
+git fetch origin
+git merge origin/main
+
+# コンフリクトがあれば解決
+git add .
+git commit -m "mainの変更をマージ"
+```
+
+### よく使るコマンド一覧
+
+| 目的 | コマンド |
+|------|---------|
+| ブランチ作成 | `git checkout -b feature/name` |
+| 現在のブランチ確認 | `git branch` |
+| 変更の確認 | `git status` |
+| ステージング | `git add .` |
+| コミット | `git commit -m "メッセージ"` |
+| プッシュ | `git push origin feature/name` |
+| mainに切り替え | `git checkout main` |
+| 最新を取得 | `git pull origin main` |
+| ブランチ削除 | `git branch -d feature/name` |
+
+これが最もシンプルで推奨されるワークフローです。
