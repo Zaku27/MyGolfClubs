@@ -208,6 +208,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const addDefaultPolygonHazard = () => addPolygonHazard(16, 16, 10, "bunker", undefined, undefined, 0.14);
   const addLargePolygonHazard = () => addPolygonHazard(20, 20, 15, "water", 25, 125, 0.16);
   const addExtraLargeWaterHazard = () => addPolygonHazard(30, 40, 30, "water", 25, 125, 0.16);
+  const addSmallWaterHazard = () => addPolygonHazard(15, 80, 12, "water", 160, undefined, 0.12);
 
   const handleCanvasClick = (point: Point2D) => {
     if (!polygonCreationMode || !selectedHole) return;
@@ -373,9 +374,22 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     if (!selectedHole || !selectedHazardId) return;
     updateHole((hole) => ({
       ...hole,
-      hazards: cloneHazards(hole.hazards).filter((hazard) => hazard.id !== selectedHazardId),
+      hazards: (hole.hazards ?? []).filter((h) => h.id !== selectedHazardId),
     }));
     setSelectedHazardId(null);
+  };
+
+  const copySelectedHazard = () => {
+    if (!selectedHazard || !selectedHole) return;
+    const newId = `hazard-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const copiedHazard: Hazard = {
+      ...selectedHazard,
+      id: newId,
+      x: (selectedHazard.x ?? 0) + 10,
+      y: (selectedHazard.y ?? 0) + 10,
+    };
+    updateSelectedHoleHazards([...(selectedHole.hazards ?? []), copiedHazard]);
+    setSelectedHazardId(newId);
   };
 
   const deleteAllHazards = () => {
@@ -686,11 +700,26 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
               </button>
               <button
                 type="button"
+                onClick={addSmallWaterHazard}
+                className="rounded-lg border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-200"
+              >
+                ウォーター細
+              </button>
+              <button
+                type="button"
                 onClick={deleteSelectedHazard}
                 disabled={!selectedHazard || selectedHazard?.locked}
                 className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-900 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 選択ハザード削除
+              </button>
+              <button
+                type="button"
+                onClick={copySelectedHazard}
+                disabled={!selectedHazard}
+                className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-sky-100"
+              >
+                選択ハザードをコピー
               </button>
               <button
                 type="button"
