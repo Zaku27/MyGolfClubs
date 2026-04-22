@@ -1,5 +1,4 @@
 import { db, type RoundHistory } from './database';
-import type { ClubUsageStat } from '../types/game';
 
 const MAX_ROUNDS = 50;
 

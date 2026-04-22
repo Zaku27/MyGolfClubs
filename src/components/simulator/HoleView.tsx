@@ -1,6 +1,6 @@
 import { useGameStore } from "../../store/gameStore";
 import { useMemo, useState, useEffect } from "react";
-import type { LieType, SimClub } from "../../types/game";
+import type { SimClub } from "../../types/game";
 import { useClubStore } from "../../store/clubStore";
 import { estimateBaseDistance } from "../../utils/shotSimulation";
 import { getSkillLabel } from "../../utils/playerSkill";
@@ -27,16 +27,6 @@ interface Props {
   onBack: () => void;
   onViewFinalScorecard?: () => void;
 }
-
-const LIE_LABEL: Record<LieType, string> = {
-  tee: "ティー",
-  fairway: "フェアウェイ",
-  semirough: "セミラフ",
-  rough: "ラフ",
-  bareground: "ベアグラウンド",
-  bunker: "バンカー",
-  green: "グリーン",
-};
 
 const SHOT_QUALITY_LABEL: Record<string, string> = {
   excellent: "会心のショット",
@@ -277,13 +267,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     : null;
   const isGreenLie = lie === "green";
   const isHoleComplete = phase === "hole_complete" || phase === "round_complete";
-  const currentStatusLabel = isHoleComplete
-    ? phase === "round_complete"
-      ? "ラウンド完了"
-      : "ホール完了"
-    : isGreenLie
-      ? "グリーン上"
-      : `ライ: ${LIE_LABEL[lie]}`;
   const currentStrokeLabel = isHoleComplete
     ? `${holeStrokes}打でホールアウト`
     : isGreenLie
