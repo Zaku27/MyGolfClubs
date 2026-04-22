@@ -15,7 +15,7 @@ export const CLUB_NUMBER_OPTIONS: Partial<Record<ClubCategory, string[]>> = {
   Wood: ['3W', '5W', '7W', '9W'],
   Hybrid: ['2H', '3H', '4H', '5H', '6H'],
   Iron: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
-  Wedge: ['PW', 'GW', 'AW', 'SW', 'LW'],
+  Wedge: ['PW', 'GW', 'UW', 'AW', 'SW', 'LW'],
 };
 
 export const CLUB_NUMBER_DEFAULT: Record<ClubCategory, string> = {

@@ -51,7 +51,7 @@ export const getClubTypeShort = (name: string): string => {
     return 'D';
   }
 
-  if (/^(PW|GW|SW)$/i.test(normalized)) {
+  if (/^(PW|GW|SW|UW|AW)$/i.test(normalized)) {
     return normalized.toUpperCase();
   }
 

@@ -81,6 +81,8 @@ export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
   { clubType: 'Iron', name: 'Iron', number: '9', length: 36, weight: 436, swingWeight: 'D1', lieAngle: 64, loftAngle: 39, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 140, notes: '' },
   { clubType: 'Wedge', name: 'Wedge', number: 'PW', length: 35.5, weight: 442, swingWeight: 'D1', lieAngle: 64, loftAngle: 44, bounceAngle: 10, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 120, notes: '' },
   { clubType: 'Wedge', name: 'Wedge', number: 'GW', length: 35.25, weight: 450, swingWeight: 'D1', lieAngle: 64, loftAngle: 50, bounceAngle: 12, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 110, notes: '' },
+  { clubType: 'Wedge', name: 'Utility Wedge', number: 'UW', length: 35.25, weight: 450, swingWeight: 'D1', lieAngle: 64, loftAngle: 50, bounceAngle: 12, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 110, notes: '' },
+  { clubType: 'Wedge', name: 'Approach Wedge', number: 'AW', length: 35.25, weight: 450, swingWeight: 'D1', lieAngle: 64, loftAngle: 50, bounceAngle: 12, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 110, notes: '' },
   { clubType: 'Wedge', name: 'Wedge', number: 'SW', length: 35, weight: 455, swingWeight: 'D1', lieAngle: 64, loftAngle: 54, bounceAngle: 14, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 100, notes: '' },
   { clubType: 'Wedge', name: 'Wedge', number: 'LW', length: 34.75, weight: 460, swingWeight: 'D1', lieAngle: 64, loftAngle: 58, bounceAngle: 8, shaftType: 'Steel', torque: 1.9, flex: 'S', distance: 90, notes: '' },
   { clubType: 'Putter', name: 'Putter', number: 'P', length: 33, weight: 500, swingWeight: 'D1', lieAngle: 70, loftAngle: 3, shaftType: 'Steel', torque: 1.0, distance: 10, notes: '' },

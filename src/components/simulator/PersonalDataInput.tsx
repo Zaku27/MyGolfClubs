@@ -216,7 +216,17 @@ export function PersonalDataInput() {
       return formatSimClubLabel({ type: 'Wedge', number: 'SW' });
     }
 
-    if (/^(pw|gw|sw)$/i.test(normalized)) {
+    // Map "Utility Wedge" to UW
+    if (/^utilitywedge$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Wedge', number: 'UW' });
+    }
+
+    // Map "Approach Wedge" to AW
+    if (/^approachwedge$/i.test(normalized)) {
+      return formatSimClubLabel({ type: 'Wedge', number: 'AW' });
+    }
+
+    if (/^(pw|gw|sw|uw|aw)$/i.test(normalized)) {
       return formatSimClubLabel({ type: 'Wedge', number: normalized.toUpperCase() });
     }
 
@@ -225,8 +235,8 @@ export function PersonalDataInput() {
     }
 
     // Already valid simulator label like Driver, 3Wood, 4Hybrid, 7Iron, PW, Putter
-    if (/^(Driver|\d+Wood|\d+Hybrid|\d+Iron|PW|GW|SW|Putter)$/i.test(value)) {
-      return formatSimClubLabel({ type: /^Driver$/i.test(value) ? 'Driver' : /Putter/i.test(value) ? 'Putter' : /^(PW|GW|SW)$/i.test(value) ? 'Wedge' : (/Wood/i.test(value) ? 'Wood' : /Hybrid/i.test(value) ? 'Hybrid' : 'Iron'),
+    if (/^(Driver|\d+Wood|\d+Hybrid|\d+Iron|PW|GW|SW|UW|AW|Putter)$/i.test(value)) {
+      return formatSimClubLabel({ type: /^Driver$/i.test(value) ? 'Driver' : /Putter/i.test(value) ? 'Putter' : /^(PW|GW|SW|UW|AW)$/i.test(value) ? 'Wedge' : (/Wood/i.test(value) ? 'Wood' : /Hybrid/i.test(value) ? 'Hybrid' : 'Iron'),
         number: (() => {
           if (/^Driver$/i.test(value) || /^Putter$/i.test(value)) return '';
           const numberMatch = value.match(/^(\d+)/);
@@ -378,7 +388,10 @@ export function PersonalDataInput() {
       if (ironMatch) return { rank: 3, value: Number(ironMatch[1]) };
       if (/^PW$/i.test(label)) return { rank: 4, value: 0 };
       if (/^GW$/i.test(label)) return { rank: 4, value: 1 };
-      if (/^SW$/i.test(label)) return { rank: 4, value: 2 };
+      if (/^UW$/i.test(label)) return { rank: 4, value: 2 };
+      if (/^AW$/i.test(label)) return { rank: 4, value: 3 };
+      if (/^SW$/i.test(label)) return { rank: 4, value: 4 };
+      if (/^LW$/i.test(label)) return { rank: 4, value: 5 };
       if (/^Putter$/i.test(label)) return { rank: 6, value: 0 };
       return { rank: 5, value: 0 };
     };
