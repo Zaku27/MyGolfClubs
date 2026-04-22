@@ -644,15 +644,15 @@
 }
 
 .reflect-button {
-  background: #2e7d32;
-  border-color: #2e7d32;
+  background: #ff9800;
+  border-color: #ff9800;
   font-size: 12px;
   padding: 8px 14px;
 }
 
 .reflect-button:hover {
-  background: #388e3c;
-  border-color: #388e3c;
+  background: #f57c00;
+  border-color: #f57c00;
 }
 
 .analysis-table-wrap {
