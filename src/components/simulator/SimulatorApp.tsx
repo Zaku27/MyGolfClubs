@@ -7,7 +7,7 @@ import { useClubStore } from "../../store/clubStore";
 import { toSimClub } from "../../utils/clubSimAdapter";
 import { COURSE_1HOLE, COURSE_3HOLES, COURSE_9HOLES, COURSE_18HOLES } from "../../data/defaultCourses";
 import { cloneCourse } from "../../utils/courseGenerator";
-import { loadStoredCustomCourse, type CustomCoursePreset } from "./CustomCourseEditorScreen";
+import type { CustomCoursePreset } from "./courseTypes";
 import { HoleView } from "./HoleView";
 import { filterClubsWithActualShots } from "../../utils/actualShotFilter";
 import { PostRoundAnalysis } from "./PostRoundAnalysis";
@@ -300,9 +300,28 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
   // 実測データモードでプレー可能なクラブ数（パター以外をカウント）
   const measuredPlayableClubCount = measuredSource.filter(club => club.type !== "Putter").length;
 
-  const storedCustomCourses = loadStoredCustomCourse();
+  const [storedCustomCourses, setStoredCustomCourses] = useState<{ selectedCourseId: string; courses: CustomCoursePreset[] }>({ selectedCourseId: "", courses: [] });
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+
+  // Load custom courses dynamically
+  useEffect(() => {
+    let cancelled = false;
+    const loadCourses = async () => {
+      try {
+        const { loadStoredCustomCourse } = await import('./customCourseStorage');
+        if (cancelled) return;
+        const courses = loadStoredCustomCourse();
+        setStoredCustomCourses(courses);
+        setSelectedCourseId(courses.selectedCourseId);
+      } catch {
+        // Fallback to empty courses on error
+      }
+    };
+    loadCourses();
+    return () => { cancelled = true; };
+  }, []);
+
   const selectableCourses = buildSelectableCourses(storedCustomCourses.courses);
-  const [selectedCourseId, setSelectedCourseId] = useState<string>(() => storedCustomCourses.selectedCourseId);
   const selectedCourse = selectableCourses.find((course) => course.id === selectedCourseId) ?? selectableCourses[0];
 
   const handleStart = (holes: Hole[], mode: "bag" | "robot" | "measured") => {

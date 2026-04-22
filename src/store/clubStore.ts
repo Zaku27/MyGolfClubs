@@ -17,14 +17,14 @@ type ClubStoreState = {
 type ClubStoreActions = {
   loadClubs: () => Promise<void>;
   loadBags: () => Promise<void>;
-  addClub: (club: Omit<GolfClub, 'id'>) => Promise<void>;
+  addClub: (club: Omit<GolfClub, 'id'>) => Promise<number>;
   updateClub: (id: number, club: Partial<GolfClub>) => Promise<void>;
   deleteClub: (id: number) => Promise<void>;
   initializeDefaults: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
   clearAllClubs: () => Promise<void>;
   clearAllBags: () => Promise<void>;
-  createBag: (name: string, imageData?: string[]) => Promise<void>;
+  createBag: (name: string, imageData?: string[]) => Promise<number>;
   renameBag: (id: number, name: string, imageData?: string[]) => Promise<void>;
   updateBagImage: (id: number, imageData: string[]) => Promise<void>;
   updateBagSwingSettings: (id: number, settings: { swingWeightTarget?: number; swingGoodTolerance?: number; swingAdjustThreshold?: number }) => Promise<void>;
@@ -138,8 +138,10 @@ export const useClubStore = create<ClubStore>((set) => ({
         clubs: [newClub, ...state.clubs],
         bags,
       }));
+      return id;
     } catch (error) {
       setStoreError(set, error);
+      throw error;
     }
   },
 
@@ -239,8 +241,10 @@ export const useClubStore = create<ClubStore>((set) => ({
       const bags = await ClubService.getAllBags();
       await ClubService.setActiveBagId(bagId);
       set({ bags, activeBagId: bagId, error: null });
+      return bagId;
     } catch (error) {
       setStoreError(set, error);
+      throw error;
     }
   },
 

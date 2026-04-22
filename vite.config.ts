@@ -9,5 +9,24 @@ export default defineConfig({
     strictPort: false,
   },
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Separate vendor chunks
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom') || id.includes('node_modules/react-helmet-async')) {
+            return 'vendor-react'
+          }
+          if (id.includes('node_modules/recharts')) {
+            return 'vendor-charts'
+          }
+          if (id.includes('node_modules/papaparse') || id.includes('node_modules/zustand')) {
+            return 'vendor-utils'
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 500,
+  },
 })
 

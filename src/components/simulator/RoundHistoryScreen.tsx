@@ -395,3 +395,5 @@ export function RoundHistoryScreen({ bagId }: Props) {
     </div>
   );
 }
+
+export default RoundHistoryScreen;

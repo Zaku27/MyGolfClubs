@@ -4,18 +4,9 @@ import type { Hole } from "../../types/game";
 import { CourseEditor } from "./CourseEditor";
 import { cloneCourse, generateRandomCourse } from "../../utils/courseGenerator";
 import { readStoredJson, writeStoredJson } from "../../utils/storage";
+import type { CustomCoursePreset, CustomCourseStorage } from "./courseTypes";
 
-export interface CustomCoursePreset {
-  id: string;
-  name: string;
-  holeCount: 1 | 3 | 9 | 18;
-  course: Hole[];
-}
-
-export interface CustomCourseStorage {
-  selectedCourseId: string;
-  courses: CustomCoursePreset[];
-}
+export type { CustomCoursePreset, CustomCourseStorage };
 
 const CUSTOM_COURSE_STORAGE_KEY = "golfbag-custom-course-library-v1";
 
@@ -664,3 +655,5 @@ export function CustomCourseEditorScreen() {
     </div>
   );
 }
+
+export default CustomCourseEditorScreen;

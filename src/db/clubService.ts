@@ -179,6 +179,7 @@ export class ClubService {
 
   static async deleteClub(id: number): Promise<void> {
     await db.clubs.delete(id);
+    // Remove club from all bags
     const bags = await db.golfBags.toArray();
     await Promise.all(
       bags
@@ -187,10 +188,17 @@ export class ClubService {
           clubIds: (bag.clubIds ?? []).filter((clubId) => clubId !== id),
         }))),
     );
+    // Delete associated personal data
+    await db.personalData.delete(String(id));
   }
 
   static async deleteAllClubs(): Promise<void> {
     await db.clubs.clear();
+    // Clear clubIds from all bags to prevent orphan references
+    const bags = await db.golfBags.toArray();
+    await Promise.all(
+      bags.map((bag) => db.golfBags.update(bag.id!, createUpdatedBagRecord({ clubIds: [] }))),
+    );
     isInitializingDefaults = false;
   }
 
@@ -308,6 +316,9 @@ export class ClubService {
       throw new Error('少なくとも1つのゴルフバッグが必要です');
     }
 
+    // Delete associated actual shot rows
+    await db.actualShotRows.delete(id);
+
     await db.golfBags.delete(id);
     const activeBagId = await this.getActiveBagId();
     if (activeBagId === id) {
@@ -317,6 +328,11 @@ export class ClubService {
   }
 
   static async deleteAllBags(): Promise<void> {
+    // Delete associated actual shot rows first
+    const bags = await db.golfBags.toArray();
+    await Promise.all(
+      bags.map((bag) => db.actualShotRows.delete(bag.id!)),
+    );
     await db.golfBags.clear();
     await this.setActiveBagId(null);
     isInitializingDefaults = false;

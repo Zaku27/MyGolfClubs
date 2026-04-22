@@ -1046,3 +1046,5 @@ export function PersonalDataInput() {
     </div>
   );
 }
+
+export default PersonalDataInput;

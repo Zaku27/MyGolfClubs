@@ -160,56 +160,48 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
       await loadClubs();
 
       // Import bags if available
+      let firstBagId: number | undefined;
       if (importedBags.length > 0) {
-        for (const bag of importedBags) {
-          await createBag(bag.name);
-        }
-        await loadBags();
+        for (const importedBag of importedBags) {
+          // Create bag and get the new ID
+          const newBagId = await createBag(importedBag.name, importedBag.imageData);
+          if (firstBagId === undefined) {
+            firstBagId = newBagId;
+          }
 
-        // Update bags with translated clubIds and other properties
-        const currentBags = useClubStore.getState().bags;
-        for (let i = 0; i < importedBags.length && i < currentBags.length; i++) {
-          const importedBag = importedBags[i];
-          const currentBag = currentBags[i];
-          if (currentBag.id) {
-            // Translate exportIds to database IDs
-            // Handle both new format (string[] exportIds) and old format (number[] database IDs)
-            let translatedClubIds: number[];
-            const clubIds = importedBag.clubIds as unknown;
-            if (Array.isArray(clubIds) && clubIds.length > 0 && typeof clubIds[0] === 'string') {
-              // New format: convert exportIds to database IDs
-              translatedClubIds = (clubIds as string[])
-                .map((exportId) => exportIdToDbIdMap.get(exportId))
-                .filter((id): id is number => id != null);
-            } else {
-              // Old format: use database IDs directly (but filter to ensure they exist)
-              const allClubIds = useClubStore.getState().clubs.map(c => c.id).filter((id): id is number => id != null);
-              translatedClubIds = (clubIds as number[])
-                .filter((id) => allClubIds.includes(id));
-            }
-            
-            // Update clubIds with translated IDs
-            await updateBagClubIds(currentBag.id, translatedClubIds);
-            
-            // Update imageData if present
-            if (importedBag.imageData) {
-              await updateBagImage(currentBag.id, importedBag.imageData);
-            }
-            // Update swing settings if present
-            if (importedBag.swingWeightTarget || importedBag.swingGoodTolerance || importedBag.swingAdjustThreshold) {
-              await updateBagSwingSettings(currentBag.id, {
-                swingWeightTarget: importedBag.swingWeightTarget,
-                swingGoodTolerance: importedBag.swingGoodTolerance,
-                swingAdjustThreshold: importedBag.swingAdjustThreshold,
-              });
-            }
+          // Translate exportIds to database IDs
+          // Handle both new format (string[] exportIds) and old format (number[] database IDs)
+          let translatedClubIds: number[];
+          const clubIds = importedBag.clubIds as unknown;
+          if (Array.isArray(clubIds) && clubIds.length > 0 && typeof clubIds[0] === 'string') {
+            // New format: convert exportIds to database IDs
+            translatedClubIds = (clubIds as string[])
+              .map((exportId) => exportIdToDbIdMap.get(exportId))
+              .filter((id): id is number => id != null);
+          } else {
+            // Old format: use database IDs directly (but filter to ensure they exist)
+            const allClubIds = useClubStore.getState().clubs.map(c => c.id).filter((id): id is number => id != null);
+            translatedClubIds = (clubIds as number[])
+              .filter((id) => allClubIds.includes(id));
+          }
+
+          // Update clubIds with translated IDs
+          await updateBagClubIds(newBagId, translatedClubIds);
+
+          // Update swing settings if present
+          if (importedBag.swingWeightTarget || importedBag.swingGoodTolerance || importedBag.swingAdjustThreshold) {
+            await updateBagSwingSettings(newBagId, {
+              swingWeightTarget: importedBag.swingWeightTarget,
+              swingGoodTolerance: importedBag.swingGoodTolerance,
+              swingAdjustThreshold: importedBag.swingAdjustThreshold,
+            });
           }
         }
         await loadBags();
 
         // Set active bag to first imported bag
-        if (currentBags.length > 0 && currentBags[0].id) {
-          await setActiveBag(currentBags[0].id);
+        if (firstBagId !== undefined) {
+          await setActiveBag(firstBagId);
         }
       } else {
         // If no bags were imported, create default bag with first 14 clubs
