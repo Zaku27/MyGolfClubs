@@ -114,6 +114,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const [polygonDraftPoints, setPolygonDraftPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [distanceInputValue, setDistanceInputValue] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
+  const [copySourceHoleIndex, setCopySourceHoleIndex] = useState<number | null>(null);
 
   const safeHoleIndex = Math.max(0, Math.min(selectedHoleIndex, holes.length - 1));
   const selectedHole = holes[safeHoleIndex];
@@ -386,6 +387,24 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
     setSelectedHazardId(null);
   };
 
+  const copyHoleFrom = (sourceIndex: number) => {
+    if (sourceIndex === safeHoleIndex) return;
+    const sourceHole = holes[sourceIndex];
+    if (!sourceHole) return;
+
+    updateHole((hole) => ({
+      ...hole,
+      par: sourceHole.par,
+      distanceFromTee: sourceHole.distanceFromTee,
+      targetDistance: sourceHole.targetDistance,
+      greenRadius: sourceHole.greenRadius,
+      greenPolygon: sourceHole.greenPolygon,
+      groundCondition: sourceHole.groundCondition ? { ...sourceHole.groundCondition } : undefined,
+      hazards: cloneHazards(sourceHole.hazards),
+    }));
+    setCopySourceHoleIndex(null);
+  };
+
   if (!selectedHole) {
     return null;
   }
@@ -400,7 +419,20 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
         >
           プレビュー
         </button>
+        <button
+          type="button"
+          onClick={() => setCopySourceHoleIndex(copySourceHoleIndex === null ? -1 : null)}
+          className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-900 transition hover:bg-sky-100"
+        >
+          {copySourceHoleIndex === null ? "他のホールからコピー" : "キャンセル"}
+        </button>
       </div>
+
+      {copySourceHoleIndex !== null && (
+        <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+          コピー元のホールを選択してください
+        </div>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {holes.map((hole, index) => (
@@ -408,15 +440,24 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
             key={`hole-tab-${hole.number}`}
             type="button"
             onClick={() => {
-              setSelectedHoleIndex(index);
-              setSelectedHazardId(null);
+              if (copySourceHoleIndex !== null) {
+                copyHoleFrom(index);
+              } else {
+                setSelectedHoleIndex(index);
+                setSelectedHazardId(null);
+              }
             }}
             className={[
               "rounded-full border px-3 py-1 text-xs font-bold transition",
-              index === safeHoleIndex
-                ? "border-emerald-700 bg-emerald-700 text-white"
-                : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+              copySourceHoleIndex !== null
+                ? index === safeHoleIndex
+                  ? "border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100"
+                : index === safeHoleIndex
+                  ? "border-emerald-700 bg-emerald-700 text-white"
+                  : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
             ].join(" ")}
+            disabled={copySourceHoleIndex !== null && index === safeHoleIndex}
           >
             {hole.number}H
           </button>

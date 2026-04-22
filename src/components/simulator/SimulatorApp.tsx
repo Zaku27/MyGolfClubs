@@ -279,7 +279,8 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
     resetGame,
     playMode,
   } = useGameStore();
-  const [showDetailedScorecard, setShowDetailedScorecard] = useState(false);
+  const [showDetailedScorecard, setShowDetailedScorecard] = useState(true);
+  const [showPostRoundAnalysis, setShowPostRoundAnalysis] = useState(false);
   const bagSource = selectedClubs;
   const robotSource = allClubs;
   
@@ -341,16 +342,17 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
         <Scorecard
           onPlayAgain={() => { setShowDetailedScorecard(false); resetGame(); }}
           onBack={() => { setShowDetailedScorecard(false); resetGame(); onBack(); }}
+          onViewStatistics={() => { setShowDetailedScorecard(false); setShowPostRoundAnalysis(true); }}
         />
       </div>
     );
   }
 
-  if (phase === "round_complete") {
+  if (phase === "round_complete" && showPostRoundAnalysis) {
     return (
       <PostRoundAnalysis
-        onPlayAnotherRound={() => { setShowDetailedScorecard(false); resetGame(); }}
-        onViewDetailedScorecard={() => { setShowDetailedScorecard(true); }}
+        onPlayAnotherRound={() => { setShowPostRoundAnalysis(false); resetGame(); }}
+        onViewDetailedScorecard={() => { setShowPostRoundAnalysis(false); setShowDetailedScorecard(true); }}
         onBackToMenu={() => { resetGame(); onBack(); }}
         courseName={selectedCourse?.name}
         bagId={bagId}

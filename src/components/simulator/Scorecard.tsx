@@ -4,6 +4,7 @@ import type { GamePhase, Hole, HoleScore } from "../../types/game";
 interface Props {
   onPlayAgain: () => void;
   onBack: () => void;
+  onViewStatistics?: () => void;
 }
 
 interface CompactScorecardProps {
@@ -131,7 +132,7 @@ function scoreDiff(strokes: number, par: number) {
   return { label, color, display };
 }
 
-export function Scorecard({ onPlayAgain, onBack }: Props) {
+export function Scorecard({ onPlayAgain, onBack, onViewStatistics }: Props) {
   const { scores, clubUsageStats } = useGameStore();
 
   const totalPar     = scores.reduce((s, h) => s + h.par, 0);
@@ -261,6 +262,14 @@ export function Scorecard({ onPlayAgain, onBack }: Props) {
 
       {/* Buttons */}
       <div className="space-y-3 pb-10">
+        {onViewStatistics && (
+          <button
+            onClick={onViewStatistics}
+            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors text-sm"
+          >
+            📊 ラウンド統計を見る
+          </button>
+        )}
         <button
           onClick={onPlayAgain}
           className="w-full py-3 bg-green-500 hover:bg-green-400 text-white font-bold rounded-xl transition-colors"

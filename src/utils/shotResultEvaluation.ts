@@ -201,7 +201,7 @@ export function simulateAutoPutts(
 ): PuttResult {
   const puttDetails: PuttResult["puttDetails"] = [];
   let currentDistance = firstPuttRemainingDistance;
-  let totalPutts = 1; // 最初のパットを含む
+  let totalPutts = 0; // 最初のパットは除く（プレイヤー操作済み）
 
   // パット成功率の計算（距離に応じて変動）
   const getPuttSuccessRate = (distance: number): number => {
@@ -226,11 +226,13 @@ export function simulateAutoPutts(
   };
 
   // 自動パットをシミュレート
-  while (currentDistance > 0 && totalPutts < maxAutoPutts + 1) {
+  while (currentDistance > 0 && totalPutts < maxAutoPutts) {
     const successRate = getPuttSuccessRate(currentDistance);
     const success = Math.random() < successRate;
 
     const remainingAfterPutt = getPuttResult(currentDistance, success);
+
+    totalPutts++;
 
     puttDetails.push({
       puttNumber: totalPutts,
@@ -238,8 +240,6 @@ export function simulateAutoPutts(
       success,
       remainingAfterPutt,
     });
-
-    totalPutts++;
 
     if (success) {
       currentDistance = 0;

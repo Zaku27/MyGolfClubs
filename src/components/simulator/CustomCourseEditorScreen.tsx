@@ -343,8 +343,17 @@ export function CustomCourseEditorScreen() {
 
   const handleChangeHoleCount = (holeCount: 1 | 3 | 9 | 18) => {
     setCustomHoleCount(holeCount);
-    const randomized = generateRandomCourse(holeCount);
-    setCustomCourse(randomized);
+    const currentHoles = customCourse;
+    if (currentHoles.length === holeCount) {
+      return;
+    }
+    if (currentHoles.length < holeCount) {
+      const additionalHoles = generateRandomCourse(holeCount - currentHoles.length);
+      const extendedCourse = [...currentHoles, ...additionalHoles.map((hole, index) => ({ ...hole, number: currentHoles.length + index + 1 }))];
+      setCustomCourse(extendedCourse);
+    } else {
+      setCustomCourse(currentHoles.slice(0, holeCount));
+    }
   };
 
   const handleSelectCustomCourse = (courseId: string) => {
@@ -368,7 +377,14 @@ export function CustomCourseEditorScreen() {
       course: cloneCourse(customCourse),
     };
 
-    setSavedCustomCourses((prev) => [...prev, newPreset]);
+    setSavedCustomCourses((prev) => {
+      const next = [...prev, newPreset];
+      writeStoredJson(CUSTOM_COURSE_STORAGE_KEY, {
+        selectedCourseId: newPreset.id,
+        courses: next,
+      } satisfies CustomCourseStorage);
+      return next;
+    });
     setSelectedCustomCourseId(newPreset.id);
     setCustomNameInput(newPreset.name);
   };
