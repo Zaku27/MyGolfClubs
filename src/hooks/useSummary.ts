@@ -428,30 +428,6 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       }
     }
 
-    // 全体のバラつき検出（優先度低）
-    const allConditions = clubsWithCondition.map((c) => c.condition!);
-    const uniqueConditions = [...new Set(allConditions)];
-
-    if (uniqueConditions.length >= 2) {
-      // カテゴリ内バラつきや互換性チェックで既に警告が出ていないか確認
-      const hasHighPriorityConditionWarning = adjustments.some(
-        (adj) => adj.priority === 'high' && adj.title.includes('調子統一')
-      );
-      const hasMediumPriorityConditionWarning = adjustments.some(
-        (adj) => adj.priority === 'medium' && adj.title.includes('調子の互換性確認')
-      );
-
-      if (!hasHighPriorityConditionWarning && !hasMediumPriorityConditionWarning) {
-        const conditionList = uniqueConditions.join('、');
-        adjustments.push({
-          priority: 'low',
-          title: '調子の確認',
-          description: `バッグ内に複数の調子が混在しています（${conditionList}）。スイングフィールに違和感がないか確認してみてください。`,
-          estimatedEffect: 'フィールの確認',
-        });
-      }
-    }
-
     // Sort adjustments by priority
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     adjustments.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
