@@ -393,18 +393,18 @@ export const checkFlexCompatibility = (
   // ミスマッチの程度を判定
   const mismatchedFlexes = [...new Set(mismatchedClubs.map((c) => c.flex))];
 
-  // フレックスの差を計算して優先度を判定
-  let maxFlexDifference = 0;
+  // フレックスの差を計算して優先度を判定（推奨フレックスの中で最も近いものとの差を使用）
+  let minFlexDifference = 999;
   for (const currentFlex of mismatchedFlexes) {
     if (!currentFlex) continue;
     for (const recommendedFlex of recommendedFlexes) {
       const diff = getFlexDifference(currentFlex, recommendedFlex);
-      maxFlexDifference = Math.max(maxFlexDifference, diff);
+      minFlexDifference = Math.min(minFlexDifference, diff);
     }
   }
 
   // 差が1以下ならmedium、それ以上ならhigh
-  const priority = maxFlexDifference <= 1 ? 'medium' : 'high';
+  const priority = minFlexDifference <= 1 ? 'medium' : 'high';
 
   adjustments.push({
     priority,

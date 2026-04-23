@@ -92,11 +92,13 @@ const generateClubNameFromSpec = (
 // Calculate category from loft and distance range
 const inferCategoryFromLoftAndDistance = (
   loftAngle: number,
-  distance: number
+  _distance: number,
+  _headSpeed: number = 44.5
 ): Recommendation['category'] => {
-  if (distance >= 220) return 'Driver';
-  if (distance >= 180) return 'Fairway';
-  if (distance >= 150) return 'Hybrid';
+  // Prioritize loft angle for category determination
+  if (loftAngle < 13) return 'Driver';
+  if (loftAngle < 18) return 'Fairway';
+  if (loftAngle < 24) return 'Hybrid';
   if (loftAngle >= 40) return 'Wedge';
   return 'Iron';
 };
@@ -383,10 +385,14 @@ const generateNarrowGapRecommendations = (
 // Generate recommendations for less than 14 clubs
 const generateRecommendationsForLessThan14Clubs = (
   clubs: GolfClub[],
-  headSpeed: number | null
+  headSpeed: number | null,
+  clubCount: number
 ): Recommendation[] => {
   const recommendations: Recommendation[] = [];
   const estimatedHeadSpeed = headSpeed ?? 44.5;
+
+  // Calculate max recommendations to reach 14 clubs (but cap at 3)
+  const maxRecommendations = Math.min(3, 14 - clubCount);
 
   // Analyze gaps
   const gaps = analyzeDistanceGaps(clubs, estimatedHeadSpeed);
@@ -395,14 +401,15 @@ const generateRecommendationsForLessThan14Clubs = (
   const wideGaps = gaps.filter((g) => g.isTooWide).sort((a, b) => b.gap - a.gap);
 
   // Handle wide gaps (add clubs)
-  for (const gap of wideGaps.slice(0, 3)) {
+  for (const gap of wideGaps.slice(0, maxRecommendations)) {
     const idealMidDistance = gap.currentClub.distance > 0
       ? (gap.currentClub.distance + gap.nextClub.distance) / 2
       : getEstimatedDistance(gap.currentClub, estimatedHeadSpeed) - gap.gap / 2;
 
     const category = inferCategoryFromLoftAndDistance(
       (gap.currentClub.loftAngle + gap.nextClub.loftAngle) / 2,
-      idealMidDistance
+      idealMidDistance,
+      estimatedHeadSpeed
     );
 
     const estimatedLoft = estimateLoftFromDistance(idealMidDistance, category, estimatedHeadSpeed);
@@ -436,7 +443,7 @@ const generateRecommendationsForLessThan14Clubs = (
     });
   }
 
-  return recommendations.slice(0, 3);
+  return recommendations;
 };
 
 // Generate recommendations for exactly 14 clubs
@@ -701,7 +708,8 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     if (clubCount < 14) {
       recommendations = generateRecommendationsForLessThan14Clubs(
         bagClubs,
-        estimateHeadSpeedFromClubs(bagClubs)
+        estimateHeadSpeedFromClubs(bagClubs),
+        clubCount
       );
     } else {
       // For 14 clubs, recommendations will be generated after adjustments are computed
