@@ -7,7 +7,7 @@ import { useClubStore } from "../../store/clubStore";
 import { toSimClub } from "../../utils/clubSimAdapter";
 import { COURSE_1HOLE, COURSE_3HOLES, COURSE_9HOLES, COURSE_18HOLES } from "../../data/defaultCourses";
 import { cloneCourse } from "../../utils/courseGenerator";
-import { loadStoredCustomCourse, type CustomCoursePreset } from "./CustomCourseEditorScreen";
+import { loadStoredCustomCourse, type CustomCoursePreset } from "../../utils/customCourseStorage";
 import { HoleView } from "./HoleView";
 import { filterClubsWithActualShots } from "../../utils/actualShotFilter";
 import { PostRoundAnalysis } from "./PostRoundAnalysis";
@@ -315,7 +315,7 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
       bag = source.map(toSimClub);
     }
     setShowDetailedScorecard(false);
-    startRound(cloneCourse(holes), bag, mode);
+    startRound(cloneCourse(holes), bag, mode, selectedCourse.name);
   };
 
   if (phase === "setup") {

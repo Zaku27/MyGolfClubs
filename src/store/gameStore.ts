@@ -83,6 +83,7 @@ function generateWind(
 interface GameStoreState {
   phase: GamePhase;
   course: Hole[];
+  courseName: string;
   currentHoleIndex: number;
   shotContext: ShotContext;
   holeStrokes: number;
@@ -117,7 +118,7 @@ interface GameStoreState {
 }
 
 interface GameStoreActions {
-  startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag" | "measured") => void;
+  startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag" | "measured", courseName?: string) => void;
   selectClub: (clubId: string) => void;
   setShotPowerPercent: (powerPercent: number) => void;
   setAimXOffset: (aimXOffset: number) => void;
@@ -135,6 +136,7 @@ type GameStore = GameStoreState & GameStoreActions;
 const INITIAL_STATE: GameStoreState = {
   phase: "setup",
   course: [],
+  courseName: "",
   currentHoleIndex: 0,
   shotContext: {
     remainingDistance: 0,
@@ -245,7 +247,7 @@ function buildHoleSummary(hole: Hole, holeShots: ShotLog[], roundShots: ShotLog[
 export const useGameStore = create<GameStore>((set, get) => ({
   ...INITIAL_STATE,
 
-  startRound: (course, bag, playMode = "bag") => {
+  startRound: (course, bag, playMode = "bag", courseName = "") => {
     const roundSeedNonce = createRoundSeedNonce();
     const initialContext = buildInitialContext(course[0], roundSeedNonce, 0, null);
 
@@ -258,6 +260,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ...INITIAL_STATE,
       phase: "playing",
       course,
+      courseName,
       bag,
       playMode,
       roundSeedNonce,

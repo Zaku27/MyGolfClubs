@@ -52,6 +52,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const {
     phase,
     course,
+    courseName,
     currentHoleIndex,
     shotContext,
     holeStrokes,
@@ -367,7 +368,16 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         onCancel={() => setShowQuitConfirm(false)}
         onConfirm={handleConfirmQuitGame}
       />
-      <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-8 pt-20 sm:px-6 sm:pt-24">
+      {courseName && (
+        <div className="mx-auto w-full max-w-6xl px-4 pt-20 sm:px-6 sm:pt-24">
+          <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 px-5 py-3 text-center shadow-sm shadow-emerald-300/40">
+            <h1 className="text-lg font-black text-emerald-900 tracking-tight sm:text-xl">
+              {courseName}
+            </h1>
+          </div>
+        </div>
+      )}
+      <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-8 pt-2 sm:px-6 sm:pt-1">
         {shotInProgress && (
           <div className="fixed inset-0 z-50 cursor-wait bg-black/0 pointer-events-auto" />
         )}
