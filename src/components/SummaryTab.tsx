@@ -158,7 +158,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
                       </span>
                     )}
                     {rec.replaceTarget && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
                         {rec.replaceTarget}の入れ替え
                       </span>
                     )}
@@ -192,7 +192,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
 
                 {/* アクションボタン */}
                 <button className="w-full mt-3 px-4 py-2 rounded-lg border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-sm font-medium">
-                  このクラブの詳細分析へ
+                  このスペックのクラブを探す
                 </button>
               </div>
             </div>

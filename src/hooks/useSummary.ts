@@ -111,11 +111,36 @@ const estimateLoftFromDistance = (
   const speedFactor = headSpeed / 44.5; // Adjust based on head speed relative to standard
   
   switch (category) {
-    case 'Driver': return Math.max(9, Math.min(12, 10.5 / speedFactor));
-    case 'Fairway': return Math.max(13, Math.min(18, 15 / speedFactor));
-    case 'Hybrid': return Math.max(17, Math.min(22, 19 / speedFactor));
-    case 'Iron': return Math.max(20, Math.min(48, (55 - distance * 0.12) / speedFactor));
-    case 'Wedge': return Math.max(48, Math.min(60, (70 - distance * 0.3) / speedFactor));
+    case 'Driver': 
+      // 距離ベースの計算: 9°≈250yd, 12°≈200yd として線形補間
+      const baseLoftDriver = 9 + (250 - distance) * 0.06; // (12-9)/(250-200) = 0.06°/yd
+      const speedAdjustmentDriver = Math.max(0, (1 - speedFactor) * 0.5);
+      return Math.max(9, Math.min(12, baseLoftDriver + speedAdjustmentDriver));
+    case 'Fairway': 
+      // 距離ベースの計算: 13°≈230yd, 18°≈180yd として線形補間
+      const baseLoftFairway = 13 + (230 - distance) * 0.1; // (18-13)/(230-180) = 0.1°/yd
+      const speedAdjustmentFairway = Math.max(0, (1 - speedFactor) * 1);
+      return Math.max(13, Math.min(18, baseLoftFairway + speedAdjustmentFairway));
+    case 'Hybrid': 
+      // 距離ベースの計算: 17°≈170yd, 24°≈130yd として線形補間
+      // 距離が短いほどロフトが大きくなる
+      const baseLoftHybrid = 17 + (170 - distance) * 0.175; // (24-17)/(170-130) = 0.175°/yd
+      const speedAdjustmentHybrid = Math.max(0, (1 - speedFactor) * 1.5);
+      return Math.max(17, Math.min(26, baseLoftHybrid + speedAdjustmentHybrid));
+    case 'Iron': 
+      // 距離ベースの計算: 5Iron(27°)≈160yd, PW(44°)≈85yd として線形補間
+      // 距離が短いほどロフトが大きくなる
+      const baseLoftIron = 27 + (160 - distance) * 0.178; // (44-27)/(160-85) = 0.227°/yd、より緩やかに設定
+      const speedAdjustmentIron = Math.max(0, (1 - speedFactor) * 1);
+      return Math.max(20, Math.min(48, baseLoftIron + speedAdjustmentIron));
+    case 'Wedge': 
+      // 実測データに基づく補正: PW(44°)=84.8yd, 56°=57.3yd
+      // 距離が短いほどロフトが大きくなる線形補間
+      // 傾き: (56-44)/(57.3-84.8) = -0.44°/yd
+      const baseLoft = 44 + (84.8 - distance) * 0.44;
+      // ヘッドスピード補正: 標準より遅い場合は最大1°多めのロフトを提案
+      const speedAdjustment = Math.max(0, (1 - speedFactor) * 1);
+      return Math.max(44, Math.min(60, baseLoft + speedAdjustment));
     case 'Putter': return 3;
   }
 };
@@ -150,11 +175,14 @@ const getIdealSwingWeightFromRegression = (
   const intercept = meanSW - slope * meanLength;
   const idealSW = slope * length + intercept;
   
-  // Convert numeric to label
-  const integerPart = Math.floor(idealSW);
-  const decimalPart = idealSW - integerPart;
-  const letter = decimalPart < 0.5 ? 'D' : 'E';
-  const modifier = integerPart + letter;
+  // Convert numeric to label (e.g., 35 -> D5, 35.5 -> D5.5, 40 -> E0)
+  // swingWeightToNumeric returns: letterIndex * 10 + point
+  // So we need to reverse this: 35 -> letterIndex=3 (D), point=5
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const letterIndex = Math.floor(idealSW / 10);
+  const letter = letters[letterIndex] || 'C';
+  const point = idealSW - letterIndex * 10;
+  const modifier = letter + point.toFixed(1);
   
   return modifier;
 };
@@ -256,80 +284,62 @@ const analyzeDistanceGaps = (
   return gaps;
 };
 
-// Generate recommendations for less than 14 clubs
-const generateRecommendationsForLessThan14Clubs = (
+// Generate recommendations for narrow gaps (replace clubs)
+const generateNarrowGapRecommendations = (
   clubs: GolfClub[],
-  headSpeed: number | null
+  headSpeed: number | null,
+  maxRecommendations: number = 3
 ): Recommendation[] => {
   const recommendations: Recommendation[] = [];
   const estimatedHeadSpeed = headSpeed ?? 44.5;
-  
+
   // Analyze gaps
   const gaps = analyzeDistanceGaps(clubs, estimatedHeadSpeed);
-  
-  // Find gaps that are too wide (priority) or too narrow
-  const wideGaps = gaps.filter((g) => g.isTooWide).sort((a, b) => b.gap - a.gap);
+
+  // Find gaps that are too narrow
   const narrowGaps = gaps.filter((g) => g.isTooNarrow).sort((a, b) => a.gap - b.gap);
-  
-  // Handle wide gaps (add clubs)
-  for (const gap of wideGaps.slice(0, 3)) {
-    const idealMidDistance = gap.currentClub.distance > 0 
-      ? (gap.currentClub.distance + gap.nextClub.distance) / 2
-      : getEstimatedDistance(gap.currentClub, estimatedHeadSpeed) - gap.gap / 2;
-    
-    const category = inferCategoryFromLoftAndDistance(
-      (gap.currentClub.loftAngle + gap.nextClub.loftAngle) / 2,
-      idealMidDistance
-    );
-    
-    const estimatedLoft = estimateLoftFromDistance(idealMidDistance, category, estimatedHeadSpeed);
-    const estimatedLength = category === 'Iron' 
-      ? 38.5 - (estimatedLoft - 30) * 0.1 
-      : category === 'Wedge'
-        ? 35 - (estimatedLoft - 48) * 0.05
-        : 45 - (estimatedLoft - 10) * 0.2;
-    
-    const idealSW = getIdealSwingWeightFromRegression(estimatedLength, clubs);
-    
-    const spec: ProposedSpec = {
-      loftAngle: estimatedLoft,
-      length: estimatedLength,
-      swingWeight: idealSW ?? undefined,
-    };
-    
-    const clubName = generateClubNameFromSpec(category, spec);
-    
-    recommendations.push({
-      category,
-      clubName,
-      reason: [
-        `${getClubTypeDisplay(gap.currentClub.clubType, gap.currentClub.number || '')}と${getClubTypeDisplay(gap.nextClub.clubType, gap.nextClub.number || '')}の距離ギャップが${gap.gap}ydあります`,
-        `中間的な${Math.round(idealMidDistance)}ydのクラブでギャップを埋めます`,
-        `トレンドに沿ったスペックで統一感を出します`,
-      ],
-      expectedDistanceGain: Math.round(gap.gap * 0.3),
-      actionType: 'add',
-      proposedSpec: spec,
-    });
-  }
-  
+
   // Handle narrow gaps (replace clubs)
-  for (const gap of narrowGaps.slice(0, 2)) {
-    if (recommendations.length >= 3) break;
-    
+  for (const gap of narrowGaps.slice(0, maxRecommendations)) {
+    if (recommendations.length >= maxRecommendations) break;
+
     // Determine which club to replace (the one with less useful distance)
     const clubToReplace = gap.currentClub.distance > gap.nextClub.distance * 1.3
-      ? gap.nextClub 
+      ? gap.nextClub
       : gap.currentClub;
-    const keepClub = clubToReplace === gap.currentClub ? gap.nextClub : gap.currentClub;
-    
-    // Calculate better distance
-    const idealDistance = keepClub.distance > 0 
-      ? (keepClub === gap.currentClub 
-          ? gap.nextClub.distance + gap.idealMax
-          : gap.currentClub.distance - gap.idealMin)
-      : getEstimatedDistance(keepClub, estimatedHeadSpeed) + (keepClub === gap.currentClub ? -gap.idealMin : gap.idealMin);
-    
+
+    // Find the clubs before and after the club to replace (excluding the club being replaced)
+    const allSortedClubs = clubs
+      .filter(c => c.distance > 0)
+      .sort((a, b) => b.distance - a.distance);
+
+    const replaceIndex = allSortedClubs.findIndex(c =>
+      c.clubType === clubToReplace.clubType && c.number === clubToReplace.number
+    );
+
+    let prevClub: GolfClub | undefined;
+    let nextClub: GolfClub | undefined;
+
+    if (replaceIndex > 0) {
+      prevClub = allSortedClubs[replaceIndex - 1];
+    }
+    if (replaceIndex < allSortedClubs.length - 1) {
+      nextClub = allSortedClubs[replaceIndex + 1];
+    }
+
+    // Calculate ideal distance as midpoint between previous and next clubs
+    let idealDistance: number;
+    if (prevClub && nextClub) {
+      idealDistance = (prevClub.distance + nextClub.distance) / 2;
+    } else if (prevClub) {
+      idealDistance = prevClub.distance - gap.idealMin;
+    } else if (nextClub) {
+      idealDistance = nextClub.distance + gap.idealMax;
+    } else {
+      // Fallback: use original logic
+      idealDistance = getEstimatedDistance(clubToReplace, estimatedHeadSpeed);
+    }
+
     const category = mapClubTypeToCategory(clubToReplace.clubType) || 'Iron';
     const estimatedLoft = estimateLoftFromDistance(idealDistance, category, estimatedHeadSpeed);
     const estimatedLength = category === 'Iron'
@@ -337,26 +347,26 @@ const generateRecommendationsForLessThan14Clubs = (
       : category === 'Wedge'
         ? 35 - (estimatedLoft - 48) * 0.05
         : 45 - (estimatedLoft - 10) * 0.2;
-    
+
     const idealSW = getIdealSwingWeightFromRegression(estimatedLength, clubs);
-    const idealLie = category === 'Iron' 
+    const idealLie = category === 'Iron'
       ? getIdealLieAngleForIron(estimatedLength, clubs.filter((c) => c.clubType === 'Iron'))
       : undefined;
-    
+
     const spec: ProposedSpec = {
       loftAngle: estimatedLoft,
       length: estimatedLength,
       swingWeight: idealSW ?? undefined,
       lieAngle: idealLie,
     };
-    
+
     const clubName = generateClubNameFromSpec(category, spec);
-    
+
     recommendations.push({
       category,
       clubName,
       reason: [
-        `${getClubTypeDisplay(gap.currentClub.clubType, gap.currentClub.number || '')}と${getClubTypeDisplay(gap.nextClub.clubType, gap.nextClub.number || '')}の距離差が${gap.gap}ydと狭く、距離が被っています`,
+        `${getClubTypeDisplay(gap.currentClub.clubType, gap.currentClub.number || '')}と${getClubTypeDisplay(gap.nextClub.clubType, gap.nextClub.number || '')}の距離差が${gap.gap.toFixed(1)}ydと狭く、距離が被っています`,
         `より適切な${Math.round(idealDistance)}ydのクラブに入れ替えます`,
         `ギャップを${gap.idealMin}-${gap.idealMax}ydに最適化します`,
       ],
@@ -366,7 +376,66 @@ const generateRecommendationsForLessThan14Clubs = (
       proposedSpec: spec,
     });
   }
-  
+
+  return recommendations;
+};
+
+// Generate recommendations for less than 14 clubs
+const generateRecommendationsForLessThan14Clubs = (
+  clubs: GolfClub[],
+  headSpeed: number | null
+): Recommendation[] => {
+  const recommendations: Recommendation[] = [];
+  const estimatedHeadSpeed = headSpeed ?? 44.5;
+
+  // Analyze gaps
+  const gaps = analyzeDistanceGaps(clubs, estimatedHeadSpeed);
+
+  // Find gaps that are too wide (priority) - narrow gaps are handled separately for >=14 clubs
+  const wideGaps = gaps.filter((g) => g.isTooWide).sort((a, b) => b.gap - a.gap);
+
+  // Handle wide gaps (add clubs)
+  for (const gap of wideGaps.slice(0, 3)) {
+    const idealMidDistance = gap.currentClub.distance > 0
+      ? (gap.currentClub.distance + gap.nextClub.distance) / 2
+      : getEstimatedDistance(gap.currentClub, estimatedHeadSpeed) - gap.gap / 2;
+
+    const category = inferCategoryFromLoftAndDistance(
+      (gap.currentClub.loftAngle + gap.nextClub.loftAngle) / 2,
+      idealMidDistance
+    );
+
+    const estimatedLoft = estimateLoftFromDistance(idealMidDistance, category, estimatedHeadSpeed);
+    const estimatedLength = category === 'Iron'
+      ? 38.5 - (estimatedLoft - 30) * 0.1
+      : category === 'Wedge'
+        ? 35 - (estimatedLoft - 48) * 0.05
+        : 45 - (estimatedLoft - 10) * 0.2;
+
+    const idealSW = getIdealSwingWeightFromRegression(estimatedLength, clubs);
+
+    const spec: ProposedSpec = {
+      loftAngle: estimatedLoft,
+      length: estimatedLength,
+      swingWeight: idealSW ?? undefined,
+    };
+
+    const clubName = generateClubNameFromSpec(category, spec);
+
+    recommendations.push({
+      category,
+      clubName,
+      reason: [
+        `${getClubTypeDisplay(gap.currentClub.clubType, gap.currentClub.number || '')}と${getClubTypeDisplay(gap.nextClub.clubType, gap.nextClub.number || '')}の距離ギャップが${gap.gap.toFixed(1)}ydあります`,
+        `中間的な${Math.round(idealMidDistance)}ydのクラブでギャップを埋めます`,
+        `トレンドに沿ったスペックで統一感を出します`,
+      ],
+      expectedDistanceGain: Math.round(gap.gap * 0.3),
+      actionType: 'add',
+      proposedSpec: spec,
+    });
+  }
+
   return recommendations.slice(0, 3);
 };
 
@@ -375,13 +444,22 @@ const generateRecommendationsFor14Clubs = (
   clubs: GolfClub[],
   adjustments: Adjustment[],
   swingLengthTable: ReturnType<typeof buildSwingLengthAnalysis>['tableClubs'],
-  regression: ReturnType<typeof buildSwingLengthAnalysis>['regression']
+  headSpeed: number | null
 ): Recommendation[] => {
   const recommendations: Recommendation[] = [];
-  
+
+  // First, check for narrow gaps - this takes priority over other recommendations
+  const narrowGapRecommendations = generateNarrowGapRecommendations(clubs, headSpeed, 3);
+  recommendations.push(...narrowGapRecommendations);
+
+  // If we already have 3 recommendations from narrow gaps, return early
+  if (recommendations.length >= 3) {
+    return recommendations.slice(0, 3);
+  }
+
   // Get high priority adjustments
   const highPriorityAdjustments = adjustments.filter((a) => a.priority === 'high');
-  
+
   for (const adjustment of highPriorityAdjustments.slice(0, 3)) {
     if (recommendations.length >= 3) break;
     
@@ -879,7 +957,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
         bagClubs,
         adjustments,
         swingLengthTable,
-        regression
+        estimateHeadSpeedFromClubs(bagClubs)
       );
     }
     

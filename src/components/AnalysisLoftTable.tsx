@@ -71,7 +71,7 @@ export const AnalysisLoftTable = ({
                 <input
                   type="number"
                   min="0"
-                  step="1"
+                  step="0.1"
                   value={club.actualDistance || ''}
                   onChange={(event) => onActualDistanceChange(club.id, event)}
                   className="analysis-input"
