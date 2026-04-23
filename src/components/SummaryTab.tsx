@@ -147,7 +147,22 @@ export function SummaryTab({ data }: SummaryTabProps) {
               <div className="p-4 space-y-3">
                 {/* ヘッダー */}
                 <div>
-                  <p className="text-sm text-muted-foreground">{rec.brand}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    {rec.actionType && (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        rec.actionType === 'add' 
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                          : 'bg-orange-100 text-orange-700 border border-orange-200'
+                      }`}>
+                        {rec.actionType === 'add' ? '追加' : '入れ替え'}
+                      </span>
+                    )}
+                    {rec.replaceTarget && (
+                      <span className="text-xs text-muted-foreground">
+                        {rec.replaceTarget}の入れ替え
+                      </span>
+                    )}
+                  </div>
                   <h3 className="font-semibold text-lg">{rec.clubName}</h3>
                 </div>
 
@@ -163,10 +178,12 @@ export function SummaryTab({ data }: SummaryTabProps) {
 
                 {/* 期待効果 */}
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                    +{rec.expectedDistanceGain}yd
-                  </span>
-                  {rec.expectedAccuracyGain && (
+                  {rec.expectedDistanceGain > 0 && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                      +{rec.expectedDistanceGain}yd
+                    </span>
+                  )}
+                  {rec.expectedAccuracyGain && rec.expectedAccuracyGain > 0 && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                       精度 +{rec.expectedAccuracyGain}%
                     </span>

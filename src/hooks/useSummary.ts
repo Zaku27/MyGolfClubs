@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { useClubStore } from '../store/clubStore';
-import type { SummaryData, Recommendation, Adjustment } from '../types/summary';
+import type { SummaryData, Recommendation, Adjustment, ProposedSpec } from '../types/summary';
 import type { GolfClub } from '../types/golf';
 import { buildSwingLengthAnalysis } from '../utils/analysisBuilders';
 import { readStoredNumber } from '../utils/storage';
-import { computeGapsAndRecommendations, evaluateSwingLengthSlope, getSwingLengthSlopeMessage, swingWeightToNumeric, estimateHeadSpeedFromClubs, checkFlexCompatibility } from '../utils/analysisUtils';
+import { computeGapsAndRecommendations, evaluateSwingLengthSlope, getSwingLengthSlopeMessage, swingWeightToNumeric, estimateHeadSpeedFromClubs, checkFlexCompatibility, getEstimatedDistance, getClubCategory } from '../utils/analysisUtils';
 import { getClubTypeDisplay } from '../utils/clubUtils';
 
 // Map internal club types to summary category types
@@ -37,61 +37,517 @@ const CATEGORY_DISTANCE_BENCHMARKS: Record<Recommendation['category'], number> =
   Putter: 0,
 };
 
-// Sample club recommendations database (simplified)
-type RecommendationBase = Omit<Recommendation, 'expectedDistanceGain' | 'category'>;
-const SAMPLE_RECOMMENDATIONS: Partial<Record<Recommendation['category'], RecommendationBase[]>> = {
-  Driver: [
-    {
-      clubName: 'Stealth 2 HD',
-      brand: 'TaylorMade',
-      reason: ['高MOI設計でミスヒット許容', '軽量シャフトでヘッドスピード向上', 'ドロー志向の重心設計'],
-    },
-    {
-      clubName: 'G430 Max 10K',
-      brand: 'PING',
-      reason: ['業界最高MOI値', '極限の直進性', '弾道安定性の向上'],
-    },
-  ],
-  Fairway: [
-    {
-      clubName: 'STEALTH 2 FW',
-      brand: 'TaylorMade',
-      reason: ['深重心で高弾道', 'やさしいミスヒット性能', 'バランスの取れた設計'],
-    },
-  ],
-  Hybrid: [
-    {
-      clubName: 'APEX UW',
-      brand: 'Callaway',
-      reason: ['ユーティリティとウッドの中間', '高い弾道でグリーンを狙える', '多用途な使用シーン'],
-    },
-  ],
-  Iron: [
-    {
-      clubName: 'T350',
-      brand: 'Titleist',
-      reason: ['中空構造で距離と許容性を両立', 'タイトリストらしい打感', 'セット全体の距離ギャップ最適化'],
-    },
-  ],
-  Wedge: [
-    {
-      clubName: 'RTX 6 ZipCore',
-      brand: 'Cleveland',
-      reason: ['高いスピン性能', '様々なライに対応', 'バンカー脱出力の向上'],
-    },
-  ],
-  Putter: [
-    {
-      clubName: 'Phantom X 5.5',
-      brand: 'Scotty Cameron',
-      reason: ['小ぶりなマレット型', '視認性の高いアライメント', '距離コントロール性能'],
-    },
-  ],
+// Distance gap ideal ranges (from analysisConstants)
+const GAP_RANGES = {
+  driverToWood: { ideal: { min: 20, max: 30 }, tooWide: 50, tooNarrow: 15 },
+  woodToHybrid: { ideal: { min: 15, max: 25 }, tooWide: 35, tooNarrow: 10 },
+  hybridToIron: { ideal: { min: 10, max: 20 }, tooWide: 30, tooNarrow: 8 },
+  ironToIron: { ideal: { min: 10, max: 15 }, tooWide: 25, tooNarrow: 8 },
+  ironToWedge: { ideal: { min: 10, max: 20 }, tooWide: 30, tooNarrow: 8 },
+  wedgeToWedge: { ideal: { min: 4, max: 6 }, tooWide: 12, tooNarrow: 3 },
 };
+
+// Gap analysis result type
+interface GapAnalysis {
+  currentClub: GolfClub;
+  nextClub: GolfClub;
+  gap: number;
+  isTooWide: boolean;
+  isTooNarrow: boolean;
+  categoryTransition: string;
+  idealMin: number;
+  idealMax: number;
+}
 
 interface UseSummaryOptions {
   bagId?: number | null;
 }
+
+// Generate club name from category and proposed spec
+const generateClubNameFromSpec = (
+  category: Recommendation['category'],
+  spec: ProposedSpec
+): string => {
+  const categoryLabel: Record<Recommendation['category'], string> = {
+    Driver: 'ドライバー',
+    Fairway: 'フェアウェイウッド',
+    Hybrid: 'ハイブリッド',
+    Iron: 'アイアン',
+    Wedge: 'ウェッジ',
+    Putter: 'パター',
+  };
+  
+  const specParts: string[] = [];
+  if (spec.loftAngle && spec.loftAngle > 0) specParts.push(`ロフト${spec.loftAngle.toFixed(1)}°`);
+  if (spec.length && spec.length > 0) specParts.push(`長さ${spec.length.toFixed(1)}in`);
+  if (spec.swingWeight && spec.swingWeight.length > 0) specParts.push(`SW ${spec.swingWeight}`);
+  if (spec.lieAngle && spec.lieAngle > 0) specParts.push(`ライ${spec.lieAngle.toFixed(1)}°`);
+  
+  const baseName = categoryLabel[category];
+  const specInfo = specParts.length > 0 ? `（${specParts.join('、')}）` : '';
+  
+  return `${baseName}${specInfo}`;
+};
+
+// Calculate category from loft and distance range
+const inferCategoryFromLoftAndDistance = (
+  loftAngle: number,
+  distance: number
+): Recommendation['category'] => {
+  if (distance >= 220) return 'Driver';
+  if (distance >= 180) return 'Fairway';
+  if (distance >= 150) return 'Hybrid';
+  if (loftAngle >= 40) return 'Wedge';
+  return 'Iron';
+};
+
+// Estimate loft angle from distance (inverse of getEstimatedDistance)
+const estimateLoftFromDistance = (
+  distance: number,
+  category: Recommendation['category'],
+  headSpeed: number
+): number => {
+  // Simplified estimation based on category and head speed
+  const speedFactor = headSpeed / 44.5; // Adjust based on head speed relative to standard
+  
+  switch (category) {
+    case 'Driver': return Math.max(9, Math.min(12, 10.5 / speedFactor));
+    case 'Fairway': return Math.max(13, Math.min(18, 15 / speedFactor));
+    case 'Hybrid': return Math.max(17, Math.min(22, 19 / speedFactor));
+    case 'Iron': return Math.max(20, Math.min(48, (55 - distance * 0.12) / speedFactor));
+    case 'Wedge': return Math.max(48, Math.min(60, (70 - distance * 0.3) / speedFactor));
+    case 'Putter': return 3;
+  }
+};
+
+// Get regression-based ideal swing weight for a given length
+const getIdealSwingWeightFromRegression = (
+  length: number,
+  clubs: GolfClub[]
+): string | null => {
+  const validClubs = clubs.filter(
+    (c) => c.length > 0 && c.swingWeight && swingWeightToNumeric(c.swingWeight) !== 0
+  );
+  
+  if (validClubs.length < 2) return null;
+  
+  // Calculate linear regression
+  const meanLength = validClubs.reduce((sum, c) => sum + c.length, 0) / validClubs.length;
+  const meanSW = validClubs.reduce((sum, c) => sum + swingWeightToNumeric(c.swingWeight), 0) / validClubs.length;
+  
+  let numerator = 0;
+  let denominator = 0;
+  for (const club of validClubs) {
+    const dx = club.length - meanLength;
+    const sw = swingWeightToNumeric(club.swingWeight);
+    numerator += dx * (sw - meanSW);
+    denominator += dx * dx;
+  }
+  
+  if (Math.abs(denominator) < 0.0001) return null;
+  
+  const slope = numerator / denominator;
+  const intercept = meanSW - slope * meanLength;
+  const idealSW = slope * length + intercept;
+  
+  // Convert numeric to label
+  const integerPart = Math.floor(idealSW);
+  const decimalPart = idealSW - integerPart;
+  const letter = decimalPart < 0.5 ? 'D' : 'E';
+  const modifier = integerPart + letter;
+  
+  return modifier;
+};
+
+// Get ideal lie angle for irons based on length
+const getIdealLieAngleForIron = (
+  length: number,
+  irons: GolfClub[]
+): number => {
+  if (irons.length === 0) return 61; // Default for irons
+  
+  const ironsWithLie = irons.filter((c) => c.lieAngle > 0 && c.length > 0);
+  if (ironsWithLie.length === 0) return 61;
+  
+  // Simple linear regression for lie angle vs length
+  const meanLength = ironsWithLie.reduce((sum, c) => sum + c.length, 0) / ironsWithLie.length;
+  const meanLie = ironsWithLie.reduce((sum, c) => sum + c.lieAngle, 0) / ironsWithLie.length;
+  
+  let numerator = 0;
+  let denominator = 0;
+  for (const club of ironsWithLie) {
+    const dx = club.length - meanLength;
+    numerator += dx * (club.lieAngle - meanLie);
+    denominator += dx * dx;
+  }
+  
+  const slope = Math.abs(denominator) < 0.0001 ? -1.4 : numerator / denominator;
+  const intercept = meanLie - slope * meanLength;
+  
+  return slope * length + intercept;
+};
+
+// Analyze gaps and return detailed gap info
+const analyzeDistanceGaps = (
+  clubs: GolfClub[],
+  headSpeed: number | null
+): GapAnalysis[] => {
+  const estimatedHeadSpeed = headSpeed ?? 44.5;
+  
+  // Get effective distance for each club
+  const clubsWithDistance = clubs
+    .filter((c) => c.clubType !== 'Putter')
+    .map((c) => ({
+      club: c,
+      distance: c.distance > 0 ? c.distance : getEstimatedDistance(c, estimatedHeadSpeed),
+    }))
+    .filter((c) => c.distance > 0);
+  
+  if (clubsWithDistance.length < 2) return [];
+  
+  // Sort by distance descending
+  const sorted = [...clubsWithDistance].sort((a, b) => b.distance - a.distance);
+  const gaps: GapAnalysis[] = [];
+  
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i];
+    const next = sorted[i + 1];
+    const gap = current.distance - next.distance;
+    
+    const currentCategory = getClubCategory(current.club);
+    const nextCategory = getClubCategory(next.club);
+    
+    // Determine which gap range applies
+    let range = GAP_RANGES.ironToIron;
+    let transition = 'iron-iron';
+    
+    if (currentCategory === 'driver' && nextCategory === 'wood') {
+      range = GAP_RANGES.driverToWood;
+      transition = 'driver-wood';
+    } else if (currentCategory === 'wood' && nextCategory === 'hybrid') {
+      range = GAP_RANGES.woodToHybrid;
+      transition = 'wood-hybrid';
+    } else if (currentCategory === 'hybrid' && nextCategory === 'iron') {
+      range = GAP_RANGES.hybridToIron;
+      transition = 'hybrid-iron';
+    } else if (currentCategory === 'iron' && nextCategory === 'iron') {
+      range = GAP_RANGES.ironToIron;
+      transition = 'iron-iron';
+    } else if (currentCategory === 'iron' && nextCategory === 'wedge') {
+      range = GAP_RANGES.ironToWedge;
+      transition = 'iron-wedge';
+    } else if (currentCategory === 'wedge' && nextCategory === 'wedge') {
+      range = GAP_RANGES.wedgeToWedge;
+      transition = 'wedge-wedge';
+    }
+    
+    gaps.push({
+      currentClub: current.club,
+      nextClub: next.club,
+      gap,
+      isTooWide: gap > range.tooWide || gap > range.ideal.max * 1.5,
+      isTooNarrow: gap < range.tooNarrow || gap < range.ideal.min * 0.7,
+      categoryTransition: transition,
+      idealMin: range.ideal.min,
+      idealMax: range.ideal.max,
+    });
+  }
+  
+  return gaps;
+};
+
+// Generate recommendations for less than 14 clubs
+const generateRecommendationsForLessThan14Clubs = (
+  clubs: GolfClub[],
+  headSpeed: number | null
+): Recommendation[] => {
+  const recommendations: Recommendation[] = [];
+  const estimatedHeadSpeed = headSpeed ?? 44.5;
+  
+  // Analyze gaps
+  const gaps = analyzeDistanceGaps(clubs, estimatedHeadSpeed);
+  
+  // Find gaps that are too wide (priority) or too narrow
+  const wideGaps = gaps.filter((g) => g.isTooWide).sort((a, b) => b.gap - a.gap);
+  const narrowGaps = gaps.filter((g) => g.isTooNarrow).sort((a, b) => a.gap - b.gap);
+  
+  // Handle wide gaps (add clubs)
+  for (const gap of wideGaps.slice(0, 3)) {
+    const idealMidDistance = gap.currentClub.distance > 0 
+      ? (gap.currentClub.distance + gap.nextClub.distance) / 2
+      : getEstimatedDistance(gap.currentClub, estimatedHeadSpeed) - gap.gap / 2;
+    
+    const category = inferCategoryFromLoftAndDistance(
+      (gap.currentClub.loftAngle + gap.nextClub.loftAngle) / 2,
+      idealMidDistance
+    );
+    
+    const estimatedLoft = estimateLoftFromDistance(idealMidDistance, category, estimatedHeadSpeed);
+    const estimatedLength = category === 'Iron' 
+      ? 38.5 - (estimatedLoft - 30) * 0.1 
+      : category === 'Wedge'
+        ? 35 - (estimatedLoft - 48) * 0.05
+        : 45 - (estimatedLoft - 10) * 0.2;
+    
+    const idealSW = getIdealSwingWeightFromRegression(estimatedLength, clubs);
+    
+    const spec: ProposedSpec = {
+      loftAngle: estimatedLoft,
+      length: estimatedLength,
+      swingWeight: idealSW ?? undefined,
+    };
+    
+    const clubName = generateClubNameFromSpec(category, spec);
+    
+    recommendations.push({
+      category,
+      clubName,
+      reason: [
+        `${getClubTypeDisplay(gap.currentClub.clubType, gap.currentClub.number || '')}と${getClubTypeDisplay(gap.nextClub.clubType, gap.nextClub.number || '')}の距離ギャップが${gap.gap}ydあります`,
+        `中間的な${Math.round(idealMidDistance)}ydのクラブでギャップを埋めます`,
+        `トレンドに沿ったスペックで統一感を出します`,
+      ],
+      expectedDistanceGain: Math.round(gap.gap * 0.3),
+      actionType: 'add',
+      proposedSpec: spec,
+    });
+  }
+  
+  // Handle narrow gaps (replace clubs)
+  for (const gap of narrowGaps.slice(0, 2)) {
+    if (recommendations.length >= 3) break;
+    
+    // Determine which club to replace (the one with less useful distance)
+    const clubToReplace = gap.currentClub.distance > gap.nextClub.distance * 1.3
+      ? gap.nextClub 
+      : gap.currentClub;
+    const keepClub = clubToReplace === gap.currentClub ? gap.nextClub : gap.currentClub;
+    
+    // Calculate better distance
+    const idealDistance = keepClub.distance > 0 
+      ? (keepClub === gap.currentClub 
+          ? gap.nextClub.distance + gap.idealMax
+          : gap.currentClub.distance - gap.idealMin)
+      : getEstimatedDistance(keepClub, estimatedHeadSpeed) + (keepClub === gap.currentClub ? -gap.idealMin : gap.idealMin);
+    
+    const category = mapClubTypeToCategory(clubToReplace.clubType) || 'Iron';
+    const estimatedLoft = estimateLoftFromDistance(idealDistance, category, estimatedHeadSpeed);
+    const estimatedLength = category === 'Iron'
+      ? 38.5 - (estimatedLoft - 30) * 0.1
+      : category === 'Wedge'
+        ? 35 - (estimatedLoft - 48) * 0.05
+        : 45 - (estimatedLoft - 10) * 0.2;
+    
+    const idealSW = getIdealSwingWeightFromRegression(estimatedLength, clubs);
+    const idealLie = category === 'Iron' 
+      ? getIdealLieAngleForIron(estimatedLength, clubs.filter((c) => c.clubType === 'Iron'))
+      : undefined;
+    
+    const spec: ProposedSpec = {
+      loftAngle: estimatedLoft,
+      length: estimatedLength,
+      swingWeight: idealSW ?? undefined,
+      lieAngle: idealLie,
+    };
+    
+    const clubName = generateClubNameFromSpec(category, spec);
+    
+    recommendations.push({
+      category,
+      clubName,
+      reason: [
+        `${getClubTypeDisplay(gap.currentClub.clubType, gap.currentClub.number || '')}と${getClubTypeDisplay(gap.nextClub.clubType, gap.nextClub.number || '')}の距離差が${gap.gap}ydと狭く、距離が被っています`,
+        `より適切な${Math.round(idealDistance)}ydのクラブに入れ替えます`,
+        `ギャップを${gap.idealMin}-${gap.idealMax}ydに最適化します`,
+      ],
+      expectedDistanceGain: Math.round((gap.idealMax - gap.gap) * 0.5),
+      actionType: 'replace',
+      replaceTarget: getClubTypeDisplay(clubToReplace.clubType, clubToReplace.number || ''),
+      proposedSpec: spec,
+    });
+  }
+  
+  return recommendations.slice(0, 3);
+};
+
+// Generate recommendations for exactly 14 clubs
+const generateRecommendationsFor14Clubs = (
+  clubs: GolfClub[],
+  adjustments: Adjustment[],
+  swingLengthTable: ReturnType<typeof buildSwingLengthAnalysis>['tableClubs'],
+  regression: ReturnType<typeof buildSwingLengthAnalysis>['regression']
+): Recommendation[] => {
+  const recommendations: Recommendation[] = [];
+  
+  // Get high priority adjustments
+  const highPriorityAdjustments = adjustments.filter((a) => a.priority === 'high');
+  
+  for (const adjustment of highPriorityAdjustments.slice(0, 3)) {
+    if (recommendations.length >= 3) break;
+    
+    const title = adjustment.title;
+    
+    // Swing weight trend adjustment
+    if (title.includes('スイングウェイトのトレンド調整')) {
+      // Find clubs that deviate from trend
+      const outliers = swingLengthTable.filter((c) => c.trendStatus === '調整推奨');
+      if (outliers.length === 0) continue;
+      
+      for (const outlier of outliers.slice(0, 2)) {
+        if (recommendations.length >= 3) break;
+        
+        const idealSW = outlier.expectedSwingWeight.toFixed(1);
+        const spec: ProposedSpec = {
+          loftAngle: outlier.loftAngle,
+          length: outlier.length,
+          swingWeight: `D${idealSW}`,
+        };
+        
+        const category = mapClubTypeToCategory(outlier.clubType) || 'Iron';
+        const clubName = generateClubNameFromSpec(category, spec);
+        
+        recommendations.push({
+          category,
+          clubName,
+          reason: [
+            `トレンドから${outlier.deviationFromTrend.toFixed(1)}ポイント外れています`,
+            `トレンドに合わせることでスイングフィールが統一されます`,
+            `方向性と一貫性が向上します`,
+          ],
+          expectedDistanceGain: 0,
+          expectedAccuracyGain: 15,
+          actionType: 'replace',
+          replaceTarget: getClubTypeDisplay(outlier.clubType, outlier.number || ''),
+          proposedSpec: spec,
+        });
+      }
+    }
+    
+    // Lie angle optimization for irons
+    else if (title.includes('アイアンのライ角最適化')) {
+      const irons = clubs.filter((c) => c.clubType === 'Iron' && c.lieAngle > 0 && c.length > 0);
+      if (irons.length < 2) continue;
+      
+      const lieAngles = irons.map((c) => c.lieAngle);
+      const minLie = Math.min(...lieAngles);
+      const maxLie = Math.max(...lieAngles);
+      
+      // Find clubs that deviate most from the average
+      const avgLie = lieAngles.reduce((a, b) => a + b, 0) / lieAngles.length;
+      const outlierIrons = irons
+        .map((c) => ({ club: c, deviation: Math.abs(c.lieAngle - avgLie) }))
+        .sort((a, b) => b.deviation - a.deviation)
+        .filter((c) => c.deviation > 1.5);
+      
+      if (outlierIrons.length === 0) continue;
+      
+      for (const { club } of outlierIrons.slice(0, 2)) {
+        if (recommendations.length >= 3) break;
+        
+        const idealLie = getIdealLieAngleForIron(club.length, irons);
+        const idealSW = getIdealSwingWeightFromRegression(club.length, clubs);
+        
+        const spec: ProposedSpec = {
+          loftAngle: club.loftAngle,
+          length: club.length,
+          swingWeight: idealSW ?? undefined,
+          lieAngle: idealLie,
+        };
+        
+        const clubName = generateClubNameFromSpec('Iron', spec);
+        
+        recommendations.push({
+          category: 'Iron',
+          clubName,
+          reason: [
+            `セット内のライ角バラつきが${(maxLie - minLie).toFixed(1)}°あります`,
+            `理想のライ角${idealLie.toFixed(1)}°に調整することで方向精度が向上します`,
+            `アイアンセット全体の一貫性が向上します`,
+          ],
+          expectedDistanceGain: 0,
+          expectedAccuracyGain: 20,
+          actionType: 'replace',
+          replaceTarget: getClubTypeDisplay(club.clubType, club.number || ''),
+          proposedSpec: spec,
+        });
+      }
+    }
+    
+    // Condition unification
+    else if (title.includes('の調子統一')) {
+      const match = title.match(/^(.*?)の調子統一/);
+      if (!match) continue;
+      
+      const categoryLabel = match[1];
+      const categoryMap: Record<string, GolfClub['clubType']> = {
+        'ドライバー': 'Driver',
+        'ウッド': 'Wood',
+        'ハイブリッド': 'Hybrid',
+        'アイアン': 'Iron',
+        'ウェッジ': 'Wedge',
+      };
+      
+      const targetType = categoryMap[categoryLabel];
+      if (!targetType) continue;
+      
+      const targetClubs = clubs.filter(
+        (c) => c.clubType === targetType && c.condition && c.condition.length > 0
+      );
+      
+      if (targetClubs.length === 0) continue;
+      
+      // Find most common condition
+      const conditionCounts = new Map<string, number>();
+      for (const club of targetClubs) {
+        const count = conditionCounts.get(club.condition!) ?? 0;
+        conditionCounts.set(club.condition!, count + 1);
+      }
+      
+      const unifiedCondition = [...conditionCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (!unifiedCondition) continue;
+      
+      // Find clubs with different conditions
+      const differentClubs = targetClubs.filter((c) => c.condition !== unifiedCondition);
+      
+      for (const club of differentClubs.slice(0, 2)) {
+        if (recommendations.length >= 3) break;
+        
+        const idealSW = getIdealSwingWeightFromRegression(club.length, clubs);
+        const idealLie = club.clubType === 'Iron' 
+          ? getIdealLieAngleForIron(club.length, clubs.filter((c) => c.clubType === 'Iron'))
+          : undefined;
+        
+        const spec: ProposedSpec = {
+          loftAngle: club.loftAngle,
+          length: club.length,
+          swingWeight: idealSW ?? undefined,
+          lieAngle: idealLie,
+          condition: unifiedCondition,
+        };
+        
+        const category = mapClubTypeToCategory(club.clubType) || 'Iron';
+        const clubName = generateClubNameFromSpec(category, spec);
+        
+        recommendations.push({
+          category,
+          clubName,
+          reason: [
+            `${categoryLabel}内で調子が統一されていません`,
+            `${unifiedCondition}に統一することでスイングフィールが一貫します`,
+            `方向性と打感の安定性が向上します`,
+          ],
+          expectedDistanceGain: 5,
+          expectedAccuracyGain: 10,
+          actionType: 'replace',
+          replaceTarget: getClubTypeDisplay(club.clubType, club.number || ''),
+          proposedSpec: spec,
+        });
+      }
+    }
+  }
+  
+  return recommendations;
+};
 
 export function useSummary(options: UseSummaryOptions = {}): SummaryData {
   const { bagId } = options;
@@ -159,36 +615,21 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       }
     });
 
-    // Generate recommendations for categories with lower than benchmark distances
-    const recommendations: Recommendation[] = [];
-    (Object.keys(CATEGORY_DISTANCE_BENCHMARKS) as Recommendation['category'][]).forEach((cat) => {
-      if (cat === 'Putter') return;
-
-      const avg = categoryAverages[cat];
-      const benchmark = CATEGORY_DISTANCE_BENCHMARKS[cat];
-      const sampleRecs = SAMPLE_RECOMMENDATIONS[cat];
-
-      // Recommend if average is 15+ yards below benchmark or no clubs in category
-      const hasGap = !avg || (avg < benchmark - 15);
-      const hasNoClubs = !categoryDistances[cat] || categoryDistances[cat]!.length === 0;
-
-      if ((hasGap || hasNoClubs) && sampleRecs && sampleRecs.length > 0) {
-        const sample = sampleRecs[0];
-        const distanceGap = avg ? Math.round(benchmark - avg) : 20;
-
-        recommendations.push({
-          category: cat,
-          clubName: sample.clubName,
-          brand: sample.brand,
-          reason: sample.reason.slice(0, 3),
-          expectedDistanceGain: Math.max(5, Math.min(distanceGap, 25)), // Cap between 5-25 yards
-        });
-      }
-    });
-
-    // Limit to top 3 recommendations, prioritize by distance gap
-    recommendations.sort((a, b) => b.expectedDistanceGain - a.expectedDistanceGain);
-    const limitedRecommendations = recommendations.slice(0, 3);
+    // Generate recommendations based on club count
+    // For less than 14 clubs: analyze distance gaps and suggest clubs to add/replace
+    // For exactly 14 clubs: suggest clubs based on high-priority adjustment items
+    let recommendations: Recommendation[];
+    
+    if (clubCount < 14) {
+      recommendations = generateRecommendationsForLessThan14Clubs(
+        bagClubs,
+        estimateHeadSpeedFromClubs(bagClubs)
+      );
+    } else {
+      // For 14 clubs, recommendations will be generated after adjustments are computed
+      // This is handled separately since we need adjustments data
+      recommendations = [];
+    }
 
     // Generate adjustments based on club specs
     const adjustments: Adjustment[] = [];
@@ -431,6 +872,19 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     // Sort adjustments by priority
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     adjustments.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+    
+    // Generate recommendations for 14 clubs after adjustments are sorted
+    if (clubCount >= 14) {
+      recommendations = generateRecommendationsFor14Clubs(
+        bagClubs,
+        adjustments,
+        swingLengthTable,
+        regression
+      );
+    }
+    
+    // Limit to top 3 recommendations
+    const limitedRecommendations = recommendations.slice(0, 3);
 
     return {
       currentSet: {
