@@ -37,14 +37,53 @@ const CATEGORY_DISTANCE_BENCHMARKS: Record<Recommendation['category'], number> =
   Putter: 0,
 };
 
-// Distance gap ideal ranges (from analysisConstants)
-const GAP_RANGES = {
+// Distance gap ideal ranges (from analysisConstants) - base values for 44.5 m/s head speed
+const GAP_RANGES_BASE = {
   driverToWood: { ideal: { min: 20, max: 30 }, tooWide: 50, tooNarrow: 15 },
   woodToHybrid: { ideal: { min: 15, max: 25 }, tooWide: 35, tooNarrow: 10 },
   hybridToIron: { ideal: { min: 10, max: 20 }, tooWide: 30, tooNarrow: 8 },
   ironToIron: { ideal: { min: 10, max: 15 }, tooWide: 25, tooNarrow: 8 },
   ironToWedge: { ideal: { min: 10, max: 20 }, tooWide: 30, tooNarrow: 8 },
   wedgeToWedge: { ideal: { min: 4, max: 6 }, tooWide: 12, tooNarrow: 3 },
+};
+
+// Get GAP_RANGES adjusted for head speed
+const getGapRanges = (headSpeed: number) => {
+  const speedFactor = headSpeed / 44.5; // Adjust based on head speed relative to standard (44.5 m/s)
+  const adjust = (value: number) => Math.round(value * speedFactor);
+  
+  return {
+    driverToWood: { 
+      ideal: { min: adjust(GAP_RANGES_BASE.driverToWood.ideal.min), max: adjust(GAP_RANGES_BASE.driverToWood.ideal.max) }, 
+      tooWide: adjust(GAP_RANGES_BASE.driverToWood.tooWide), 
+      tooNarrow: adjust(GAP_RANGES_BASE.driverToWood.tooNarrow) 
+    },
+    woodToHybrid: { 
+      ideal: { min: adjust(GAP_RANGES_BASE.woodToHybrid.ideal.min), max: adjust(GAP_RANGES_BASE.woodToHybrid.ideal.max) }, 
+      tooWide: adjust(GAP_RANGES_BASE.woodToHybrid.tooWide), 
+      tooNarrow: adjust(GAP_RANGES_BASE.woodToHybrid.tooNarrow) 
+    },
+    hybridToIron: { 
+      ideal: { min: adjust(GAP_RANGES_BASE.hybridToIron.ideal.min), max: adjust(GAP_RANGES_BASE.hybridToIron.ideal.max) }, 
+      tooWide: adjust(GAP_RANGES_BASE.hybridToIron.tooWide), 
+      tooNarrow: adjust(GAP_RANGES_BASE.hybridToIron.tooNarrow) 
+    },
+    ironToIron: { 
+      ideal: { min: adjust(GAP_RANGES_BASE.ironToIron.ideal.min), max: adjust(GAP_RANGES_BASE.ironToIron.ideal.max) }, 
+      tooWide: adjust(GAP_RANGES_BASE.ironToIron.tooWide), 
+      tooNarrow: adjust(GAP_RANGES_BASE.ironToIron.tooNarrow) 
+    },
+    ironToWedge: { 
+      ideal: { min: adjust(GAP_RANGES_BASE.ironToWedge.ideal.min), max: adjust(GAP_RANGES_BASE.ironToWedge.ideal.max) }, 
+      tooWide: adjust(GAP_RANGES_BASE.ironToWedge.tooWide), 
+      tooNarrow: adjust(GAP_RANGES_BASE.ironToWedge.tooNarrow) 
+    },
+    wedgeToWedge: { 
+      ideal: { min: adjust(GAP_RANGES_BASE.wedgeToWedge.ideal.min), max: adjust(GAP_RANGES_BASE.wedgeToWedge.ideal.max) }, 
+      tooWide: adjust(GAP_RANGES_BASE.wedgeToWedge.tooWide), 
+      tooNarrow: adjust(GAP_RANGES_BASE.wedgeToWedge.tooNarrow) 
+    },
+  };
 };
 
 // Gap analysis result type
@@ -247,7 +286,8 @@ const analyzeDistanceGaps = (
     const currentCategory = getClubCategory(current.club);
     const nextCategory = getClubCategory(next.club);
     
-    // Determine which gap range applies
+    // Determine which gap range applies (adjusted for head speed)
+    const GAP_RANGES = getGapRanges(estimatedHeadSpeed);
     let range = GAP_RANGES.ironToIron;
     let transition = 'iron-iron';
     
@@ -406,13 +446,17 @@ const generateRecommendationsForLessThan14Clubs = (
       ? (gap.currentClub.distance + gap.nextClub.distance) / 2
       : getEstimatedDistance(gap.currentClub, estimatedHeadSpeed) - gap.gap / 2;
 
+    const midLoft = (gap.currentClub.loftAngle + gap.nextClub.loftAngle) / 2;
     const category = inferCategoryFromLoftAndDistance(
-      (gap.currentClub.loftAngle + gap.nextClub.loftAngle) / 2,
+      midLoft,
       idealMidDistance,
       estimatedHeadSpeed
     );
 
-    const estimatedLoft = estimateLoftFromDistance(idealMidDistance, category, estimatedHeadSpeed);
+    // Use midpoint loft as base, with head speed adjustment
+    const speedFactor = estimatedHeadSpeed / 44.5;
+    const speedAdjustment = Math.max(0, (1 - speedFactor) * 1);
+    const estimatedLoft = midLoft + speedAdjustment;
     const estimatedLength = category === 'Iron'
       ? 38.5 - (estimatedLoft - 30) * 0.1
       : category === 'Wedge'
