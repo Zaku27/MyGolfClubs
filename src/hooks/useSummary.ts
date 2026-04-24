@@ -699,6 +699,21 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     // Calculate basic metrics
     const clubCount = bagClubs.length;
 
+    // If less than 8 clubs, skip recommendations and adjustments
+    if (clubCount < 8) {
+      return {
+        currentSet: {
+          clubCount,
+          avgDriverDistance: 0,
+          avg7IronDistance: 0,
+          potentialGain: 0,
+        },
+        recommendations: [],
+        adjustments: [],
+        message: 'クラブ数が少ないため、おすすめ新クラブと調整・フィッティング提案の判定は行われません。まずはクラブを追加してください。',
+      };
+    }
+
     // Driver distances
     const drivers = bagClubs.filter((c) => c.clubType === 'Driver');
     const avgDriverDistance = drivers.length > 0

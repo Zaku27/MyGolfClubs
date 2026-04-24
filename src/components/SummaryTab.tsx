@@ -118,6 +118,19 @@ export function SummaryTab({ data }: SummaryTabProps) {
       {/* セパレーター */}
       <div className="h-px bg-border" />
 
+      {/* メッセージ表示（クラブ数が少ない場合） */}
+      {data.message && (
+        <section className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+          <div className="flex items-start gap-3">
+            <div className="text-amber-600 text-xl">⚠️</div>
+            <div>
+              <h3 className="font-semibold text-amber-800 mb-1">クラブ数が不足しています</h3>
+              <p className="text-amber-700">{data.message}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 2. おすすめ新クラブ提案セクション */}
       <section>
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">

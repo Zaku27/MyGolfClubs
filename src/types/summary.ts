@@ -7,6 +7,7 @@ export interface SummaryData {
   };
   recommendations: Recommendation[];
   adjustments: Adjustment[];
+  message?: string;                // クラブ数が少ない場合などのメッセージ
 }
 
 export interface ProposedSpec {

@@ -373,6 +373,64 @@ function drawHighlightPoint(
   context.restore();
 }
 
+/**
+ * ロックされたハザードに鍵マークを描画する。
+ */
+function drawLockIcon(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+) {
+  const size = 14;
+  const shackleWidth = size * 0.5;
+  const bodyWidth = size * 0.7;
+  const bodyHeight = size * 0.5;
+
+  context.save();
+  
+  // Background circle for visibility
+  context.fillStyle = "rgba(255, 255, 255, 0.9)";
+  context.beginPath();
+  context.arc(x, y, size * 0.8, 0, Math.PI * 2);
+  context.fill();
+  
+  // Lock shackle (top arch)
+  context.strokeStyle = "rgba(120, 53, 15, 1)"; // Amber-900
+  context.lineWidth = 2.5;
+  context.lineCap = "round";
+  context.beginPath();
+  context.arc(
+    x,
+    y - bodyHeight * 0.3,
+    shackleWidth / 2,
+    Math.PI,
+    0,
+  );
+  context.stroke();
+  
+  // Lock body (rectangle with rounded corners)
+  context.fillStyle = "rgba(120, 53, 15, 1)"; // Amber-900
+  const bodyX = x - bodyWidth / 2;
+  const bodyY = y - bodyHeight * 0.2;
+  context.beginPath();
+  context.roundRect(bodyX, bodyY, bodyWidth, bodyHeight, 2);
+  context.fill();
+  
+  // Keyhole
+  context.fillStyle = "rgba(255, 255, 255, 0.9)";
+  context.beginPath();
+  context.arc(x, y - bodyHeight * 0.05, 2, 0, Math.PI * 2);
+  context.fill();
+  context.beginPath();
+  context.moveTo(x - 1, y - bodyHeight * 0.05);
+  context.lineTo(x + 1, y - bodyHeight * 0.05);
+  context.lineTo(x, y + bodyHeight * 0.25);
+  context.closePath();
+  context.fill();
+  
+  context.restore();
+}
+
 function drawRoundedRectangle(
   context: CanvasRenderingContext2D,
   x: number,
@@ -1147,6 +1205,15 @@ export function HoleMapCanvas({
 
     if (highlightPoint) {
       drawHighlightPoint(context, highlightPoint, yardToPxX, yardToPxY);
+    }
+
+    // Draw lock icons for locked hazards
+    for (const hazard of hazards) {
+      if (hazard.locked) {
+        const centerX = yardToPxX(hazard.xCenter);
+        const centerY = yardToPxY((hazard.yFront + hazard.yBack) / 2);
+        drawLockIcon(context, centerX, centerY);
+      }
     }
 
     context.restore();
