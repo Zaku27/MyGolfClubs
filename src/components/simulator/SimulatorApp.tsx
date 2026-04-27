@@ -43,10 +43,10 @@ interface SelectableCourse {
 
 function buildSelectableCourses(customCourses: CustomCoursePreset[]): SelectableCourse[] {
   const builtinCourses: SelectableCourse[] = [
-    { id: "builtin-1", name: "標準 1ホール", holes: COURSE_1HOLE, source: "builtin" },
-    { id: "builtin-3", name: "標準 3ホール", holes: COURSE_3HOLES, source: "builtin" },
-    { id: "builtin-9", name: "標準 9ホール", holes: COURSE_9HOLES, source: "builtin" },
-    { id: "builtin-18", name: "標準 18ホール", holes: COURSE_18HOLES, source: "builtin" },
+    { id: "builtin-1", name: "ノーザンカントリー錦ヶ原 1H", holes: COURSE_1HOLE, source: "builtin" },
+    { id: "builtin-3", name: "ノーザンカントリー錦ヶ原 3H", holes: COURSE_3HOLES, source: "builtin" },
+    { id: "builtin-9", name: "ノーザンカントリー錦ヶ原 OUT", holes: COURSE_9HOLES, source: "builtin" },
+    { id: "builtin-18", name: "ノーザンカントリー錦ヶ原", holes: COURSE_18HOLES, source: "builtin" },
   ];
 
   const customSelectable = customCourses.map((course) => ({

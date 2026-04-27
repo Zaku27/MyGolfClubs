@@ -463,6 +463,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               hole={currentHole}
               shotContext={shotContext}
               aimXOffset={aimXOffset}
+              selectedClub={selectedClub}
               lastShotResult={lastShotResult}
               strokeLabel={currentStrokeLabel}
               className="h-72 sm:h-80"

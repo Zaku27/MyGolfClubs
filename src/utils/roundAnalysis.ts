@@ -14,7 +14,7 @@ export interface PredictedScore {
 }
 
 export interface PerformanceSummary {
-  label: "Good Round" | "Average" | "Struggled";
+  label: "素晴らしいラウンド" | "平均的" | "苦戦した";
   toneClass: string;
 }
 
@@ -133,14 +133,14 @@ export function estimatePredictedScore(
 
 export function getPerformanceSummary(finalScore: number, predictedScore: number): PerformanceSummary {
   if (finalScore <= predictedScore - 2) {
-    return { label: "Good Round", toneClass: "text-emerald-300" };
+    return { label: "素晴らしいラウンド", toneClass: "text-emerald-300" };
   }
 
   if (finalScore <= predictedScore + 2) {
-    return { label: "Average", toneClass: "text-amber-300" };
+    return { label: "平均的", toneClass: "text-amber-300" };
   }
 
-  return { label: "Struggled", toneClass: "text-rose-300" };
+  return { label: "苦戦した", toneClass: "text-rose-300" };
 }
 
 export function buildInsights(
@@ -154,25 +154,25 @@ export function buildInsights(
     .sort((a, b) => a.successRate - b.successRate)[0];
 
   if (strugglingClub) {
-    insights.push(`Your ${strugglingClub.clubName} was inconsistent today (${strugglingClub.successRate}% success)`);
+    insights.push(`今日の${strugglingClub.clubName}は安定していませんでした（成功率${strugglingClub.successRate}%）`);
   }
 
   const par5Scores = perHoleResults.filter((hole) => hole.par === 5);
   if (par5Scores.length > 0) {
     const par5AvgDiff = par5Scores.reduce((sum, hole) => sum + (hole.strokes - hole.par), 0) / par5Scores.length;
     if (par5AvgDiff <= 0.5) {
-      insights.push("Good decision making on par 5s");
+      insights.push("パー5での判断力が良かった");
     }
   }
 
   if (keyStats.girPercent < 40) {
-    insights.push("Consider practicing approaches from 100-120 yards");
+    insights.push("100-120ヤードのアプローチ練習を検討してください");
   } else if (keyStats.puttsPerHole > 2.0) {
-    insights.push("Short-game consistency can lower your score next round");
+    insights.push("ショートゲームの安定性が次のラウンドでスコアを下げられます");
   }
 
   if (insights.length < 3) {
-    insights.push("Keep building confidence with your most reliable clubs");
+    insights.push("信頼できるクラブで自信を積み上げ続けてください");
   }
 
   return insights.slice(0, 4);

@@ -1191,14 +1191,16 @@ export function HoleMapCanvas({
       const markerX = yardToPxX(absoluteAimPoint.x);
       const markerY = yardToPxY(absoluteAimPoint.y);
       context.save();
-      context.strokeStyle = "rgba(14, 116, 144, 0.95)";
+      context.strokeStyle = "rgba(255, 255, 255, 0.95)";
       context.lineWidth = 2.5;
       const sizePx = 8;
       context.beginPath();
-      context.moveTo(markerX - sizePx, markerY - sizePx);
-      context.lineTo(markerX + sizePx, markerY + sizePx);
-      context.moveTo(markerX - sizePx, markerY + sizePx);
-      context.lineTo(markerX + sizePx, markerY - sizePx);
+      // 横線
+      context.moveTo(markerX - sizePx, markerY);
+      context.lineTo(markerX + sizePx, markerY);
+      // 縦線
+      context.moveTo(markerX, markerY - sizePx);
+      context.lineTo(markerX, markerY + sizePx);
       context.stroke();
       context.restore();
     }

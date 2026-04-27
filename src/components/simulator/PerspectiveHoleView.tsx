@@ -5,6 +5,9 @@ interface Props {
   hole: Hole;
   shotContext: ShotContext;
   aimXOffset: number;
+  selectedClub?: {
+    avgDistance: number;
+  } | null;
   lastShotResult?: {
     finalOutcome?: "fairway" | "rough" | "bunker" | "water" | "ob" | "green";
     landing?: {
@@ -66,6 +69,7 @@ export function PerspectiveHoleView({
   hole,
   shotContext,
   aimXOffset,
+  selectedClub,
   lastShotResult,
   strokeLabel,
   className = "",
@@ -126,15 +130,18 @@ export function PerspectiveHoleView({
     return { x, y, scale };
   }, [targetDistance, perspective]);
 
-  // 狙い点の計算（aimXOffsetを適用）
+  // 狙い点の計算（選択クラブの飛距離に基づく）
   const aimPosition = useMemo(() => {
-    const aimDistance = Math.max(0, targetDistance - remainingDistance);
+    // 選択したクラブの飛距離に基づいてターゲット位置を決定
+    const clubDistance = selectedClub?.avgDistance ?? 0;
+    // 残り距離とクラブ飛距離の小さい方を使用（ピンを超えないように）
+    const aimDistance = Math.min(clubDistance, remainingDistance, targetDistance);
     const y = perspective.distanceToY(aimDistance);
     // aimXOffsetは実距離なので、スケール変換を適用
     const scale = perspective.distanceToScale(aimDistance);
     const x = perspective.xToScreenX(aimXOffset, aimDistance);
     return { x, y, scale };
-  }, [aimXOffset, remainingDistance, targetDistance, perspective]);
+  }, [aimXOffset, remainingDistance, targetDistance, perspective, selectedClub]);
 
   // 前回ショットの着地点（あれば）
   const lastLandingPosition = useMemo(() => {
@@ -626,30 +633,15 @@ export function PerspectiveHoleView({
           />
         </g>
 
-        {/* 狙い点マーカー - より洗練されたデザイン */}
+        {/* 狙い点マーカー - 白十字デザイン */}
         <g transform={`translate(${aimPosition.x}, ${aimPosition.y})`}>
-          {/* 外側リング（影） */}
-          <circle
-            r={3.2 * aimPosition.scale}
-            fill="none"
-            stroke="rgba(0,0,0,0.2)"
-            strokeWidth="0.4"
-          />
-          {/* 外側リング */}
-          <circle
-            r={3 * aimPosition.scale}
-            fill="none"
-            stroke="#ef4444"
-            strokeWidth="0.3"
-            opacity="0.7"
-          />
           {/* 十字マーカー */}
           <line
             x1={-2.5 * aimPosition.scale}
             y1="0"
             x2={2.5 * aimPosition.scale}
             y2="0"
-            stroke="#ef4444"
+            stroke="white"
             strokeWidth={0.4 * aimPosition.scale}
             opacity="0.9"
             strokeLinecap="round"
@@ -659,7 +651,7 @@ export function PerspectiveHoleView({
             y1={-2.5 * aimPosition.scale}
             x2="0"
             y2={2.5 * aimPosition.scale}
-            stroke="#ef4444"
+            stroke="white"
             strokeWidth={0.4 * aimPosition.scale}
             opacity="0.9"
             strokeLinecap="round"
@@ -667,17 +659,8 @@ export function PerspectiveHoleView({
           {/* 中心ドット */}
           <circle
             r={0.6 * aimPosition.scale}
-            fill="#ef4444"
+            fill="white"
             opacity="0.9"
-          />
-          {/* インナーリング */}
-          <circle
-            r={1.8 * aimPosition.scale}
-            fill="none"
-            stroke="#f87171"
-            strokeWidth="0.2"
-            strokeDasharray="0.8,0.4"
-            opacity="0.6"
           />
         </g>
 

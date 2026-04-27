@@ -133,7 +133,7 @@ function scoreDiff(strokes: number, par: number) {
 }
 
 export function Scorecard({ onPlayAgain, onBack, onViewStatistics }: Props) {
-  const { scores, clubUsageStats } = useGameStore();
+  const { scores } = useGameStore();
 
   const totalPar     = scores.reduce((s, h) => s + h.par, 0);
   const totalStrokes = scores.reduce((s, h) => s + h.strokes, 0);
@@ -154,12 +154,6 @@ export function Scorecard({ onPlayAgain, onBack, onViewStatistics }: Props) {
     overallDiff <= 5   ? "text-orange-400": "text-red-400";
   const overallDisplay =
     overallDiff === 0 ? "E" : overallDiff > 0 ? `+${overallDiff}` : String(overallDiff);
-  const clubSummary = [...clubUsageStats]
-    .filter((club) => club.timesUsed > 0)
-    .sort((a, b) => {
-      if (b.timesUsed !== a.timesUsed) return b.timesUsed - a.timesUsed;
-      return b.successRate - a.successRate;
-    });
 
   function SubtotalRow({ label, par, strokes }: { label: string; par: number; strokes: number }) {
     const d = strokes - par;
@@ -185,37 +179,6 @@ export function Scorecard({ onPlayAgain, onBack, onViewStatistics }: Props) {
           {totalStrokes}打 / PAR {totalPar}
         </div>
 
-        <section className="mt-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 text-left shadow-sm shadow-emerald-300/40">
-          <h3 className="text-sm font-bold tracking-[0.08em] text-emerald-800">ラウンドサマリー（クラブ別）</h3>
-          {clubSummary.length === 0 ? (
-            <p className="mt-2 text-sm text-emerald-700">クラブ使用データがありません。</p>
-          ) : (
-            <div className="mt-3">
-              <table className="w-full table-fixed text-[10px] sm:text-xs">
-                <thead>
-                  <tr className="border-b border-emerald-200 text-emerald-700">
-                    <th className="w-[38%] px-1.5 py-1.5 text-left font-semibold">クラブ</th>
-                    <th className="w-[16%] px-1 py-1.5 text-left font-semibold">使用回数</th>
-                    <th className="w-[16%] px-1 py-1.5 text-left font-semibold">成功回数</th>
-                    <th className="w-[14%] px-1 py-1.5 text-left font-semibold">成功率</th>
-                    <th className="w-[16%] px-1 py-1.5 text-left font-semibold">平均飛距離</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clubSummary.map((club) => (
-                    <tr key={club.clubId} className="border-b border-emerald-100 text-emerald-900 last:border-b-0">
-                      <td className="break-words px-1.5 py-1.5 font-semibold leading-tight">{club.clubName}</td>
-                      <td className="px-1 py-1.5">{club.timesUsed}回</td>
-                      <td className="px-1 py-1.5">{club.successes}回</td>
-                      <td className="px-1 py-1.5">{club.successRate}%</td>
-                      <td className="px-1 py-1.5">{club.avgDistanceAchieved}yd</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
       </div>
 
       {/* Table */}
