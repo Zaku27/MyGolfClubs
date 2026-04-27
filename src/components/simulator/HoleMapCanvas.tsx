@@ -1191,8 +1191,8 @@ export function HoleMapCanvas({
       const markerX = yardToPxX(absoluteAimPoint.x);
       const markerY = yardToPxY(absoluteAimPoint.y);
       context.save();
-      context.strokeStyle = "rgba(255, 255, 255, 0.95)";
-      context.lineWidth = 2.5;
+      context.strokeStyle = "#1e3a8a";
+      context.lineWidth = 1.5;
       const sizePx = 8;
       context.beginPath();
       // 横線

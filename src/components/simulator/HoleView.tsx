@@ -369,7 +369,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
         onConfirm={handleConfirmQuitGame}
       />
       {courseName && (
-        <div className="mx-auto w-full max-w-6xl px-4 pt-20 sm:px-6 sm:pt-24">
+        <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6 sm:pt-5">
           <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 px-5 py-3 text-center shadow-sm shadow-emerald-300/40">
             <h1 className="text-lg font-black text-emerald-900 tracking-tight sm:text-xl">
               {courseName}

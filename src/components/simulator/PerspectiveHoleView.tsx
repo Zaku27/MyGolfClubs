@@ -1,5 +1,22 @@
 import { useMemo } from "react";
-import type { Hole, ShotContext, LieType, HazardType } from "../../types/game";
+import type { Hole, ShotContext } from "../../types/game";
+import {
+  calculatePerspectiveParams,
+  calculateBallPosition,
+  calculatePinPosition,
+  calculateAimPosition,
+  calculateLastLandingPosition,
+  calculateFairwayPath,
+  calculateGreenRect,
+  calculateHazardPositions,
+  getHazardColor,
+  LIE_COLORS,
+  OUTCOME_COLORS,
+  type PerspectiveParams,
+  type Position3D,
+  type HazardPosition,
+  type GreenRect,
+} from "./utils/perspectiveGeometry";
 
 interface Props {
   hole: Hole;
@@ -19,52 +36,6 @@ interface Props {
   className?: string;
 }
 
-// ハザード位置の型定義
-interface RectangleHazardPosition {
-  type: HazardType;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  scale: number;
-  shape: "rectangle";
-  pathData?: undefined;
-  bbox?: undefined;
-}
-
-interface PolygonHazardPosition {
-  type: HazardType;
-  pathData: string;
-  bbox: { x: number; y: number; width: number; height: number };
-  scale: number;
-  shape: "polygon";
-  x?: undefined;
-  y?: undefined;
-  width?: undefined;
-  height?: undefined;
-}
-
-type HazardPosition = RectangleHazardPosition | PolygonHazardPosition;
-
-const LIE_COLORS: Record<LieType, string> = {
-  tee: "#10b981",      // emerald-500
-  fairway: "#22c55e",  // green-500
-  semirough: "#84cc16", // lime-500
-  rough: "#22c55e",    // green-500 (swapped with OB)
-  bareground: "#a8a29e", // stone-400
-  bunker: "#fbbf24",   // amber-400
-  green: "#34d399",    // emerald-400
-};
-
-const OUTCOME_COLORS: Record<string, string> = {
-  fairway: "#22c55e",
-  rough: "#22c55e",
-  bunker: "#fbbf24",
-  water: "#3b82f6",
-  ob: "#16a34a",
-  green: "#34d399",
-};
-
 export function PerspectiveHoleView({
   hole,
   shotContext,
@@ -77,231 +48,67 @@ export function PerspectiveHoleView({
   const { remainingDistance, lie, originX, originY, targetDistance } = shotContext;
 
   // パースペクティブ投影パラメータ
-  const perspective = useMemo(() => {
-    const horizonY = 40; // 水平線のY位置（%）- 空と地面の境界
-    const vanishingPointY = 16; // 消失点のY位置（%）
-    const scaleFactor = 0.6; // 遠景の縮小率
-    const maxVisibleDistance = targetDistance * 1.2;
-
-    // 距離をY座標に変換（近いほど下、遠いほど上）
-    const distanceToY = (distance: number): number => {
-      const normalized = Math.max(0, Math.min(1, 1 - distance / maxVisibleDistance));
-      // 非線形変換でパースペクティブ感を出す
-      const perspectiveNormalized = Math.pow(normalized, 0.7);
-      return vanishingPointY + (100 - vanishingPointY) * perspectiveNormalized;
-    };
-
-    // 距離に応じたスケール
-    const distanceToScale = (distance: number): number => {
-      const normalized = Math.max(0, Math.min(1, 1 - distance / maxVisibleDistance));
-      return scaleFactor + (1 - scaleFactor) * Math.pow(normalized, 0.5);
-    };
-
-    // 横位置の変換（パースペクティブ効果込み）
-    const xToScreenX = (x: number, distance: number): number => {
-      const scale = distanceToScale(distance);
-      // 中心からのオフセットをスケールに適用
-      return 50 + (x * scale * 0.8);
-    };
-
-    return {
-      horizonY,
-      vanishingPointY,
-      maxVisibleDistance,
-      distanceToY,
-      distanceToScale,
-      xToScreenX,
-    };
-  }, [targetDistance]);
+  const perspective = useMemo(() => calculatePerspectiveParams(targetDistance), [targetDistance]);
 
   // ボール位置の計算
-  const ballPosition = useMemo(() => {
-    const y = perspective.distanceToY(originY);
-    const x = perspective.xToScreenX(originX, originY);
-    const scale = perspective.distanceToScale(originY);
-    return { x, y, scale };
-  }, [originX, originY, perspective]);
+  const ballPosition = useMemo(
+    () => calculateBallPosition(originX, originY, perspective),
+    [originX, originY, perspective]
+  );
 
   // ピン位置の計算
-  const pinPosition = useMemo(() => {
-    const y = perspective.distanceToY(targetDistance);
-    const x = 50; // ピンは常に中央
-    const scale = perspective.distanceToScale(targetDistance);
-    return { x, y, scale };
-  }, [targetDistance, perspective]);
+  const pinPosition = useMemo(
+    () => calculatePinPosition(targetDistance, perspective),
+    [targetDistance, perspective]
+  );
 
   // 狙い点の計算（選択クラブの飛距離に基づく）
-  const aimPosition = useMemo(() => {
-    // 選択したクラブの飛距離に基づいてターゲット位置を決定
-    const clubDistance = selectedClub?.avgDistance ?? 0;
-    // 残り距離とクラブ飛距離の小さい方を使用（ピンを超えないように）
-    const aimDistance = Math.min(clubDistance, remainingDistance, targetDistance);
-    const y = perspective.distanceToY(aimDistance);
-    // aimXOffsetは実距離なので、スケール変換を適用
-    const scale = perspective.distanceToScale(aimDistance);
-    const x = perspective.xToScreenX(aimXOffset, aimDistance);
-    return { x, y, scale };
-  }, [aimXOffset, remainingDistance, targetDistance, perspective, selectedClub]);
+  const aimPosition = useMemo(
+    () =>
+      calculateAimPosition(
+        aimXOffset,
+        remainingDistance,
+        targetDistance,
+        perspective,
+        selectedClub?.avgDistance,
+        originX,
+        originY
+      ),
+    [aimXOffset, remainingDistance, targetDistance, perspective, selectedClub, originX, originY]
+  );
 
   // 前回ショットの着地点（あれば）
-  const lastLandingPosition = useMemo(() => {
-    if (!lastShotResult?.landing) return null;
-    const { finalX, finalY } = lastShotResult.landing;
-    const y = perspective.distanceToY(finalY);
-    const x = perspective.xToScreenX(finalX, finalY);
-    const scale = perspective.distanceToScale(finalY);
-    return { x, y, scale, outcome: lastShotResult.finalOutcome };
-  }, [lastShotResult, perspective]);
+  const lastLandingPosition = useMemo(
+    () =>
+      lastShotResult?.landing
+        ? calculateLastLandingPosition(
+            lastShotResult.landing.finalX,
+            lastShotResult.landing.finalY,
+            lastShotResult.finalOutcome,
+            perspective
+          )
+        : null,
+    [lastShotResult, perspective]
+  );
 
   // フェアウェイの描画パス生成（横幅広げた版）
-  const fairwayPath = useMemo(() => {
-    const startY = perspective.distanceToY(0);
-    const endY = perspective.distanceToY(targetDistance);
-    const startWidth = 100; // 広げた（80→100）
-    const endWidth = 40;    // 広げた（30→40）
-
-    // 台形のフェアウェイ
-    return `
-      M ${50 - startWidth / 2} ${startY}
-      L ${50 + startWidth / 2} ${startY}
-      L ${50 + endWidth / 2} ${endY}
-      L ${50 - endWidth / 2} ${endY}
-      Z
-    `;
-  }, [targetDistance, perspective]);
+  const fairwayPath = useMemo(
+    () => calculateFairwayPath(targetDistance, perspective),
+    [targetDistance, perspective]
+  );
 
   // グリーンの描画
-  const greenRect = useMemo(() => {
-    const greenY = perspective.distanceToY(targetDistance);
-    const greenScale = perspective.distanceToScale(targetDistance);
-    const greenWidth = 15 * greenScale;
-    const greenHeight = 8 * greenScale;
-    return {
-      x: 50 - greenWidth / 2,
-      y: greenY - greenHeight / 2,
-      width: greenWidth,
-      height: greenHeight,
-    };
-  }, [targetDistance, perspective]);
+  const greenRect = useMemo(
+    () => calculateGreenRect(targetDistance, perspective),
+    [targetDistance, perspective]
+  );
 
   // ハザードの位置計算（長方形とポリゴンの両方に対応）
-  const hazardPositions = useMemo<HazardPosition[]>(() => {
-    if (!hole.hazards) return [];
+  const hazardPositions = useMemo<HazardPosition[]>(
+    () => calculateHazardPositions(hole, perspective),
+    [hole, perspective]
+  );
 
-    return hole.hazards.map<HazardPosition | null>((hazard) => {
-      const frontY = perspective.distanceToY(hazard.yFront);
-      const backY = perspective.distanceToY(hazard.yBack);
-      const midDistance = (hazard.yFront + hazard.yBack) / 2;
-      const scale = perspective.distanceToScale(midDistance);
-
-      if (hazard.shape === "rectangle") {
-        const x = perspective.xToScreenX(hazard.xCenter - hazard.width / 2, midDistance);
-        const width = hazard.width * scale * 0.8;
-        const height = Math.abs(backY - frontY);
-        return {
-          type: hazard.type,
-          x,
-          y: frontY,
-          width,
-          height,
-          scale,
-          shape: "rectangle" as const,
-        };
-      } else if (hazard.shape === "polygon" && hazard.points && hazard.points.length >= 3) {
-        // ポリゴンのパースペクティブ変換（地平線でクリップ）
-        const horizonY = perspective.horizonY;
-        
-        // 各ポイントを変換
-        const rawPoints = hazard.points.map((point) => ({
-          x: perspective.xToScreenX(point.x, point.y),
-          y: perspective.distanceToY(point.y),
-        }));
-        
-        // 全ての点が地平線より上なら描画しない
-        const allAboveHorizon = rawPoints.every(p => p.y < horizonY);
-        if (allAboveHorizon) return null;
-        
-        // 地平線でポリゴンをクリップ
-        const clippedPoints: Array<{x: number, y: number}> = [];
-        for (let i = 0; i < rawPoints.length; i++) {
-          const curr = rawPoints[i];
-          const prev = rawPoints[(i - 1 + rawPoints.length) % rawPoints.length];
-          
-          const currAbove = curr.y < horizonY;
-          const prevAbove = prev.y < horizonY;
-          
-          if (currAbove !== prevAbove) {
-            // 地平線との交差点を計算
-            const t = (horizonY - prev.y) / (curr.y - prev.y);
-            const intersectX = prev.x + t * (curr.x - prev.x);
-            clippedPoints.push({ x: intersectX, y: horizonY });
-          }
-          
-          if (!currAbove) {
-            // 地平線以下の点を追加
-            clippedPoints.push(curr);
-          }
-        }
-        
-        // クリップ後のポイントが不足していれば描画しない
-        if (clippedPoints.length < 3) return null;
-
-        // SVG path 文字列を生成
-        const pathData = clippedPoints
-          .map((pt, i) => `${i === 0 ? "M" : "L"} ${pt.x} ${pt.y}`)
-          .join(" ") + " Z";
-
-        // バウンディングボックスを計算
-        const xs = clippedPoints.map((p) => p.x);
-        const ys = clippedPoints.map((p) => p.y);
-        
-        const bbox = {
-          x: Math.min(...xs),
-          y: Math.min(...ys),
-          width: Math.max(...xs) - Math.min(...xs),
-          height: Math.max(...ys) - Math.min(...ys),
-        };
-
-        return {
-          type: hazard.type,
-          pathData,
-          bbox,
-          scale,
-          shape: "polygon" as const,
-        };
-      } else {
-        // フォールバック：バウンディングボックス表示
-        const x = perspective.xToScreenX(hazard.xCenter - hazard.width / 2, midDistance);
-        const width = hazard.width * scale * 0.8;
-        const height = Math.abs(backY - frontY);
-        return {
-          type: hazard.type,
-          x,
-          y: frontY,
-          width,
-          height,
-          scale,
-          shape: "rectangle" as const,
-        };
-      }
-    }).filter((h): h is HazardPosition => h !== null);
-  }, [hole.hazards, perspective]);
-
-  const hazardColor = (type: string): string => {
-    switch (type) {
-      case "water":
-        return "#3b82f6";
-      case "bunker":
-        return "#fbbf24";
-      case "rough":
-      case "semirough":
-        return "#22c55e";
-      case "ob":
-        return "#16a34a";
-      default:
-        return "#9ca3af";
-    }
-  };
 
   return (
     <div className={`relative w-full overflow-hidden rounded-xl bg-gradient-to-b from-sky-100 to-emerald-50 ${className}`}>
@@ -411,7 +218,7 @@ export function PerspectiveHoleView({
           return (
             <g key={type} opacity="0.75">
               {typeHazards.map((hazard, idx) => (
-                <path key={idx} d={hazard.pathData} fill={hazardColor(hazard.type)} />
+                <path key={idx} d={hazard.pathData} fill={getHazardColor(hazard.type)} />
               ))}
             </g>
           );
@@ -429,7 +236,7 @@ export function PerspectiveHoleView({
                 <path
                   key={idx}
                   d={hazard.pathData}
-                  fill={hazardColor(hazard.type)}
+                  fill={getHazardColor(hazard.type)}
                   filter={hazard.type === "bunker" ? "url(#shadow)" : undefined}
                 />
               ))}
@@ -454,7 +261,7 @@ export function PerspectiveHoleView({
           return (
             <g key="ob" opacity="1">
               {obHazards.map((hazard, idx) => (
-                <path key={idx} d={hazard.pathData} fill={hazardColor(hazard.type)} />
+                <path key={idx} d={hazard.pathData} fill={getHazardColor(hazard.type)} />
               ))}
             </g>
           );
@@ -479,7 +286,7 @@ export function PerspectiveHoleView({
                   y={hazard.y}
                   width={hazard.width}
                   height={hazard.height}
-                  fill={hazardColor(hazard.type)}
+                  fill={getHazardColor(hazard.type)}
                   opacity={hazard.type === "water" ? 0.85 : 0.75}
                   filter={hazard.type === "bunker" ? "url(#shadow)" : undefined}
                 />
@@ -633,7 +440,7 @@ export function PerspectiveHoleView({
           />
         </g>
 
-        {/* 狙い点マーカー - 白十字デザイン */}
+        {/* 狙い点マーカー - 濃い青十字デザイン */}
         <g transform={`translate(${aimPosition.x}, ${aimPosition.y})`}>
           {/* 十字マーカー */}
           <line
@@ -641,9 +448,9 @@ export function PerspectiveHoleView({
             y1="0"
             x2={2.5 * aimPosition.scale}
             y2="0"
-            stroke="white"
-            strokeWidth={0.4 * aimPosition.scale}
-            opacity="0.9"
+            stroke="#1e3a8a"
+            strokeWidth={0.5 * aimPosition.scale}
+            opacity={0.9}
             strokeLinecap="round"
           />
           <line
@@ -651,16 +458,16 @@ export function PerspectiveHoleView({
             y1={-2.5 * aimPosition.scale}
             x2="0"
             y2={2.5 * aimPosition.scale}
-            stroke="white"
-            strokeWidth={0.4 * aimPosition.scale}
-            opacity="0.9"
+            stroke="#1e3a8a"
+            strokeWidth={0.5 * aimPosition.scale}
+            opacity={0.9}
             strokeLinecap="round"
           />
           {/* 中心ドット */}
           <circle
             r={0.6 * aimPosition.scale}
-            fill="white"
-            opacity="0.9"
+            fill="#1e3a8a"
+            opacity={0.9}
           />
         </g>
 
@@ -679,32 +486,38 @@ export function PerspectiveHoleView({
         {/* 距離表示パネル */}
         <g>
           {/* パネル背景 */}
-          <rect x="2" y="2" width="40" height="18" rx="4" fill="rgba(255,255,255,0.95)" filter="url(#shadow)" />
+          <rect x="-10" y="2" width="40" height="14" rx="3" fill="rgba(229, 250, 216, 0.95)" filter="url(#shadow)" />
           {/* パネルの装飾ライン */}
-          <rect x="2" y="2" width="40" height="18" rx="4" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          <rect x="-10" y="2" width="40" height="14" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
           {/* タイトル */}
-          <text x="5" y="6.5" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
+          <text x="-5" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
           {/* 距離値 */}
-          <text x="38" y="12" textAnchor="end" fontSize="8" fill="#065f46" fontWeight="bold">
+          <text x="25" y="12" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
             {remainingDistance}Y
           </text>
-          {/* 打数情報（あれば） */}
-          {strokeLabel && (
-            <text x="38" y="16.5" textAnchor="end" fontSize="4" fill="#065f46" fontWeight="bold">
-              {strokeLabel}
-            </text>
-          )}
         </g>
 
         {/* ライ表示パネル（別個） */}
         <g>
           {/* パネル背景 */}
-          <rect x="76" y="2" width="22" height="9" rx="2" fill={LIE_COLORS[lie]} opacity="0.85" filter="url(#shadow)" />
+          <rect x="66" y="2" width="30" height="10" rx="2" fill={LIE_COLORS[lie]} opacity="0.85" filter="url(#shadow)" />
           {/* ライラベル */}
-          <text x="87" y="9" textAnchor="middle" fontSize="4" fill="white" fontWeight="bold">
-            {lie.toUpperCase()}
+          <text x="81" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3" fill="white" fontWeight="bold">
+            {lie === "tee" ? "ティーグラウンド" : lie === "fairway" ? "フェアウェイ" : lie === "rough" ? "ラフ" : lie === "green" ? "グリーン" : lie === "bunker" ? "バンカー" : lie === "semirough" ? "セミラフ" : lie === "bareground" ? "ベアグランド" : lie}
           </text>
         </g>
+
+        {/* 打数表示パネル（独立） */}
+        {strokeLabel && (
+          <g>
+            {/* パネル背景 */}
+            <rect x="98" y="2" width="18" height="10" rx="2" fill="rgba(106, 128, 196, 0.85)" filter="url(#shadow)" />
+            {/* 打数ラベル */}
+            <text x="107" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3.5" fill="white" fontWeight="bold">
+              {strokeLabel}
+            </text>
+          </g>
+        )}
 
         {/* ピンまでの距離マーカー（フェアウェイ上） */}
         {[50, 100, 150].map((markerDist) => {
@@ -713,9 +526,9 @@ export function PerspectiveHoleView({
           return (
             <g key={markerDist}>
               {/* 距離ライン */}
-              <line x1="25" y1={markerY} x2="75" y2={markerY} stroke="rgba(255,255,255,0.5)" strokeWidth="0.3" strokeDasharray="2,2" />
+              <line x1="25" y1={markerY} x2="75" y2={markerY} stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" strokeDasharray="2,2" />
               {/* 距離ラベル */}
-              <text x="50" y={markerY - 1} textAnchor="middle" fontSize="2.5" fill="rgba(255,255,255,0.7)" fontWeight="bold">{markerDist}yd</text>
+              <text x="50" y={markerY - 1} textAnchor="middle" fontSize="3.5" fill="rgba(255,255,255,0.7)" fontWeight="bold">{markerDist}yd</text>
             </g>
           );
         })}
