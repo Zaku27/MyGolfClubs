@@ -8,6 +8,7 @@ import {
   calculateLastLandingPosition,
   calculateFairwayPath,
   calculateGreenRect,
+  calculateGreenPolygon,
   calculateHazardPositions,
   getHazardColor,
   LIE_COLORS,
@@ -16,6 +17,7 @@ import {
   type Position3D,
   type HazardPosition,
   type GreenRect,
+  type GreenPolygonPosition,
 } from "./utils/perspectiveGeometry";
 
 interface Props {
@@ -101,6 +103,12 @@ export function PerspectiveHoleView({
   const greenRect = useMemo(
     () => calculateGreenRect(targetDistance, perspective),
     [targetDistance, perspective]
+  );
+
+  // グリーンのポリゴン描画
+  const greenPolygon = useMemo(
+    () => calculateGreenPolygon(hole.greenPolygon ?? [], perspective),
+    [hole.greenPolygon, perspective]
   );
 
   // ハザードの位置計算（長方形とポリゴンの両方に対応）
@@ -326,6 +334,25 @@ export function PerspectiveHoleView({
             ) : null}
           </g>
         ))}
+
+        {/* グリーンのポリゴン描画 */}
+        {greenPolygon && (
+          <g>
+            <path
+              d={greenPolygon.pathData}
+              fill="#34d399"
+              opacity="0.85"
+              filter="url(#shadow)"
+            />
+            {/* グリーンの縁 */}
+            <path
+              d={greenPolygon.pathData}
+              fill="none"
+              stroke="rgba(255,255,255,0.3)"
+              strokeWidth="0.2"
+            />
+          </g>
+        )}
 
         {/* ピンのみ表示（グリーン本体は非表示） */}
         <g>

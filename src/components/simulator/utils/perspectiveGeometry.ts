@@ -196,7 +196,7 @@ export function calculateFairwayPath(
 }
 
 /**
- * グリーンの描画情報を計算
+ * グリーンの描画情報を計算（長方形版）
  */
 export interface GreenRect {
   x: number;
@@ -218,6 +218,85 @@ export function calculateGreenRect(
     y: greenY - greenHeight / 2,
     width: greenWidth,
     height: greenHeight,
+  };
+}
+
+/**
+ * グリーンのポリゴンを計算
+ */
+export interface GreenPolygonPosition {
+  pathData: string;
+  bbox: { x: number; y: number; width: number; height: number };
+  scale: number;
+}
+
+export function calculateGreenPolygon(
+  greenPolygon: Array<{ x: number; y: number }>,
+  perspective: PerspectiveParams
+): GreenPolygonPosition | null {
+  if (!greenPolygon || greenPolygon.length < 3) return null;
+
+  const horizonY = perspective.horizonY;
+
+  // 各ポイントをパースペクティブ変換（地平線でクリップ）
+  const rawPoints = greenPolygon.map((point) => ({
+    x: perspective.xToScreenX(point.x, point.y),
+    y: perspective.distanceToY(point.y),
+  }));
+
+  // 全ての点が地平線より上なら描画しない
+  const allAboveHorizon = rawPoints.every((p) => p.y < horizonY);
+  if (allAboveHorizon) return null;
+
+  // 地平線でポリゴンをクリップ
+  const clippedPoints: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < rawPoints.length; i++) {
+    const curr = rawPoints[i];
+    const prev = rawPoints[(i - 1 + rawPoints.length) % rawPoints.length];
+
+    const currAbove = curr.y < horizonY;
+    const prevAbove = prev.y < horizonY;
+
+    if (currAbove !== prevAbove) {
+      // 地平線との交差点を計算
+      const t = (horizonY - prev.y) / (curr.y - prev.y);
+      const intersectX = prev.x + t * (curr.x - prev.x);
+      clippedPoints.push({ x: intersectX, y: horizonY });
+    }
+
+    if (!currAbove) {
+      // 地平線以下の点を追加
+      clippedPoints.push(curr);
+    }
+  }
+
+  // クリップ後のポイントが不足していれば描画しない
+  if (clippedPoints.length < 3) return null;
+
+  // SVG path 文字列を生成
+  const pathData = clippedPoints
+    .map((pt, i) => `${i === 0 ? "M" : "L"} ${pt.x} ${pt.y}`)
+    .join(" ") + " Z";
+
+  // バウンディングボックスを計算
+  const xs = clippedPoints.map((p) => p.x);
+  const ys = clippedPoints.map((p) => p.y);
+
+  const bbox = {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
+
+  // 平均距離からスケールを計算
+  const avgY = greenPolygon.reduce((sum, p) => sum + p.y, 0) / greenPolygon.length;
+  const scale = perspective.distanceToScale(avgY);
+
+  return {
+    pathData,
+    bbox,
+    scale,
   };
 }
 
