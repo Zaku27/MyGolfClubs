@@ -32,7 +32,6 @@ export type HazardPosition = PolygonHazardPosition;
  * パースペクティブ投影パラメータを計算
  */
 export function calculatePerspectiveParams(targetDistance: number): PerspectiveParams {
-  const horizonY = 40; // 水平線のY位置（%）- 空と地面の境界
   const vanishingPointY = 16; // 消失点のY位置（%）
   const scaleFactor = 0.6; // 遠景の縮小率
   const maxVisibleDistance = targetDistance * 1.2;
@@ -44,6 +43,9 @@ export function calculatePerspectiveParams(targetDistance: number): PerspectiveP
     const perspectiveNormalized = Math.pow(normalized, 0.7);
     return vanishingPointY + (100 - vanishingPointY) * perspectiveNormalized;
   };
+
+  // 地平線をグリーンを少し超えた位置に設定
+  const horizonY = distanceToY(targetDistance * 1.05);
 
   // 距離に応じたスケール
   const distanceToScale = (distance: number): number => {
@@ -162,10 +164,16 @@ export function calculateLastLandingPosition(
  */
 export function calculateFairwayPath(
   targetDistance: number,
-  perspective: PerspectiveParams
+  perspective: PerspectiveParams,
+  maxPolygonY?: number
 ): string {
   const startY = perspective.distanceToY(0);
   const endY = perspective.distanceToY(targetDistance);
+  const horizonY = perspective.horizonY;
+
+  // ポリゴンの最大Y値があればそれを使用、なければターゲット距離を使用
+  const polygonMaxY = maxPolygonY !== undefined ? perspective.distanceToY(maxPolygonY) : endY;
+  const clippedEndY = Math.max(polygonMaxY, horizonY);
 
   // 横幅いっぱいのフェアウェイ（viewBox: -100 0 300 100）
   const leftX = -100;
@@ -175,8 +183,8 @@ export function calculateFairwayPath(
   return `
     M ${leftX} ${startY}
     L ${rightX} ${startY}
-    L ${rightX} ${endY}
-    L ${leftX} ${endY}
+    L ${rightX} ${clippedEndY}
+    L ${leftX} ${clippedEndY}
     Z
   `;
 }

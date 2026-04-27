@@ -1,5 +1,31 @@
 import { useMemo } from "react";
 import type { Hole, ShotContext } from "../../types/game";
+
+// 決定論的な乱数生成（シード値から）
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+// シード値から乱数を生成
+function seededRandomRange(seed: number, min: number, max: number): number {
+  return min + seededRandom(seed) * (max - min);
+}
+
+// HoleMapCanvasと同じ正多角形生成関数
+function buildRegularPolygonPoints(centerX: number, centerY: number, radius: number, sides: number, irregularity: number = 0): Array<{ x: number; y: number }> {
+  const points: Array<{ x: number; y: number }> = [];
+  const amount = Math.max(0, Math.min(irregularity, 0.3));
+  for (let index = 0; index < sides; index += 1) {
+    const angle = (2 * Math.PI * index) / sides - Math.PI / 2;
+    const randomRatio = 1 + (Math.random() * 2 - 1) * amount;
+    points.push({
+      x: centerX + radius * randomRatio * Math.cos(angle),
+      y: centerY + radius * randomRatio * Math.sin(angle),
+    });
+  }
+  return points;
+}
 import {
   calculatePerspectiveParams,
   calculateBallPosition,
@@ -93,9 +119,29 @@ export function PerspectiveHoleView({
   );
 
   // フェアウェイの描画パス生成（横幅広げた版）
+  const maxPolygonY = useMemo(() => {
+    let maxY = targetDistance;
+    // グリーンのポリゴンから最大Yを取得
+    if (hole.greenPolygon && hole.greenPolygon.length > 0) {
+      maxY = Math.max(maxY, ...hole.greenPolygon.map(p => p.y));
+    }
+    // ハザードのポリゴンから最大Yを取得
+    if (hole.hazards) {
+      hole.hazards.forEach(hazard => {
+        if (hazard.shape === "polygon" && hazard.points && hazard.points.length > 0) {
+          maxY = Math.max(maxY, ...hazard.points.map(p => p.y));
+        } else {
+          // 長方形ハザードの場合
+          maxY = Math.max(maxY, hazard.yBack);
+        }
+      });
+    }
+    return maxY;
+  }, [hole.greenPolygon, hole.hazards, targetDistance]);
+
   const fairwayPath = useMemo(
-    () => calculateFairwayPath(targetDistance, perspective),
-    [targetDistance, perspective]
+    () => calculateFairwayPath(targetDistance, perspective, maxPolygonY),
+    [targetDistance, perspective, maxPolygonY]
   );
 
   // グリーンの描画
@@ -105,10 +151,50 @@ export function PerspectiveHoleView({
   );
 
   // グリーンのポリゴン描画
-  const greenPolygon = useMemo(
-    () => calculateGreenPolygon(hole.greenPolygon ?? [], perspective),
-    [hole.greenPolygon, perspective]
-  );
+  const greenPolygon = useMemo(() => {
+    const polygon = hole.greenPolygon;
+    // グリーンのポリゴンがない場合はデフォルトの正20角形を作成
+    const greenRadius = hole.greenRadius ?? 13;
+    const targetDistance = shotContext.targetDistance;
+    const GREEN_POLYGON_SIDES = 20;
+
+    if (!polygon || polygon.length < 3) {
+      // HoleMapCanvasと同じロジックでデフォルトポリゴンを作成
+      const defaultPolygon = buildRegularPolygonPoints(0, targetDistance, greenRadius, GREEN_POLYGON_SIDES, 0.1);
+      return calculateGreenPolygon(defaultPolygon, perspective);
+    }
+    return calculateGreenPolygon(polygon, perspective);
+  }, [hole.greenPolygon, hole.greenRadius, shotContext.targetDistance, perspective]);
+
+  // ホールごとのランダムな雲を生成
+  const clouds = useMemo(() => {
+    const seed = hole.number;
+    const cloudCount = Math.floor(seededRandomRange(seed, 3, 6));
+    const clouds = [];
+
+    for (let i = 0; i < cloudCount; i++) {
+      const cloudSeed = seed * 100 + i;
+      const x = seededRandomRange(cloudSeed, -80, 180);
+      const y = seededRandomRange(cloudSeed + 1, 8, 30);
+      const scale = seededRandomRange(cloudSeed + 2, 0.7, 1.2);
+      const opacity = seededRandomRange(cloudSeed + 3, 0.3, 0.5);
+      const ellipseCount = Math.floor(seededRandomRange(cloudSeed + 4, 3, 5));
+
+      const ellipses = [];
+      for (let j = 0; j < ellipseCount; j++) {
+        const ellipseSeed = cloudSeed * 10 + j;
+        const ex = seededRandomRange(ellipseSeed, -5, 5);
+        const ey = seededRandomRange(ellipseSeed + 1, -3, 3);
+        const rx = seededRandomRange(ellipseSeed + 2, 6, 12) * scale;
+        const ry = seededRandomRange(ellipseSeed + 3, 3, 6) * scale;
+        ellipses.push({ ex, ey, rx, ry });
+      }
+
+      clouds.push({ x, y, opacity, ellipses });
+    }
+
+    return clouds;
+  }, [hole.number]);
 
   // ハザードの位置計算（長方形とポリゴンの両方に対応）
   const hazardPositions = useMemo<HazardPosition[]>(
@@ -175,6 +261,24 @@ export function PerspectiveHoleView({
 
         {/* 背景 - viewBox全体をカバー */}
         <rect x="-100" width="300" height="100" fill="url(#skyGradient)" />
+
+        {/* 雲 */}
+        <g opacity="0.8">
+          {clouds.map((cloud, idx) => (
+            <g key={idx} transform={`translate(${cloud.x}, ${cloud.y})`} opacity={cloud.opacity}>
+              {cloud.ellipses.map((ellipse, eIdx) => (
+                <ellipse
+                  key={eIdx}
+                  cx={ellipse.ex}
+                  cy={ellipse.ey}
+                  rx={ellipse.rx}
+                  ry={ellipse.ry}
+                  fill="white"
+                />
+              ))}
+            </g>
+          ))}
+        </g>
 
         {/* フェアウェイ - 草のテクスチャを重ねる */}
         <path d={fairwayPath} fill="url(#fairwayGradient)" opacity="0.9" />
@@ -247,7 +351,6 @@ export function PerspectiveHoleView({
               d={greenPolygon.pathData}
               fill="#34d399"
               opacity="0.85"
-              filter="url(#shadow)"
             />
             {/* グリーンの縁 */}
             <path
@@ -418,25 +521,25 @@ export function PerspectiveHoleView({
         {/* ホール情報パネル */}
         <g>
           {/* パネル背景 */}
-          <rect x="-18" y="2" width="26" height="10" rx="3" fill="rgba(200, 238, 61, 0.95)" filter="url(#shadow)" />
+          <rect x="-38" y="2" width="26" height="9" rx="3" fill="rgba(200, 238, 61, 0.95)" filter="url(#shadow)" />
           {/* パネルの装飾ライン */}
-          <rect x="-18" y="2" width="26" height="10" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          <rect x="-38" y="2" width="26" height="9" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
           {/* ホール番号 */}
-          <text x="-15" y="8" fontSize="4" fill="#065f46" fontWeight="bold" opacity="0.8">{hole.number}H</text>
+          <text x="-35" y="8" fontSize="4" fill="#065f46" fontWeight="bold" opacity="0.8">{hole.number}H</text>
           {/* パー数 */}
-          <text x="-5" y="8" fontSize="4" fill="#065f46" fontWeight="bold">PAR {hole.par}</text>
+          <text x="-25" y="8" fontSize="4" fill="#065f46" fontWeight="bold">PAR {hole.par}</text>
         </g>
 
         {/* 距離表示パネル */}
         <g>
           {/* パネル背景 */}
-          <rect x="10" y="2" width="40" height="12" rx="3" fill="rgba(229, 250, 216, 0.95)" filter="url(#shadow)" />
+          <rect x="-10" y="2" width="40" height="10" rx="3" fill="rgba(229, 250, 216, 0.95)" filter="url(#shadow)" />
           {/* パネルの装飾ライン */}
-          <rect x="10" y="2" width="40" height="12" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          <rect x="-10" y="2" width="40" height="10" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
           {/* タイトル */}
-          <text x="13" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
+          <text x="-7" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
           {/* 距離値 */}
-          <text x="45" y="11" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
+          <text x="25" y="10" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
             {remainingDistance}Y
           </text>
         </g>
@@ -444,9 +547,9 @@ export function PerspectiveHoleView({
         {/* ライ表示パネル（別個） */}
         <g>
           {/* パネル背景 */}
-          <rect x="66" y="2" width="30" height="10" rx="2" fill={LIE_COLORS[lie]} opacity="0.85" filter="url(#shadow)" />
+          <rect x="86" y="2" width="30" height="9" rx="2" fill={LIE_COLORS[lie]} opacity="0.85" filter="url(#shadow)" />
           {/* ライラベル */}
-          <text x="81" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3" fill="white" fontWeight="bold">
+          <text x="101" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3" fill="white" fontWeight="bold">
             {lie === "tee" ? "ティーグラウンド" : lie === "fairway" ? "フェアウェイ" : lie === "rough" ? "ラフ" : lie === "green" ? "グリーン" : lie === "bunker" ? "バンカー" : lie === "semirough" ? "セミラフ" : lie === "bareground" ? "ベアグランド" : lie}
           </text>
         </g>
@@ -455,9 +558,9 @@ export function PerspectiveHoleView({
         {strokeLabel && (
           <g>
             {/* パネル背景 */}
-            <rect x="98" y="2" width="18" height="10" rx="2" fill="rgba(106, 128, 196, 0.85)" filter="url(#shadow)" />
+            <rect x="118" y="2" width="18" height="9" rx="2" fill="rgba(106, 128, 196, 0.85)" filter="url(#shadow)" />
             {/* 打数ラベル */}
-            <text x="107" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3.5" fill="white" fontWeight="bold">
+            <text x="127" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3.5" fill="white" fontWeight="bold">
               {strokeLabel}
             </text>
           </g>

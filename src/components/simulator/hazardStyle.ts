@@ -9,7 +9,7 @@ export function getHazardStyle(type: Hazard["type"]): { fill: string; stroke: st
   }
   if (type === "water") {
     return {
-      fill: "rgba(59, 130, 246, 0.38)",
+      fill: "rgba(59, 130, 246, 0.85)",
       stroke: "rgba(220, 38, 38, 0.95)",
     };
   }
