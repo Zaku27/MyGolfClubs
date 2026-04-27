@@ -174,45 +174,11 @@ export function PerspectiveHoleView({
         </defs>
 
         {/* 背景 - viewBox全体をカバー */}
-        <rect x="-20" width="140" height="100" fill="url(#skyGradient)" />
+        <rect x="-100" width="300" height="100" fill="url(#skyGradient)" />
 
         {/* フェアウェイ - 草のテクスチャを重ねる */}
         <path d={fairwayPath} fill="url(#fairwayGradient)" opacity="0.9" />
         <path d={fairwayPath} fill="url(#grassPattern)" opacity="0.4" />
-
-        {/* ラフエリア（フェアウェイの外側） - フェアウェイと同じグラデーション・テクスチャ */}
-        <path
-          d={`
-            M -20 ${perspective.distanceToY(0)}
-            L 0 ${perspective.distanceToY(0)}
-            L 30 ${perspective.distanceToY(targetDistance)}
-            L -20 ${perspective.distanceToY(targetDistance)}
-            Z
-            M 120 ${perspective.distanceToY(0)}
-            L 100 ${perspective.distanceToY(0)}
-            L 70 ${perspective.distanceToY(targetDistance)}
-            L 120 ${perspective.distanceToY(targetDistance)}
-            Z
-          `}
-          fill="url(#fairwayGradient)"
-          opacity="0.8"
-        />
-        <path
-          d={`
-            M -20 ${perspective.distanceToY(0)}
-            L 0 ${perspective.distanceToY(0)}
-            L 30 ${perspective.distanceToY(targetDistance)}
-            L -20 ${perspective.distanceToY(targetDistance)}
-            Z
-            M 120 ${perspective.distanceToY(0)}
-            L 100 ${perspective.distanceToY(0)}
-            L 70 ${perspective.distanceToY(targetDistance)}
-            L 120 ${perspective.distanceToY(targetDistance)}
-            Z
-          `}
-          fill="url(#grassPattern)"
-          opacity="0.5"
-        />
 
         {/* ポリゴンハザード - タイプごとにグループ化して透明度を統一 */}
         {/* ラフ/セミラフを先に描画 */}

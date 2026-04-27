@@ -166,15 +166,17 @@ export function calculateFairwayPath(
 ): string {
   const startY = perspective.distanceToY(0);
   const endY = perspective.distanceToY(targetDistance);
-  const startWidth = 100; // 広げた（80→100）
-  const endWidth = 40;    // 広げた（30→40）
+
+  // 横幅いっぱいのフェアウェイ（viewBox: -100 0 300 100）
+  const leftX = -100;
+  const rightX = 200;
 
   // 台形のフェアウェイ
   return `
-    M ${50 - startWidth / 2} ${startY}
-    L ${50 + startWidth / 2} ${startY}
-    L ${50 + endWidth / 2} ${endY}
-    L ${50 - endWidth / 2} ${endY}
+    M ${leftX} ${startY}
+    L ${rightX} ${startY}
+    L ${rightX} ${endY}
+    L ${leftX} ${endY}
     Z
   `;
 }
