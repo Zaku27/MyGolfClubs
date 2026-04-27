@@ -251,9 +251,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const roundSeedNonce = createRoundSeedNonce();
     const initialContext = buildInitialContext(course[0], roundSeedNonce, 0, null);
 
-    // 実測データモードの場合、パタースキルレベルを0.5～0.9の範囲でランダムに決定
+    // 実測データモードの場合、パタースキルレベルを0.5～0.8の範囲でランダムに決定
     const measuredModePutterSkillLevel = playMode === "measured"
-      ? 0.5 + Math.random() * 0.4
+      ? 0.5 + Math.random() * 0.3
       : null;
 
     set({
@@ -279,9 +279,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   selectClub: (clubId) => set({ selectedClubId: clubId }),
 
-  setShotPowerPercent: (powerPercent) => set({
-    shotPowerPercent: Math.max(0, Math.min(110, Math.round(powerPercent))),
-  }),
+  setShotPowerPercent: (powerPercent) => {
+    const { playMode } = get();
+    const maxPower = playMode === "measured" ? 100 : 110;
+    set({
+      shotPowerPercent: Math.max(0, Math.min(maxPower, Math.round(powerPercent))),
+    });
+  },
 
   setAimXOffset: (aimXOffset) => set({
     aimXOffset: Math.max(-50, Math.min(50, Math.round(aimXOffset))),

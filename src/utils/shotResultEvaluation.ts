@@ -205,10 +205,12 @@ export function simulateAutoPutts(
 
   // パット成功率の計算（距離に応じて変動）
   const getPuttSuccessRate = (distance: number): number => {
+    // 1ヤード以下は98%の成功率
+    if (distance <= 1) return 0.98;
     // 基本成功率（プレイヤースキルに基づく）
     const baseRate = 0.5 + playerSkillLevel * 0.4; // 0.5-0.9
-    // 距離減衰
-    const distancePenalty = Math.min(0.4, distance * 0.03);
+    // 非線形な距離減衰（距離の2乗を含めることで長い距離で急激に低下）
+    const distancePenalty = Math.min(0.5, distance * 0.015 + (distance * distance) * 0.0015);
     return Math.max(0.1, baseRate - distancePenalty);
   };
 

@@ -72,15 +72,15 @@ const SKILL_DISTANCE_RANGE = { min: 0.92, max: 1.08 };
 /** 有効成功率の範囲 */
 const SUCCESS_RATE_BOUNDS = { min: 15, max: 95 };
 
-/** パット基礎成功率（距離ごと） */
+/** パット基礎成功率（距離ごと） - PGAツアーデータに基づいて調整 */
 const PUTT_BASE_CHANCES = [
-  { maxDist: 3, chance: 0.96 },
-  { maxDist: 5, chance: 0.77 },
-  { maxDist: 8, chance: 0.50 },
-  { maxDist: 10, chance: 0.40 },
-  { maxDist: 15, chance: 0.23 },
-  { maxDist: 20, chance: 0.15 },
-  { maxDist: 30, chance: 0.07 },
+  { maxDist: 3, chance: 0.90 },
+  { maxDist: 5, chance: 0.65 },
+  { maxDist: 8, chance: 0.40 },
+  { maxDist: 10, chance: 0.30 },
+  { maxDist: 15, chance: 0.18 },
+  { maxDist: 20, chance: 0.12 },
+  { maxDist: 30, chance: 0.05 },
 ];
 
 /** 弱いクラブの閾値 */
@@ -734,11 +734,12 @@ function simulatePutt(
 } {
 
   if (remaining <= 1) {
+    const made = random() < 0.98;
     return {
-      made: true,
-      newRemaining: 0,
-      message: `パットが決まりました！ (${remaining}y)`,
-      effectiveSuccessRate: 100,
+      made,
+      newRemaining: made ? 0 : Math.max(0.1, remaining * 0.1),
+      message: made ? `パットが決まりました！ (${remaining}y)` : `パット外れ… 残り ${Math.max(0.1, remaining * 0.1).toFixed(1)}y`,
+      effectiveSuccessRate: 98,
     };
   }
 
@@ -769,7 +770,7 @@ function simulatePutt(
   let leftOver: number;
   if (remaining <= 30) {
     // Normal putt: leave a short tap-in
-    leftOver = Math.max(1, Math.round(remaining * (0.05 + random() * 0.12)));
+    leftOver = Math.max(0.3, remaining * (0.05 + random() * 0.12));
   } else {
     // Very long putt from off-green: ball advances somewhat
     const advanced = Math.round(20 + random() * 15);
@@ -779,7 +780,7 @@ function simulatePutt(
   return {
     made: false,
     newRemaining: leftOver,
-    message: `パット外れ… 残り ${leftOver}y`,
+    message: `パット外れ… 残り ${leftOver.toFixed(1)}y`,
     effectiveSuccessRate: Math.round(makeChance * 100),
   };
 }
@@ -1447,7 +1448,7 @@ export function simulateShotFromActualData(
   
   // メッセージ構築
   const clubDisplayName = `${club.name}${club.number ? " " + club.number : ""}`;
-  const nextShotAdvice = buildNextShotAdvice(finalOutcome, newLie);
+  const nextShotAdvice = buildNextShotAdvice(finalOutcome, newLie, true);
   const message = buildDetailedShotMessage({
     qualityLabel: "実測データ",
     clubLabel: clubDisplayName,

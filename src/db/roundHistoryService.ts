@@ -178,7 +178,12 @@ export const RoundHistoryService = {
       const roundDate = round.completedAt.split('T')[0]; // YYYY-MM-DD
 
       for (const stat of round.clubUsageStats) {
-        if (stat.timesUsed < 5) continue; // 使用回数5回以上のクラブのみ
+        if (stat.timesUsed < 3) continue; // 使用回数3回以上のクラブのみ
+
+        // パターを除外（クラブ名で判定）
+        if (stat.clubName.includes('パター') || stat.clubName.toLowerCase().includes('putter')) {
+          continue;
+        }
 
         clubNameMap.set(stat.clubId, stat.clubName);
 

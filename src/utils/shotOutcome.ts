@@ -288,6 +288,7 @@ export function buildOutcomeMessage(
 export function buildNextShotAdvice(
   finalOutcome: ShotResult["finalOutcome"],
   lie: LieType,
+  isMeasuredMode: boolean = false,
 ): string {
   const lieLabelMap: Record<LieType, string> = {
     tee: "ティー",
@@ -323,6 +324,9 @@ export function buildNextShotAdvice(
   }
 
   if (finalOutcome === "green") {
+    if (isMeasuredMode) {
+      return `グリーン上です。残り距離による成功率で、カップインが自動的に判定されます。`;
+    }
     return `グリーン上です。残り距離による成功率とスキルレベルで、カップインが自動的に判定されます。`;
   }
 

@@ -20,9 +20,9 @@ interface Props {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
-      <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">{label}</p>
-      <p className="mt-2 text-2xl font-black text-emerald-50">{value}</p>
+    <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 shadow-sm shadow-emerald-300/40">
+      <p className="text-xs uppercase tracking-[0.16em] text-emerald-700">{label}</p>
+      <p className="mt-2 text-2xl font-black text-emerald-900">{value}</p>
     </div>
   );
 }
@@ -44,23 +44,23 @@ function ClubStatList({
   accentClass: string;
 }) {
   return (
-    <section className="rounded-2xl border border-emerald-700/45 bg-emerald-950/50 p-4 sm:p-5">
-      <h3 className="text-lg font-bold text-emerald-50">{title}</h3>
+    <section className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 sm:p-5 shadow-sm shadow-emerald-300/40">
+      <h3 className="text-lg font-bold text-emerald-900">{title}</h3>
       <div className="mt-3 space-y-2">
         {items.length > 0 ? (
           items.map((club) => (
-            <div key={`${title}-${club.clubName}`} className="rounded-xl border border-emerald-700/35 bg-emerald-900/35 px-3 py-3">
+            <div key={`${title}-${club.clubName}`} className="rounded-xl border border-emerald-300 bg-emerald-50/80 px-3 py-3">
               <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-semibold text-emerald-50">{club.clubName}</p>
+                <p className="text-sm font-semibold text-emerald-900">{club.clubName}</p>
                 <span className={`text-sm font-bold ${accentClass}`}>{club.successRate}%</span>
               </div>
-              <p className="mt-1 text-xs text-emerald-300">
+              <p className="mt-1 text-xs text-emerald-600">
                 {club.timesUsed}回使用 | 平均飛距離 {club.avgDistanceAchieved}yd
               </p>
             </div>
           ))
         ) : (
-          <p className="rounded-xl border border-emerald-700/35 bg-emerald-900/30 px-3 py-3 text-sm text-emerald-300">
+          <p className="rounded-xl border border-emerald-300 bg-emerald-50/80 px-3 py-3 text-sm text-emerald-700">
             ラウンドデータがありません。
           </p>
         )}
@@ -82,10 +82,10 @@ function RoundClubSummaryTable({
   }>;
 }) {
   return (
-    <section className="mt-4 rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
-      <h2 className="text-sm font-bold tracking-[0.08em] text-emerald-100">ラウンドサマリー（クラブ別）</h2>
+    <section className="mt-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 shadow-sm shadow-emerald-300/40">
+      <h2 className="text-sm font-bold tracking-[0.08em] text-emerald-900">ラウンドサマリー（クラブ別）</h2>
       {items.length === 0 ? (
-        <p className="mt-3 rounded-xl border border-emerald-700/35 bg-emerald-900/30 px-3 py-3 text-sm text-emerald-300">
+        <p className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50/80 px-3 py-3 text-sm text-emerald-700">
           クラブ使用データがありません。
         </p>
       ) : (
@@ -102,7 +102,7 @@ function RoundClubSummaryTable({
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.clubId} className="rounded-xl border border-emerald-700/35 bg-emerald-900/35 text-emerald-50">
+                <tr key={item.clubId} className="rounded-xl border border-emerald-300 bg-emerald-50/80 text-emerald-900">
                   <td className="rounded-l-xl break-words px-2 py-2 font-semibold leading-tight">{item.clubName}</td>
                   <td className="px-1.5 py-2">{item.timesUsed}回</td>
                   <td className="px-1.5 py-2">{item.successes}回</td>
@@ -201,22 +201,22 @@ export function PostRoundAnalysis({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-950 via-green-900 to-green-950 px-4 py-6 text-emerald-50 sm:px-6 sm:py-8">
+    <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 px-4 py-6 text-emerald-900 sm:px-6 sm:py-8">
       <div className="mx-auto w-full max-w-5xl space-y-5 sm:space-y-6">
-        <header className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 px-5 py-6 shadow-2xl shadow-emerald-950/40 sm:px-7 sm:py-7">
-          <p className="text-xs uppercase tracking-[0.24em] text-emerald-300">ラウンド完了</p>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">ラウンド分析</h1>
+        <header className="rounded-3xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 shadow-sm shadow-emerald-300/40 sm:px-7 sm:py-7">
+          <p className="text-xs uppercase tracking-[0.24em] text-emerald-700">ラウンド完了</p>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl text-emerald-900">ラウンド分析</h1>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">最終スコア</p>
-              <p className="mt-2 text-5xl font-black leading-none text-emerald-50">{toParString(analysis.final, analysis.totalPar)}</p>
-              <p className="mt-2 text-sm text-emerald-200">ストローク{analysis.final}/パー{analysis.totalPar}</p>
+            <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 shadow-sm shadow-emerald-300/40">
+              <p className="text-xs uppercase tracking-[0.16em] text-emerald-700">最終スコア</p>
+              <p className="mt-2 text-5xl font-black leading-none text-emerald-900">{toParString(analysis.final, analysis.totalPar)}</p>
+              <p className="mt-2 text-sm text-emerald-600">ストローク{analysis.final}/パー{analysis.totalPar}</p>
             </div>
 
-            <div className="rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">全体結果</p>
-              <p className="mt-2 text-xl font-bold text-emerald-50">
+            <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 shadow-sm shadow-emerald-300/40">
+              <p className="text-xs uppercase tracking-[0.16em] text-emerald-700">全体結果</p>
+              <p className="mt-2 text-xl font-bold text-emerald-900">
                 {analysis.final} (予測 {analysis.predicted.predicted} ± {analysis.predicted.variance})
               </p>
               <p className={`mt-3 text-base font-bold ${analysis.performance.toneClass}`}>
@@ -228,8 +228,8 @@ export function PostRoundAnalysis({
           <RoundClubSummaryTable items={analysis.clubRoundSummary} />
         </header>
 
-        <section className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 p-5 sm:p-6">
-          <h2 className="text-xl font-bold text-emerald-50">主要統計</h2>
+        <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
+          <h2 className="text-xl font-bold text-emerald-900">主要統計</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="総ストローク数" value={String(analysis.keyStats.totalStrokes)} />
             <StatCard label="GIR" value={`${analysis.keyStats.girPercent}%`} />
@@ -239,17 +239,17 @@ export function PostRoundAnalysis({
         </section>
 
         <section className="grid gap-4 lg:grid-cols-2">
-          <ClubStatList title="ベストクラブTOP3" items={analysis.bestClubs} accentClass="text-emerald-300" />
-          <ClubStatList title="苦戦クラブTOP3" items={analysis.strugglingClubs} accentClass="text-rose-300" />
+          <ClubStatList title="ベストクラブTOP3" items={analysis.bestClubs} accentClass="text-emerald-700" />
+          <ClubStatList title="苦戦クラブTOP3" items={analysis.strugglingClubs} accentClass="text-rose-600" />
         </section>
 
-        <section className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 p-5 sm:p-6">
-          <h2 className="text-xl font-bold text-emerald-50">分析と提案</h2>
+        <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
+          <h2 className="text-xl font-bold text-emerald-900">分析と提案</h2>
           <ul className="mt-3 space-y-2">
             {analysis.insights.map((insight) => (
               <li
                 key={insight}
-                className="rounded-xl border border-emerald-700/35 bg-emerald-900/30 px-3 py-2 text-sm text-emerald-100"
+                className="rounded-xl border border-emerald-300 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-900"
               >
                 • {insight}
               </li>
@@ -259,12 +259,12 @@ export function PostRoundAnalysis({
 
         <footer className="space-y-4 pb-4">
           {/* 統計保存チェックボックス */}
-          <label className="flex items-center justify-center gap-2 text-sm text-emerald-200">
+          <label className="flex items-center justify-center gap-2 text-sm text-emerald-700">
             <input
               type="checkbox"
               checked={skipSave}
               onChange={(e) => setSkipSave(e.target.checked)}
-              className="h-4 w-4 rounded border-emerald-500 bg-emerald-900 text-emerald-500 focus:ring-emerald-500"
+              className="h-4 w-4 rounded border-emerald-400 bg-emerald-50 text-emerald-600 focus:ring-emerald-500"
             />
             統計に保存しない
           </label>
@@ -280,14 +280,14 @@ export function PostRoundAnalysis({
             <button
               type="button"
               onClick={() => handleSaveAndNavigate(onViewDetailedScorecard)}
-              className="rounded-xl border border-emerald-400/60 bg-emerald-900/40 px-4 py-3 text-sm font-bold text-emerald-100 transition hover:border-emerald-300"
+              className="rounded-xl border border-emerald-400 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 transition hover:border-emerald-500"
             >
               スコアカードを見る
             </button>
             <button
               type="button"
               onClick={() => handleSaveAndNavigate(onBackToMenu)}
-              className="rounded-xl border border-emerald-700/70 bg-transparent px-4 py-3 text-sm font-bold text-emerald-300 transition hover:border-emerald-400 hover:text-emerald-100"
+              className="rounded-xl border border-emerald-400 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 transition hover:border-emerald-500"
             >
               メニューに戻る
             </button>
@@ -296,7 +296,7 @@ export function PostRoundAnalysis({
             <button
               type="button"
               onClick={() => handleSaveAndNavigate(onViewRoundHistory)}
-              className="w-full rounded-xl border border-sky-400/60 bg-sky-900/40 px-4 py-3 text-sm font-bold text-sky-100 transition hover:border-sky-300"
+              className="w-full rounded-xl border border-sky-400 bg-sky-50 px-4 py-3 text-sm font-bold text-sky-900 transition hover:border-sky-500"
             >
               📊 ラウンド履歴・統計を見る
             </button>

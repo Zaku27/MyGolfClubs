@@ -5,7 +5,6 @@ import { useClubStore } from "../../store/clubStore";
 import { estimateBaseDistance } from "../../utils/shotSimulation";
 import { getSkillLabel } from "../../utils/playerSkill";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
-import { CompactScorecard } from "./Scorecard";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
 import { loadRangePlayerSettings } from "../../utils/rangePlayerSettings";
 import {
@@ -75,9 +74,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     executeAutoPutts,
   } = useGameStore();
   const [showAllClubs, setShowAllClubs] = useState(false);
-  const [showMobileScorecard, setShowMobileScorecard] = useState(false);
   const [selectedClub, setSelectedClub] = useState<SimClub | null>(null);
   const [landingHistory, setLandingHistory] = useState<LandingHistoryItem[]>([]);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
 
   useEffect(() => {
     if (lastShotResult) {
@@ -252,7 +251,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
 
     return stats;
   }, [roundShots]);
-  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
 
   const handleQuitGame = () => {
     setShowQuitConfirm(true);
@@ -269,24 +267,13 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const isGreenLie = lie === "green";
   const isHoleComplete = phase === "hole_complete" || phase === "round_complete";
   const currentStrokeLabel = isHoleComplete
-    ? `${holeStrokes}打でホールアウト`
-    : isGreenLie
-      ? `${holeStrokes + 1}打目 (パット)`
-      : `${holeStrokes + 1}打目`;
+    ? `${holeStrokes}打`
+    : `${holeStrokes + 1}打目`;
   const shotResultTitle = lastShotResult?.newRemainingDistance === 0 ? "最終結果" : "結果";
   const showGreenRemaining = lastShotResult?.finalOutcome === "green" && (lastShotResult.newRemainingDistance ?? 0) > 0;
   const lastShotLog = roundShots.length > 0 ? roundShots[roundShots.length - 1] : null;
   const lastShotClub = lastShotLog ? bag.find((club) => club.id === lastShotLog.clubId) : null;
   const lastShotWasPutter = lastShotClub?.type === "Putter";
-  const hazardFeedbackMessage = lastShotResult && ["bunker", "water", "rough", "ob"].includes(lastShotResult.finalOutcome)
-    ? lastShotResult.finalOutcome === "water"
-      ? "ウォーターハザードに入ってしまいました。次は救済またはペナルティで続けます。"
-      : lastShotResult.finalOutcome === "bunker"
-        ? "バンカーに入りました。落ち着いて次の1打を狙いましょう。"
-        : lastShotResult.finalOutcome === "rough"
-          ? "ラフにつかまりました。次は脱出を意識しましょう。"
-          : "OB でした。仕切り直して次のショットを打ちましょう。"
-    : null;
   const resultDistanceLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotWasPutter
       ? `パット距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}yd`
@@ -375,27 +362,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           <div className="fixed inset-0 z-50 cursor-wait bg-black/0 pointer-events-auto" />
         )}
         <div className="mb-4 lg:hidden">
-          {showScoreDisplay && (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowMobileScorecard((prev) => !prev)}
-                className="w-full rounded-xl border border-emerald-300 bg-emerald-50/90 px-4 py-2 text-sm font-bold text-emerald-800 transition hover:border-emerald-500"
-              >
-                {showMobileScorecard ? "スコアカードを閉じる" : "スコアカードを開く"}
-              </button>
-              {showMobileScorecard && (
-                <CompactScorecard
-                  course={course}
-                  scores={scores}
-                  currentHoleIndex={currentHoleIndex}
-                  holeStrokes={holeStrokes}
-                  phase={phase}
-                  className="mt-3"
-                />
-              )}
-            </>
-          )}
 
           <section className="mt-3 rounded-3xl border border-emerald-300 bg-emerald-50/90 px-4 py-8 shadow-sm shadow-emerald-300/30 sm:px-6 sm:py-10">
             <div className="flex items-center justify-between gap-3">
@@ -459,6 +425,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               selectedClub={selectedClub}
               lastShotResult={lastShotResult}
               strokeLabel={currentStrokeLabel}
+              scoreLabel={showScoreDisplay ? scoreLabel : undefined}
               className="h-72 sm:h-80"
             />
           </div>
@@ -544,12 +511,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                       <span className="text-xs text-rose-700">罰打 +{lastShotResult.penaltyStrokes}</span>
                     )}
                     {showGreenRemaining && (
-                      <span className="text-xs text-sky-800">残り {lastShotResult.newRemainingDistance}ヤード</span>
+                      <span className="text-xs text-sky-800">残り {lastShotResult.newRemainingDistance.toFixed(1)}ヤード</span>
                     )}
                   </div>
-                  {hazardFeedbackMessage && (
-                    <p className="mt-1 text-xs text-emerald-700">{hazardFeedbackMessage}</p>
-                  )}
                 </div>
               </div>
               {lastShotResult.nextShotAdvice && (
@@ -715,7 +679,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             <input
               type="range"
               min={0}
-              max={110}
+              max={playMode === "measured" ? 100 : 110}
               step={1}
               value={shotPowerPercent}
               onChange={e => setShotPowerPercent(Number(e.target.value))}
@@ -726,7 +690,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-emerald-700">
               <span>0%</span>
 
-              <span>110%</span>
+              <span>{playMode === "measured" ? "100%" : "110%"}</span>
             </div>
           </div>
 
@@ -808,16 +772,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           </div>
 
         <aside className="hidden lg:sticky lg:top-24 lg:block">
-          {showScoreDisplay && (
-            <CompactScorecard
-              course={course}
-              scores={scores}
-              currentHoleIndex={currentHoleIndex}
-              holeStrokes={holeStrokes}
-              phase={phase}
-            />
-          )}
-
           <section className="mt-4 rounded-3xl border border-emerald-300 bg-emerald-50/90 px-3 py-4 shadow-sm shadow-emerald-300/30">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-xs font-bold tracking-[0.16em] text-emerald-700">コース情報</h2>

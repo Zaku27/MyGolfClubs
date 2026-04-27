@@ -51,7 +51,8 @@ interface Props {
   aimXOffset: number;
   selectedClub?: {
     avgDistance: number;
-  } | null;
+    type: string;
+  };
   lastShotResult?: {
     finalOutcome?: "fairway" | "rough" | "bunker" | "water" | "ob" | "green";
     landing?: {
@@ -60,6 +61,7 @@ interface Props {
     };
   } | null;
   strokeLabel?: string;
+  scoreLabel?: string;
   className?: string;
 }
 
@@ -70,6 +72,7 @@ export function PerspectiveHoleView({
   selectedClub,
   lastShotResult,
   strokeLabel,
+  scoreLabel,
   className = "",
 }: Props) {
   const { remainingDistance, lie, originX, originY, targetDistance } = shotContext;
@@ -540,16 +543,16 @@ export function PerspectiveHoleView({
           <text x="-7" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
           {/* 距離値 */}
           <text x="25" y="10" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
-            {remainingDistance}Y
+            {Math.round(remainingDistance)}Y
           </text>
         </g>
 
         {/* ライ表示パネル（別個） */}
         <g>
           {/* パネル背景 */}
-          <rect x="86" y="2" width="30" height="9" rx="2" fill={LIE_COLORS[lie]} opacity="0.85" filter="url(#shadow)" />
+          <rect x="71" y="2" width="30" height="9" rx="2" fill={LIE_COLORS[lie]} opacity="0.85" filter="url(#shadow)" />
           {/* ライラベル */}
-          <text x="101" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3" fill="white" fontWeight="bold">
+          <text x="86" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3" fill="white" fontWeight="bold">
             {lie === "tee" ? "ティーグラウンド" : lie === "fairway" ? "フェアウェイ" : lie === "rough" ? "ラフ" : lie === "green" ? "グリーン" : lie === "bunker" ? "バンカー" : lie === "semirough" ? "セミラフ" : lie === "bareground" ? "ベアグランド" : lie}
           </text>
         </g>
@@ -558,10 +561,22 @@ export function PerspectiveHoleView({
         {strokeLabel && (
           <g>
             {/* パネル背景 */}
-            <rect x="118" y="2" width="18" height="9" rx="2" fill="rgba(106, 128, 196, 0.85)" filter="url(#shadow)" />
+            <rect x="103" y="2" width="18" height="9" rx="2" fill="rgba(106, 128, 196, 0.85)" filter="url(#shadow)" />
             {/* 打数ラベル */}
-            <text x="127" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3.5" fill="white" fontWeight="bold">
+            <text x="112" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3.5" fill="white" fontWeight="bold">
               {strokeLabel}
+            </text>
+          </g>
+        )}
+
+        {/* スコア表示パネル */}
+        {scoreLabel && (
+          <g>
+            {/* パネル背景 */}
+            <rect x="123" y="2" width="18" height="9" rx="2" fill="rgba(251, 191, 36, 0.85)" filter="url(#shadow)" />
+            {/* スコアラベル */}
+            <text x="132" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3.5" fill="white" fontWeight="bold">
+              {scoreLabel}
             </text>
           </g>
         )}

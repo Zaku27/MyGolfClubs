@@ -284,83 +284,12 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
           </section>
         )}
 
-        {/* ラウンド一覧 */}
-        <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
-          <h2 className="text-xl font-bold text-emerald-900">ラウンド一覧</h2>
-
-          {rounds.length === 0 ? (
-            <p className="mt-4 text-emerald-700">ラウンド履歴がありません。</p>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-emerald-300 text-emerald-700">
-                    <th className="px-3 py-2">日付</th>
-                    <th className="px-3 py-2">コース</th>
-                    <th className="px-3 py-2">モード</th>
-                    <th className="px-3 py-2 text-right">Par</th>
-                    <th className="px-3 py-2 text-right">ストローク</th>
-                    <th className="px-3 py-2 text-right">スコア</th>
-                    <th className="px-3 py-2 text-center">お気に入り</th>
-                    <th className="px-3 py-2 text-center">削除</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rounds.map((round) => (
-                    <tr
-                      key={round.id}
-                      className="border-b border-emerald-200 hover:bg-emerald-100/50"
-                    >
-                      <td className="px-3 py-3 text-emerald-900">{formatDate(round.completedAt)}</td>
-                      <td className="px-3 py-3 text-emerald-900">
-                        {round.courseName} ({round.courseHoleCount}H)
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className="rounded-full bg-emerald-200 px-2 py-1 text-xs text-emerald-800">
-                          {PLAY_MODE_LABELS[round.playMode]}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right text-emerald-700">
-                        {round.totalPar}
-                      </td>
-                      <td className="px-3 py-3 text-right font-bold text-emerald-900">
-                        {round.totalScore}
-                      </td>
-                      <td className="px-3 py-3 text-right text-emerald-700">
-                        {toParString(round.totalScore, round.totalPar)}
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <button
-                          onClick={() => round.id && handleToggleFavorite(round.id)}
-                          className={`text-xl transition ${
-                            round.isFavorite ? 'text-yellow-500' : 'text-emerald-400 hover:text-emerald-600'
-                          }`}
-                        >
-                          {round.isFavorite ? '★' : '☆'}
-                        </button>
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <button
-                          onClick={() => round.id && handleDelete(round.id)}
-                          className="rounded-lg bg-rose-900/50 px-3 py-1 text-xs text-rose-300 transition hover:bg-rose-900/70"
-                        >
-                          削除
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
         {/* クラブ別成功率トレンド */}
         {clubTrends.length > 0 && (
           <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
             <h2 className="text-xl font-bold text-emerald-900">クラブ別成功率推移</h2>
             <p className="mt-1 text-sm text-emerald-700">
-              使用回数5回以上のクラブのみ表示
+              使用回数3回以上のクラブのみ表示（パターを除く）
             </p>
 
             <div className="mt-4 space-y-4">
@@ -401,6 +330,84 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
             </div>
           </section>
         )}
+
+        {/* ラウンド一覧 */}
+        <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
+          <h2 className="text-xl font-bold text-emerald-900">ラウンド一覧</h2>
+
+          {rounds.length === 0 ? (
+            <p className="mt-4 text-emerald-700">ラウンド履歴がありません。</p>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <div className="max-h-96 overflow-y-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="sticky top-0 bg-emerald-50/95">
+                    <tr className="border-b border-emerald-300 text-emerald-700">
+                      <th className="px-3 py-2">日付</th>
+                      <th className="px-3 py-2">コース</th>
+                      <th className="px-3 py-2">モード</th>
+                      <th className="px-3 py-2 text-right">Par</th>
+                      <th className="px-3 py-2 text-right">ストローク</th>
+                      <th className="px-3 py-2 text-right">スコア</th>
+                      <th className="px-3 py-2 text-center">お気に入り</th>
+                      <th className="px-3 py-2 text-center">削除</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rounds.slice(0, 10).map((round) => (
+                      <tr
+                        key={round.id}
+                        className="border-b border-emerald-200 hover:bg-emerald-100/50"
+                      >
+                        <td className="px-3 py-3 text-emerald-900">{formatDate(round.completedAt)}</td>
+                        <td className="px-3 py-3 text-emerald-900">
+                          {round.courseName} ({round.courseHoleCount}H)
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="rounded-full bg-emerald-200 px-2 py-1 text-xs text-emerald-800">
+                            {PLAY_MODE_LABELS[round.playMode]}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right text-emerald-700">
+                          {round.totalPar}
+                        </td>
+                        <td className="px-3 py-3 text-right font-bold text-emerald-900">
+                          {round.totalScore}
+                        </td>
+                        <td className="px-3 py-3 text-right text-emerald-700">
+                          {toParString(round.totalScore, round.totalPar)}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            onClick={() => round.id && handleToggleFavorite(round.id)}
+                            className={`text-xl transition ${
+                              round.isFavorite ? 'text-yellow-500' : 'text-emerald-400 hover:text-emerald-600'
+                            }`}
+                          >
+                            {round.isFavorite ? '★' : '☆'}
+                          </button>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            onClick={() => round.id && handleDelete(round.id)}
+                            className="rounded-lg bg-rose-900/50 px-3 py-1 text-xs text-rose-300 transition hover:bg-rose-900/70"
+                          >
+                            削除
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {rounds.length > 10 && (
+                <p className="mt-2 text-xs text-emerald-600 text-center">
+                  最新10件を表示（全{rounds.length}件中）
+                </p>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

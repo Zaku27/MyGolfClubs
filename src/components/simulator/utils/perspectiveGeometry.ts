@@ -32,7 +32,7 @@ export type HazardPosition = PolygonHazardPosition;
  * パースペクティブ投影パラメータを計算
  */
 export function calculatePerspectiveParams(targetDistance: number): PerspectiveParams {
-  const vanishingPointY = 16; // 消失点のY位置（%）
+  const vanishingPointY = 20; // 消失点のY位置（%）- 視点を下げるために値を増加
   const scaleFactor = 0.6; // 遠景の縮小率
   const maxVisibleDistance = targetDistance * 1.2;
 
@@ -79,9 +79,11 @@ export function calculateBallPosition(
   perspective: PerspectiveParams
 ): Position3D {
   const y = perspective.distanceToY(originY);
+  // 地平線より上にならないようにY座標を制限
+  const clampedY = Math.max(y, perspective.horizonY);
   const x = perspective.xToScreenX(originX, originY);
   const scale = perspective.distanceToScale(originY);
-  return { x, y, scale };
+  return { x, y: clampedY, scale };
 }
 
 /**
@@ -136,9 +138,12 @@ export function calculateAimPosition(
   const aimX = originX + forward.x * aimDistance + right.x * aimXOffset;
   const aimY = originY + forward.y * aimDistance + right.y * aimXOffset;
   
-  const y = perspective.distanceToY(aimY);
-  const scale = perspective.distanceToScale(aimY);
-  const x = perspective.xToScreenX(aimX, aimY);
+  // 地平線より上にならないようにY座標を制限
+  const clampedAimY = Math.min(aimY, targetDistance * 1.05); // 地平線位置に基づいて制限
+  
+  const y = perspective.distanceToY(clampedAimY);
+  const scale = perspective.distanceToScale(clampedAimY);
+  const x = perspective.xToScreenX(aimX, clampedAimY);
   
   return { x, y, scale };
 }
