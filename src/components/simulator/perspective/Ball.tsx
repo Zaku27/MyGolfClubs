@@ -14,7 +14,7 @@ const LIE_COLORS: Record<LieType, number> = {
   tee: 0x10b981,
   fairway: 0x22c55e,
   semirough: 0x84cc16,
-  rough: 0x65a30d,
+  rough: 0x22c55e,
   bareground: 0xa8a29e,
   bunker: 0xfbbf24,
   green: 0x34d399,

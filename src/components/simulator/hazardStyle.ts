@@ -15,7 +15,7 @@ export function getHazardStyle(type: Hazard["type"]): { fill: string; stroke: st
   }
   if (type === "ob") {
     return {
-      fill: "rgba(34, 197, 94, 0.25)",
+      fill: "rgba(22, 163, 74, 0.25)",
       stroke: "rgba(22, 101, 52, 0.85)",
     };
   }
@@ -26,7 +26,7 @@ export function getHazardStyle(type: Hazard["type"]): { fill: string; stroke: st
     };
   }
   return {
-    fill: "rgba(74, 222, 128, 0.35)",
+    fill: "rgba(34, 197, 94, 0.35)",
     stroke: "rgba(22, 101, 52, 0.85)",
   };
 }

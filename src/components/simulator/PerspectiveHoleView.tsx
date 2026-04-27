@@ -50,7 +50,7 @@ const LIE_COLORS: Record<LieType, string> = {
   tee: "#10b981",      // emerald-500
   fairway: "#22c55e",  // green-500
   semirough: "#84cc16", // lime-500
-  rough: "#65a30d",    // lime-600
+  rough: "#22c55e",    // green-500 (swapped with OB)
   bareground: "#a8a29e", // stone-400
   bunker: "#fbbf24",   // amber-400
   green: "#34d399",    // emerald-400
@@ -58,10 +58,10 @@ const LIE_COLORS: Record<LieType, string> = {
 
 const OUTCOME_COLORS: Record<string, string> = {
   fairway: "#22c55e",
-  rough: "#65a30d",
+  rough: "#22c55e",
   bunker: "#fbbf24",
   water: "#3b82f6",
-  ob: "#22c55e",
+  ob: "#16a34a",
   green: "#34d399",
 };
 
@@ -295,9 +295,9 @@ export function PerspectiveHoleView({
         return "#fbbf24";
       case "rough":
       case "semirough":
-        return "#65a30d";
-      case "ob":
         return "#22c55e";
+      case "ob":
+        return "#16a34a";
       default:
         return "#9ca3af";
     }

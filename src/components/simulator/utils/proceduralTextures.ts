@@ -54,7 +54,7 @@ export function createRoughTexture(): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d")!;
 
   // 濃い緑のベース
-  ctx.fillStyle = "#65a30d";
+  ctx.fillStyle = "#22c55e";
   ctx.fillRect(0, 0, 512, 512);
 
   // ラフのノイズパターン

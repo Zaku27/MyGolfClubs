@@ -85,7 +85,7 @@ export function Terrain({ fairwayPath, targetDistance }: TerrainProps) {
   const roughMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({
       map: roughTexture,
-      color: 0x65a30d,
+      color: 0x22c55e,
       roughness: 1.0,
       metalness: 0.0,
     });
@@ -107,7 +107,7 @@ export function Terrain({ fairwayPath, targetDistance }: TerrainProps) {
       <mesh geometry={roughGeometry} material={roughMaterial} receiveShadow position={[0, 0, 0.01]}>
         <meshStandardMaterial
           map={roughTexture}
-          color={0x65a30d}
+          color={0x22c55e}
           roughness={1.0}
           metalness={0.0}
         />
