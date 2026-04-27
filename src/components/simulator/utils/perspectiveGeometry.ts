@@ -18,31 +18,15 @@ export interface Position3D {
 }
 
 // ハザード位置の型定義
-export interface RectangleHazardPosition {
-  type: HazardType;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  scale: number;
-  shape: "rectangle";
-  pathData?: undefined;
-  bbox?: undefined;
-}
-
 export interface PolygonHazardPosition {
   type: HazardType;
   pathData: string;
   bbox: { x: number; y: number; width: number; height: number };
   scale: number;
   shape: "polygon";
-  x?: undefined;
-  y?: undefined;
-  width?: undefined;
-  height?: undefined;
 }
 
-export type HazardPosition = RectangleHazardPosition | PolygonHazardPosition;
+export type HazardPosition = PolygonHazardPosition;
 
 /**
  * パースペクティブ投影パラメータを計算
@@ -301,7 +285,7 @@ export function calculateGreenPolygon(
 }
 
 /**
- * ハザードの位置計算（長方形とポリゴンの両方に対応）
+ * ハザードの位置計算（ポリゴンのみ）
  */
 export function calculateHazardPositions(
   hole: Hole,
@@ -310,101 +294,75 @@ export function calculateHazardPositions(
   if (!hole.hazards) return [];
 
   return hole.hazards.map<HazardPosition | null>((hazard) => {
-    const frontY = perspective.distanceToY(hazard.yFront);
-    const backY = perspective.distanceToY(hazard.yBack);
-    const midDistance = (hazard.yFront + hazard.yBack) / 2;
-    const scale = perspective.distanceToScale(midDistance);
-
-    if (hazard.shape === "rectangle") {
-      const x = perspective.xToScreenX(hazard.xCenter - hazard.width / 2, midDistance);
-      const width = hazard.width * scale * 0.8;
-      const height = Math.abs(backY - frontY);
-      return {
-        type: hazard.type,
-        x,
-        y: frontY,
-        width,
-        height,
-        scale,
-        shape: "rectangle" as const,
-      };
-    } else if (hazard.shape === "polygon" && hazard.points && hazard.points.length >= 3) {
-      // ポリゴンのパースペクティブ変換（地平線でクリップ）
-      const horizonY = perspective.horizonY;
-      
-      // 各ポイントを変換
-      const rawPoints = hazard.points.map((point) => ({
-        x: perspective.xToScreenX(point.x, point.y),
-        y: perspective.distanceToY(point.y),
-      }));
-      
-      // 全ての点が地平線より上なら描画しない
-      const allAboveHorizon = rawPoints.every(p => p.y < horizonY);
-      if (allAboveHorizon) return null;
-      
-      // 地平線でポリゴンをクリップ
-      const clippedPoints: Array<{x: number, y: number}> = [];
-      for (let i = 0; i < rawPoints.length; i++) {
-        const curr = rawPoints[i];
-        const prev = rawPoints[(i - 1 + rawPoints.length) % rawPoints.length];
-        
-        const currAbove = curr.y < horizonY;
-        const prevAbove = prev.y < horizonY;
-        
-        if (currAbove !== prevAbove) {
-          // 地平線との交差点を計算
-          const t = (horizonY - prev.y) / (curr.y - prev.y);
-          const intersectX = prev.x + t * (curr.x - prev.x);
-          clippedPoints.push({ x: intersectX, y: horizonY });
-        }
-        
-        if (!currAbove) {
-          // 地平線以下の点を追加
-          clippedPoints.push(curr);
-        }
-      }
-      
-      // クリップ後のポイントが不足していれば描画しない
-      if (clippedPoints.length < 3) return null;
-
-      // SVG path 文字列を生成
-      const pathData = clippedPoints
-        .map((pt, i) => `${i === 0 ? "M" : "L"} ${pt.x} ${pt.y}`)
-        .join(" ") + " Z";
-
-      // バウンディングボックスを計算
-      const xs = clippedPoints.map((p) => p.x);
-      const ys = clippedPoints.map((p) => p.y);
-      
-      const bbox = {
-        x: Math.min(...xs),
-        y: Math.min(...ys),
-        width: Math.max(...xs) - Math.min(...xs),
-        height: Math.max(...ys) - Math.min(...ys),
-      };
-
-      return {
-        type: hazard.type,
-        pathData,
-        bbox,
-        scale,
-        shape: "polygon" as const,
-      };
-    } else {
-      // フォールバック：バウンディングボックス表示
-      const x = perspective.xToScreenX(hazard.xCenter - hazard.width / 2, midDistance);
-      const width = hazard.width * scale * 0.8;
-      const height = Math.abs(backY - frontY);
-      return {
-        type: hazard.type,
-        x,
-        y: frontY,
-        width,
-        height,
-        scale,
-        shape: "rectangle" as const,
-      };
+    if (hazard.shape !== "polygon" || !hazard.points || hazard.points.length < 3) {
+      return null;
     }
+
+    // ポリゴンのパースペクティブ変換（地平線でクリップ）
+    const horizonY = perspective.horizonY;
+
+    // 各ポイントを変換
+    const rawPoints = hazard.points.map((point) => ({
+      x: perspective.xToScreenX(point.x, point.y),
+      y: perspective.distanceToY(point.y),
+    }));
+
+    // 全ての点が地平線より上なら描画しない
+    const allAboveHorizon = rawPoints.every((p) => p.y < horizonY);
+    if (allAboveHorizon) return null;
+
+    // 地平線でポリゴンをクリップ
+    const clippedPoints: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < rawPoints.length; i++) {
+      const curr = rawPoints[i];
+      const prev = rawPoints[(i - 1 + rawPoints.length) % rawPoints.length];
+
+      const currAbove = curr.y < horizonY;
+      const prevAbove = prev.y < horizonY;
+
+      if (currAbove !== prevAbove) {
+        // 地平線との交差点を計算
+        const t = (horizonY - prev.y) / (curr.y - prev.y);
+        const intersectX = prev.x + t * (curr.x - prev.x);
+        clippedPoints.push({ x: intersectX, y: horizonY });
+      }
+
+      if (!currAbove) {
+        // 地平線以下の点を追加
+        clippedPoints.push(curr);
+      }
+    }
+
+    // クリップ後のポイントが不足していれば描画しない
+    if (clippedPoints.length < 3) return null;
+
+    // SVG path 文字列を生成
+    const pathData = clippedPoints
+      .map((pt, i) => `${i === 0 ? "M" : "L"} ${pt.x} ${pt.y}`)
+      .join(" ") + " Z";
+
+    // バウンディングボックスを計算
+    const xs = clippedPoints.map((p) => p.x);
+    const ys = clippedPoints.map((p) => p.y);
+
+    const bbox = {
+      x: Math.min(...xs),
+      y: Math.min(...ys),
+      width: Math.max(...xs) - Math.min(...xs),
+      height: Math.max(...ys) - Math.min(...ys),
+    };
+
+    // 平均距離からスケールを計算
+    const avgY = hazard.points.reduce((sum, p) => sum + p.y, 0) / hazard.points.length;
+    const scale = perspective.distanceToScale(avgY);
+
+    return {
+      type: hazard.type,
+      pathData,
+      bbox,
+      scale,
+      shape: "polygon" as const,
+    };
   }).filter((h): h is HazardPosition => h !== null);
 }
 

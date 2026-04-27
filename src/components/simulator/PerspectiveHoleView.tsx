@@ -17,7 +17,6 @@ import {
   type Position3D,
   type HazardPosition,
   type GreenRect,
-  type GreenPolygonPosition,
 } from "./utils/perspectiveGeometry";
 
 interface Props {
@@ -275,66 +274,6 @@ export function PerspectiveHoleView({
           );
         })()}
 
-        {/* 長方形ハザード */}
-        {hazardPositions.map((hazard, index) => (
-          <g key={index}>
-            {hazard.shape === "rectangle" && typeof hazard.x === "number" ? (
-              <>
-                {/* 長方形ハザードの縁（立体的効果） */}
-                <rect
-                  x={hazard.x + 0.3}
-                  y={hazard.y + 0.3}
-                  width={hazard.width}
-                  height={hazard.height}
-                  fill="rgba(0,0,0,0.3)"
-                />
-                {/* 長方形ハザード本体 */}
-                <rect
-                  x={hazard.x}
-                  y={hazard.y}
-                  width={hazard.width}
-                  height={hazard.height}
-                  fill={getHazardColor(hazard.type)}
-                  opacity={hazard.type === "water" ? 0.85 : 0.75}
-                  filter={hazard.type === "bunker" ? "url(#shadow)" : undefined}
-                />
-                {/* ウォーターの波紋パターン */}
-                {hazard.type === "water" && (
-                  <rect
-                    x={hazard.x}
-                    y={hazard.y}
-                    width={hazard.width}
-                    height={hazard.height}
-                    fill="url(#waterPattern)"
-                    opacity="0.5"
-                  />
-                )}
-                {/* バンカーの砂テクスチャ */}
-                {hazard.type === "bunker" && (
-                  <rect
-                    x={hazard.x}
-                    y={hazard.y}
-                    width={hazard.width}
-                    height={hazard.height}
-                    fill="url(#sandPattern)"
-                    opacity="0.6"
-                  />
-                )}
-                {/* 長方形のハイライト縁 */}
-                <rect
-                  x={hazard.x}
-                  y={hazard.y}
-                  width={hazard.width}
-                  height={hazard.height}
-                  fill="none"
-                  stroke="rgba(255,255,255,0.3)"
-                  strokeWidth="0.2"
-                />
-              </>
-            ) : null}
-          </g>
-        ))}
-
         {/* グリーンのポリゴン描画 */}
         {greenPolygon && (
           <g>
@@ -510,16 +449,28 @@ export function PerspectiveHoleView({
           opacity="0.5"
         />
 
+        {/* ホール情報パネル */}
+        <g>
+          {/* パネル背景 */}
+          <rect x="-18" y="2" width="26" height="10" rx="3" fill="rgba(200, 238, 61, 0.95)" filter="url(#shadow)" />
+          {/* パネルの装飾ライン */}
+          <rect x="-18" y="2" width="26" height="10" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          {/* ホール番号 */}
+          <text x="-15" y="8" fontSize="4" fill="#065f46" fontWeight="bold" opacity="0.8">{hole.number}H</text>
+          {/* パー数 */}
+          <text x="-5" y="8" fontSize="4" fill="#065f46" fontWeight="bold">PAR {hole.par}</text>
+        </g>
+
         {/* 距離表示パネル */}
         <g>
           {/* パネル背景 */}
-          <rect x="-10" y="2" width="40" height="14" rx="3" fill="rgba(229, 250, 216, 0.95)" filter="url(#shadow)" />
+          <rect x="10" y="2" width="40" height="12" rx="3" fill="rgba(229, 250, 216, 0.95)" filter="url(#shadow)" />
           {/* パネルの装飾ライン */}
-          <rect x="-10" y="2" width="40" height="14" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          <rect x="10" y="2" width="40" height="12" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
           {/* タイトル */}
-          <text x="-5" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
+          <text x="13" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
           {/* 距離値 */}
-          <text x="25" y="12" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
+          <text x="45" y="11" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
             {remainingDistance}Y
           </text>
         </g>
