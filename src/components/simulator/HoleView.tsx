@@ -343,13 +343,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
             )}
             <button
               type="button"
-              onClick={onBack}
-              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
-            >
-              ホームに戻る
-            </button>
-            <button
-              type="button"
               onClick={handleQuitGame}
               className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-rose-400/70 hover:text-rose-700 sm:text-xs"
             >

@@ -5,6 +5,7 @@ import type { RoundHistory } from '../../db/database';
 
 interface Props {
   bagId?: number | null;
+  onBack?: () => void;
 }
 
 const PLAY_MODE_LABELS: Record<string, string> = {
@@ -22,10 +23,10 @@ const DATE_RANGE_LABELS: Record<string, string> = {
 
 function StatCard({ label, value, subValue }: { label: string; value: string; subValue?: string }) {
   return (
-    <div className="rounded-2xl border border-emerald-700/45 bg-emerald-900/35 p-4">
-      <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">{label}</p>
-      <p className="mt-2 text-2xl font-black text-emerald-50">{value}</p>
-      {subValue && <p className="mt-1 text-sm text-emerald-200">{subValue}</p>}
+    <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 shadow-sm shadow-emerald-300/40">
+      <p className="text-xs uppercase tracking-[0.16em] text-emerald-700">{label}</p>
+      <p className="mt-2 text-2xl font-black text-emerald-900">{value}</p>
+      {subValue && <p className="mt-1 text-sm text-emerald-600">{subValue}</p>}
     </div>
   );
 }
@@ -48,7 +49,7 @@ function toParString(score: number, par: number): string {
   return `${diff}`;
 }
 
-export function RoundHistoryScreen({ bagId }: Props) {
+export function RoundHistoryScreen({ bagId, onBack }: Props) {
   const [rounds, setRounds] = useState<RoundHistory[]>([]);
   const [stats, setStats] = useState<AggregateStats | null>(null);
   const [clubTrends, setClubTrends] = useState<ClubSuccessTrend[]>([]);
@@ -137,44 +138,53 @@ export function RoundHistoryScreen({ bagId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-950 via-green-900 to-green-950 flex items-center justify-center">
-        <div className="text-emerald-300">読み込み中...</div>
+      <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex items-center justify-center">
+        <div className="text-emerald-900">読み込み中...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-950 via-green-900 to-green-950 px-4 py-6 text-emerald-50 sm:px-6 sm:py-8">
+    <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 px-4 py-6 text-emerald-900 sm:px-6 sm:py-8">
       <div className="mx-auto w-full max-w-6xl space-y-5 sm:space-y-6">
         {/* ヘッダー */}
-        <header className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 px-5 py-6 shadow-2xl shadow-emerald-950/40 sm:px-7 sm:py-7">
+        <header className="rounded-3xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 shadow-sm shadow-emerald-300/40 sm:px-7 sm:py-7">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-emerald-300">Statistics</p>
-              <h1 className="mt-2 text-3xl font-black sm:text-4xl">ラウンド履歴・統計</h1>
+              <p className="text-xs uppercase tracking-[0.24em] text-emerald-700">Statistics</p>
+              <h1 className="mt-2 text-3xl font-black sm:text-4xl text-emerald-900">ラウンド履歴・統計</h1>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                to={`/simulator${bagQuery}`}
-                className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
-              >
-                コースシミュレーターに戻る
-              </Link>
+              {onBack ? (
+                <button
+                  onClick={onBack}
+                  className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+                >
+                  コースシミュレーターに戻る
+                </button>
+              ) : (
+                <Link
+                  to={`/simulator${bagQuery}`}
+                  className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+                >
+                  コースシミュレーターに戻る
+                </Link>
+              )}
             </div>
           </div>
         </header>
 
         {/* フィルターセクション */}
-        <section className="rounded-2xl border border-emerald-700/45 bg-emerald-900/25 p-4 sm:p-5">
-          <h2 className="text-sm font-bold text-emerald-200">フィルター</h2>
+        <section className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 sm:p-5 shadow-sm shadow-emerald-300/40">
+          <h2 className="text-sm font-bold text-emerald-900">フィルター</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* コース選択 */}
             <div>
-              <label className="text-xs text-emerald-400">コース</label>
+              <label className="text-xs text-emerald-700">コース</label>
               <select
                 value={filter.courseName || ''}
                 onChange={(e) => handleCourseChange(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-emerald-600/50 bg-emerald-950/50 px-3 py-2 text-sm text-emerald-100"
+                className="mt-1 w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
               >
                 <option value="">すべて</option>
                 {courseNames.map((name) => (
@@ -187,11 +197,11 @@ export function RoundHistoryScreen({ bagId }: Props) {
 
             {/* 期間選択 */}
             <div>
-              <label className="text-xs text-emerald-400">期間</label>
+              <label className="text-xs text-emerald-700">期間</label>
               <select
                 value={typeof filter.dateRange === 'string' ? filter.dateRange : 'all'}
                 onChange={(e) => handleDateRangeChange(e.target.value as 'last10' | 'last30' | 'last50' | 'all')}
-                className="mt-1 w-full rounded-lg border border-emerald-600/50 bg-emerald-950/50 px-3 py-2 text-sm text-emerald-100"
+                className="mt-1 w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
               >
                 {Object.entries(DATE_RANGE_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -206,12 +216,12 @@ export function RoundHistoryScreen({ bagId }: Props) {
               <label className="text-xs text-emerald-400">プレーモード</label>
               <div className="mt-2 flex flex-wrap gap-2">
                 {(['bag', 'robot', 'measured'] as const).map((mode) => (
-                  <label key={mode} className="flex items-center gap-1.5 text-sm text-emerald-200">
+                  <label key={mode} className="flex items-center gap-1.5 text-sm text-emerald-900">
                     <input
                       type="checkbox"
                       checked={filter.playModes?.includes(mode) ?? false}
                       onChange={(e) => handlePlayModeChange(mode, e.target.checked)}
-                      className="rounded border-emerald-600 bg-emerald-950 text-emerald-500"
+                      className="rounded border-emerald-400 bg-emerald-50 text-emerald-600"
                     />
                     {PLAY_MODE_LABELS[mode]}
                   </label>
@@ -221,12 +231,12 @@ export function RoundHistoryScreen({ bagId }: Props) {
 
             {/* お気に入りのみ */}
             <div className="flex items-end">
-              <label className="flex items-center gap-2 text-sm text-emerald-200">
+              <label className="flex items-center gap-2 text-sm text-emerald-900">
                 <input
                   type="checkbox"
                   checked={filter.favoritesOnly ?? false}
                   onChange={handleFavoritesToggle}
-                  className="rounded border-emerald-600 bg-emerald-950 text-emerald-500"
+                  className="rounded border-emerald-400 bg-emerald-50 text-emerald-600"
                 />
                 お気に入りのみ
               </label>
@@ -236,9 +246,9 @@ export function RoundHistoryScreen({ bagId }: Props) {
 
         {/* 統計ダッシュボード */}
         {stats && stats.totalRounds > 0 && (
-          <section className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 p-5 sm:p-6">
-            <h2 className="text-xl font-bold text-emerald-50">統計サマリー</h2>
-            <p className="mt-1 text-sm text-emerald-300">{stats.totalRounds} ラウンド</p>
+          <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
+            <h2 className="text-xl font-bold text-emerald-900">統計サマリー</h2>
+            <p className="mt-1 text-sm text-emerald-700">{stats.totalRounds} ラウンド</p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard
@@ -275,16 +285,16 @@ export function RoundHistoryScreen({ bagId }: Props) {
         )}
 
         {/* ラウンド一覧 */}
-        <section className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 p-5 sm:p-6">
-          <h2 className="text-xl font-bold text-emerald-50">ラウンド一覧</h2>
+        <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
+          <h2 className="text-xl font-bold text-emerald-900">ラウンド一覧</h2>
 
           {rounds.length === 0 ? (
-            <p className="mt-4 text-emerald-300">ラウンド履歴がありません。</p>
+            <p className="mt-4 text-emerald-700">ラウンド履歴がありません。</p>
           ) : (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-emerald-700/50 text-emerald-300">
+                  <tr className="border-b border-emerald-300 text-emerald-700">
                     <th className="px-3 py-2">日付</th>
                     <th className="px-3 py-2">コース</th>
                     <th className="px-3 py-2">モード</th>
@@ -299,31 +309,31 @@ export function RoundHistoryScreen({ bagId }: Props) {
                   {rounds.map((round) => (
                     <tr
                       key={round.id}
-                      className="border-b border-emerald-800/30 hover:bg-emerald-900/20"
+                      className="border-b border-emerald-200 hover:bg-emerald-100/50"
                     >
-                      <td className="px-3 py-3 text-emerald-100">{formatDate(round.completedAt)}</td>
-                      <td className="px-3 py-3 text-emerald-100">
+                      <td className="px-3 py-3 text-emerald-900">{formatDate(round.completedAt)}</td>
+                      <td className="px-3 py-3 text-emerald-900">
                         {round.courseName} ({round.courseHoleCount}H)
                       </td>
                       <td className="px-3 py-3">
-                        <span className="rounded-full bg-emerald-900/50 px-2 py-1 text-xs text-emerald-300">
+                        <span className="rounded-full bg-emerald-200 px-2 py-1 text-xs text-emerald-800">
                           {PLAY_MODE_LABELS[round.playMode]}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-right text-emerald-200">
+                      <td className="px-3 py-3 text-right text-emerald-700">
                         {round.totalPar}
                       </td>
-                      <td className="px-3 py-3 text-right font-bold text-emerald-50">
+                      <td className="px-3 py-3 text-right font-bold text-emerald-900">
                         {round.totalScore}
                       </td>
-                      <td className="px-3 py-3 text-right text-emerald-300">
+                      <td className="px-3 py-3 text-right text-emerald-700">
                         {toParString(round.totalScore, round.totalPar)}
                       </td>
                       <td className="px-3 py-3 text-center">
                         <button
                           onClick={() => round.id && handleToggleFavorite(round.id)}
                           className={`text-xl transition ${
-                            round.isFavorite ? 'text-yellow-400' : 'text-emerald-700 hover:text-emerald-500'
+                            round.isFavorite ? 'text-yellow-500' : 'text-emerald-400 hover:text-emerald-600'
                           }`}
                         >
                           {round.isFavorite ? '★' : '☆'}
@@ -347,9 +357,9 @@ export function RoundHistoryScreen({ bagId }: Props) {
 
         {/* クラブ別成功率トレンド */}
         {clubTrends.length > 0 && (
-          <section className="rounded-3xl border border-emerald-700/50 bg-emerald-950/60 p-5 sm:p-6">
-            <h2 className="text-xl font-bold text-emerald-50">クラブ別成功率推移</h2>
-            <p className="mt-1 text-sm text-emerald-300">
+          <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
+            <h2 className="text-xl font-bold text-emerald-900">クラブ別成功率推移</h2>
+            <p className="mt-1 text-sm text-emerald-700">
               使用回数5回以上のクラブのみ表示
             </p>
 
@@ -357,30 +367,30 @@ export function RoundHistoryScreen({ bagId }: Props) {
               {clubTrends.map((trend) => (
                 <div
                   key={trend.clubId}
-                  className="rounded-2xl border border-emerald-700/35 bg-emerald-900/25 p-4"
+                  className="rounded-2xl border border-emerald-300 bg-emerald-50/80 p-4"
                 >
-                  <h3 className="font-bold text-emerald-100">{trend.clubName}</h3>
+                  <h3 className="font-bold text-emerald-900">{trend.clubName}</h3>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {trend.data.map((point, idx) => (
                       <div
                         key={idx}
-                        className="flex flex-col items-center rounded-lg bg-emerald-950/50 px-3 py-2"
+                        className="flex flex-col items-center rounded-lg bg-emerald-100 px-3 py-2"
                       >
-                        <span className="text-xs text-emerald-400">
+                        <span className="text-xs text-emerald-600">
                           {point.roundDate.slice(5)}
                         </span>
                         <span
                           className={`text-sm font-bold ${
                             point.successRate >= 70
-                              ? 'text-emerald-300'
+                              ? 'text-emerald-700'
                               : point.successRate >= 50
-                              ? 'text-yellow-300'
-                              : 'text-rose-300'
+                              ? 'text-yellow-600'
+                              : 'text-rose-600'
                           }`}
                         >
                           {point.successRate}%
                         </span>
-                        <span className="text-xs text-emerald-500">
+                        <span className="text-xs text-emerald-600">
                           {point.timesUsed}回使用
                         </span>
                       </div>

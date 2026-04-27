@@ -11,6 +11,7 @@ import { loadStoredCustomCourse, type CustomCoursePreset } from "../../utils/cus
 import { HoleView } from "./HoleView";
 import { filterClubsWithActualShots } from "../../utils/actualShotFilter";
 import { PostRoundAnalysis } from "./PostRoundAnalysis";
+import { RoundHistoryScreen } from "./RoundHistoryScreen";
 
 import { Scorecard } from "./Scorecard";
 
@@ -108,22 +109,10 @@ function SetupScreen({
             >
               統計
             </Link>
-            <Link
-              to={`/range${bagQuery}`}
-              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
-            >
-              レンジに戻る
-            </Link>
-            <Link
-              to={`/personal-data${bagQuery}`}
-              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
-            >
-              パーソナルデータ
-            </Link>
             <button
               type="button"
               onClick={onBack}
-              className="rounded-full border border-emerald-400/70 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-500 hover:text-emerald-900 sm:text-xs"
+              className="rounded-full border border-emerald-500 bg-white/70 px-3 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-600 hover:text-emerald-900 sm:text-xs"
             >
               ホームに戻る
             </button>
@@ -273,14 +262,10 @@ function SetupScreen({
 }
 
 export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, bagId }: Props) {
-  const {
-    phase,
-    startRound,
-    resetGame,
-    playMode,
-  } = useGameStore();
+  const { phase, startRound, resetGame, playMode } = useGameStore();
   const [showDetailedScorecard, setShowDetailedScorecard] = useState(true);
   const [showPostRoundAnalysis, setShowPostRoundAnalysis] = useState(false);
+  const [showRoundHistory, setShowRoundHistory] = useState(false);
   const bagSource = selectedClubs;
   const robotSource = allClubs;
   
@@ -340,8 +325,6 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 p-4 overflow-y-auto">
         <Scorecard
-          onPlayAgain={() => { setShowDetailedScorecard(false); resetGame(); }}
-          onBack={() => { setShowDetailedScorecard(false); resetGame(); onBack(); }}
           onViewStatistics={() => { setShowDetailedScorecard(false); setShowPostRoundAnalysis(true); }}
         />
       </div>
@@ -354,10 +337,22 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
         onPlayAnotherRound={() => { setShowPostRoundAnalysis(false); resetGame(); }}
         onViewDetailedScorecard={() => { setShowPostRoundAnalysis(false); setShowDetailedScorecard(true); }}
         onBackToMenu={() => { resetGame(); onBack(); }}
+        onViewRoundHistory={() => { setShowPostRoundAnalysis(false); setShowRoundHistory(true); }}
         courseName={selectedCourse?.name}
         bagId={bagId}
         playMode={playMode}
       />
+    );
+  }
+
+  if (showRoundHistory) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 p-4 overflow-y-auto">
+        <RoundHistoryScreen
+          bagId={bagId}
+          onBack={() => { setShowRoundHistory(false); resetGame(); }}
+        />
+      </div>
     );
   }
 

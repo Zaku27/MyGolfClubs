@@ -1165,7 +1165,7 @@ export function HoleMapCanvas({
     context.lineTo(pinX, pinY - 12);
     context.stroke();
 
-    context.fillStyle = "#ef4444";
+    context.fillStyle = "#ca8a04";
     context.beginPath();
     context.moveTo(pinX, pinY - 12);
     context.lineTo(pinX + 12, pinY - 8);

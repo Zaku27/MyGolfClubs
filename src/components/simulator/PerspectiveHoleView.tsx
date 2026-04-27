@@ -380,7 +380,7 @@ export function PerspectiveHoleView({
                L ${50 + greenRect.width * 0.3} ${greenRect.y + greenRect.height / 2 - greenRect.height * 0.6}
                L 50 ${greenRect.y + greenRect.height / 2 - greenRect.height * 0.4}
                Z`}
-            fill="#ef4444"
+            fill="#ca8a04"
             filter="url(#shadow)"
           />
         </g>
@@ -398,12 +398,12 @@ export function PerspectiveHoleView({
             {/* フラッグ布 - 布の揺れを表現 */}
             <path
               d="M 0 -4.8 Q 2 -4.5, 3 -4 Q 2 -3.5, 0 -3.2 Z"
-              fill="#ef4444"
+              fill="#eab308"
             />
             {/* フラッグのハイライト */}
             <path
               d="M 0.3 -4.6 Q 1.5 -4.3, 2.2 -4 Q 1.5 -3.7, 0.3 -3.4"
-              stroke="#f87171"
+              stroke="#ca8a04"
               strokeWidth="0.2"
               fill="none"
             />

@@ -78,7 +78,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
       <section>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* 使用クラブ本数 */}
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <IconTrophy className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">使用クラブ本数</span>
@@ -87,7 +87,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
           </div>
 
           {/* ドライバー平均飛距離 */}
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <IconTarget className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">ドライバー平均</span>
@@ -96,7 +96,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
           </div>
 
           {/* 7I平均飛距離 */}
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <IconTarget className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">7I平均飛距離</span>
@@ -105,7 +105,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
           </div>
 
           {/* 改善ポテンシャル */}
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <IconTrendingUp className="w-4 h-4 text-green-500" />
               <span className="text-sm text-muted-foreground">改善ポテンシャル</span>
@@ -120,7 +120,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
 
       {/* メッセージ表示（クラブ数が少ない場合） */}
       {data.message && (
-        <section className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+        <section className="bg-amber-50/80 border border-amber-200 rounded-xl p-6">
           <div className="flex items-start gap-3">
             <div className="text-amber-600 text-xl">⚠️</div>
             <div>
@@ -139,9 +139,9 @@ export function SummaryTab({ data }: SummaryTabProps) {
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {recommendations.map((rec, index) => (
-            <div key={index} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+            <div key={index} className="bg-card/80 border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
               {/* 画像エリア */}
-              <div className="aspect-video bg-muted flex items-center justify-center">
+              <div className="aspect-video bg-muted/50 flex items-center justify-center">
                 {rec.imageUrl ? (
                   <img
                     src={rec.imageUrl}
@@ -228,7 +228,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
             return (
               <div
                 key={index}
-                className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+                className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start gap-4">
                   {/* 優先度バッジ */}
@@ -260,7 +260,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
       <div className="h-px bg-border" />
 
       {/* 4. 全体評価セクション（フッター風） */}
-      <section className="bg-muted/50 rounded-xl p-6">
+      <section className="bg-muted/30 rounded-xl p-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="space-y-2 text-center md:text-left">
             <h3 className="font-semibold text-lg">クラブセット完成度</h3>

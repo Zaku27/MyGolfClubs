@@ -12,6 +12,7 @@ interface Props {
   onPlayAnotherRound: () => void;
   onViewDetailedScorecard: () => void;
   onBackToMenu: () => void;
+  onViewRoundHistory?: () => void;
   courseName?: string;
   bagId?: number | null;
   playMode?: 'bag' | 'robot' | 'measured';
@@ -121,6 +122,7 @@ export function PostRoundAnalysis({
   onPlayAnotherRound,
   onViewDetailedScorecard,
   onBackToMenu,
+  onViewRoundHistory,
   courseName,
   bagId,
   playMode,
@@ -280,7 +282,7 @@ export function PostRoundAnalysis({
               onClick={() => handleSaveAndNavigate(onViewDetailedScorecard)}
               className="rounded-xl border border-emerald-400/60 bg-emerald-900/40 px-4 py-3 text-sm font-bold text-emerald-100 transition hover:border-emerald-300"
             >
-              詳細スコアカードを見る
+              スコアカードを見る
             </button>
             <button
               type="button"
@@ -290,6 +292,15 @@ export function PostRoundAnalysis({
               メニューに戻る
             </button>
           </div>
+          {onViewRoundHistory && (
+            <button
+              type="button"
+              onClick={() => handleSaveAndNavigate(onViewRoundHistory)}
+              className="w-full rounded-xl border border-sky-400/60 bg-sky-900/40 px-4 py-3 text-sm font-bold text-sky-100 transition hover:border-sky-300"
+            >
+              📊 ラウンド履歴・統計を見る
+            </button>
+          )}
         </footer>
       </div>
     </div>

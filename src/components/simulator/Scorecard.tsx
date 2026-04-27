@@ -2,8 +2,6 @@ import { useGameStore } from "../../store/gameStore";
 import type { GamePhase, Hole, HoleScore } from "../../types/game";
 
 interface Props {
-  onPlayAgain: () => void;
-  onBack: () => void;
   onViewStatistics?: () => void;
 }
 
@@ -132,7 +130,7 @@ function scoreDiff(strokes: number, par: number) {
   return { label, color, display };
 }
 
-export function Scorecard({ onPlayAgain, onBack, onViewStatistics }: Props) {
+export function Scorecard({ onViewStatistics }: Props) {
   const { scores } = useGameStore();
 
   const totalPar     = scores.reduce((s, h) => s + h.par, 0);
@@ -230,21 +228,9 @@ export function Scorecard({ onPlayAgain, onBack, onViewStatistics }: Props) {
             onClick={onViewStatistics}
             className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors text-sm"
           >
-            📊 ラウンド統計を見る
+            📊 ラウンド分析を見る
           </button>
         )}
-        <button
-          onClick={onPlayAgain}
-          className="w-full py-3 bg-green-500 hover:bg-green-400 text-white font-bold rounded-xl transition-colors"
-        >
-          ⛳ もう一度プレー
-        </button>
-        <button
-          onClick={onBack}
-          className="w-full py-2.5 bg-transparent border border-emerald-400 text-emerald-700 hover:text-white hover:bg-emerald-700 hover:border-emerald-700 rounded-xl transition-colors text-sm"
-        >
-          ホームに戻る
-        </button>
       </div>
     </div>
   );
