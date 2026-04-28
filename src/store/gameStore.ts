@@ -57,17 +57,14 @@ function generateWind(
   random: () => number = Math.random,
   previousWindStrength: number | null = null,
 ): Pick<ShotContext, "windStrength" | "windDirectionDegrees"> {
-  const roll = random();
-  if (roll < 0.40) return { windStrength: 0, windDirectionDegrees: 0 };
-
   let windStrength: number;
   if (previousWindStrength === null) {
-    // 最初のホール：5–20 mph、風速が高くなるほど確率が下がる分布（指数分布）
+    // 最初のホール：0–20 mph、風速が高くなるほど確率が下がる分布（指数分布）
     const exponentialRoll = -Math.log(random());
-    windStrength = Math.round(5 + exponentialRoll * 3);
+    windStrength = Math.round(exponentialRoll * 5);
     if (windStrength > 20) windStrength = 20;
   } else {
-    // 次のホール：前の風速に近い値（±5 mph以内）
+    // 次のホール：前の風速に近い値（±5 mph以内）、最小0
     const minWind = Math.max(0, previousWindStrength - 5);
     const maxWind = Math.min(25, previousWindStrength + 5);
     windStrength = Math.round(minWind + random() * (maxWind - minWind));

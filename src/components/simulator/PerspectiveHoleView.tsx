@@ -523,63 +523,57 @@ export function PerspectiveHoleView({
 
         {/* ホール情報パネル */}
         <g>
-          {/* パネル背景 */}
-          <rect x="-38" y="2" width="26" height="9" rx="3" fill="rgba(200, 238, 61, 0.95)" filter="url(#shadow)" />
-          {/* パネルの装飾ライン */}
-          <rect x="-38" y="2" width="26" height="9" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          {/* パネル背景 - 薄い青 */}
+          <rect x="-39" y="2" width="27" height="9" rx="2" fill="#0c73e9f2" filter="url(#shadow)" />
           {/* ホール番号 */}
-          <text x="-35" y="8" fontSize="4" fill="#065f46" fontWeight="bold" opacity="0.8">{hole.number}H</text>
+          <text x="-36" y="7" dominantBaseline="middle" fontSize="4" fill="#eaecf1" fontWeight="bold">{hole.number}H</text>
+          {/* 区切り線 */}
+          <line x1="-27" y1="3" x2="-27" y2="10" stroke="#eaecf1" strokeWidth="0.3" opacity="0.5" />
           {/* パー数 */}
-          <text x="-25" y="8" fontSize="4" fill="#065f46" fontWeight="bold">PAR {hole.par}</text>
+          <text x="-25" y="7" dominantBaseline="middle" fontSize="4" fill="#eaecf1" fontWeight="bold">PAR {hole.par}</text>
         </g>
 
         {/* 距離表示パネル */}
         <g>
           {/* パネル背景 */}
-          <rect x="-10" y="2" width="40" height="10" rx="3" fill="rgba(229, 250, 216, 0.95)" filter="url(#shadow)" />
+          <rect x="-8" y="2" width="40" height="10" rx="3" fill="rgba(229, 250, 216, 0.95)" filter="url(#shadow)" />
           {/* パネルの装飾ライン */}
-          <rect x="-10" y="2" width="40" height="10" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
+          <rect x="-8" y="2" width="40" height="10" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
           {/* タイトル */}
-          <text x="-7" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
+          <text x="-5" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
           {/* 距離値 */}
-          <text x="25" y="10" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
+          <text x="27" y="10" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
             {Math.round(remainingDistance)}Y
           </text>
         </g>
 
-        {/* ライ表示パネル（別個） */}
+        {/* ライ・打数・スコア統合パネル */}
         <g>
-          {/* パネル背景 */}
-          <rect x="71" y="2" width="30" height="9" rx="2" fill={LIE_COLORS[lie]} opacity="0.85" filter="url(#shadow)" />
+          {/* パネル背景 - 薄い青 */}
+          <rect x="71" y="2" width="70" height="9" rx="2" fill="#0c73e9f2" filter="url(#shadow)" />
           {/* ライラベル */}
-          <text x="86" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3" fill="white" fontWeight="bold">
+          <text x="76" y="7" dominantBaseline="middle" fontSize="4" fill="#eaecf1" fontWeight="bold">
             {lie === "tee" ? "ティーグラウンド" : lie === "fairway" ? "フェアウェイ" : lie === "rough" ? "ラフ" : lie === "green" ? "グリーン" : lie === "bunker" ? "バンカー" : lie === "semirough" ? "セミラフ" : lie === "bareground" ? "ベアグランド" : lie}
           </text>
-        </g>
-
-        {/* 打数表示パネル（独立） */}
-        {strokeLabel && (
-          <g>
-            {/* パネル背景 */}
-            <rect x="103" y="2" width="18" height="9" rx="2" fill="rgba(106, 128, 196, 0.85)" filter="url(#shadow)" />
-            {/* 打数ラベル */}
-            <text x="112" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3.5" fill="white" fontWeight="bold">
+          {/* 区切り線 */}
+          <line x1="112" y1="3" x2="112" y2="10" stroke="#eaecf1" strokeWidth="0.3" opacity="0.5" />
+          {/* 打数ラベル */}
+          {strokeLabel && (
+            <text x="116" y="7" dominantBaseline="middle" fontSize="4" fill="#eaecf1" fontWeight="bold">
               {strokeLabel}
             </text>
-          </g>
-        )}
-
-        {/* スコア表示パネル */}
-        {scoreLabel && (
-          <g>
-            {/* パネル背景 */}
-            <rect x="123" y="2" width="18" height="9" rx="2" fill="rgba(251, 191, 36, 0.85)" filter="url(#shadow)" />
-            {/* スコアラベル */}
-            <text x="132" y="7" textAnchor="middle" dominantBaseline="middle" fontSize="3.5" fill="white" fontWeight="bold">
+          )}
+          {/* 区切り線 */}
+          {strokeLabel && scoreLabel && (
+            <line x1="130" y1="3" x2="130" y2="10" stroke="#eaecf1" strokeWidth="0.3" opacity="0.5" />
+          )}
+          {/* スコアラベル */}
+          {scoreLabel && (
+            <text x={strokeLabel ? 133 : 96} y="7" dominantBaseline="middle" fontSize="4" fill="#eaecf1" fontWeight="bold">
               {scoreLabel}
             </text>
-          </g>
-        )}
+          )}
+        </g>
 
         {/* ピンまでの距離マーカー（フェアウェイ上） */}
         {[50, 100, 150].map((markerDist) => {
