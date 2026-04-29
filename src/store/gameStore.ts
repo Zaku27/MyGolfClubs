@@ -461,6 +461,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             finalOutcome: "green",
             penaltyStrokes: 0,
             autoPuttResult: puttResult,
+            distanceBeforeShot: shotContext.remainingDistance, // 1パット目の開始距離
+            distanceAfterShot: result.newRemainingDistance, // 1パット目の終了距離（自動パット開始距離）
           } as unknown as ShotResult,
           scores: newScores,
           perHoleResults: newScores,

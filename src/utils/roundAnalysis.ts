@@ -83,7 +83,7 @@ export function calculateKeyRoundStats(
     const reachedGreenInRegulation = shots.some(
       (shot) =>
         shot.strokeNumber <= girStrokes &&
-        (shot.lieAfter === "green" || shot.distanceAfterShot <= 20 || shot.distanceAfterShot === 0),
+        (shot.lieAfter === "green" || shot.distanceAfterShot === 0),
     );
 
     if (reachedGreenInRegulation) girCount += 1;

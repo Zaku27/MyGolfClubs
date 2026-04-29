@@ -243,7 +243,7 @@ export function PostRoundAnalysis({
           <ClubStatList title="苦戦クラブTOP3" items={analysis.strugglingClubs} accentClass="text-rose-600" />
         </section>
 
-        <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
+        {/* <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
           <h2 className="text-xl font-bold text-emerald-900">分析と提案</h2>
           <ul className="mt-3 space-y-2">
             {analysis.insights.map((insight) => (
@@ -255,7 +255,7 @@ export function PostRoundAnalysis({
               </li>
             ))}
           </ul>
-        </section>
+        </section> */}
 
         <footer className="space-y-4 pb-4">
           {/* 統計保存チェックボックス */}

@@ -159,9 +159,11 @@ export function calculateLastLandingPosition(
 ): (Position3D & { outcome?: string }) | null {
   if (!perspective) return null;
   const y = perspective.distanceToY(finalY);
+  // 地平線より上にならないようにY座標を制限
+  const clampedY = Math.max(y, perspective.horizonY);
   const x = perspective.xToScreenX(finalX, finalY);
   const scale = perspective.distanceToScale(finalY);
-  return { x, y, scale, outcome: finalOutcome };
+  return { x, y: clampedY, scale, outcome: finalOutcome };
 }
 
 /**

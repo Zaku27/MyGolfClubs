@@ -551,6 +551,24 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
                 <p className="text-sm font-bold text-sky-800 mb-2">パット結果</p>
                 <div className="space-y-1">
+                  {/* 1パット目（手動パット） */}
+                  {(() => {
+                    const firstPuttDistance = lastShotResult.distanceBeforeShot ?? 0;
+                    const firstPuttRemaining = lastShotResult.distanceAfterShot ?? 0;
+                    const firstPuttSuccess = firstPuttRemaining === 0;
+                    const firstPuttNumber = currentHolePutts - lastShotResult.autoPuttResult!.putts;
+                    return (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-sky-700">
+                          {firstPuttNumber}パット目: {Math.round(firstPuttDistance * 3)}ft
+                        </span>
+                        <span className={firstPuttSuccess ? "text-emerald-600 font-semibold" : "text-amber-600"}>
+                          {firstPuttSuccess ? "成功" : `残り ${Math.round(firstPuttRemaining * 3)}ft`}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  {/* 2パット目以降（自動パット） */}
                   {lastShotResult.autoPuttResult.puttDetails.map((detail) => {
                     const actualPuttNumber = currentHolePutts - lastShotResult.autoPuttResult!.putts + detail.puttNumber;
                     return (
