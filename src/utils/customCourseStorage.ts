@@ -1,5 +1,6 @@
 import { readStoredJson } from "./storage";
 import type { CustomCoursePreset, CustomCourseStorage } from "../components/simulator/courseTypes";
+import type { Hole, HazardType } from "../types/game";
 
 export type { CustomCoursePreset, CustomCourseStorage };
 
@@ -48,12 +49,12 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
     return null;
   }
 
-  const normalizedCourse = preset.course.slice(0, 18).reduce<any[]>((acc, hole, index) => {
+  const normalizedCourse = preset.course.slice(0, 18).reduce<Hole[]>((acc, hole, index) => {
     if (!hole || typeof hole !== "object") {
       return acc;
     }
 
-    const raw = hole as Partial<any>;
+    const raw = hole as unknown as Record<string, unknown>;
     const par = raw.par === 3 || raw.par === 4 || raw.par === 5 ? raw.par : 4;
     const distance = Number(raw.distanceFromTee) || 360;
     const greenRadius = Math.max(6, Math.min(25, Number(raw.greenRadius) || 12));
@@ -61,18 +62,18 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
       ? raw.hazards
           .filter((hazard) => hazard && typeof hazard === "object")
           .map((hazard, hazardIndex) => {
-            const h = hazard as any;
+            const h = hazard as unknown as Record<string, unknown>;
             const yFront = Math.max(0, Number(h.yFront) || 0);
             const yBack = Math.max(yFront + 3, Number(h.yBack) || yFront + 15);
             const width = Math.max(6, Number(h.width) || 20);
-            const type = h.type === "bunker" || h.type === "water" || h.type === "ob" || h.type === "rough" || h.type === "semirough" || h.type === "bareground"
-              ? h.type
+            const type: HazardType = h.type === "bunker" || h.type === "water" || h.type === "ob" || h.type === "rough" || h.type === "semirough" || h.type === "bareground"
+              ? (h.type as HazardType)
               : "bunker";
             const penaltyStrokes: 0 | 1 | 2 = type === "ob" ? 2 : type === "water" ? 1 : 0;
             const points = Array.isArray(h.points)
               ? h.points
-                  .filter((point: any) => point && typeof point === "object")
-                  .map((point: any) => {
+                  .filter((point: unknown) => point && typeof point === "object")
+                  .map((point: unknown) => {
                     const rawPoint = point as Record<string, unknown>;
                     return {
                       x: Number(rawPoint.x) || 0,
@@ -83,8 +84,8 @@ function normalizePreset(preset: Partial<CustomCoursePreset>, fallbackName: stri
             const isPolygon = h.shape === "polygon" && points.length >= 3;
 
             if (isPolygon) {
-              const xs = points.map((p: any) => p.x);
-              const ys = points.map((p: any) => p.y);
+              const xs = points.map((p: { x: number; y: number }) => p.x);
+              const ys = points.map((p: { x: number; y: number }) => p.y);
               const minX = Math.min(...xs);
               const maxX = Math.max(...xs);
               const minY = Math.min(...ys);
@@ -191,7 +192,7 @@ function parseStoredCustomCourse(value: unknown): CustomCourseStorage {
   }
 
   const candidate = value as Partial<CustomCourseStorage>;
-  const legacyCandidate = value as Partial<{ holeCount: 1 | 3 | 9 | 18; course: any[] }>;
+  const legacyCandidate = value as Partial<{ holeCount: 1 | 3 | 9 | 18; course: unknown[] }>;
 
   if (Array.isArray(legacyCandidate.course) && legacyCandidate.course.length > 0) {
     const migrated = normalizePreset(
@@ -199,7 +200,7 @@ function parseStoredCustomCourse(value: unknown): CustomCourseStorage {
         id: createCourseId(),
         name: "マイコース 1",
         holeCount: legacyCandidate.holeCount,
-        course: legacyCandidate.course,
+        course: legacyCandidate.course as Hole[],
       },
       "マイコース 1",
     );

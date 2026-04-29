@@ -203,28 +203,65 @@ export function simulateAutoPutts(
   let currentDistance = firstPuttRemainingDistance;
   let totalPutts = 0; // 最初のパットは除く（プレイヤー操作済み）
 
-  // パット成功率の計算（距離に応じて変動）
+  // パット成功率の計算（距離に応じて変動、フィート単位）
   const getPuttSuccessRate = (distance: number): number => {
-    // 1ヤード以下は98%の成功率
-    if (distance <= 1) return 0.98;
-    // 基本成功率（プレイヤースキルに基づく）
-    const baseRate = 0.5 + playerSkillLevel * 0.4; // 0.5-0.9
-    // 非線形な距離減衰（距離の2乗を含めることで長い距離で急激に低下）
-    const distancePenalty = Math.min(0.5, distance * 0.015 + (distance * distance) * 0.0015);
-    return Math.max(0.1, baseRate - distancePenalty);
+    // 3フィート以下は98%の成功率
+    if (distance <= 3) return 0.98;
+
+    // 線形補間でスムーズなカーブに
+    const interpolate = (dist: number, points: Array<{ d: number; r: number }>): number => {
+      if (dist <= points[0].d) return points[0].r;
+      if (dist >= points[points.length - 1].d) return points[points.length - 1].r;
+      for (let i = 0; i < points.length - 1; i++) {
+        if (dist >= points[i].d && dist <= points[i + 1].d) {
+          const t = (dist - points[i].d) / (points[i + 1].d - points[i].d);
+          return points[i].r + t * (points[i + 1].r - points[i].r);
+        }
+      }
+      return points[points.length - 1].r;
+    };
+
+    // PGAツアーデータを基準とした成功率カーブ（フィート単位）
+    const pgaPoints = [
+      { d: 3, r: 0.95 },   // 1yd
+      { d: 6, r: 0.75 },   // 2yd
+      { d: 10, r: 0.60 },  // 3.3yd
+      { d: 15, r: 0.45 },  // 5yd
+      { d: 20, r: 0.35 },  // 6.7yd
+      { d: 25, r: 0.25 },  // 8.3yd
+      { d: 30, r: 0.18 },  // 10yd
+      { d: 45, r: 0.10 },  // 15yd
+      { d: 60, r: 0.05 },  // 20yd
+    ];
+
+    const pgaRate = interpolate(distance, pgaPoints);
+
+    // playerSkillLevelによる調整
+    // 0.0: PGAの10%（初心者アマチュア）
+    // 0.5: PGAの47.5%（中級アマチュア）
+    // 0.8: PGAの70%（上級アマチュア）
+    // 1.0: PGAの85%（プロレベル）
+    const skillFactor = 0.1 + playerSkillLevel * 0.75; // 0.1-0.85
+
+    // 距離が長くなるほどPGAデータから大きく離れる
+    // 短い距離ではPGAに近い、長い距離では大きく下がる
+    const distanceGap = Math.min(0.5, distance * 0.01); // フィート単位に合わせて調整
+    const adjustedRate = pgaRate * skillFactor - distanceGap;
+
+    return Math.max(0.01, adjustedRate);
   };
 
-  // パット後の残り距離を計算
+  // パット後の残り距離を計算（フィート単位）
   const getPuttResult = (distance: number, success: boolean): number => {
     if (success) return 0;
 
     // 失敗した場合、残り距離を計算
     const overshootOrUndershoot = Math.random() > 0.5 ? 1 : -1;
-    const missDistance = 0.5 + Math.random() * 1.5; // 0.5-2ydのミス
+    const missDistance = 1.5 + Math.random() * 4.5; // 1.5-6ftのミス
     const newDistance = Math.abs(distance + overshootOrUndershoot * missDistance);
 
-    // 少なくとも少しは近づく
-    return Math.max(0.3, Math.min(distance * 0.8, newDistance));
+    // 少なくとも少しは近づく（最低1ft残る）
+    return Math.max(1, Math.min(distance * 0.8, newDistance));
   };
 
   // 自動パットをシミュレート

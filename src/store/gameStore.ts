@@ -397,6 +397,91 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const nextHoleShots = [...currentHoleShots, shotLog];
       const nextRoundShots = [...roundShots, shotLog];
 
+      // パット後に残りがある場合は自動的にカップインまでパット
+      if (isPutter && result.newRemainingDistance > 0 && result.lie === "green") {
+        // 自動パットシミュレーション（フィート単位）
+        const puttResult = simulateAutoPutts(
+          result.newRemainingDistance * 3, // ヤードをフィートに変換
+          playerSkillLevel,
+          5, // 最大5パットまで
+        );
+
+        const autoPuttLogs: ShotLog[] = [];
+        let autoRemainingDistance = result.newRemainingDistance;
+
+        for (const detail of puttResult.puttDetails) {
+          const puttLog: ShotLog = {
+            holeNumber: course[currentHoleIndex].number,
+            clubId: bag.find((c) => c.type === "Putter")?.id ?? "putter",
+            clubLabel: "パター",
+            success: detail.success,
+            distanceHit: (detail.fromDistance - detail.remainingAfterPutt) / 3, // フィートをヤードに変換
+            distanceBeforeShot: autoRemainingDistance,
+            distanceAfterShot: detail.remainingAfterPutt / 3, // フィートをヤードに変換
+            strokeNumber: newHoleStrokes + autoPuttLogs.length + 1,
+            lieBefore: "green",
+            lieAfter: "green",
+            shotQuality: detail.success ? "good" : "average",
+            wasWeakClub: false,
+          };
+          autoPuttLogs.push(puttLog);
+          autoRemainingDistance = detail.remainingAfterPutt / 3; // フィートをヤードに変換
+        }
+
+        const finalHoleShots = [...nextHoleShots, ...autoPuttLogs];
+        const finalRoundShots = [...nextRoundShots, ...autoPuttLogs];
+        const finalPuttCount = newPuttCount + puttResult.putts;
+        const finalHoleStrokes = newHoleStrokes + puttResult.putts;
+
+        // ホール完了処理
+        const currentHole = course[currentHoleIndex];
+        const holeSummary = buildHoleSummary(currentHole, finalHoleShots, finalRoundShots);
+        const newScores: HoleScore[] = [
+          ...scores,
+          { holeNumber: currentHole.number, par: currentHole.par, strokes: finalHoleStrokes, putts: finalPuttCount },
+        ];
+        const isRoundComplete = currentHoleIndex >= course.length - 1;
+        const clubUsageStats = isRoundComplete ? buildClubUsageStats(finalRoundShots, bag) : [];
+        const finalScore = isRoundComplete
+          ? newScores.reduce((sum, hole) => sum + hole.strokes, 0)
+          : null;
+
+        set({
+          holeStrokes: finalHoleStrokes,
+          lastShotResult: {
+            newRemainingDistance: 0,
+            outcomeMessage: puttResult.success ? "カップイン" : "カップイン（自動パット）",
+            strokesAdded: result.strokesAdded + puttResult.putts,
+            lie: "green",
+            penalty: false,
+            distanceHit: result.distanceHit + puttResult.puttDetails.reduce((sum, d) => sum + (d.fromDistance - d.remainingAfterPutt), 0) / 3,
+            shotQuality: puttResult.success ? "good" : "average",
+            wasSuccessful: puttResult.success,
+            effectiveSuccessRate: 100,
+            finalOutcome: "green",
+            penaltyStrokes: 0,
+            autoPuttResult: puttResult,
+          } as unknown as ShotResult,
+          scores: newScores,
+          perHoleResults: newScores,
+          clubUsageStats,
+          finalScore,
+          phase: isRoundComplete ? "round_complete" : "hole_complete",
+          selectedClubId: null,
+          shotPowerPercent: 100,
+          aimXOffset: 0,
+          currentHoleShots: finalHoleShots,
+          roundShots: finalRoundShots,
+          lastHoleSummary: holeSummary,
+          holeSummaries: [...holeSummaries, holeSummary],
+          goodShotStreak: streakAfterShot + (puttResult.success ? 1 : 0),
+          shotInProgress: false,
+          currentHolePutts: finalPuttCount,
+          hasTakenFirstPutt: true,
+        });
+        return;
+      }
+
       if (result.newRemainingDistance === 0) {
         // ── Hole complete ──
         const currentHole = course[currentHoleIndex];
@@ -518,9 +603,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // グリーン上でない場合は何もしない
     if (shotContext.lie !== "green") return;
 
-    // パットシミュレーション実行
+    // パットシミュレーション実行（フィート単位に変換）
     const puttResult = simulateAutoPutts(
-      shotContext.remainingDistance,
+      shotContext.remainingDistance * 3, // ヤードをフィートに変換
       playerSkillLevel,
       5, // 最大5パットまで
     );
@@ -530,7 +615,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const strokesAdded = puttResult.putts;
     const newHoleStrokes = holeStrokes + strokesAdded;
 
-    // パットログを生成
+    // パットログを生成（フィートをヤードに戻して記録）
     let remainingDistance = shotContext.remainingDistance;
     const newShotLogs: ShotLog[] = [];
 
@@ -540,9 +625,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         clubId: bag.find((c) => c.type === "Putter")?.id ?? "putter",
         clubLabel: "パター",
         success: detail.success,
-        distanceHit: detail.fromDistance - detail.remainingAfterPutt,
+        distanceHit: (detail.fromDistance - detail.remainingAfterPutt) / 3, // フィートをヤードに変換
         distanceBeforeShot: remainingDistance,
-        distanceAfterShot: detail.remainingAfterPutt,
+        distanceAfterShot: detail.remainingAfterPutt / 3, // フィートをヤードに変換
         strokeNumber: holeStrokes + newShotLogs.length + 1,
         lieBefore: "green",
         lieAfter: "green",
@@ -550,7 +635,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         wasWeakClub: false,
       };
       newShotLogs.push(puttLog);
-      remainingDistance = detail.remainingAfterPutt;
+      remainingDistance = detail.remainingAfterPutt / 3; // フィートをヤードに変換
     }
 
     const nextHoleShots = [...currentHoleShots, ...newShotLogs];
@@ -576,7 +661,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         strokesAdded,
         lie: "green",
         penalty: false,
-        distanceHit: puttResult.puttDetails.reduce((sum, d) => sum + (d.fromDistance - d.remainingAfterPutt), 0),
+        distanceHit: puttResult.puttDetails.reduce((sum, d) => sum + (d.fromDistance - d.remainingAfterPutt), 0) / 3, // フィートをヤードに変換
         shotQuality: puttResult.success ? "good" : "average",
         wasSuccessful: puttResult.success,
         effectiveSuccessRate: 100,

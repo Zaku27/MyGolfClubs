@@ -17,7 +17,9 @@ function loadProfileFromStorage(): UserProfile {
         if (parsed && typeof parsed === 'object') {
           return {};
         }
-      } catch {}
+      } catch {
+        // Ignore parse errors and return default
+      }
     }
   }
   return {};

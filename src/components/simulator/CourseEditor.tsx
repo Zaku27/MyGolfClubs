@@ -107,6 +107,34 @@ function getPenaltyStrokesByType(type: HazardType): 0 | 1 | 2 {
   return 0;
 }
 
+// ハザードID生成（イベントハンドラ内で使用）
+function generateHazardId(holeNumber: number): string {
+  return `hazard-${holeNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// 10角形のデフォルト多角形を生成（イベントハンドラ専用）
+function buildDefaultPolygonPoints(
+  centerX: number,
+  centerY: number,
+  radiusX: number,
+  radiusY: number,
+  sides: number = 10,
+  irregularity: number = 0,
+) {
+  const points = [];
+  const amount = Math.max(0, Math.min(irregularity, 0.4));
+  for (let i = 0; i < sides; i++) {
+    const angle = (2 * Math.PI * i) / sides - Math.PI / 2;
+    const randomRatioX = 1 + (Math.random() * 2 - 1) * amount;
+    const randomRatioY = 1 + (Math.random() * 2 - 1) * amount;
+    points.push({
+      x: centerX + radiusX * randomRatioX * Math.cos(angle),
+      y: centerY + radiusY * randomRatioY * Math.sin(angle),
+    });
+  }
+  return points;
+}
+
 export function CourseEditor({ holes, onChange }: CourseEditorProps) {
   const [selectedHoleIndex, setSelectedHoleIndex] = useState(0);
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
@@ -131,29 +159,6 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
 
   const selectedGroundCondition = selectedHazard?.groundCondition ?? selectedHole?.groundCondition ?? DEFAULT_GROUND_CONDITION;
   const normalizedSlope = normalizeSlopeForDisplay(selectedGroundCondition.slopeAngle, selectedGroundCondition.slopeDirection);
-
-  // 10角形のデフォルト多角形を生成
-  function buildDefaultPolygonPoints(
-    centerX: number,
-    centerY: number,
-    radiusX: number,
-    radiusY: number,
-    sides: number = 10,
-    irregularity: number = 0,
-  ) {
-    const points = [];
-    const amount = Math.max(0, Math.min(irregularity, 0.4));
-    for (let i = 0; i < sides; i++) {
-      const angle = (2 * Math.PI * i) / sides - Math.PI / 2;
-      const randomRatioX = 1 + (Math.random() * 2 - 1) * amount;
-      const randomRatioY = 1 + (Math.random() * 2 - 1) * amount;
-      points.push({
-        x: centerX + radiusX * randomRatioX * Math.cos(angle),
-        y: centerY + radiusY * randomRatioY * Math.sin(angle),
-      });
-    }
-    return points;
-  }
 
   const addPolygonHazard = (
     radiusX: number,
@@ -182,7 +187,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       yBack: Math.max(...points.map((p) => p.y)),
     };
     const newHazard: Hazard = {
-      id: `hazard-${selectedHole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: generateHazardId(selectedHole.number),
       type,
       shape: "polygon",
       points,
@@ -242,7 +247,7 @@ export function CourseEditor({ holes, onChange }: CourseEditorProps) {
       yBack: Math.max(...ys),
     };
     const newHazard: Hazard = {
-      id: `hazard-${hole.number}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: generateHazardId(hole.number),
       type: "bunker",
       shape: "polygon",
       points,

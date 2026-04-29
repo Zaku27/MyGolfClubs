@@ -15,6 +15,21 @@ import {
   type GroundHardness,
 } from '../utils/rangeUtils';
 
+// RangeSummary type ( mirrors RangeScreen.tsx )
+type RangeSummary = {
+  avg: number;
+  std: number;
+  success: number;
+  estimatedDist: number;
+  diff: number;
+  avgToTargetDistance: number;
+  meanRoll: number;
+  meanLateral: number;
+  groundRollContribution: string;
+  groundLateralContribution: string;
+  appliedGroundHardness: GroundHardness;
+};
+
 // Temporary functions until they're moved to utils
 function buildMonteCarloResult(rawResults: ShotResult[]): MonteCarloResult {
   const shots = rawResults
@@ -111,7 +126,7 @@ export function useRangeState(allClubs: GolfClub[], activeBagClubs: GolfClub[]) 
   // Results
   const [results, setResults] = useState<ShotResult[]>([]);
   const [flatBaselineResults, setFlatBaselineResults] = useState<ShotResult[]>([]);
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<RangeSummary | null>(null);
 
   // Computed values
   const monteCarloResult = useMemo(() => buildMonteCarloResult(results), [results]);

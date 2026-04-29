@@ -491,7 +491,7 @@ export default function RangeScreen() {
     const clubLabel = formatSimClubLabel(toSimClub(selectedClub));
     const parseNumber = (value?: string): number | null => {
       if (!value) return null;
-      const raw = value.replace(/,/g, '').replace(/ /g, ' ').trim();
+      const raw = value.replace(/,/g, '').replace(/\u00A0/g, ' ').trim();
       const normalized = raw.replace(/左/g, 'L').replace(/右/g, 'R');
       const directionMatch = normalized.match(/^\s*([LR])\s*([+-]?\d+(?:\.\d+)?)\s*$/i)
         || normalized.match(/^\s*([+-]?\d+(?:\.\d+)?)\s*([LR])\s*$/i);
@@ -571,7 +571,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
           penaltyStrokes: 0,
         };
       });
-  }, [actualShotRows, seatType, selectedClub]);
+  }, [actualShotRows, seatType, selectedClub, estimatedClubDistance]);
 
   const actualModeSummary = useMemo<RangeSummary | null>(() => {
     if (seatType !== 'actual' || actualModeResults.length === 0) {
@@ -621,7 +621,7 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
       groundLateralContribution: slopeEffectLabel,
       appliedGroundHardness: groundHardness,
     };
-  }, [actualModeResults, selectedClub, groundHardness, slopeAngle, slopeDirection]);
+  }, [actualModeResults, selectedClub, groundHardness, slopeAngle, slopeDirection, estimatedClubDistance, seatType]);
 
   const selectedResults = seatType === 'actual' ? actualModeResults : results;
   const selectedSummary = seatType === 'actual' ? actualModeSummary : summary;

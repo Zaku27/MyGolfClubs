@@ -257,7 +257,7 @@ export function buildOutcomeMessage(
   if (finalOutcome === "green") {
     return newRemainingDistance === 0
       ? `グリーンオン！カップインの可能性があります。`
-      : `グリーンに近いです。残り${newRemainingDistance}y（${lieLabel}）。`;
+      : `グリーンに近いです。残り${Math.round(newRemainingDistance * 3)}ft（${lieLabel}）。`;
   }
 
   if (finalOutcome === "bunker") {
@@ -369,7 +369,8 @@ export function buildDetailedShotMessage({
     return `${qualityLabel} ${clubLabel} — ${actualDistance}yのショットがカップイン！🎉`;
   }
 
-  return `${qualityLabel} ${clubLabel} — ${actualDistance}y、残り${newRemainingDistance}y（${lieLabel}）`;
+  const remainingDisplay = finalOutcome === "green" ? `${Math.round(newRemainingDistance * 3)}ft` : `${newRemainingDistance}y`;
+  return `${qualityLabel} ${clubLabel} — ${actualDistance}y、残り${remainingDisplay}（${lieLabel}）`;
 }
 
 function isPointInPolygon(

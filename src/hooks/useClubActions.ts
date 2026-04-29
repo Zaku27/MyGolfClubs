@@ -53,6 +53,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
   const handleEditClub = useCallback((_club: GolfClub) => {
     // This will be handled by the UI state hook
     // Just a placeholder for consistency
+    void _club; // eslint-disable-line @typescript-eslint/no-unused-vars
   }, []);
 
   const handleDeleteClub = useCallback(async (id: number) => {

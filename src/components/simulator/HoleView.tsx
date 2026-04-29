@@ -70,8 +70,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     playerSkillLevel,
     shotInProgress,
     currentHolePutts,
-    hasTakenFirstPutt,
-    executeAutoPutts,
   } = useGameStore();
   const [showAllClubs, setShowAllClubs] = useState(false);
   const [selectedClub, setSelectedClub] = useState<SimClub | null>(null);
@@ -276,12 +274,12 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const lastShotWasPutter = lastShotClub?.type === "Putter";
   const resultDistanceLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotWasPutter
-      ? `パット距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}yd`
+      ? `パット距離: ${Math.round((lastShotResult.distanceHit ?? 0) * 3)}ft`
       : `飛距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}yd`
     : `飛距離: ${((lastShotResult?.landing?.totalDistance ?? lastShotResult?.distanceHit ?? 0)).toFixed(1)}yd`;
   const resultOutcomeLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotResult.newRemainingDistance === 0
-      ? "カップイン"
+      ? ""
       : "グリーン"
     : lastShotResult?.finalOutcome === "fairway"
       ? "フェアウェイ"
@@ -422,7 +420,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               hole={currentHole}
               shotContext={shotContext}
               aimXOffset={aimXOffset}
-              selectedClub={selectedClub}
+              selectedClub={selectedClub ?? undefined}
               lastShotResult={lastShotResult}
               strokeLabel={currentStrokeLabel}
               scoreLabel={showScoreDisplay ? scoreLabel : undefined}
@@ -511,7 +509,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                       <span className="text-xs text-rose-700">罰打 +{lastShotResult.penaltyStrokes}</span>
                     )}
                     {showGreenRemaining && (
-                      <span className="text-xs text-sky-800">残り {lastShotResult.newRemainingDistance.toFixed(1)}ヤード</span>
+                      <span className="text-xs text-sky-800">残り {Math.round(lastShotResult.newRemainingDistance * 3)}フィート</span>
                     )}
                   </div>
                 </div>
@@ -548,21 +546,24 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               </div>
             )}
 
-            {/* 自動パット結果の詳細表示 */}
+            {/* パット結果の詳細表示 */}
             {lastShotResult.autoPuttResult && (
               <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-                <p className="text-sm font-bold text-sky-800 mb-2">自動パット結果</p>
+                <p className="text-sm font-bold text-sky-800 mb-2">パット結果</p>
                 <div className="space-y-1">
-                  {lastShotResult.autoPuttResult.puttDetails.map((detail) => (
-                    <div key={detail.puttNumber} className="flex items-center justify-between text-xs">
-                      <span className="text-sky-700">
-                        {detail.puttNumber}パット目: {detail.fromDistance.toFixed(1)}yd
-                      </span>
-                      <span className={detail.success ? "text-emerald-600 font-semibold" : "text-amber-600"}>
-                        {detail.success ? "成功" : `残り ${detail.remainingAfterPutt.toFixed(1)}yd`}
-                      </span>
-                    </div>
-                  ))}
+                  {lastShotResult.autoPuttResult.puttDetails.map((detail) => {
+                    const actualPuttNumber = currentHolePutts - lastShotResult.autoPuttResult!.putts + detail.puttNumber;
+                    return (
+                      <div key={detail.puttNumber} className="flex items-center justify-between text-xs">
+                        <span className="text-sky-700">
+                          {actualPuttNumber}パット目: {Math.round(detail.fromDistance)}ft
+                        </span>
+                        <span className={detail.success ? "text-emerald-600 font-semibold" : "text-amber-600"}>
+                          {detail.success ? "成功" : `残り ${Math.round(detail.remainingAfterPutt)}ft`}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <p className="text-sm font-bold text-sky-800 mt-2 text-right">
                   合計 {currentHolePutts} パット
@@ -605,18 +606,6 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
           );
         })()}
 
-        {/* グリーン上での自動パットボタン（結果パネルの下） */}
-        {isGreenLie && hasTakenFirstPutt && lastShotResult && lastShotResult.newRemainingDistance > 0 && (
-          <div className="mt-4 flex justify-center">
-            <button
-              onClick={executeAutoPutts}
-              disabled={shotInProgress}
-              className="rounded-xl bg-sky-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-sky-300/50 transition hover:bg-sky-400 disabled:opacity-50"
-            >
-              残りのパットを自動で打つ ({currentHolePutts}パット目)
-            </button>
-          </div>
-        )}
         </section>
 
         {/* おすすめクラブセクション ...existing code... */}

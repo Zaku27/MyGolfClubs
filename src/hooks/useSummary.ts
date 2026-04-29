@@ -134,6 +134,7 @@ const inferCategoryFromLoftAndDistance = (
   _distance: number,
   _headSpeed: number = 44.5
 ): Recommendation['category'] => {
+  void _headSpeed; // eslint-disable-line @typescript-eslint/no-unused-vars
   // Prioritize loft angle for category determination
   if (loftAngle < 13) return 'Driver';
   if (loftAngle < 18) return 'Fairway';
@@ -152,29 +153,33 @@ const estimateLoftFromDistance = (
   const speedFactor = headSpeed / 44.5; // Adjust based on head speed relative to standard
   
   switch (category) {
-    case 'Driver': 
+    case 'Driver': {
       // 距離ベースの計算: 9°≈250yd, 12°≈200yd として線形補間
       const baseLoftDriver = 9 + (250 - distance) * 0.06; // (12-9)/(250-200) = 0.06°/yd
       const speedAdjustmentDriver = Math.max(0, (1 - speedFactor) * 0.5);
       return Math.max(9, Math.min(12, baseLoftDriver + speedAdjustmentDriver));
-    case 'Fairway': 
+    }
+    case 'Fairway': {
       // 距離ベースの計算: 13°≈230yd, 18°≈180yd として線形補間
       const baseLoftFairway = 13 + (230 - distance) * 0.1; // (18-13)/(230-180) = 0.1°/yd
       const speedAdjustmentFairway = Math.max(0, (1 - speedFactor) * 1);
       return Math.max(13, Math.min(18, baseLoftFairway + speedAdjustmentFairway));
-    case 'Hybrid': 
+    }
+    case 'Hybrid': {
       // 距離ベースの計算: 17°≈170yd, 24°≈130yd として線形補間
       // 距離が短いほどロフトが大きくなる
       const baseLoftHybrid = 17 + (170 - distance) * 0.175; // (24-17)/(170-130) = 0.175°/yd
       const speedAdjustmentHybrid = Math.max(0, (1 - speedFactor) * 1.5);
       return Math.max(17, Math.min(26, baseLoftHybrid + speedAdjustmentHybrid));
-    case 'Iron': 
+    }
+    case 'Iron': {
       // 距離ベースの計算: 5Iron(27°)≈160yd, PW(44°)≈85yd として線形補間
       // 距離が短いほどロフトが大きくなる
       const baseLoftIron = 27 + (160 - distance) * 0.178; // (44-27)/(160-85) = 0.227°/yd、より緩やかに設定
       const speedAdjustmentIron = Math.max(0, (1 - speedFactor) * 1);
       return Math.max(20, Math.min(48, baseLoftIron + speedAdjustmentIron));
-    case 'Wedge': 
+    }
+    case 'Wedge': {
       // 実測データに基づく補正: PW(44°)=84.8yd, 56°=57.3yd
       // 距離が短いほどロフトが大きくなる線形補間
       // 傾き: (56-44)/(57.3-84.8) = -0.44°/yd
@@ -182,6 +187,7 @@ const estimateLoftFromDistance = (
       // ヘッドスピード補正: 標準より遅い場合は最大1°多めのロフトを提案
       const speedAdjustment = Math.max(0, (1 - speedFactor) * 1);
       return Math.max(44, Math.min(60, baseLoft + speedAdjustment));
+    }
     case 'Putter': return 3;
   }
 };

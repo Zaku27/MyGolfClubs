@@ -91,4 +91,5 @@ export const DEFAULT_CLUBS: Omit<GolfClub, 'id'>[] = [
 // ─── ユーザープロフィール情報 ──────────────────────────────
 export interface UserProfile {
   // 今後、年齢・性別・身長・体重なども追加可能
+  _placeholder?: never; // 空インターフェース回避用
 }

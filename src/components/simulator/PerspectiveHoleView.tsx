@@ -39,10 +39,7 @@ import {
   getHazardColor,
   LIE_COLORS,
   OUTCOME_COLORS,
-  type PerspectiveParams,
-  type Position3D,
   type HazardPosition,
-  type GreenRect,
 } from "./utils/perspectiveGeometry";
 
 interface Props {
@@ -541,9 +538,9 @@ export function PerspectiveHoleView({
           <rect x="-8" y="2" width="40" height="10" rx="3" fill="none" stroke="rgba(6,95,70,0.2)" strokeWidth="0.3" />
           {/* タイトル */}
           <text x="-5" y="6" fontSize="3" fill="#065f46" fontWeight="bold" opacity="0.8">ピンまで</text>
-          {/* 距離値 */}
+          {/* 距離値（グリーン上はフィート、その他はヤード） */}
           <text x="27" y="10" textAnchor="end" fontSize="7" fill="#065f46" fontWeight="bold">
-            {Math.round(remainingDistance)}Y
+            {lie === "green" ? Math.round(remainingDistance * 3) + "ft" : Math.round(remainingDistance) + "Y"}
           </text>
         </g>
 

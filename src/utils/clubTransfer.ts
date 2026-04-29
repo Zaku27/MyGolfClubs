@@ -47,7 +47,8 @@ const generateUUID = (): string => {
 };
 
 const sanitizeClubForTransfer = (club: GolfClub): ExportableClub => {
-  const { id, createdAt, updatedAt, ...rest } = club;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = club;
   return {
     ...rest,
     exportId: generateUUID(), // Generate UUID to preserve identity across import/export
@@ -55,7 +56,8 @@ const sanitizeClubForTransfer = (club: GolfClub): ExportableClub => {
 };
 
 const sanitizeBagForTransfer = (bag: GolfBag, clubExportIdMap: Map<number, string>): ExportableBag => {
-  const { id, createdAt, updatedAt, clubIds, ...rest } = bag;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, clubIds, ...rest } = bag;
   // Convert database club IDs to export IDs
   const exportClubIds = (clubIds ?? []).map((dbId) => clubExportIdMap.get(dbId)).filter((id): id is string => id != null);
   return {
@@ -216,7 +218,8 @@ export const downloadCompleteDataAsJson = (
     clubs: sanitizedClubs,
     bags: bags.map((bag) => sanitizeBagForTransfer(bag, clubExportIdMap)),
     accessories: accessories.map((acc) => {
-      const { id, createdAt, ...rest } = acc;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _id, createdAt: _createdAt, ...rest } = acc;
       return rest;
     }),
   };

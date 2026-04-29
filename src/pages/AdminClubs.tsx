@@ -112,7 +112,7 @@ const normalizeHeaderKey = (value: string): string => {
     .trim()
     .toLowerCase()
     .replace(/[\s\-_/\\]/g, '')
-    .replace(/[()\[\]{}]/g, '')
+    .replace(/[()[\]{}]/g, '')
     .replace(/[（）。・]/g, '')
     .replace(/\./g, '')
     .replace(/インチ|inch|inches/g, 'in')

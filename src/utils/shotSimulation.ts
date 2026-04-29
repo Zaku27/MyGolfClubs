@@ -588,7 +588,7 @@ export function estimateShotDistance(
 
   // Skill level also affects expected distance slightly so UI estimates follow robot/person skill settings.
   const skillDistanceMultiplier = getSkillDistanceMultiplier(playerSkillLevel);
-  let expected = baseDistance * lieMultiplier * weakDistanceMultiplier * skillDistanceMultiplier + windYards;
+  const expected = baseDistance * lieMultiplier * weakDistanceMultiplier * skillDistanceMultiplier + windYards;
 
   return Math.max(5, Math.round(expected * 10) / 10);
 }
@@ -1088,7 +1088,7 @@ export function simulateShot(
     context.greenPolygon,
     absoluteTrajectoryPoints,
   );
-  let { geometricRemainingDistance: geometricRemaining, hazard: landedHazard, isOnGreen } = assessment;
+  const { geometricRemainingDistance: geometricRemaining, hazard: landedHazard, isOnGreen } = assessment;
   newRemaining = geometricRemaining;
 
   // Non-putter hole-outs are intentionally rare.
@@ -1393,7 +1393,7 @@ export function simulateShotFromActualData(
     ),
   );
   
-  let { geometricRemainingDistance: geometricRemaining, hazard: landedHazard, isOnGreen } = assessment;
+  const { geometricRemainingDistance: geometricRemaining, hazard: landedHazard, isOnGreen } = assessment;
   let newRemaining = geometricRemaining;
   
   // ホールアウト判定
