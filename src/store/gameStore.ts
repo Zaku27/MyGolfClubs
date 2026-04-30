@@ -397,6 +397,48 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const nextHoleShots = [...currentHoleShots, shotLog];
       const nextRoundShots = [...roundShots, shotLog];
 
+      // Parの倍のスコアになった時点でホールアウト
+      const currentHole = course[currentHoleIndex];
+      const maxStrokes = currentHole.par * 2;
+      if (newHoleStrokes >= maxStrokes) {
+        const holeSummary = buildHoleSummary(currentHole, nextHoleShots, nextRoundShots);
+        const newScores: HoleScore[] = [
+          ...scores,
+          { holeNumber: currentHole.number, par: currentHole.par, strokes: newHoleStrokes, putts: newPuttCount },
+        ];
+        const isRoundComplete = currentHoleIndex >= course.length - 1;
+        const clubUsageStats = isRoundComplete ? buildClubUsageStats(nextRoundShots, bag) : [];
+        const finalScore = isRoundComplete
+          ? newScores.reduce((sum, hole) => sum + hole.strokes, 0)
+          : null;
+
+        set({
+          holeStrokes: newHoleStrokes,
+          lastShotResult: {
+            ...result,
+            outcomeMessage: `最大打数（${maxStrokes}打）に達しました`,
+            strokesAdded: result.strokesAdded,
+          },
+          scores: newScores,
+          perHoleResults: newScores,
+          clubUsageStats,
+          finalScore,
+          phase: isRoundComplete ? "round_complete" : "hole_complete",
+          selectedClubId: null,
+          shotPowerPercent: 100,
+          aimXOffset: 0,
+          currentHoleShots: nextHoleShots,
+          roundShots: nextRoundShots,
+          lastHoleSummary: holeSummary,
+          holeSummaries: [...holeSummaries, holeSummary],
+          goodShotStreak: streakAfterShot,
+          shotInProgress: false,
+          currentHolePutts: newPuttCount,
+          hasTakenFirstPutt: newHasTakenFirstPutt,
+        });
+        return;
+      }
+
       // パット後に残りがある場合は自動的にカップインまでパット
       if (isPutter && result.newRemainingDistance > 0 && result.lie === "green") {
         // 自動パットシミュレーション（フィート単位）

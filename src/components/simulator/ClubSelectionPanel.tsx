@@ -147,7 +147,7 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
             {/* Stats */}
             <div className="text-right flex-shrink-0">
               <div className="text-sm font-mono font-bold">
-                {estimatedDistance}
+                {Math.round(estimatedDistance)}
                 <span className="text-xs text-green-500 font-normal">yd</span>
               </div>
               {!isMeasuredMode && (

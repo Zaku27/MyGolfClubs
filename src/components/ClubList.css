@@ -253,8 +253,12 @@
   margin-left: 12px;
 }
 
-.btn-simulator + .btn-toggle-view {
+.btn-range + .btn-simulator {
   margin-left: 12px;
+}
+
+.btn-simulator + .btn-toggle-view {
+  margin-left: 0;
 }
 
 .btn-analysis:hover:not(:disabled) {

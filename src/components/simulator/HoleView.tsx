@@ -140,8 +140,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const displayedSkillLevel = playMode === "robot" ? robotSkillLevel : playerSkillLevel;
   const displayedSkillLabel = getSkillLabel(displayedSkillLevel);
   const completedRelativeToPar = scores.reduce((sum, s) => sum + (s.strokes - s.par), 0);
-  const currentHoleRelativeToPar =
-    phase === "playing" && holeStrokes > 0 ? holeStrokes - currentHole.par : 0;
+  const currentHoleRelativeToPar = 0;
   const cumulativeRelativeToPar = completedRelativeToPar + currentHoleRelativeToPar;
   const scoreLabel =
     cumulativeRelativeToPar > 0
@@ -275,8 +274,8 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   const resultDistanceLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotWasPutter
       ? `パット距離: ${Math.round((lastShotResult.distanceHit ?? 0) * 3)}ft`
-      : `飛距離: ${(lastShotResult.distanceHit ?? 0).toFixed(1)}yd`
-    : `飛距離: ${((lastShotResult?.landing?.totalDistance ?? lastShotResult?.distanceHit ?? 0)).toFixed(1)}yd`;
+      : `飛距離: ${Math.round(lastShotResult.distanceHit ?? 0)}yd`
+    : `飛距離: ${Math.round(lastShotResult?.landing?.totalDistance ?? lastShotResult?.distanceHit ?? 0)}yd`;
   const resultOutcomeLabel = lastShotResult?.finalOutcome === "green"
     ? lastShotResult.newRemainingDistance === 0
       ? ""
@@ -536,10 +535,10 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 {lastShotResult.landing && (
                   <>
                     <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                      キャリー {lastShotResult.landing.carry.toFixed(1)}yd
+                      キャリー {Math.round(lastShotResult.landing.carry)}yd
                     </span>
                     <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1">
-                      ラン {lastShotResult.landing.roll.toFixed(1)}yd
+                      ラン {Math.round(lastShotResult.landing.roll)}yd
                     </span>
                   </>
                 )}
@@ -757,7 +756,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                         </span>
                       )}
                     </div>
-                    <p className="mt-2 text-sm text-emerald-700">推定飛距離: {(estimatedDistanceByClub.get(club.id) ?? 0).toFixed(1)}ヤード</p>
+                    <p className="mt-2 text-sm text-emerald-700">推定飛距離: {Math.round(estimatedDistanceByClub.get(club.id) ?? 0)}ヤード</p>
                     {playMode !== "measured" && (
                       <p className="mt-1 text-sm text-emerald-700">
                         クラブ成功率: {effectiveRate}%

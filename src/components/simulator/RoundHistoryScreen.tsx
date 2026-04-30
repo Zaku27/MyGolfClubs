@@ -354,7 +354,7 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {rounds.slice(0, 10).map((round) => (
+                    {rounds.map((round) => (
                       <tr
                         key={round.id}
                         className="border-b border-emerald-200 hover:bg-emerald-100/50"
@@ -400,11 +400,9 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
                   </tbody>
                 </table>
               </div>
-              {rounds.length > 10 && (
-                <p className="mt-2 text-xs text-emerald-600 text-center">
-                  最新10件を表示（全{rounds.length}件中）
-                </p>
-              )}
+              <p className="mt-2 text-xs text-emerald-600 text-center">
+                全{rounds.length}件を表示
+              </p>
             </div>
           )}
         </section>

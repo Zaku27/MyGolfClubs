@@ -139,7 +139,7 @@ export function PostRoundAnalysis({
 
     const ranked = [...clubUsageStats].filter((club) => club.timesUsed > 0);
     const bestClubs = ranked
-      .filter((club) => club.timesUsed >= 2)
+      .filter((club) => club.timesUsed >= 2 && club.successRate >= 70)
       .sort((a, b) => {
         const left = a.successRate * a.timesUsed;
         const right = b.successRate * b.timesUsed;
@@ -148,7 +148,7 @@ export function PostRoundAnalysis({
       .slice(0, 3);
 
     const strugglingClubs = ranked
-      .filter((club) => club.timesUsed >= 2)
+      .filter((club) => club.timesUsed >= 2 && club.successRate <= 60)
       .sort((a, b) => a.successRate - b.successRate)
       .slice(0, 3);
 

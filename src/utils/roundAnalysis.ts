@@ -32,7 +32,10 @@ export function buildClubUsageStats(roundShots: ShotLog[], bag: SimClub[]): Club
     };
 
     const isPutter = club?.type === "Putter";
-    const isSuccessfulShot = isPutter ? shot.distanceAfterShot === 0 : shot.success;
+    // パターは残り距離が3フィート（約1ヤード）以内なら成功とみなす
+    const isSuccessfulShot = isPutter 
+      ? shot.distanceAfterShot <= 1 
+      : shot.success;
 
     base.uses += 1;
     if (isSuccessfulShot) base.successes += 1;
