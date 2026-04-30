@@ -136,6 +136,10 @@ export interface ShotResult {
       remainingAfterPutt: number;
     }>;
   };
+  /** ショット前の残り距離（パットの場合に使用） */
+  distanceBeforeShot?: number;
+  /** ショット後の残り距離（パットの場合に使用） */
+  distanceAfterShot?: number;
 }
 
 export interface ShotLog {
