@@ -1209,12 +1209,14 @@ export function HoleMapCanvas({
       drawHighlightPoint(context, highlightPoint, yardToPxX, yardToPxY);
     }
 
-    // Draw lock icons for locked hazards
-    for (const hazard of hazards) {
-      if (hazard.locked) {
-        const centerX = yardToPxX(hazard.xCenter);
-        const centerY = yardToPxY((hazard.yFront + hazard.yBack) / 2);
-        drawLockIcon(context, centerX, centerY);
+    // Draw lock icons for locked hazards (only in edit mode)
+    if (editable) {
+      for (const hazard of hazards) {
+        if (hazard.locked) {
+          const centerX = yardToPxX(hazard.xCenter);
+          const centerY = yardToPxY((hazard.yFront + hazard.yBack) / 2);
+          drawLockIcon(context, centerX, centerY);
+        }
       }
     }
 

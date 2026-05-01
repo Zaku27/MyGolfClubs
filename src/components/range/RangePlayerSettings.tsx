@@ -83,8 +83,9 @@ export function RangePlayerSettings({
 
 // Helper function to get skill label
 function getSkillLabel(level: number): string {
-  if (level >= 0.9) return '上級者';
-  if (level >= 0.7) return '中級者';
-  if (level >= 0.5) return '初級者';
-  return 'ビギナー';
+  if (level < 0.15) return '初心者';
+  if (level < 0.35) return '初級者';
+  if (level < 0.65) return '中級者';
+  if (level < 0.9) return '上級者';
+  return '超上級者';
 }

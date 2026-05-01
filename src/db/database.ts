@@ -175,6 +175,26 @@ export class GolfBagDatabase extends Dexie {
       appSettings: 'id',
       roundHistory: '++id, completedAt, playMode, isFavorite, bagId',
     });
+
+    // v11: add per-bag playerSkillLevel
+    this.version(11).stores({
+      clubs: '++id, name',
+      golfBags: '++id, name, createdAt',
+      personalData: 'clubId',
+      actualShotRows: 'bagId',
+      appSettings: 'id',
+      roundHistory: '++id, completedAt, playMode, isFavorite, bagId',
+    }).upgrade(async (tx) => {
+      // Migrate global playerSkillLevel to bags
+      const settings = await tx.table('appSettings').get('app');
+      const globalSkillLevel = settings?.playerSkillLevel ?? 0.5;
+
+      await tx.table('golfBags').toCollection().modify((bag) => {
+        if (bag.playerSkillLevel == null) {
+          bag.playerSkillLevel = globalSkillLevel;
+        }
+      });
+    });
   }
 }
 

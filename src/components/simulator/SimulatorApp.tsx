@@ -25,6 +25,15 @@ interface Props {
 }
 
 const SIMULATOR_PLAY_MODE_STORAGE_KEY = "golfbag-simulator-play-mode-v1";
+const SIMULATOR_ROBOT_SETTINGS_KEY = "golfbag-simulator-robot-settings-v1";
+
+const DEFAULT_ROBOT_HEAD_SPEED = 40;
+const DEFAULT_ROBOT_SKILL_LEVEL = 0.5;
+
+interface RobotSettings {
+  headSpeed: number;
+  skillLevel: number;
+}
 
 function loadStoredSimulatorPlayMode(): "bag" | "robot" | "measured" {
   if (typeof window === "undefined") {
@@ -34,6 +43,31 @@ function loadStoredSimulatorPlayMode(): "bag" | "robot" | "measured" {
   if (raw === "robot") return "robot";
   if (raw === "measured") return "measured";
   return "bag";
+}
+
+function loadStoredRobotSettings(): RobotSettings {
+  if (typeof window === "undefined") {
+    return { headSpeed: DEFAULT_ROBOT_HEAD_SPEED, skillLevel: DEFAULT_ROBOT_SKILL_LEVEL };
+  }
+  try {
+    const raw = window.localStorage.getItem(SIMULATOR_ROBOT_SETTINGS_KEY);
+    if (!raw) {
+      return { headSpeed: DEFAULT_ROBOT_HEAD_SPEED, skillLevel: DEFAULT_ROBOT_SKILL_LEVEL };
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      headSpeed: Math.max(20, Math.min(60, Number(parsed.headSpeed) || DEFAULT_ROBOT_HEAD_SPEED)),
+      skillLevel: Math.max(0, Math.min(1, Number(parsed.skillLevel) || DEFAULT_ROBOT_SKILL_LEVEL)),
+    };
+  } catch {
+    return { headSpeed: DEFAULT_ROBOT_HEAD_SPEED, skillLevel: DEFAULT_ROBOT_SKILL_LEVEL };
+  }
+}
+
+function saveRobotSettings(settings: RobotSettings): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(SIMULATOR_ROBOT_SETTINGS_KEY, JSON.stringify(settings));
+  }
 }
 
 interface SelectableCourse {
@@ -78,8 +112,12 @@ function SetupScreen({
   courses,
   selectedCourse,
   onChangeSelectedCourse,
+  bags,
+  selectedBagId,
+  onSelectBag,
+  selectedBagSkillLevel,
 }: {
-  onStart: (holes: Hole[], mode: "bag" | "robot" | "measured") => void;
+  onStart: (holes: Hole[], mode: "bag" | "robot" | "measured", robotSettings?: RobotSettings) => void;
   onBack: () => void;
   bagClubCount: number;
   robotClubCount: number;
@@ -90,8 +128,13 @@ function SetupScreen({
   courses: SelectableCourse[];
   selectedCourse: SelectableCourse;
   onChangeSelectedCourse: (courseId: string) => void;
+  bags: { id?: number; name: string; playerSkillLevel?: number }[];
+  selectedBagId: number | null;
+  onSelectBag: (bagId: number) => void;
+  selectedBagSkillLevel: number;
 }) {
   const [playMode, setPlayMode] = useState<"bag" | "robot" | "measured">(() => loadStoredSimulatorPlayMode());
+  const [robotSettings, setRobotSettings] = useState<RobotSettings>(() => loadStoredRobotSettings());
   const bagQuery = typeof bagId === 'number' ? `?bagId=${bagId}` : '';
   const clubCount = playMode === "robot" ? robotClubCount : playMode === "measured" ? measuredClubCount : bagClubCount;
 
@@ -100,6 +143,10 @@ function SetupScreen({
       window.localStorage.setItem(SIMULATOR_PLAY_MODE_STORAGE_KEY, playMode);
     }
   }, [playMode]);
+
+  useEffect(() => {
+    saveRobotSettings(robotSettings);
+  }, [robotSettings]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 flex flex-col">
@@ -225,6 +272,85 @@ function SetupScreen({
               ? "パター以外の実測データが登録されていません。パーソナルデータ画面でCSVをインポートしてください。"
               : "実測データからランダムにショットを選択してプレーします。"}
           </p>
+
+          {/* バッグ選択UI */}
+          {playMode === "bag" && bags.length > 0 && (
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+              <p className="text-xs font-bold tracking-[0.1em] text-emerald-700">バッグ選択</p>
+              <div className="mt-3 space-y-2">
+                {bags.map((bag) => (
+                  <button
+                    key={bag.id}
+                    type="button"
+                    onClick={() => bag.id != null && onSelectBag(bag.id)}
+                    className={[
+                      "w-full rounded-lg border px-3 py-2 text-sm font-medium transition flex items-center justify-between gap-3",
+                      selectedBagId === bag.id
+                        ? "border-emerald-600 bg-emerald-100 text-emerald-900"
+                        : "border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50",
+                    ].join(" ")}
+                  >
+                    <span className="flex-1 truncate text-left">{bag.name}</span>
+                    <span className="flex-shrink-0 text-xs opacity-70">{Math.round((bag.playerSkillLevel ?? 0.5) * 100)}%</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-emerald-600">
+                選択中: {activeBagName ?? "バッグなし"} · スキルレベル {Math.round(selectedBagSkillLevel * 100)}%
+              </p>
+            </div>
+          )}
+
+          {/* ロボット設定UI */}
+          {playMode === "robot" && (
+            <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50/60 p-4">
+              <p className="text-xs font-bold tracking-[0.1em] text-sky-700">ロボット設定</p>
+              <div className="mt-3 space-y-4">
+                {/* ヘッドスピード */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-sky-800">ヘッドスピード</label>
+                    <span className="text-sm font-semibold text-sky-700">{robotSettings.headSpeed} m/s</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={20}
+                    max={60}
+                    step={1}
+                    value={robotSettings.headSpeed}
+                    onChange={(e) => setRobotSettings((prev) => ({ ...prev, headSpeed: Number(e.target.value) }))}
+                    className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-lg bg-sky-200 accent-sky-600"
+                  />
+                  <div className="mt-1 flex justify-between text-[10px] text-sky-600">
+                    <span>20</span>
+                    <span>40</span>
+                    <span>60</span>
+                  </div>
+                </div>
+                {/* スキルレベル */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-sky-800">スキルレベル</label>
+                    <span className="text-sm font-semibold text-sky-700">{(robotSettings.skillLevel * 100).toFixed(0)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={robotSettings.skillLevel}
+                    onChange={(e) => setRobotSettings((prev) => ({ ...prev, skillLevel: Number(e.target.value) }))}
+                    className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-lg bg-sky-200 accent-sky-600"
+                  />
+                  <div className="mt-1 flex justify-between text-[10px] text-sky-600">
+                    <span>0%</span>
+                    <span>50%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="text-center text-emerald-700 text-sm border-b border-emerald-200 pb-3">
@@ -255,7 +381,7 @@ function SetupScreen({
         </div>
 
         <button
-          onClick={() => onStart(selectedCourse.holes, playMode)}
+          onClick={() => onStart(selectedCourse.holes, playMode, playMode === "robot" ? robotSettings : undefined)}
           disabled={clubCount === 0}
           className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-700/60 disabled:text-emerald-100/70 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors"
         >
@@ -273,12 +399,24 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
   const [showPostRoundAnalysis, setShowPostRoundAnalysis] = useState(false);
   const [showRoundHistory, setShowRoundHistory] = useState(false);
   const bagSource = selectedClubs;
-  const robotSource = allClubs;
-  
+
   const actualShotRows = useClubStore((state) => state.actualShotRows);
+  const bags = useClubStore((state) => state.bags);
   const activeBagId = useClubStore((state) => state.activeBagId);
+  const setActiveBag = useClubStore((state) => state.setActiveBag);
   const loadActualShotRows = useClubStore((state) => state.loadActualShotRows);
   const bagSimClubs = bagSource.map(toSimClub);
+
+  // 選択中バッグのスキルレベルを取得
+  const selectedBag = bags.find((b) => b.id === activeBagId);
+  const selectedBagSkillLevel = selectedBag?.playerSkillLevel ?? 0.5;
+
+  // 先頭のバッグに含まれるクラブをロボットモードで使用
+  const firstBag = bags[0] ?? null;
+  const firstBagClubIds = firstBag?.clubIds ?? [];
+  const robotSource = useMemo(() => {
+    return allClubs.filter((club) => club.id != null && firstBagClubIds.includes(club.id));
+  }, [allClubs, firstBagClubIds]);
 
   // 実測データをロード
   useEffect(() => {
@@ -292,12 +430,16 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
   // 実測データモードでプレー可能なクラブ数（パター以外をカウント）
   const measuredPlayableClubCount = measuredSource.filter(club => club.type !== "Putter").length;
 
+  // バッグにパターが含まれていれば本数に加える（実測データがなくても表示に含める）
+  const hasPutterInBag = bagSource.some(club => club.clubType === "Putter");
+  const measuredClubCount = measuredSource.length + (hasPutterInBag ? 1 : 0);
+
   const storedCustomCourses = loadStoredCustomCourse();
   const selectableCourses = buildSelectableCourses(storedCustomCourses.courses);
   const [selectedCourseId, setSelectedCourseId] = useState<string>(() => storedCustomCourses.selectedCourseId);
   const selectedCourse = selectableCourses.find((course) => course.id === selectedCourseId) ?? selectableCourses[0];
   
-  const handleStart = (holes: Hole[], mode: "bag" | "robot" | "measured") => {
+  const handleStart = (holes: Hole[], mode: "bag" | "robot" | "measured", robotSettings?: RobotSettings) => {
     let bag: SimClub[];
     if (mode === "measured") {
       bag = measuredSource;
@@ -306,7 +448,9 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
       bag = source.map(toSimClub);
     }
     setShowDetailedScorecard(false);
-    startRound(cloneCourse(holes), bag, mode, selectedCourse.name);
+    // バッグモード時は選択中バッグのスキルレベルを渡す
+    const bagSkillLevel = mode === "bag" ? selectedBagSkillLevel : undefined;
+    startRound(cloneCourse(holes), bag, mode, selectedCourse.name, robotSettings, bagSkillLevel);
   };
 
   if (phase === "setup") {
@@ -316,13 +460,17 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
         onBack={onBack}
         bagClubCount={bagSource.length}
         robotClubCount={robotSource.length}
-        measuredClubCount={measuredSource.length}
+        measuredClubCount={measuredClubCount}
         measuredPlayableClubCount={measuredPlayableClubCount}
         activeBagName={activeBagName}
         bagId={bagId}
         courses={selectableCourses}
         selectedCourse={selectedCourse}
         onChangeSelectedCourse={setSelectedCourseId}
+        bags={bags}
+        selectedBagId={activeBagId}
+        onSelectBag={(id) => void setActiveBag(id)}
+        selectedBagSkillLevel={selectedBagSkillLevel}
       />
     );
   }

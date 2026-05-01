@@ -92,8 +92,8 @@ const DEFAULT_HEAD_SPEED = 44.5;
 const GLOBAL_CARRY_TUNING = 1;
 
 /** スキルカーブのべき乗（1より大きいほど低スキルで分散が増える） */
-const DISPERSION_SKILL_CURVE_POWER = 1.8;
-const MISHIT_SKILL_CURVE_POWER = 1.7;
+const DISPERSION_SKILL_CURVE_POWER = 3.0;
+const MISHIT_SKILL_CURVE_POWER = 2.5;
 
 /** 低スキル回避関連定数 */
 const LOW_SKILL_NEAR_TARGET_RADIUS = 15;
@@ -150,7 +150,7 @@ const SKILL_DIVISOR_FOR_PERCENTAGE = 100;
 const MIN_CARRY_SIGMA = 1;
 const MIN_LATERAL_SIGMA = 1;
 const MISHIT_PROBABILITY_MIN = 0.003;
-const MISHIT_PROBABILITY_MAX = 0.40;
+const MISHIT_PROBABILITY_MAX = 0.60;
 const SKILL_COMPONENT_COUNT = 3;
 const EFFECTIVE_SKILL_MIN = 0;
 const EFFECTIVE_SKILL_MAX = 1;
@@ -426,12 +426,12 @@ function buildForcedExecutionProfile(quality: ShotQuality): ExecutionProfile {
     return { quality, carrySigmaMultiplier: 0.75, lateralSigmaMultiplier: 0.75, carryBiasRatio: 0 };
   }
   if (quality === "average") {
-    return { quality, carrySigmaMultiplier: 1, lateralSigmaMultiplier: 1, carryBiasRatio: -0.01 };
+    return { quality, carrySigmaMultiplier: 1, lateralSigmaMultiplier: 1, carryBiasRatio: -0.08 };
   }
   if (quality === "poor") {
-    return { quality, carrySigmaMultiplier: 1.35, lateralSigmaMultiplier: 1.45, carryBiasRatio: -0.08 };
+    return { quality, carrySigmaMultiplier: 1.35, lateralSigmaMultiplier: 1.45, carryBiasRatio: -0.30 };
   }
-  return { quality, carrySigmaMultiplier: 1.85, lateralSigmaMultiplier: 2.1, carryBiasRatio: -0.2 };
+  return { quality, carrySigmaMultiplier: 1.85, lateralSigmaMultiplier: 2.1, carryBiasRatio: -0.55 };
 }
 
 /**
@@ -481,12 +481,14 @@ function buildDispersionProfile(club: ClubData, skillLevel: SkillLevel): Dispers
   // 上級者では大ミス発生率を急減、初心者では発生率を高める非線形カーブ。
   const mishitSkillCurve = Math.pow(clamp(mishitSkill01, 0, 1), MISHIT_SKILL_CURVE_POWER);
   const mishitProbability = base.mishitHigh - (base.mishitHigh - base.mishitLow) * mishitSkillCurve;
+  // 低スキル時にさらに大ミス確率を増加（スキル30%以下で急増）
+  const lowSkillMishitBoost = skill01 < 0.3 ? (0.3 - skill01) * 0.5 : 0;
   const effectiveSkill = clamp((skill01 + mishitSkill01 + sideSkill01) / SKILL_COMPONENT_COUNT, EFFECTIVE_SKILL_MIN, EFFECTIVE_SKILL_MAX);
 
   return {
     carrySigma: Math.max(MIN_CARRY_SIGMA, carrySigma),
     lateralSigma: Math.max(MIN_LATERAL_SIGMA, lateralSigma),
-    mishitProbability: clamp(mishitProbability, MISHIT_PROBABILITY_MIN, MISHIT_PROBABILITY_MAX),
+    mishitProbability: clamp(mishitProbability + lowSkillMishitBoost, MISHIT_PROBABILITY_MIN, MISHIT_PROBABILITY_MAX),
     effectiveSkill,
   };
 }

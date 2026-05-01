@@ -6,7 +6,6 @@ import { estimateBaseDistance } from "../../utils/shotSimulation";
 import { getSkillLabel } from "../../utils/playerSkill";
 import { formatSimClubLabel } from "../../utils/simClubLabel";
 import { resolvePersonalDataForSimClub } from "../../utils/personalData";
-import { loadRangePlayerSettings } from "../../utils/rangePlayerSettings";
 import {
   buildAnalysisPenaltyByClubId,
   calculateDisplayClubSuccessRate,
@@ -68,6 +67,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
     lastShotResult,
     playMode,
     playerSkillLevel,
+    robotSettings,
     shotInProgress,
     currentHolePutts,
   } = useGameStore();
@@ -135,7 +135,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
   };
 
   const { remainingDistance, lie, windStrength = 0, windDirectionDegrees } = shotContext;
-  const { robotHeadSpeed, robotSkillLevel } = loadRangePlayerSettings();
+  // ロボットモード時はgameStoreのrobotSettingsを使用（SimulatorAppで設定された値）
+  const robotSkillLevel = robotSettings?.skillLevel ?? 0.5;
+  const robotHeadSpeed = robotSettings?.headSpeed ?? 40;
   const seatType = playMode === "robot" ? "robot" : "personal";
   const displayedSkillLevel = playMode === "robot" ? robotSkillLevel : playerSkillLevel;
   const displayedSkillLabel = getSkillLabel(displayedSkillLevel);
@@ -208,7 +210,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       remainingDistance,
       windStrength,
       seatType,
-      robotHeadSpeed,
+      robotSettings?.headSpeed,
     ],
   );
 
@@ -221,7 +223,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
       );
     }
     return distances;
-  }, [bag, seatType, robotHeadSpeed]);
+  }, [bag, seatType, robotSettings?.headSpeed]);
 
   const allClubsSorted = useMemo(
     () => {
@@ -320,6 +322,9 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                 適用スキルレベル {(displayedSkillLevel * 100).toFixed(0)}% ({displayedSkillLabel})
               </span>
             )}
+            <span className="rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[11px] font-bold tracking-[0.08em] text-emerald-800">
+              全{course.length}H
+            </span>
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             {showScoreDisplay && (
@@ -420,6 +425,7 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
               shotContext={shotContext}
               aimXOffset={aimXOffset}
               selectedClub={selectedClub ?? undefined}
+              selectedClubEstimatedDistance={selectedClubEstimatedDistance ?? undefined}
               lastShotResult={lastShotResult}
               strokeLabel={currentStrokeLabel}
               scoreLabel={showScoreDisplay ? scoreLabel : undefined}

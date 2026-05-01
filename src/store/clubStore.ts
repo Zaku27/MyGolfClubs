@@ -99,7 +99,7 @@ const refreshBags = async (
   });
 };
 
-export const useClubStore = create<ClubStore>((set) => ({
+export const useClubStore = create<ClubStore>((set, get) => ({
   ...INITIAL_STATE,
 
   loadClubs: async () => {
@@ -435,7 +435,10 @@ export const useClubStore = create<ClubStore>((set) => ({
   loadPlayerSkillLevel: async () => {
     set({ error: null });
     try {
-      const playerSkillLevel = await ClubService.getPlayerSkillLevel();
+      const { activeBagId } = get();
+      const playerSkillLevel = activeBagId != null
+        ? await ClubService.getBagPlayerSkillLevel(activeBagId)
+        : await ClubService.getPlayerSkillLevel();
       set({ playerSkillLevel });
     } catch (error) {
       setStoreError(set, error);
@@ -455,8 +458,13 @@ export const useClubStore = create<ClubStore>((set) => ({
   setPlayerSkillLevel: async (level) => {
     set({ error: null });
     try {
+      const { activeBagId } = get();
       const clamped = clampSkillLevel(level);
-      await ClubService.setPlayerSkillLevel(clamped);
+      if (activeBagId != null) {
+        await ClubService.setBagPlayerSkillLevel(activeBagId, clamped);
+      } else {
+        await ClubService.setPlayerSkillLevel(clamped); // fallback to global
+      }
       set({ playerSkillLevel: clamped });
     } catch (error) {
       setStoreError(set, error);

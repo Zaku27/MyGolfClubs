@@ -427,6 +427,11 @@ export default function RangeScreen() {
     void initializeScreen();
   }, [loadBags, loadClubs, loadPersonalData, loadPlayerSkillLevel, loadActualShotRows]);
 
+  // バッグ切り替え時にスキルレベルを再読み込み
+  useEffect(() => {
+    void loadPlayerSkillLevel();
+  }, [activeBag?.id, loadPlayerSkillLevel]);
+
   useEffect(() => {
     if (clubs.length === 0) {
       if (selectedClubId !== '') {

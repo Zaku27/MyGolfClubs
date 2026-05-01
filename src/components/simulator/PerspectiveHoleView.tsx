@@ -50,6 +50,7 @@ interface Props {
     avgDistance: number;
     type: string;
   };
+  selectedClubEstimatedDistance?: number;
   lastShotResult?: {
     finalOutcome?: "fairway" | "rough" | "bunker" | "water" | "ob" | "green";
     landing?: {
@@ -67,6 +68,7 @@ export function PerspectiveHoleView({
   shotContext,
   aimXOffset,
   selectedClub,
+  selectedClubEstimatedDistance,
   lastShotResult,
   strokeLabel,
   scoreLabel,
@@ -89,7 +91,9 @@ export function PerspectiveHoleView({
     [targetDistance, perspective]
   );
 
-  // 狙い点の計算（選択クラブの飛距離に基づく）
+  // 狙い点の計算（選択クラブの推定飛距離に基づく）
+  // selectedClubEstimatedDistanceを優先し、ない場合はavgDistanceを使用
+  const aimDistance = selectedClubEstimatedDistance ?? selectedClub?.avgDistance;
   const aimPosition = useMemo(
     () =>
       calculateAimPosition(
@@ -97,11 +101,11 @@ export function PerspectiveHoleView({
         remainingDistance,
         targetDistance,
         perspective,
-        selectedClub?.avgDistance,
+        aimDistance,
         originX,
         originY
       ),
-    [aimXOffset, remainingDistance, targetDistance, perspective, selectedClub, originX, originY]
+    [aimXOffset, remainingDistance, targetDistance, perspective, aimDistance, originX, originY]
   );
 
   // 前回ショットの着地点（あれば）

@@ -453,4 +453,16 @@ export class ClubService {
       activeBagId: settings?.activeBagId,
     });
   }
+
+  // ─── Per-Bag Player Skill Level ─────────────────────────────────────────────
+
+  static async getBagPlayerSkillLevel(bagId: number): Promise<number> {
+    const bag = await db.golfBags.get(bagId);
+    return bag?.playerSkillLevel ?? 0.5;
+  }
+
+  static async setBagPlayerSkillLevel(bagId: number, level: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(1, Math.round(level * 100) / 100));
+    await db.golfBags.update(bagId, { playerSkillLevel: clamped });
+  }
 }

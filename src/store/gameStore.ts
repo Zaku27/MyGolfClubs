@@ -23,6 +23,12 @@ import {
 } from "../utils/clubSuccessDisplay";
 import { simulateAutoPutts } from "../utils/shotResultEvaluation";
 
+/** ロボット設定 */
+export interface RobotSettings {
+  headSpeed: number;
+  skillLevel: number;
+}
+
 // ─── Wind generation ──────────────────────────────────────────────────────────
 
 function hashSeed(seed: string): number {
@@ -112,10 +118,12 @@ interface GameStoreState {
   currentHolePutts: number;
   /** グリーン上で最初のパットを済ませたか */
   hasTakenFirstPutt: boolean;
+  /** ロボットモード設定 */
+  robotSettings: RobotSettings | null;
 }
 
 interface GameStoreActions {
-  startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag" | "measured", courseName?: string) => void;
+  startRound: (course: Hole[], bag: SimClub[], playMode?: "robot" | "bag" | "measured", courseName?: string, robotSettings?: RobotSettings, bagSkillLevel?: number) => void;
   selectClub: (clubId: string) => void;
   setShotPowerPercent: (powerPercent: number) => void;
   setAimXOffset: (aimXOffset: number) => void;
@@ -167,6 +175,7 @@ const INITIAL_STATE: GameStoreState = {
   measuredModePutterSkillLevel: null,
   currentHolePutts: 0,
   hasTakenFirstPutt: false,
+  robotSettings: null,
 };
 
 function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: number, previousWindStrength: number | null = null): ShotContext {
@@ -244,7 +253,7 @@ function buildHoleSummary(hole: Hole, holeShots: ShotLog[], roundShots: ShotLog[
 export const useGameStore = create<GameStore>((set, get) => ({
   ...INITIAL_STATE,
 
-  startRound: (course, bag, playMode = "bag", courseName = "") => {
+  startRound: (course, bag, playMode = "bag", courseName = "", robotSettings, bagSkillLevel) => {
     const roundSeedNonce = createRoundSeedNonce();
     const initialContext = buildInitialContext(course[0], roundSeedNonce, 0, null);
 
@@ -252,6 +261,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const measuredModePutterSkillLevel = playMode === "measured"
       ? 0.5 + Math.random() * 0.3
       : null;
+
+    // スキルレベルの決定（優先順位: ロボット設定 > バッグ設定 > グローバル設定 > デフォルト0.5）
+    let playerSkillLevel = 0.5;
+    if (playMode === "robot" && robotSettings) {
+      playerSkillLevel = robotSettings.skillLevel;
+    } else if (playMode === "bag" && bagSkillLevel != null) {
+      playerSkillLevel = bagSkillLevel;
+    } else if (playMode === "measured") {
+      // 実測データモード: パター用にグローバルスキルレベルを取得（DBから非同期取得）
+      playerSkillLevel = 0.5; // 一時的にデフォルト値、後でDBから上書き
+    }
 
     set({
       ...INITIAL_STATE,
@@ -267,11 +287,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       measuredModePutterSkillLevel,
       currentHolePutts: 0,
       hasTakenFirstPutt: false,
+      playerSkillLevel,
+      robotSettings: playMode === "robot" ? robotSettings : null,
     });
-    // パット確率用にプレイヤースキルレベルを非同期取得
-    ClubService.getPlayerSkillLevel()
-      .then((level) => set({ playerSkillLevel: level }))
-      .catch(() => {/* デフォルト 0.5 を維持 */});
+    // バッグ・実測データモードの場合は、指定されていなければDBからスキルレベルを非同期取得
+    if (playMode !== "robot" && bagSkillLevel == null) {
+      ClubService.getPlayerSkillLevel()
+        .then((level) => set({ playerSkillLevel: level }))
+        .catch(() => {/* デフォルト 0.5 を維持 */});
+    }
   },
 
   selectClub: (clubId) => set({ selectedClubId: clubId }),
@@ -342,7 +366,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // 実測データモード: 実測データからランダムにショットを選択
       // ロボット: 非パターは成功率100固定。バッグモード: 個人データを使って通常計算。
       const isPutter = club.type === "Putter";
-      const { measuredModePutterSkillLevel } = get();
+      const { measuredModePutterSkillLevel, robotSettings } = get();
       let result;
 
       if (isMeasuredMode && !isPutter) {
@@ -367,6 +391,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           useStoredDistance: !isRobotMode,
           shotIndex: currentHoleShots.length,
           seedNonce: `${roundSeedNonce}|hole:${currentHoleIndex}`,
+          headSpeed: isRobotMode && robotSettings ? robotSettings.headSpeed : undefined,
         });
       }
       const newHoleStrokes = holeStrokes + result.strokesAdded;
