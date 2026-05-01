@@ -144,6 +144,13 @@ function SetupScreen({
     }
   }, [playMode]);
 
+  // 実測データがない場合は自動的にバッグモードに切り替える
+  useEffect(() => {
+    if (playMode === "measured" && measuredPlayableClubCount === 0) {
+      setPlayMode("bag");
+    }
+  }, [playMode, measuredPlayableClubCount]);
+
   useEffect(() => {
     saveRobotSettings(robotSettings);
   }, [robotSettings]);
@@ -210,12 +217,6 @@ function SetupScreen({
           <p className="mt-2 text-sm text-emerald-700">
             選択中: <span className="font-semibold text-emerald-900">{selectedCourse.name}</span> ・ {selectedCourse.holes.length}ホール
           </p>
-          <Link
-            to={`/course-editor${bagQuery}`}
-            className="mt-3 inline-block text-sm text-sky-700 hover:text-sky-900 underline"
-          >
-            コースエディタでマイコースを作成・編集
-          </Link>
         </div>
         <div className="rounded-xl border border-emerald-200 bg-white/80 p-4">
           <p className="text-xs font-bold tracking-[0.12em] text-emerald-700">プレーモード</p>
@@ -422,6 +423,11 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
   useEffect(() => {
     loadActualShotRows();
   }, [loadActualShotRows]);
+
+  // バッグ切り替え時に実測データを再読み込み
+  useEffect(() => {
+    loadActualShotRows();
+  }, [activeBagId, loadActualShotRows]);
   const measuredSource = useMemo(() => {
     if (!activeBagId) return [];
     return filterClubsWithActualShots(bagSimClubs, actualShotRows[String(activeBagId)] ?? []);

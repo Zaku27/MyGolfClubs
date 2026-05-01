@@ -101,6 +101,10 @@ export const RoundHistoryService = {
     await db.roundHistory.delete(id);
   },
 
+  async deleteRounds(ids: number[]): Promise<void> {
+    await db.roundHistory.bulkDelete(ids);
+  },
+
   async getAggregateStats(rounds?: RoundHistory[]): Promise<AggregateStats> {
     const targetRounds = rounds ?? (await this.getAllRounds());
 

@@ -237,11 +237,11 @@ export function simulateAutoPutts(
     const pgaRate = interpolate(distance, pgaPoints);
 
     // playerSkillLevelによる調整
-    // 0.0: PGAの10%（初心者アマチュア）
-    // 0.5: PGAの47.5%（中級アマチュア）
-    // 0.8: PGAの70%（上級アマチュア）
-    // 1.0: PGAの85%（プロレベル）
-    const skillFactor = 0.1 + playerSkillLevel * 0.75; // 0.1-0.85
+    // 0.0: PGAの5%（初心者アマチュア）
+    // 0.5: PGAの40%（中級アマチュア）
+    // 0.8: PGAの61%（上級アマチュア）
+    // 1.0: PGAの75%（プロレベル）
+    const skillFactor = 0.05 + playerSkillLevel * 0.70; // 0.05-0.75
 
     // 距離が長くなるほどPGAデータから大きく離れる
     // 短い距離ではPGAに近い、長い距離では大きく下がる

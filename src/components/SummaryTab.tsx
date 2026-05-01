@@ -27,22 +27,6 @@ const IconTrendingUp = ({ className = '' }: { className?: string }) => (
   </svg>
 );
 
-const IconFileDown = ({ className = '' }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} width="1em" height="1em">
-    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-    <polyline points="14 2 14 8 20 8" />
-    <path d="M12 18v-6" />
-    <path d="m9 15 3 3 3-3" />
-  </svg>
-);
-
-const IconMapPin = ({ className = '' }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} width="1em" height="1em">
-    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-    <circle cx="12" cy="10" r="3" />
-  </svg>
-);
-
 const IconCheckCircle = ({ className = '' }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} width="1em" height="1em">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />

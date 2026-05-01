@@ -892,49 +892,112 @@ export function PersonalDataInput() {
 
 
         <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex-1">
-              <h2 className="text-base font-semibold text-emerald-900">スキルレベル設定</h2>
-              <p className="text-sm text-emerald-800 mt-1">
-                現在: {getSkillLabel(playerSkillLevel)} ({playerSkillLevel.toFixed(2)})
-              </p>
-              <div className="mt-4 flex items-center gap-3">
-                <span className="w-10 text-xs text-slate-600">0.00</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={playerSkillLevel}
-                  onChange={(event) => void handleSkillLevelChange(Number(event.target.value))}
-                  className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-emerald-200 accent-emerald-600"
-                />
-                <span className="w-10 text-right text-xs text-slate-600">1.00</span>
+          <div className="flex flex-col gap-4">
+            {/* ヘッダー */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+              <div>
+                <h2 className="text-base font-semibold text-emerald-900">スキルレベル設定</h2>
+                <p className="text-sm text-emerald-800 mt-1">
+                  現在: <span className="font-bold">{getSkillLabel(playerSkillLevel)}</span>
+                  <span className="ml-2 text-xs">(スコア目安: {SKILL_PRESETS.find(p => getSkillLabel(playerSkillLevel) === p.label)?.score ?? '-'})</span>
+                </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {SKILL_PRESETS.map((preset) => {
-                const isActive = Math.abs(playerSkillLevel - preset.value) < 0.01;
-                return (
+
+            {/* スキルレベルゲージ - 中央揃え */}
+            <div className="flex justify-center">
+              <div className="w-[90%]">
+                {/* ゲージ本体 */}
+                <div className="relative">
+                  {/* 背景の色分けバー */}
+                  <div className="absolute top-1/2 left-0 right-0 h-3 -translate-y-1/2 rounded-full overflow-hidden flex">
+                    <div className="h-full bg-red-400" style={{ width: '15%' }} title="初心者 (0.00-0.15)" />
+                    <div className="h-full bg-orange-400" style={{ width: '20%' }} title="初級者 (0.15-0.35)" />
+                    <div className="h-full bg-yellow-400" style={{ width: '30%' }} title="中級者 (0.35-0.65)" />
+                    <div className="h-full bg-lime-400" style={{ width: '25%' }} title="上級者 (0.65-0.90)" />
+                    <div className="h-full bg-emerald-500" style={{ width: '10%' }} title="超上級者 (0.90-1.00)" />
+                  </div>
+                  {/* 実際のrange input */}
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={playerSkillLevel}
+                    onChange={(event) => void handleSkillLevelChange(Number(event.target.value))}
+                    className="relative z-10 w-full h-6 cursor-pointer opacity-0"
+                  />
+                  {/* 現在位置インジケーター */}
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-4 h-6 bg-emerald-700 rounded-sm border-2 border-white shadow-md pointer-events-none transition-all duration-150"
+                    style={{ left: `calc(${playerSkillLevel * 100}% - 8px)` }}
+                  />
+                </div>
+
+                {/* 目盛りラベル */}
+                <div className="relative mt-2 h-12">
+                  {/* 初心者 */}
                   <button
-                    key={preset.label}
                     type="button"
-                    onClick={() => void handleSkillLevelChange(preset.value)}
-                    className={[
-                      "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
-                      isActive
-                        ? "border-emerald-700 bg-emerald-700 text-white"
-                        : "border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-100",
-                    ].join(" ")}
-                    title={`スコア目安: ${preset.score}`}
+                    onClick={() => void handleSkillLevelChange(0.1)}
+                    className="absolute text-center cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{ left: '7.5%', transform: 'translateX(-50%)' }}
                   >
-                    {preset.label}
-                    <span className="ml-1 text-xs text-emerald-900">({preset.score})</span>
+                    <div className="text-xs font-medium text-red-600">初心者</div>
+                    <div className="text-[10px] text-slate-500">120以上</div>
                   </button>
-                );
-              })}
+                  {/* 初級者 */}
+                  <button
+                    type="button"
+                    onClick={() => void handleSkillLevelChange(0.2)}
+                    className="absolute text-center cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{ left: '25%', transform: 'translateX(-50%)' }}
+                  >
+                    <div className="text-xs font-medium text-orange-600">初級者</div>
+                    <div className="text-[10px] text-slate-500">110-119</div>
+                  </button>
+                  {/* 中級者 */}
+                  <button
+                    type="button"
+                    onClick={() => void handleSkillLevelChange(0.5)}
+                    className="absolute text-center cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{ left: '50%', transform: 'translateX(-50%)' }}
+                  >
+                    <div className="text-xs font-medium text-yellow-600">中級者</div>
+                    <div className="text-[10px] text-slate-500">90-109</div>
+                  </button>
+                  {/* 上級者 */}
+                  <button
+                    type="button"
+                    onClick={() => void handleSkillLevelChange(0.8)}
+                    className="absolute text-center cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{ left: '77.5%', transform: 'translateX(-50%)' }}
+                  >
+                    <div className="text-xs font-medium text-lime-600">上級者</div>
+                    <div className="text-[10px] text-slate-500">80-89</div>
+                  </button>
+                  {/* 超上級者 */}
+                  <button
+                    type="button"
+                    onClick={() => void handleSkillLevelChange(1.0)}
+                    className="absolute text-center cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{ left: '90%', transform: 'translateX(-50%)' }}
+                  >
+                    <div className="text-xs font-medium text-emerald-600">超上級者</div>
+                    <div className="text-[10px] text-slate-500">79以下</div>
+                  </button>
+                </div>
+
+                {/* 数値表示 */}
+                <div className="flex justify-between text-xs text-slate-400 mt-1">
+                  <span>0.00</span>
+                  <span className="font-mono text-emerald-700 font-bold">{playerSkillLevel.toFixed(2)}</span>
+                  <span>1.00</span>
+                </div>
+              </div>
             </div>
           </div>
+
           <div className="mt-4 flex flex-col gap-2 border-t border-emerald-200 pt-4">
             <div className="flex items-center gap-2">
               {(() => {

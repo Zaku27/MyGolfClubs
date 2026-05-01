@@ -56,6 +56,7 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
   const [clubTrends, setClubTrends] = useState<ClubSuccessTrend[]>([]);
   const [courseNames, setCourseNames] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   // フィルター状態
   const [filter, setFilter] = useState<RoundFilter>({
@@ -134,7 +135,53 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
   const handleDelete = async (id: number) => {
     if (!confirm('このラウンドを削除しますか？')) return;
     await RoundHistoryService.deleteRound(id);
-    setRounds((prev) => prev.filter((r) => r.id !== id));
+    const newRounds = rounds.filter((r) => r.id !== id);
+    setRounds(newRounds);
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
+    // 統計サマリーを更新
+    const aggregateStats = await RoundHistoryService.getAggregateStats(newRounds);
+    setStats(aggregateStats);
+    const trends = await RoundHistoryService.getClubSuccessTrends(newRounds);
+    setClubTrends(trends);
+  };
+
+  // 複数選択ハンドラー
+  const handleToggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === rounds.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(rounds.map((r) => r.id).filter((id): id is number => id !== undefined)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`選択した ${selectedIds.size} 件のラウンドを削除しますか？`)) return;
+    await RoundHistoryService.deleteRounds(Array.from(selectedIds));
+    const newRounds = rounds.filter((r) => !selectedIds.has(r.id ?? 0));
+    setRounds(newRounds);
+    setSelectedIds(new Set());
+    // 統計サマリーを更新
+    const aggregateStats = await RoundHistoryService.getAggregateStats(newRounds);
+    setStats(aggregateStats);
+    const trends = await RoundHistoryService.getClubSuccessTrends(newRounds);
+    setClubTrends(trends);
   };
 
   if (isLoading) {
@@ -331,7 +378,17 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
 
         {/* ラウンド一覧 */}
         <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
-          <h2 className="text-xl font-bold text-emerald-900">ラウンド一覧</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-emerald-900">ラウンド一覧</h2>
+            {selectedIds.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-rose-700"
+              >
+                選択した {selectedIds.size} 件を削除
+              </button>
+            )}
+          </div>
 
           {rounds.length === 0 ? (
             <p className="mt-4 text-emerald-700">ラウンド履歴がありません。</p>
@@ -341,6 +398,15 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
                 <table className="w-full text-left text-sm">
                   <thead className="sticky top-0 bg-emerald-50/95">
                     <tr className="border-b border-emerald-300 text-emerald-700">
+                      <th className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.size === rounds.length && rounds.length > 0}
+                          onChange={handleSelectAll}
+                          className="rounded border-emerald-400 bg-emerald-50 text-emerald-600"
+                          title="全選択/解除"
+                        />
+                      </th>
                       <th className="px-3 py-2">日付</th>
                       <th className="px-3 py-2">コース</th>
                       <th className="px-3 py-2">モード</th>
@@ -355,8 +421,16 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
                     {rounds.map((round) => (
                       <tr
                         key={round.id}
-                        className="border-b border-emerald-200 hover:bg-emerald-100/50"
+                        className={`border-b border-emerald-200 hover:bg-emerald-100/50 ${selectedIds.has(round.id ?? 0) ? 'bg-emerald-100/70' : ''}`}
                       >
+                        <td className="px-3 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(round.id ?? 0)}
+                            onChange={() => round.id && handleToggleSelect(round.id)}
+                            className="rounded border-emerald-400 bg-emerald-50 text-emerald-600"
+                          />
+                        </td>
                         <td className="px-3 py-3 text-emerald-900">{formatDate(round.completedAt)}</td>
                         <td className="px-3 py-3 text-emerald-900">
                           {round.courseName} ({round.courseHoleCount}H)

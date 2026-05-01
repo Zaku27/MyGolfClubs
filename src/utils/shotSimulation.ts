@@ -752,9 +752,9 @@ function simulatePutt(
     }
   }
 
-  // スキルレベルを反映（最低50%保証）
-  const minSkillMultiplier = 0.5;
-  let makeChance = baseChance * (minSkillMultiplier + (1 - minSkillMultiplier) * playerSkillLevel);
+  // スキルレベルを反映（最低40%保証）
+  const minSkillMultiplier = 0.4;
+  let makeChance = baseChance * (minSkillMultiplier + 0.4 * playerSkillLevel);
   makeChance = Math.min(0.98, makeChance);
 
   if (random() < makeChance) {
