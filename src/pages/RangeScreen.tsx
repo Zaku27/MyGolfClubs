@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/PageHeader';
 import { classifyShotQualityByTargetError } from '../utils/landingPosition';
 import { GolfBagPanel } from '../components/GolfBagPanel';
 import {
@@ -864,26 +865,27 @@ const expectedDistance = estimatedClubDistance ?? actualTotalDistance;
       <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           {/* Header */}
-          <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">シミュレーター設定</p>
-              <h1 className="text-2xl font-bold text-slate-900">レンジシミュレーター</h1>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Link
-                to="/personal-data"
-                className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 transition-colors"
-              >
-                パーソナルデータへ
-              </Link>
-              <Link
-                to="/"
-                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                ホームに戻る
-              </Link>
-            </div>
-          </div>
+          <PageHeader
+            title="レンジシミュレーター"
+            label="シミュレーター設定"
+            variant="simulator"
+            actions={
+              <>
+                <Link
+                  to="/personal-data"
+                  className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 transition-colors"
+                >
+                  パーソナルデータへ
+                </Link>
+                <Link
+                  to="/"
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  ホームに戻る
+                </Link>
+              </>
+            }
+          />
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
         <main className="w-full lg:flex-[1_1_0] min-w-0 flex flex-col gap-4">

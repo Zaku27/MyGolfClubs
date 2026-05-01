@@ -7,6 +7,7 @@ import {
   getPerformanceSummary,
 } from "../../utils/roundAnalysis";
 import { RoundHistoryService } from "../../db/roundHistoryService";
+import { PageHeader } from "../PageHeader";
 
 interface Props {
   onPlayAnotherRound: () => void;
@@ -203,11 +204,14 @@ export function PostRoundAnalysis({
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 px-4 py-6 text-emerald-900 sm:px-6 sm:py-8">
       <div className="mx-auto w-full max-w-5xl space-y-5 sm:space-y-6">
-        <header className="rounded-3xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 shadow-sm shadow-emerald-300/40 sm:px-7 sm:py-7">
-          <p className="text-xs uppercase tracking-[0.24em] text-emerald-700">ラウンド完了</p>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl text-emerald-900">ラウンド分析</h1>
+        <PageHeader
+          title="ラウンド分析"
+          label="ラウンド完了"
+          variant="simulator"
+        />
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 px-5 py-5 shadow-sm shadow-emerald-300/40">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 shadow-sm shadow-emerald-300/40">
               <p className="text-xs uppercase tracking-[0.16em] text-emerald-700">最終スコア</p>
               <p className="mt-2 text-5xl font-black leading-none text-emerald-900">{toParString(analysis.final, analysis.totalPar)}</p>
@@ -226,7 +230,7 @@ export function PostRoundAnalysis({
           </div>
 
           <RoundClubSummaryTable items={analysis.clubRoundSummary} />
-        </header>
+        </section>
 
         <section className="rounded-3xl border border-emerald-300 bg-emerald-50/90 p-5 sm:p-6 shadow-sm shadow-emerald-300/40">
           <h2 className="text-xl font-bold text-emerald-900">主要統計</h2>

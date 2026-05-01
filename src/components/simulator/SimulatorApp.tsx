@@ -12,6 +12,7 @@ import { HoleView } from "./HoleView";
 import { filterClubsWithActualShots } from "../../utils/actualShotFilter";
 import { PostRoundAnalysis } from "./PostRoundAnalysis";
 import { RoundHistoryScreen } from "./RoundHistoryScreen";
+import { SHOW_HOME_RELEASE_LIMITED_ACTIONS } from "../../config/featureFlags";
 
 import { Scorecard } from "./Scorecard";
 
@@ -44,11 +45,16 @@ interface SelectableCourse {
 
 function buildSelectableCourses(customCourses: CustomCoursePreset[]): SelectableCourse[] {
   const builtinCourses: SelectableCourse[] = [
-    { id: "builtin-1", name: "ノーザンカントリー錦ヶ原 1H", holes: COURSE_1HOLE, source: "builtin" },
-    { id: "builtin-3", name: "ノーザンカントリー錦ヶ原 3H", holes: COURSE_3HOLES, source: "builtin" },
-    { id: "builtin-9", name: "ノーザンカントリー錦ヶ原 OUT", holes: COURSE_9HOLES, source: "builtin" },
-    { id: "builtin-18", name: "ノーザンカントリー錦ヶ原", holes: COURSE_18HOLES, source: "builtin" },
+    { id: "builtin-1", name: "標準コース 1H", holes: COURSE_1HOLE, source: "builtin" },
+    { id: "builtin-3", name: "標準コース 3H", holes: COURSE_3HOLES, source: "builtin" },
+    { id: "builtin-9", name: "標準コース OUT", holes: COURSE_9HOLES, source: "builtin" },
+    { id: "builtin-18", name: "標準コース", holes: COURSE_18HOLES, source: "builtin" },
   ];
+
+  // SHOW_HOME_RELEASE_LIMITED_ACTIONS が false の時はマイコースを表示しない
+  if (!SHOW_HOME_RELEASE_LIMITED_ACTIONS) {
+    return builtinCourses;
+  }
 
   const customSelectable = customCourses.map((course) => ({
     id: course.id,

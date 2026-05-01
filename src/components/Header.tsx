@@ -1,4 +1,4 @@
-import { APP, SOCIAL } from '../constants/app';
+import { APP } from '../constants/app';
 import './Header.css';
 
 export const AppHeader = ({ showSimulator }: { showSimulator?: boolean }) => {
@@ -46,6 +46,7 @@ export const AppHeader = ({ showSimulator }: { showSimulator?: boolean }) => {
           </div>
         )}
         
+        {/* Share button - hidden for now
         {!showSimulator && (
           <div className="header-actions">
             <button 
@@ -71,7 +72,7 @@ export const AppHeader = ({ showSimulator }: { showSimulator?: boolean }) => {
               <span className="share-text">Share</span>
             </button>
           </div>
-        )}
+        )} */}
       </div>
       
       {/* Room-like grid background pattern */}

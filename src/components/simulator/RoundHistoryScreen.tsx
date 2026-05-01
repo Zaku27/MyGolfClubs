@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RoundHistoryService, type RoundFilter, type AggregateStats, type ClubSuccessTrend } from '../../db/roundHistoryService';
 import type { RoundHistory } from '../../db/database';
+import { PageHeader } from '../PageHeader';
 
 interface Props {
   bagId?: number | null;
@@ -148,31 +149,28 @@ export function RoundHistoryScreen({ bagId, onBack }: Props) {
     <div className="min-h-screen bg-gradient-to-b from-green-100 via-emerald-100 to-lime-100 px-4 py-6 text-emerald-900 sm:px-6 sm:py-8">
       <div className="mx-auto w-full max-w-6xl space-y-5 sm:space-y-6">
         {/* ヘッダー */}
-        <header className="rounded-3xl border border-emerald-300 bg-emerald-50/90 px-5 py-6 shadow-sm shadow-emerald-300/40 sm:px-7 sm:py-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-emerald-700">Statistics</p>
-              <h1 className="mt-2 text-3xl font-black sm:text-4xl text-emerald-900">ラウンド履歴・統計</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              {onBack ? (
-                <button
-                  onClick={onBack}
-                  className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
-                >
-                  コースシミュレーターに戻る
-                </button>
-              ) : (
-                <Link
-                  to={`/simulator${bagQuery}`}
-                  className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
-                >
-                  コースシミュレーターに戻る
-                </Link>
-              )}
-            </div>
-          </div>
-        </header>
+        <PageHeader
+          title="ラウンド履歴・統計"
+          label="Statistics"
+          variant="simulator"
+          actions={
+            onBack ? (
+              <button
+                onClick={onBack}
+                className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+              >
+                コースシミュレーターに戻る
+              </button>
+            ) : (
+              <Link
+                to={`/simulator${bagQuery}`}
+                className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+              >
+                コースシミュレーターに戻る
+              </Link>
+            )
+          }
+        />
 
         {/* フィルターセクション */}
         <section className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 sm:p-5 shadow-sm shadow-emerald-300/40">

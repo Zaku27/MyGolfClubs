@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Papa from 'papaparse';
 import type { ParseResult } from 'papaparse';
-import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/PageHeader';
 import {
   buildCatalogSpecKey,
   CATALOG_CLUB_TYPES,
@@ -693,15 +693,12 @@ export default function AdminClubs() {
 
   return (
     <main className="admin-clubs-page">
-      <div className="admin-clubs-header">
-        <div>
-          <h1>Catalog Specs 管理</h1>
-          <p>CatalogSpecsは参照データです。MyClubsとは分離し、最小限編集だけ許可しています。</p>
-        </div>
-        <Link to="/" className="btn-primary">
-          ホームに戻る
-        </Link>
-      </div>
+      <PageHeader
+        title="Catalog Specs 管理"
+        subtitle="CatalogSpecsは参照データです。MyClubsとは分離し、最小限編集だけ許可しています。"
+        variant="admin"
+        backTo="/"
+      />
 
       <div className="admin-clubs-tabs" role="tablist" aria-label="管理タブ">
         <button
