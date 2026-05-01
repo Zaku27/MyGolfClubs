@@ -104,13 +104,13 @@ export function SummaryTab({ data }: SummaryTabProps) {
             <p className="text-3xl font-bold">{currentSet.avg7IronDistance}<span className="text-lg font-normal text-muted-foreground">yd</span></p>
           </div>
 
-          {/* 改善ポテンシャル */}
+          {/* 推定ヘッドスピード */}
           <div className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
-              <IconTrendingUp className="w-4 h-4 text-green-500" />
-              <span className="text-sm text-muted-foreground">改善ポテンシャル</span>
+              <IconTrendingUp className="w-4 h-4 text-blue-500" />
+              <span className="text-sm text-muted-foreground">推定ヘッドスピード</span>
             </div>
-            <p className="text-3xl font-bold text-green-600">+{currentSet.potentialGain}<span className="text-lg font-normal text-muted-foreground">yd</span></p>
+            <p className="text-3xl font-bold text-blue-800">{currentSet.estimatedHeadSpeed.toFixed(1)}<span className="text-lg font-normal text-muted-foreground">m/s</span></p>
           </div>
         </div>
       </section>
@@ -132,86 +132,88 @@ export function SummaryTab({ data }: SummaryTabProps) {
       )}
 
       {/* 2. おすすめ新クラブ提案セクション */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <IconTrophy className="w-5 h-5 text-primary" />
-          おすすめ新クラブ
-        </h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {recommendations.map((rec, index) => (
-            <div key={index} className="bg-card/80 border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-              {/* 画像エリア */}
-              <div className="aspect-video bg-muted/50 flex items-center justify-center">
-                {rec.imageUrl ? (
-                  <img
-                    src={rec.imageUrl}
-                    alt={rec.clubName}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="text-muted-foreground text-sm">
-                    <IconTarget className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                    {categoryLabel[rec.category]}
-                  </div>
-                )}
-              </div>
-
-              {/* コンテンツエリア */}
-              <div className="p-4 space-y-3">
-                {/* ヘッダー */}
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    {rec.actionType && (
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        rec.actionType === 'add' 
-                          ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                          : 'bg-orange-100 text-orange-700 border border-orange-200'
-                      }`}>
-                        {rec.actionType === 'add' ? '追加' : '入れ替え'}
-                      </span>
-                    )}
-                    {rec.replaceTarget && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                        {rec.replaceTarget}の入れ替え
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-semibold text-lg">{rec.clubName}</h3>
-                </div>
-
-                {/* 理由 */}
-                <ul className="space-y-1">
-                  {rec.reason.map((r, i) => (
-                    <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      {r}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* 期待効果 */}
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {rec.expectedDistanceGain > 0 && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                      +{rec.expectedDistanceGain}yd
-                    </span>
-                  )}
-                  {rec.expectedAccuracyGain && rec.expectedAccuracyGain > 0 && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                      精度 +{rec.expectedAccuracyGain}%
-                    </span>
+      {recommendations.length > 0 && (
+        <section>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <IconTrophy className="w-5 h-5 text-primary" />
+            おすすめ新クラブ
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {recommendations.map((rec, index) => (
+              <div key={index} className="bg-card/80 border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                {/* 画像エリア */}
+                <div className="aspect-video bg-muted/50 flex items-center justify-center">
+                  {rec.imageUrl ? (
+                    <img
+                      src={rec.imageUrl}
+                      alt={rec.clubName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-muted-foreground text-sm">
+                      <IconTarget className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                      {categoryLabel[rec.category]}
+                    </div>
                   )}
                 </div>
 
-                {/* アクションボタン */}
-                <button className="w-full mt-3 px-4 py-2 rounded-lg border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-sm font-medium">
-                  このスペックのクラブを探す
-                </button>
+                {/* コンテンツエリア */}
+                <div className="p-4 space-y-3">
+                  {/* ヘッダー */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      {rec.actionType && (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          rec.actionType === 'add'
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                            : 'bg-orange-100 text-orange-700 border border-orange-200'
+                        }`}>
+                          {rec.actionType === 'add' ? '追加' : '入れ替え'}
+                        </span>
+                      )}
+                      {rec.replaceTarget && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                          {rec.replaceTarget}の入れ替え
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-semibold text-lg">{rec.clubName}</h3>
+                  </div>
+
+                  {/* 理由 */}
+                  <ul className="space-y-1">
+                    {rec.reason.map((r, i) => (
+                      <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* 期待効果 */}
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {rec.expectedDistanceGain > 0 && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                        +{rec.expectedDistanceGain}yd
+                      </span>
+                    )}
+                    {rec.expectedAccuracyGain && rec.expectedAccuracyGain > 0 && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        精度 +{rec.expectedAccuracyGain}%
+                      </span>
+                    )}
+                  </div>
+
+                  {/* アクションボタン */}
+                  <button className="w-full mt-3 px-4 py-2 rounded-lg border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-sm font-medium">
+                    このスペックのクラブを探す
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* セパレーター */}
       <div className="h-px bg-border" />
@@ -223,36 +225,43 @@ export function SummaryTab({ data }: SummaryTabProps) {
           調整・フィッティング提案
         </h2>
         <div className="space-y-3">
-          {adjustments.map((adj, index) => {
-            const priority = priorityConfig[adj.priority];
-            return (
-              <div
-                key={index}
-                className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start gap-4">
-                  {/* 優先度バッジ */}
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border shrink-0 ${priority.badgeClass}`}>
-                    {priority.label}
-                  </span>
+          {adjustments.length === 0 ? (
+            <div className="bg-card/80 border border-border rounded-xl p-6 text-center">
+              <IconCheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+              <p className="text-muted-foreground">問題は見つかりませんでした。現在のクラブセットは良好な状態です。</p>
+            </div>
+          ) : (
+            adjustments.map((adj, index) => {
+              const priority = priorityConfig[adj.priority];
+              return (
+                <div
+                  key={index}
+                  className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start gap-4">
+                    {/* 優先度バッジ */}
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border shrink-0 ${priority.badgeClass}`}>
+                      {priority.label}
+                    </span>
 
-                  {/* コンテンツ */}
-                  <div className="flex-1 space-y-2">
-                    <h3 className="font-semibold text-lg">{adj.title}</h3>
-                    <p className="text-sm text-muted-foreground">{adj.description}</p>
+                    {/* コンテンツ */}
+                    <div className="flex-1 space-y-2">
+                      <h3 className="font-semibold text-lg">{adj.title}</h3>
+                      <p className="text-sm text-muted-foreground">{adj.description}</p>
 
-                    {/* 効果 */}
-                    <div className="flex flex-wrap gap-3 pt-1">
-                      <span className="inline-flex items-center text-sm text-green-600 font-medium">
-                        <IconTrendingUp className="w-4 h-4 mr-1" />
-                        {adj.estimatedEffect}
-                      </span>
+                      {/* 効果 */}
+                      <div className="flex flex-wrap gap-3 pt-1">
+                        <span className="inline-flex items-center text-sm text-green-600 font-medium">
+                          <IconTrendingUp className="w-4 h-4 mr-1" />
+                          {adj.estimatedEffect}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </section>
 
@@ -262,7 +271,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
       {/* 4. 全体評価セクション（フッター風） */}
       <section className="bg-muted/30 rounded-xl p-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="space-y-2 text-center md:text-left">
+          {/* <div className="space-y-2 text-center md:text-left">
             <h3 className="font-semibold text-lg">クラブセット完成度</h3>
             <div className="flex items-center gap-4">
               <div className="w-48 h-2 bg-muted-foreground/20 rounded-full overflow-hidden">
@@ -273,10 +282,10 @@ export function SummaryTab({ data }: SummaryTabProps) {
               </div>
               <span className="text-sm text-muted-foreground">{currentSet.clubCount}/14本</span>
             </div>
-          </div>
+          </div> */}
 
           {/* CTAボタン */}
-          <div className="flex flex-wrap gap-3">
+          {/* <div className="flex flex-wrap gap-3">
             <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium">
               <IconFileDown className="w-4 h-4" />
               この提案をPDFで保存
@@ -285,7 +294,7 @@ export function SummaryTab({ data }: SummaryTabProps) {
               <IconMapPin className="w-4 h-4" />
               ショップ検索
             </button>
-          </div>
+          </div> */}
         </div>
       </section>
     </div>

@@ -67,7 +67,7 @@ const NEAR_CUP_DISTANCES: Record<ShotQuality | "other", { min: number; range: nu
 };
 
 /** スキルレベルによる距離倍率（最小〜最大） */
-const SKILL_DISTANCE_RANGE = { min: 0.92, max: 1.08 };
+const SKILL_DISTANCE_RANGE = { min: 0.85, max: 1.12 };
 
 /** 有効成功率の範囲 */
 const SUCCESS_RATE_BOUNDS = { min: 15, max: 95 };
@@ -140,9 +140,9 @@ const LIE_SUCCESS_PENALTIES: Partial<Record<LieType, number>> = {
 
 /** スキルレベルごとのハザード回復係数 */
 const HAZARD_RECOVERY_FACTORS = [
-  { threshold: 0.35, factor: 0.4 },
-  { threshold: 0.65, factor: 0.7 },
-  { threshold: 1.0, factor: 0.95 },
+  { threshold: 0.2, factor: 0.3 },
+  { threshold: 0.5, factor: 0.65 },
+  { threshold: 1.0, factor: 0.98 },
 ];
 
 /** 地面の硬さマッピング */

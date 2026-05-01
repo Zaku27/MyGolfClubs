@@ -42,25 +42,29 @@ export function calculateBaseClubSuccessRate({
 
   // At low skill, difficult clubs are penalized more strongly to widen the
   // putter-to-driver gap.
-  const lowSkillDifficultyPenalty = Math.pow(1 - skill, 1.15) * difficulty * 22;
+  // 初心者・初級者のペナルティを強化（22→28）
+  const lowSkillDifficultyPenalty = Math.pow(1 - skill, 1.3) * difficulty * 28;
   const lowSkillRate = Math.max(5, baseSuccessRate - lowSkillDifficultyPenalty);
 
   // At high skill, all clubs converge into a narrow high-success band near 100.
-  const highSkillTarget = 99 - difficulty * 2.2;
-  const normalizedSkill = Math.pow(skill, 0.78);
+  // 上級者の成功率目標をさらに高く設定（99→99.5）
+  const highSkillTarget = 99.5 - difficulty * 1.5;
+  // スキルの影響をより強く反映（0.78→0.65）
+  const normalizedSkill = Math.pow(skill, 0.65);
   let rate = lowSkillRate * (1 - normalizedSkill) + highSkillTarget * normalizedSkill;
 
   // Weak-club weakness is stricter at low skill and mostly relaxed at high skill.
+  // 弱いクラブのペナルティを低スキルでさらに厳しく
   let weakness = personalData ? personalData.weaknessFactor : 0;
   if (isWeakClub) {
-    const minWeaknessPenalty = 0.35 - skill * 0.34; // 0.35 -> 0.01
+    const minWeaknessPenalty = 0.45 - skill * 0.43; // 0.45 -> 0.02
     weakness = Math.max(weakness, minWeaknessPenalty);
   }
   const weaknessMultiplier =
-    1 - weakness * (isWeakClub ? 1.28 : 0.82) * (1 - skill * 0.92);
+    1 - weakness * (isWeakClub ? 1.45 : 0.95) * (1 - skill * 0.88);
 
   rate = rate * weaknessMultiplier;
 
   // Allow near-100 outcomes for high-skill players.
-  return Math.max(5, Math.min(99, Math.round(rate * 10) / 10));
+  return Math.max(5, Math.min(99.5, Math.round(rate * 10) / 10));
 }

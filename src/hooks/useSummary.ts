@@ -705,6 +705,9 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     // Calculate basic metrics
     const clubCount = bagClubs.length;
 
+    // Calculate estimated head speed from clubs (based on measured distances and lofts)
+    const estimatedHeadSpeed = estimateHeadSpeedFromClubs(bagClubs) ?? 44.5;
+
     // If less than 8 clubs, skip recommendations and adjustments
     if (clubCount < 8) {
       return {
@@ -713,6 +716,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
           avgDriverDistance: 0,
           avg7IronDistance: 0,
           potentialGain: 0,
+          estimatedHeadSpeed,
         },
         recommendations: [],
         adjustments: [],
@@ -898,7 +902,6 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     adjustments.push(...gapRecommendations);
 
     // Check shaft flex compatibility based on estimated head speed
-    const estimatedHeadSpeed = estimateHeadSpeedFromClubs(bagClubs);
     const flexAdjustments = checkFlexCompatibility(bagClubs, estimatedHeadSpeed);
     adjustments.push(...flexAdjustments);
 
@@ -1043,6 +1046,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
         avgDriverDistance,
         avg7IronDistance,
         potentialGain,
+        estimatedHeadSpeed,
       },
       recommendations: limitedRecommendations,
       adjustments,

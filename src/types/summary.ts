@@ -4,6 +4,7 @@ export interface SummaryData {
     avgDriverDistance: number;     // ヤード
     avg7IronDistance: number;
     potentialGain: number;         // 改善ポテンシャル（ヤード）
+    estimatedHeadSpeed: number;   // 推定ヘッドスピード（実測値から算出）
   };
   recommendations: Recommendation[];
   adjustments: Adjustment[];
