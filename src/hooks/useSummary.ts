@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useClubStore } from '../store/clubStore';
-import type { SummaryData, Recommendation, Adjustment, ProposedSpec } from '../types/summary';
+import type { SummaryData, Recommendation, Adjustment, ProposedSpec, WeightLengthSuggestion } from '../types/summary';
 import type { GolfClub } from '../types/golf';
-import { buildSwingLengthAnalysis } from '../utils/analysisBuilders';
+import { buildSwingLengthAnalysis, buildWeightLengthAnalysis } from '../utils/analysisBuilders';
 import { readStoredNumber } from '../utils/storage';
 import { computeGapsAndRecommendations, evaluateSwingLengthSlope, getSwingLengthSlopeMessage, swingWeightToNumeric, estimateHeadSpeedFromClubs, checkFlexCompatibility, getEstimatedDistance, getClubCategory } from '../utils/analysisUtils';
 import { getClubTypeDisplay } from '../utils/clubUtils';
@@ -720,6 +720,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
         },
         recommendations: [],
         adjustments: [],
+        weightLengthSuggestions: [],
         message: 'クラブ数が少ないため、おすすめ新クラブと調整・フィッティング提案の判定は行われません。まずはクラブを追加してください。',
       };
     }
@@ -1026,7 +1027,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
     // Sort adjustments by priority
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     adjustments.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-    
+
     // Generate recommendations for 14 clubs after adjustments are sorted
     if (clubCount >= 14) {
       recommendations = generateRecommendationsFor14Clubs(
@@ -1036,9 +1037,139 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
         estimateHeadSpeedFromClubs(bagClubs)
       );
     }
-    
+
     // Limit to top 3 recommendations
     const limitedRecommendations = recommendations.slice(0, 3);
+
+    // Generate weight/length analysis suggestions
+    const { tableClubs: weightLengthTable } = buildWeightLengthAnalysis(bagClubs, () => true);
+    const weightLengthSuggestions: WeightLengthSuggestion[] = [];
+
+    // Calculate overall set weight trend (average deviation)
+    const avgDeviation = weightLengthTable.length > 0
+      ? weightLengthTable.reduce((sum, club) => sum + club.deviation, 0) / weightLengthTable.length
+      : 0;
+    const isSetGenerallyLight = avgDeviation < -5;  // Average deviation less than -5g
+    const isSetGenerallyHeavy = avgDeviation > 5; // Average deviation more than 5g
+
+    // Find clubs with significant weight deviations from trend
+    const weightOutliers = weightLengthTable.filter((club) => {
+      const absDeviation = Math.abs(club.deviation);
+      return absDeviation > 12; // More than 12g deviation from trend
+    });
+
+    for (const club of weightOutliers) {
+      const absDeviation = Math.abs(club.deviation);
+      const priority: 'high' | 'medium' | 'low' = absDeviation > 20 ? 'high' : absDeviation > 15 ? 'medium' : 'low';
+
+      // Calculate recommended adjustments
+      const recommendedWeight = club.expectedWeight;
+      const currentLength = club.length;
+      // Length adjustment suggestion: typically 0.5 inch per club number
+      const recommendedLength = currentLength;
+
+      let reason: string;
+      let expectedEffect: string;
+
+      if (club.deviation > 0) {
+        // This club is heavier than trend
+        if (isSetGenerallyLight) {
+          // Set is light overall, so this club might actually be appropriate
+          reason = `重量がトレンドより${club.deviation.toFixed(1)}g重いですが、セット全体が軽めのため、軽いクラブを重く調整するのも検討してください。`;
+          expectedEffect = 'セット全体のバランス向上、ドライバーの重量は適正範囲内に';
+        } else if (isSetGenerallyHeavy) {
+          // Set is heavy overall, this club is even heavier
+          reason = `重量がトレンドより${club.deviation.toFixed(1)}g重いです。セット全体が重めなので、このクラブは特に重すぎる可能性があります。軽量化を検討してください。`;
+          expectedEffect = 'スイングスピード向上、操作性の改善';
+        } else {
+          // Set is in appropriate range, but this club deviates
+          reason = `重量がトレンドより${club.deviation.toFixed(1)}g重いです。セット全体のバランスが良いため、このクラブだけ調整することでさらに改善できます。`;
+          expectedEffect = 'セット全体のトレンドラインに沿った理想的な重量配分に';
+        }
+      } else {
+        // This club is lighter than trend
+        if (isSetGenerallyHeavy) {
+          // Set is heavy overall, so this club might actually be appropriate
+          reason = `重量がトレンドより${Math.abs(club.deviation).toFixed(1)}g軽いですが、セット全体が重めのため、重いクラブを軽く調整するのも検討してください。`;
+          expectedEffect = 'セット全体のバランス向上、操作性の改善';
+        } else if (isSetGenerallyLight) {
+          // Set is light overall, this club is even lighter
+          reason = `重量がトレンドより${Math.abs(club.deviation).toFixed(1)}g軽いです。セット全体が軽めなので、このクラブは特に軽すぎる可能性があります。重量の見直しを検討してください。`;
+          expectedEffect = '打感の安定化、ミスショットの減少';
+        } else {
+          // Set is in appropriate range, but this club deviates
+          reason = `重量がトレンドより${Math.abs(club.deviation).toFixed(1)}g軽いです。セット全体のバランスが良いため、このクラブだけ調整することでさらに改善できます。`;
+          expectedEffect = 'セット全体のトレンドラインに沿った理想的な重量配分に';
+        }
+      }
+
+      weightLengthSuggestions.push({
+        clubName: getClubTypeDisplay(club.clubType, club.number || ''),
+        clubType: club.clubType ?? 'Unknown',
+        currentWeight: club.weight,
+        currentLength,
+        recommendedWeight,
+        recommendedLength,
+        weightDeviation: club.deviation,
+        lengthDeviation: 0,
+        priority,
+        reason,
+        expectedEffect,
+      });
+    }
+
+    // [COMMENTED OUT] Check for length consistency within categories
+    // const categoryLengths = new Map<string, { club: GolfClub; length: number }[]>();
+    // for (const club of bagClubs) {
+    //   if (club.length > 0 && club.clubType && club.clubType !== 'Putter') {
+    //     if (!categoryLengths.has(club.clubType)) {
+    //       categoryLengths.set(club.clubType, []);
+    //     }
+    //     categoryLengths.get(club.clubType)!.push({ club, length: club.length });
+    //   }
+    // }
+
+    // for (const [, clubsWithLength] of categoryLengths.entries()) {
+    //   if (clubsWithLength.length >= 2) {
+    //     const lengths = clubsWithLength.map((c) => c.length);
+    //     const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+
+    //     for (const { club } of clubsWithLength) {
+    //       const lengthDeviation = club.length - avgLength;
+    //       const absDeviation = Math.abs(lengthDeviation);
+
+    //       // Skip if already added as weight outlier
+    //       const alreadyAdded = weightLengthSuggestions.some(
+    //         (s) => s.clubName === getClubTypeDisplay(club.clubType, club.number || '')
+    //       );
+
+    //       if (absDeviation > 0.5 && !alreadyAdded) {
+    //         const priority: 'high' | 'medium' | 'low' = absDeviation > 1.0 ? 'high' : 'medium';
+
+    //         weightLengthSuggestions.push({
+    //           clubName: getClubTypeDisplay(club.clubType, club.number || ''),
+    //           clubType: club.clubType ?? 'Unknown',
+    //           currentWeight: club.weight || 0,
+    //           currentLength: club.length,
+    //           recommendedWeight: club.weight || 0,
+    //           recommendedLength: avgLength,
+    //           weightDeviation: 0,
+    //           lengthDeviation: lengthDeviation,
+    //           priority,
+    //           reason: `長さが同カテゴリ平均より${absDeviation.toFixed(1)}inch${lengthDeviation > 0 ? '長い' : '短い'}です。`,
+    //           expectedEffect: '距離ギャップの適正化、スイングフィールの統一',
+    //         });
+    //       }
+    //     }
+    //   }
+    // }
+
+    // Sort by priority
+    const wlPriorityOrder = { high: 0, medium: 1, low: 2 };
+    weightLengthSuggestions.sort((a, b) => wlPriorityOrder[a.priority] - wlPriorityOrder[b.priority]);
+
+    // Limit to top 5 suggestions
+    const limitedWeightLengthSuggestions = weightLengthSuggestions.slice(0, 5);
 
     return {
       currentSet: {
@@ -1050,6 +1181,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       },
       recommendations: limitedRecommendations,
       adjustments,
+      weightLengthSuggestions: limitedWeightLengthSuggestions,
     };
   }, [clubs, bags, targetBagId]);
 }

@@ -8,6 +8,7 @@ export interface SummaryData {
   };
   recommendations: Recommendation[];
   adjustments: Adjustment[];
+  weightLengthSuggestions: WeightLengthSuggestion[];  // 重量と長さの提案
   message?: string;                // クラブ数が少ない場合などのメッセージ
 }
 
@@ -37,4 +38,19 @@ export interface Adjustment {
   title: string;
   description: string;
   estimatedEffect: string;             // 例: "飛距離 +8yd 見込み"
+}
+
+// 重量と長さの分析提案
+export interface WeightLengthSuggestion {
+  clubName: string;
+  clubType: string;
+  currentWeight: number;
+  currentLength: number;
+  recommendedWeight: number;
+  recommendedLength: number;
+  weightDeviation: number;              // 現在の重量と推奨重量の差 (g)
+  lengthDeviation: number;              // 現在の長さと推奨長さの差 (inch)
+  priority: 'high' | 'medium' | 'low';
+  reason: string;
+  expectedEffect: string;
 }

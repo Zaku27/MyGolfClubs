@@ -202,49 +202,110 @@ export function SummaryTab({ data }: SummaryTabProps) {
       {/* セパレーター */}
       <div className="h-px bg-border" />
 
-      {/* 3. 調整・フィッティング提案セクション */}
+      {/* 3. 調整・フィッティング提案セクション（重量・長さ含む） */}
       <section>
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           <IconCheckCircle className="w-5 h-5 text-primary" />
           調整・フィッティング提案
         </h2>
         <div className="space-y-3">
-          {adjustments.length === 0 ? (
+          {adjustments.length === 0 && data.weightLengthSuggestions.length === 0 ? (
             <div className="bg-card/80 border border-border rounded-xl p-6 text-center">
               <IconCheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
               <p className="text-muted-foreground">問題は見つかりませんでした。現在のクラブセットは良好な状態です。</p>
             </div>
           ) : (
-            adjustments.map((adj, index) => {
-              const priority = priorityConfig[adj.priority];
-              return (
-                <div
-                  key={index}
-                  className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start gap-4">
-                    {/* 優先度バッジ */}
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border shrink-0 ${priority.badgeClass}`}>
-                      {priority.label}
-                    </span>
+            <>
+              {/* 既存の調整提案 */}
+              {adjustments.map((adj, index) => {
+                const priority = priorityConfig[adj.priority];
+                return (
+                  <div
+                    key={`adj-${index}`}
+                    className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* 優先度バッジ */}
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border shrink-0 ${priority.badgeClass}`}>
+                        {priority.label}
+                      </span>
 
-                    {/* コンテンツ */}
-                    <div className="flex-1 space-y-2">
-                      <h3 className="font-semibold text-lg">{adj.title}</h3>
-                      <p className="text-sm text-muted-foreground">{adj.description}</p>
+                      {/* コンテンツ */}
+                      <div className="flex-1 space-y-2">
+                        <h3 className="font-semibold text-lg">{adj.title}</h3>
+                        <p className="text-sm text-muted-foreground">{adj.description}</p>
 
-                      {/* 効果 */}
-                      <div className="flex flex-wrap gap-3 pt-1">
-                        <span className="inline-flex items-center text-sm text-green-600 font-medium">
-                          <IconTrendingUp className="w-4 h-4 mr-1" />
-                          {adj.estimatedEffect}
-                        </span>
+                        {/* 効果 */}
+                        <div className="flex flex-wrap gap-3 pt-1">
+                          <span className="inline-flex items-center text-sm text-green-600 font-medium">
+                            <IconTrendingUp className="w-4 h-4 mr-1" />
+                            {adj.estimatedEffect}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+
+              {/* 重量と長さの提案 */}
+              {data.weightLengthSuggestions.map((suggestion, index) => {
+                const priority = priorityConfig[suggestion.priority];
+                return (
+                  <div
+                    key={`wl-${index}`}
+                    className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* 優先度バッジ */}
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border shrink-0 ${priority.badgeClass}`}>
+                        {priority.label}
+                      </span>
+
+                      {/* コンテンツ */}
+                      <div className="flex-1 space-y-2">
+                        <h3 className="font-semibold text-lg">{suggestion.clubName}</h3>
+                        <p className="text-sm text-muted-foreground">{suggestion.reason}</p>
+
+                        {/* 推奨スペック */}
+                        <div className="flex flex-wrap gap-4 pt-2 text-sm">
+                          {suggestion.weightDeviation !== 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">重量:</span>
+                              <span className="font-medium">{suggestion.currentWeight.toFixed(0)}g</span>
+                              <span className="text-muted-foreground">→</span>
+                              <span className="font-medium text-primary">{suggestion.recommendedWeight.toFixed(0)}g</span>
+                              <span className={`text-xs ${suggestion.weightDeviation > 0 ? 'text-orange-600' : 'text-blue-600'}`}>
+                                ({suggestion.weightDeviation > 0 ? '-' : '+'}{Math.abs(suggestion.weightDeviation).toFixed(1)}g)
+                              </span>
+                            </div>
+                          )}
+                          {suggestion.lengthDeviation !== 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">長さ:</span>
+                              <span className="font-medium">{suggestion.currentLength.toFixed(1)}&quot;</span>
+                              <span className="text-muted-foreground">→</span>
+                              <span className="font-medium text-primary">{suggestion.recommendedLength.toFixed(1)}&quot;</span>
+                              <span className={`text-xs ${suggestion.lengthDeviation > 0 ? 'text-orange-600' : 'text-blue-600'}`}>
+                                ({suggestion.lengthDeviation > 0 ? '-' : '+'}{Math.abs(suggestion.lengthDeviation).toFixed(1)}&quot;)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 効果 */}
+                        <div className="flex flex-wrap gap-3 pt-1">
+                          <span className="inline-flex items-center text-sm text-green-600 font-medium">
+                            <IconTrendingUp className="w-4 h-4 mr-1" />
+                            {suggestion.expectedEffect}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </section>
