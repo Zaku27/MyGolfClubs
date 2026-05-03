@@ -26,6 +26,7 @@ interface Props {
 
 const SIMULATOR_PLAY_MODE_STORAGE_KEY = "golfbag-simulator-play-mode-v1";
 const SIMULATOR_ROBOT_SETTINGS_KEY = "golfbag-simulator-robot-settings-v1";
+const SIMULATOR_LAST_COURSE_KEY = "golfbag-simulator-last-course-v1";
 
 const DEFAULT_ROBOT_HEAD_SPEED = 40;
 const DEFAULT_ROBOT_SKILL_LEVEL = 0.5;
@@ -67,6 +68,19 @@ function loadStoredRobotSettings(): RobotSettings {
 function saveRobotSettings(settings: RobotSettings): void {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(SIMULATOR_ROBOT_SETTINGS_KEY, JSON.stringify(settings));
+  }
+}
+
+function loadLastPlayedCourseId(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.localStorage.getItem(SIMULATOR_LAST_COURSE_KEY);
+}
+
+function saveLastPlayedCourseId(courseId: string): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(SIMULATOR_LAST_COURSE_KEY, courseId);
   }
 }
 
@@ -436,16 +450,27 @@ export function SimulatorApp({ onBack, selectedClubs, allClubs, activeBagName, b
   // 実測データモードでプレー可能なクラブ数（パター以外をカウント）
   const measuredPlayableClubCount = measuredSource.filter(club => club.type !== "Putter").length;
 
-  // バッグにパターが含まれていれば本数に加える（実測データがなくても表示に含める）
-  const hasPutterInBag = bagSource.some(club => club.clubType === "Putter");
-  const measuredClubCount = measuredSource.length + (hasPutterInBag ? 1 : 0);
+  // measuredSource は既にパターを含んでいる（実測データがなくても含めるため）
+  const measuredClubCount = measuredSource.length;
 
   const storedCustomCourses = loadStoredCustomCourse();
   const selectableCourses = buildSelectableCourses(storedCustomCourses.courses);
-  const [selectedCourseId, setSelectedCourseId] = useState<string>(() => storedCustomCourses.selectedCourseId);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(() => {
+    // 前回プレイしたコースを優先して使用
+    const lastPlayedCourseId = loadLastPlayedCourseId();
+    if (lastPlayedCourseId) {
+      const exists = selectableCourses.some((c) => c.id === lastPlayedCourseId);
+      if (exists) {
+        return lastPlayedCourseId;
+      }
+    }
+    return storedCustomCourses.selectedCourseId;
+  });
   const selectedCourse = selectableCourses.find((course) => course.id === selectedCourseId) ?? selectableCourses[0];
   
   const handleStart = (holes: Hole[], mode: "bag" | "robot" | "measured", robotSettings?: RobotSettings) => {
+    // プレイ開始時に選択中のコースIDを保存
+    saveLastPlayedCourseId(selectedCourseId);
     let bag: SimClub[];
     if (mode === "measured") {
       bag = measuredSource;

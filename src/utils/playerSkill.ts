@@ -15,8 +15,8 @@ export const SKILL_PRESETS: readonly SkillPreset[] = [
 export function getSkillLabel(level: number): string {
   if (level < 0.15) return "初心者";
   if (level < 0.35) return "初級者";
-  if (level < 0.65) return "中級者";
-  if (level < 0.9) return "上級者";
+  if (level < 0.6) return "中級者";
+  if (level < 0.85) return "上級者";
   return "超上級者";
 }
 
@@ -107,8 +107,8 @@ export function estimateSkillLevelFromActualShots(
     smashScore * 0.2 +
     launchScore * 0.1;
 
-  // スコアをスキルレベル範囲にマッピング（0.3〜0.95）
-  const skillLevel = 0.3 + rawScore * 0.65;
+  // スコアをスキルレベル範囲にマッピング（0.4〜0.99）
+  const skillLevel = 0.4 + rawScore * 0.59;
 
   // 小数第2位で丸め
   return Math.round(skillLevel * 100) / 100;
