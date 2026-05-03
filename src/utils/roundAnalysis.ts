@@ -133,12 +133,20 @@ function getSkillBasedExpectedScore(skillLevel: number): number {
   return expectedScores[expectedScores.length - 1];
 }
 
+export interface CourseAverageScore {
+  avgScore: number;
+  avgToPar: number;
+  totalPar: number;
+  rounds: number;
+}
+
 export function estimatePredictedScore(
   totalPar: number,
   holesPlayed: number,
   clubUsageStats: ClubUsageStat[],
   playerSkillLevel?: number,
   isMeasuredMode?: boolean,
+  courseAverage?: CourseAverageScore | null,
 ): PredictedScore {
   if (holesPlayed === 0) {
     return { predicted: totalPar, variance: 5 };
@@ -157,6 +165,20 @@ export function estimatePredictedScore(
   const parAdjustment = totalPar - 72; // パー72からの差分
   const skillBasedPredicted = skillBasedExpectedScore + parAdjustment;
 
+  // コース別平均スコアがある場合は、それも考慮に入れる
+  // 同じパーを基準にして、過去の実績とスキルベースの予測をブレンド
+  let courseAdjustedPredicted: number;
+  if (courseAverage && courseAverage.rounds >= 3) {
+    // パーの差分を考慮してコース平均を現在のパーに換算
+    const courseParDiff = totalPar - courseAverage.totalPar;
+    const courseAvgAdjusted = courseAverage.avgScore + courseParDiff;
+
+    // スキルベース予測とコース平均をブレンド（コース実績40%、スキル60%）
+    courseAdjustedPredicted = skillBasedPredicted * 0.6 + courseAvgAdjusted * 0.4;
+  } else {
+    courseAdjustedPredicted = skillBasedPredicted;
+  }
+
   // 実測データモードでは、実測データの特性（ショットの分散が大きい）を考慮し、
   // スキルベースの基準値を中心に、成功率の影響を小さくする
   let performanceBonus: number;
@@ -167,7 +189,7 @@ export function estimatePredictedScore(
     // 通常モード: 標準的な調整
     performanceBonus = (weightedSuccessRate - 65) / 10;
   }
-  const consistencyAdjusted = skillBasedPredicted - performanceBonus * holesFactor;
+  const consistencyAdjusted = courseAdjustedPredicted - performanceBonus * holesFactor;
 
   // 最終予測スコア（スキルベースと実績ベースのバランス）
   const predicted = Math.round(consistencyAdjusted);

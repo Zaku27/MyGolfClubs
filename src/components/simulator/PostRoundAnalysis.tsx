@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useGameStore } from "../../store/gameStore";
 import {
   buildInsights,
   calculateKeyRoundStats,
   estimatePredictedScore,
   getPerformanceSummary,
+  type CourseAverageScore,
 } from "../../utils/roundAnalysis";
 import { RoundHistoryService } from "../../db/roundHistoryService";
 import { PageHeader } from "../PageHeader";
@@ -136,12 +137,22 @@ export function PostRoundAnalysis({
 }: Props) {
   const { finalScore, perHoleResults, clubUsageStats, course, roundShots, roundSeedNonce, playerSkillLevel } = useGameStore();
   const [skipSave, setSkipSave] = useState(false);
+  const [courseAverage, setCourseAverage] = useState<CourseAverageScore | null>(null);
+
+  // コース別の平均スコアを取得
+  useEffect(() => {
+    if (courseName) {
+      RoundHistoryService.getAverageScoreForCourse(courseName, 3)
+        .then((avg) => setCourseAverage(avg))
+        .catch(() => setCourseAverage(null));
+    }
+  }, [courseName]);
 
   const analysis = useMemo(() => {
     const totalPar = perHoleResults.reduce((sum, hole) => sum + hole.par, 0);
     const final = finalScore ?? perHoleResults.reduce((sum, hole) => sum + hole.strokes, 0);
     const keyStats = calculateKeyRoundStats(perHoleResults, course, roundShots);
-    const predicted = estimatePredictedScore(totalPar, perHoleResults.length, clubUsageStats, playerSkillLevel, playMode === 'measured');
+    const predicted = estimatePredictedScore(totalPar, perHoleResults.length, clubUsageStats, playerSkillLevel, playMode === 'measured', courseAverage);
     const performance = getPerformanceSummary(final, predicted.predicted, playerSkillLevel);
 
     const ranked = [...clubUsageStats].filter((club) => club.timesUsed > 0);
@@ -176,7 +187,7 @@ export function PostRoundAnalysis({
       insights,
       clubRoundSummary,
     };
-  }, [clubUsageStats, course, finalScore, perHoleResults, roundShots, playerSkillLevel]);
+  }, [clubUsageStats, course, finalScore, perHoleResults, roundShots, playerSkillLevel, courseAverage]);
 
   // ラウンド保存ハンドラー
   const handleSaveAndNavigate = async (callback: () => void) => {

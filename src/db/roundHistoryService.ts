@@ -248,4 +248,33 @@ export const RoundHistoryService = {
     const names = new Set(rounds.map((r) => r.courseName));
     return Array.from(names).sort();
   },
+
+  /**
+   * 特定コースでの平均スコアを取得
+   * @param courseName コース名
+   * @param minRounds 計算に必要な最小ラウンド数（デフォルト3）
+   * @returns 平均スコアデータ、データ不足の場合はnull
+   */
+  async getAverageScoreForCourse(
+    courseName: string,
+    minRounds: number = 3
+  ): Promise<{ avgScore: number; avgToPar: number; totalPar: number; rounds: number } | null> {
+    const rounds = await this.getRoundsWithFilters({ courseName });
+
+    if (rounds.length < minRounds) {
+      return null;
+    }
+
+    const scores = rounds.map((r) => r.totalScore);
+    const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    const avgTotalPar = Math.round(rounds.reduce((a, b) => a + b.totalPar, 0) / rounds.length);
+    const avgToPar = Number((scores.reduce((a, b, i) => a + (b - rounds[i].totalPar), 0) / scores.length).toFixed(1));
+
+    return {
+      avgScore,
+      avgToPar,
+      totalPar: avgTotalPar,
+      rounds: rounds.length,
+    };
+  },
 };
