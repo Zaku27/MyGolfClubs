@@ -15,8 +15,8 @@ export const SKILL_PRESETS: readonly SkillPreset[] = [
 export function getSkillLabel(level: number): string {
   if (level < 0.15) return "初心者";
   if (level < 0.35) return "初級者";
-  if (level < 0.6) return "中級者";
-  if (level < 0.85) return "上級者";
+  if (level < 0.70) return "中級者";
+  if (level < 0.90) return "上級者";
   return "超上級者";
 }
 
@@ -25,8 +25,8 @@ export function formatSkillLevelLabel(level: number): string {
 }
 
 /**
- * 実績データからプレーヤースキルレベルを推定する
- * @param shotRecords ショット実績データの配列
+ * 実測データからプレーヤースキルレベルを推定する
+ * @param shotRecords ショット実測データの配列
  * @returns 推定スキルレベル (0.0〜1.0)
  */
 export function estimateSkillLevelFromActualShots(
@@ -35,6 +35,16 @@ export function estimateSkillLevelFromActualShots(
   if (shotRecords.length === 0) {
     return 0.5; // デフォルト値
   }
+
+  return computeSkillLevelFromMetrics(shotRecords);
+}
+
+/**
+ * 内部計算: 実測データからスキルレベルを計算する
+ */
+function computeSkillLevelFromMetrics(
+  shotRecords: Array<Record<string, string>>
+): number {
 
   // 数値パーサー
   const parseNum = (val: string | undefined): number | null => {
@@ -107,9 +117,33 @@ export function estimateSkillLevelFromActualShots(
     smashScore * 0.2 +
     launchScore * 0.1;
 
-  // スコアをスキルレベル範囲にマッピング（0.4〜0.99）
+  // スコアをスキルレベル範囲にマッピング（0.35〜0.99）
   const skillLevel = 0.4 + rawScore * 0.59;
 
   // 小数第2位で丸め
   return Math.round(skillLevel * 100) / 100;
+}
+
+/**
+ * 指定されたバッグIDと実測データからスキルレベルを推定する
+ * @param bagId バッグID
+ * @param actualShotRows バッグIDをキーとする実測データのレコード
+ * @param minShots 推定に必要な最小ショット数（デフォルト3）
+ * @returns 推定スキルレベル (0.0〜1.0)、データ不足の場合はnull
+ */
+export function estimateSkillLevelFromActualShotsForBag(
+  bagId: number | null | undefined,
+  actualShotRows: Record<string, Array<Record<string, string>>>,
+  minShots: number = 3
+): number | null {
+  if (!bagId) {
+    return null;
+  }
+
+  const shots = actualShotRows[String(bagId)];
+  if (!shots || shots.length < minShots) {
+    return null;
+  }
+
+  return estimateSkillLevelFromActualShots(shots);
 }

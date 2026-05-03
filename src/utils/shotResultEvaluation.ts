@@ -316,7 +316,7 @@ export function getScoreCelebration(strokes: number, par: number): ScoreCelebrat
     return {
       type: "hole_in_one",
       label: "ホールインワン！",
-      emoji: "🎯",
+      emoji: "�",
       bgClass: "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400",
       textClass: "text-amber-900",
       animationClass: "animate-bounce",
@@ -327,7 +327,7 @@ export function getScoreCelebration(strokes: number, par: number): ScoreCelebrat
     return {
       type: "albatross",
       label: "アルバトロス！",
-      emoji: "🦅✨",
+      emoji: "👑",
       bgClass: "bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400",
       textClass: "text-white",
       animationClass: "animate-pulse",
@@ -338,7 +338,7 @@ export function getScoreCelebration(strokes: number, par: number): ScoreCelebrat
     return {
       type: "eagle",
       label: "イーグル！",
-      emoji: "🦅",
+      emoji: "🏆",
       bgClass: "bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-400",
       textClass: "text-white",
       animationClass: "animate-pulse",
@@ -349,7 +349,7 @@ export function getScoreCelebration(strokes: number, par: number): ScoreCelebrat
     return {
       type: "birdie",
       label: "バーディー！",
-      emoji: "🐦",
+      emoji: "✨",
       bgClass: "bg-gradient-to-r from-sky-400 via-blue-400 to-sky-400",
       textClass: "text-white",
       animationClass: "animate-pulse",
@@ -360,7 +360,7 @@ export function getScoreCelebration(strokes: number, par: number): ScoreCelebrat
     return {
       type: "par",
       label: "パー",
-      emoji: "⭕",
+      emoji: "●",
       bgClass: "bg-emerald-100",
       textClass: "text-emerald-800",
       animationClass: "",
@@ -371,7 +371,7 @@ export function getScoreCelebration(strokes: number, par: number): ScoreCelebrat
     return {
       type: "bogey",
       label: "ボギー",
-      emoji: "📍",
+      emoji: "△",
       bgClass: "bg-yellow-100",
       textClass: "text-yellow-800",
       animationClass: "",
@@ -381,7 +381,7 @@ export function getScoreCelebration(strokes: number, par: number): ScoreCelebrat
   return {
     type: "double_bogey_or_worse",
     label: diff >= 2 ? `+${diff}` : "",
-    emoji: "💦",
+    emoji: "▲",
     bgClass: "bg-red-100",
     textClass: "text-red-800",
     animationClass: "",

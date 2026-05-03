@@ -762,8 +762,10 @@ export function HoleView({ onBack, onViewFinalScorecard }: Props) {
                         </span>
                       )}
                     </div>
-                    <p className="mt-2 text-sm text-emerald-700">推定飛距離: {Math.round(estimatedDistanceByClub.get(club.id) ?? 0)}ヤード</p>
-                    {playMode !== "measured" && (
+                    {club.type !== "Putter" && (
+                      <p className="mt-2 text-sm text-emerald-700">推定飛距離: {Math.round(estimatedDistanceByClub.get(club.id) ?? 0)}ヤード</p>
+                    )}
+                    {playMode !== "measured" && club.type !== "Putter" && (
                       <p className="mt-1 text-sm text-emerald-700">
                         クラブ成功率: {effectiveRate}%
                       </p>

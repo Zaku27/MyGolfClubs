@@ -15,6 +15,7 @@ import { buildClubUsageStats } from "../utils/roundAnalysis";
 import { formatSimClubDisplayName } from "../utils/simClubLabel";
 import { ClubService } from "../db/clubService";
 import { useClubStore } from "./clubStore";
+import { estimateSkillLevelFromActualShotsForBag } from "../utils/playerSkill";
 import { resolvePersonalDataForSimClub } from "../utils/personalData";
 import {
   buildAnalysisPenaltyByClubId,
@@ -62,6 +63,7 @@ function createRoundSeedNonce(): string {
 function generateWind(
   random: () => number = Math.random,
   previousWindStrength: number | null = null,
+  previousWindDirectionDegrees: number | null = null,
 ): Pick<ShotContext, "windStrength" | "windDirectionDegrees"> {
   let windStrength: number;
   if (previousWindStrength === null) {
@@ -70,14 +72,21 @@ function generateWind(
     windStrength = Math.round(exponentialRoll * 5);
     if (windStrength > 20) windStrength = 20;
   } else {
-    // 次のホール：前の風速に近い値（±5 mph以内）、最小0
-    const minWind = Math.max(0, previousWindStrength - 5);
-    const maxWind = Math.min(25, previousWindStrength + 5);
+    // 次のホール：前の風速に近い値（±3 mph以内）、最小0
+    const minWind = Math.max(0, previousWindStrength - 3);
+    const maxWind = Math.min(20, previousWindStrength + 3);
     windStrength = Math.round(minWind + random() * (maxWind - minWind));
   }
 
-  // 風向はランダム（0-359度）
-  const windDirectionDegrees = Math.floor(random() * 360);
+  // 風向：前のホールと似た方向（±60度以内）、最初はランダム
+  let windDirectionDegrees: number;
+  if (previousWindDirectionDegrees === null) {
+    windDirectionDegrees = Math.floor(random() * 360);
+  } else {
+    // ±60度以内で変動
+    const directionChange = Math.floor(random() * 121) - 60; // -60 to +60
+    windDirectionDegrees = (previousWindDirectionDegrees + directionChange + 360) % 360;
+  }
   return { windStrength, windDirectionDegrees };
 }
 
@@ -112,6 +121,8 @@ interface GameStoreState {
   playMode: "robot" | "bag" | "measured";
   /** 前のホールの風速（mph）。次のホールで近い値を選ぶために使用。 */
   previousWindStrength: number | null;
+  /** 前のホールの風向（度）。次のホールで近い値を選ぶために使用。 */
+  previousWindDirectionDegrees: number | null;
   /** 実測データモード用のパタースキルレベル (0.5-0.9)。開始時に一回決定。 */
   measuredModePutterSkillLevel: number | null;
   /** 現在のホールで使用したパット数 */
@@ -143,6 +154,7 @@ const INITIAL_STATE: GameStoreState = {
   course: [],
   courseName: "",
   currentHoleIndex: 0,
+  previousWindDirectionDegrees: null,
   shotContext: {
     remainingDistance: 0,
     lie: "tee",
@@ -178,7 +190,13 @@ const INITIAL_STATE: GameStoreState = {
   robotSettings: null,
 };
 
-function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: number, previousWindStrength: number | null = null): ShotContext {
+function buildInitialContext(
+  hole: Hole,
+  roundSeedNonce: string,
+  holeIndex: number,
+  previousWindStrength: number | null = null,
+  previousWindDirectionDegrees: number | null = null,
+): ShotContext {
   const windRandom = createSeededRandom(`${roundSeedNonce}|hole:${holeIndex}|wind`);
   const targetDistance = hole.targetDistance ?? hole.distanceFromTee;
   return {
@@ -190,7 +208,7 @@ function buildInitialContext(hole: Hole, roundSeedNonce: string, holeIndex: numb
     greenRadius: hole.greenRadius,
     greenPolygon: hole.greenPolygon,
     hazards: hole.hazards ?? [],
-    ...generateWind(windRandom, previousWindStrength),
+    ...generateWind(windRandom, previousWindStrength, previousWindDirectionDegrees),
   };
 }
 
@@ -255,12 +273,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   startRound: (course, bag, playMode = "bag", courseName = "", robotSettings, bagSkillLevel) => {
     const roundSeedNonce = createRoundSeedNonce();
-    const initialContext = buildInitialContext(course[0], roundSeedNonce, 0, null);
+    const initialContext = buildInitialContext(course[0], roundSeedNonce, 0, null, null);
 
-    // 実測データモードの場合、パタースキルレベルを0.5～0.8の範囲でランダムに決定
-    const measuredModePutterSkillLevel = playMode === "measured"
-      ? 0.5 + Math.random() * 0.3
-      : null;
+    // 実測データモードの場合、パタースキルレベルを実測データから推定
+    let measuredModePutterSkillLevel: number | null = null;
+    if (playMode === "measured") {
+      const { activeBagId, actualShotRows } = useClubStore.getState();
+      const estimatedSkill = estimateSkillLevelFromActualShotsForBag(activeBagId, actualShotRows, 3);
+      // 推定できない場合はデフォルト値0.5を使用
+      measuredModePutterSkillLevel = estimatedSkill ?? 0.5;
+    }
 
     // スキルレベルの決定（優先順位: ロボット設定 > バッグ設定 > グローバル設定 > デフォルト0.5）
     let playerSkillLevel = 0.5;
@@ -284,6 +306,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentHoleIndex: 0,
       shotContext: initialContext,
       previousWindStrength: initialContext.windStrength ?? null,
+      previousWindDirectionDegrees: initialContext.windDirectionDegrees ?? null,
       measuredModePutterSkillLevel,
       currentHolePutts: 0,
       hasTakenFirstPutt: false,
@@ -631,11 +654,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   advanceHole: () => {
-    const { currentHoleIndex, course, roundSeedNonce, previousWindStrength } = get();
+    const { currentHoleIndex, course, roundSeedNonce, previousWindStrength, previousWindDirectionDegrees } = get();
     const nextIndex = currentHoleIndex + 1;
     if (nextIndex >= course.length) return; // safety guard
 
-    const nextContext = buildInitialContext(course[nextIndex], roundSeedNonce, nextIndex, previousWindStrength);
+    const nextContext = buildInitialContext(course[nextIndex], roundSeedNonce, nextIndex, previousWindStrength, previousWindDirectionDegrees);
     set({
       currentHoleIndex: nextIndex,
       phase: "playing",
@@ -645,6 +668,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentHoleShots: [],
       shotContext: nextContext,
       previousWindStrength: nextContext.windStrength ?? null,
+      previousWindDirectionDegrees: nextContext.windDirectionDegrees ?? null,
       currentHolePutts: 0,
       hasTakenFirstPutt: false,
     });

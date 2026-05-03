@@ -147,10 +147,14 @@ export function ClubSelectionPanel({ remainingDistance, isOnGreen, lie = "fairwa
             {/* Stats */}
             <div className="text-right flex-shrink-0">
               <div className="text-sm font-mono font-bold">
-                {Math.round(estimatedDistance)}
-                <span className="text-xs text-green-500 font-normal">yd</span>
+                {!isPutter && (
+                  <>
+                    {Math.round(estimatedDistance)}
+                    <span className="text-xs text-green-500 font-normal">yd</span>
+                  </>
+                )}
               </div>
-              {!isMeasuredMode && (
+              {!isMeasuredMode && !isPutter && (
                 <div className="text-xs text-green-500">{effectiveRate.toFixed(1)}%</div>
               )}
             </div>

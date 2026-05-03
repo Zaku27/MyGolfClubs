@@ -44,6 +44,12 @@ function ClubStatList({
   items: Array<{ clubName: string; timesUsed: number; successRate: number; avgDistanceAchieved: number }>;
   accentClass: string;
 }) {
+  const emptyMessage = title.includes("ベスト")
+    ? "特に目立った好成績クラブはありませんでした。"
+    : title.includes("苦戦")
+      ? "苦手なクラブはありませんでした。安定したプレーでした。"
+      : "ラウンドデータがありません。";
+
   return (
     <section className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 sm:p-5 shadow-sm shadow-emerald-300/40">
       <h3 className="text-lg font-bold text-emerald-900">{title}</h3>
@@ -62,7 +68,7 @@ function ClubStatList({
           ))
         ) : (
           <p className="rounded-xl border border-emerald-300 bg-emerald-50/80 px-3 py-3 text-sm text-emerald-700">
-            ラウンドデータがありません。
+            {emptyMessage}
           </p>
         )}
       </div>
@@ -128,15 +134,15 @@ export function PostRoundAnalysis({
   bagId,
   playMode,
 }: Props) {
-  const { finalScore, perHoleResults, clubUsageStats, course, roundShots, roundSeedNonce } = useGameStore();
+  const { finalScore, perHoleResults, clubUsageStats, course, roundShots, roundSeedNonce, playerSkillLevel } = useGameStore();
   const [skipSave, setSkipSave] = useState(false);
 
   const analysis = useMemo(() => {
     const totalPar = perHoleResults.reduce((sum, hole) => sum + hole.par, 0);
     const final = finalScore ?? perHoleResults.reduce((sum, hole) => sum + hole.strokes, 0);
     const keyStats = calculateKeyRoundStats(perHoleResults, course, roundShots);
-    const predicted = estimatePredictedScore(totalPar, perHoleResults.length, clubUsageStats);
-    const performance = getPerformanceSummary(final, predicted.predicted);
+    const predicted = estimatePredictedScore(totalPar, perHoleResults.length, clubUsageStats, playerSkillLevel, playMode === 'measured');
+    const performance = getPerformanceSummary(final, predicted.predicted, playerSkillLevel);
 
     const ranked = [...clubUsageStats].filter((club) => club.timesUsed > 0);
     const bestClubs = ranked
@@ -170,7 +176,7 @@ export function PostRoundAnalysis({
       insights,
       clubRoundSummary,
     };
-  }, [clubUsageStats, course, finalScore, perHoleResults, roundShots]);
+  }, [clubUsageStats, course, finalScore, perHoleResults, roundShots, playerSkillLevel]);
 
   // ラウンド保存ハンドラー
   const handleSaveAndNavigate = async (callback: () => void) => {

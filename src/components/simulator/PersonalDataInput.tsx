@@ -595,7 +595,7 @@ export function PersonalDataInput() {
     await setPlayerSkillLevel(toSkillLevel(level));
   };
 
-  // 実績データからスキルレベルを推定して設定（現在のバッグのみ使用）
+  // 実測データからスキルレベルを推定して設定（現在のバッグのみ使用）
   const handleEstimateSkillFromActualShots = async () => {
     if (!activeBag?.id) {
       alert("アクティブなバッグが選択されていません。");
@@ -605,7 +605,7 @@ export function PersonalDataInput() {
     const currentBagShots = actualShotRows[String(activeBag.id)] as ShotRecord[] | undefined;
 
     if (!currentBagShots || currentBagShots.length < 3) {
-      alert("スキル推定には、現在のバッグに少なくとも3ショットの実績データが必要です。");
+      alert("スキル推定には、現在のバッグに少なくとも3ショットの実測データが必要です。");
       return;
     }
 
@@ -1015,16 +1015,16 @@ export function PersonalDataInput() {
                           ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
                           : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100",
                       ].join(" ")}
-                      title="現在のバッグの実績データからスキルレベルを自動推定"
+                      title="現在のバッグの実測データからスキルレベルを自動推定"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
                       </svg>
-                      実績データから推定
+                      実測データから推定
                     </button>
                     {shotCount < 3 && (
                       <span className="text-xs text-slate-500">
-                        （現在のバッグに実績データ3ショット以上が必要）
+                        （現在のバッグに実測データ3ショット以上が必要）
                       </span>
                     )}
                     {shotCount >= 3 && (

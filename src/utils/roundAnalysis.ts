@@ -112,34 +112,85 @@ export function calculateKeyRoundStats(
   };
 }
 
+// スキルレベルに対応する基準スコア（パー72基準）を線形補間で計算
+function getSkillBasedExpectedScore(skillLevel: number): number {
+  // SKILL_PRESETSの中間値を基準としたマッピング
+  // 0.1→120, 0.2→115, 0.5→100, 0.8→85, 1.0→75
+  const skillPoints = [0.1, 0.2, 0.5, 0.8, 1.0];
+  const expectedScores = [120, 115, 100, 85, 75];
+
+  // 範囲外の場合は端の値を返す
+  if (skillLevel <= skillPoints[0]) return expectedScores[0];
+  if (skillLevel >= skillPoints[skillPoints.length - 1]) return expectedScores[expectedScores.length - 1];
+
+  // 線形補間
+  for (let i = 0; i < skillPoints.length - 1; i++) {
+    if (skillLevel <= skillPoints[i + 1]) {
+      const t = (skillLevel - skillPoints[i]) / (skillPoints[i + 1] - skillPoints[i]);
+      return expectedScores[i] + t * (expectedScores[i + 1] - expectedScores[i]);
+    }
+  }
+  return expectedScores[expectedScores.length - 1];
+}
+
 export function estimatePredictedScore(
   totalPar: number,
   holesPlayed: number,
   clubUsageStats: ClubUsageStat[],
+  playerSkillLevel?: number,
+  isMeasuredMode?: boolean,
 ): PredictedScore {
   if (holesPlayed === 0) {
     return { predicted: totalPar, variance: 5 };
   }
 
+  const skillLevel = playerSkillLevel ?? 0.5;
   const totalUses = clubUsageStats.reduce((sum, stat) => sum + stat.timesUsed, 0);
   const weightedSuccessRate = totalUses > 0
     ? clubUsageStats.reduce((sum, stat) => sum + stat.successRate * stat.timesUsed, 0) / totalUses
     : 60;
 
   const holesFactor = holesPlayed / 9;
-  const consistencyPenalty = Math.max(0, (65 - weightedSuccessRate) / 6) * holesFactor;
-  const predicted = Math.round(totalPar + consistencyPenalty);
+
+  // スキルレベルの基準スコアをパー72基準から現在のパーにスケーリング
+  const skillBasedExpectedScore = getSkillBasedExpectedScore(skillLevel);
+  const parAdjustment = totalPar - 72; // パー72からの差分
+  const skillBasedPredicted = skillBasedExpectedScore + parAdjustment;
+
+  // 実測データモードでは、実測データの特性（ショットの分散が大きい）を考慮し、
+  // スキルベースの基準値を中心に、成功率の影響を小さくする
+  let performanceBonus: number;
+  if (isMeasuredMode) {
+    // 実測データモード: 成功率の影響を半分にし、スキルベースを重視
+    performanceBonus = (weightedSuccessRate - 65) / 20; // 調整係数を/10から/20に
+  } else {
+    // 通常モード: 標準的な調整
+    performanceBonus = (weightedSuccessRate - 65) / 10;
+  }
+  const consistencyAdjusted = skillBasedPredicted - performanceBonus * holesFactor;
+
+  // 最終予測スコア（スキルベースと実績ベースのバランス）
+  const predicted = Math.round(consistencyAdjusted);
   const variance = Math.max(4, Math.min(7, Math.round(5 + (62 - weightedSuccessRate) / 20)));
 
   return { predicted, variance };
 }
 
-export function getPerformanceSummary(finalScore: number, predictedScore: number): PerformanceSummary {
-  if (finalScore <= predictedScore - 2) {
+export function getPerformanceSummary(
+  finalScore: number,
+  predictedScore: number,
+  playerSkillLevel?: number,
+): PerformanceSummary {
+  const skillLevel = playerSkillLevel ?? 0.5;
+  // スキルレベルに応じて閾値を調整
+  // 初心者(0.1): ±3, 中級者(0.5): ±2, 上級者(0.9): ±1
+  const threshold = Math.round(3 - skillLevel * 2); // 0.1→2.8→3, 0.5→2, 0.9→1.2→1
+
+  if (finalScore <= predictedScore - threshold) {
     return { label: "素晴らしいラウンド", toneClass: "text-emerald-300" };
   }
 
-  if (finalScore <= predictedScore + 2) {
+  if (finalScore <= predictedScore + threshold) {
     return { label: "平均的", toneClass: "text-amber-300" };
   }
 
