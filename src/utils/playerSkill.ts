@@ -117,8 +117,8 @@ function computeSkillLevelFromMetrics(
     smashScore * 0.2 +
     launchScore * 0.1;
 
-  // スコアをスキルレベル範囲にマッピング（0.35〜0.99）
-  const skillLevel = 0.4 + rawScore * 0.59;
+  // スコアをスキルレベル範囲にマッピング（0.30〜1.00、下限広げて範囲拡張）
+  const skillLevel = Math.min(1.0, 0.3 + rawScore * 0.7);
 
   // 小数第2位で丸め
   return Math.round(skillLevel * 100) / 100;
