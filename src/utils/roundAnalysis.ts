@@ -114,10 +114,10 @@ export function calculateKeyRoundStats(
 
 // スキルレベルに対応する基準スコア（パー72基準）を線形補間で計算
 function getSkillBasedExpectedScore(skillLevel: number): number {
-  // SKILL_PRESETSの中間値を基準としたマッピング
-  // 0.1→120, 0.2→115, 0.5→100, 0.8→85, 1.0→75
-  const skillPoints = [0.1, 0.2, 0.5, 0.8, 1.0];
-  const expectedScores = [120, 115, 100, 85, 75];
+  // より現実的なスコア基準に調整
+  // 0.1→110 (+38), 0.3→95 (+23), 0.5→90 (+18), 0.8→80 (+8), 1.0→72 (E)
+  const skillPoints = [0.1, 0.3, 0.5, 0.8, 1.0];
+  const expectedScores = [110, 95, 90, 80, 72];
 
   // 範囲外の場合は端の値を返す
   if (skillLevel <= skillPoints[0]) return expectedScores[0];
@@ -158,12 +158,12 @@ export function estimatePredictedScore(
     ? clubUsageStats.reduce((sum, stat) => sum + stat.successRate * stat.timesUsed, 0) / totalUses
     : 60;
 
-  const holesFactor = holesPlayed / 9;
-
-  // スキルレベルの基準スコアをパー72基準から現在のパーにスケーリング
+  // スキルレベルの基準スコア（パー72基準=18ホール）を取得
   const skillBasedExpectedScore = getSkillBasedExpectedScore(skillLevel);
-  const parAdjustment = totalPar - 72; // パー72からの差分
-  const skillBasedPredicted = skillBasedExpectedScore + parAdjustment;
+  // 18ホール基準のtoParを、プレイしたホール数に比例して換算
+  const expectedToPar72 = skillBasedExpectedScore - 72; // par72に対する差分
+  const expectedToPar = expectedToPar72 * (holesPlayed / 18); // プレイしたホール数に比例
+  const skillBasedPredicted = totalPar + expectedToPar;
 
   // コース別平均スコアがある場合は、それも考慮に入れる
   // 同じパーを基準にして、過去の実績とスキルベースの予測をブレンド
@@ -189,30 +189,54 @@ export function estimatePredictedScore(
     // 通常モード: 標準的な調整
     performanceBonus = (weightedSuccessRate - 65) / 10;
   }
-  const consistencyAdjusted = courseAdjustedPredicted - performanceBonus * holesFactor;
+  const consistencyAdjusted = courseAdjustedPredicted - performanceBonus;
 
   // 最終予測スコア（スキルベースと実績ベースのバランス）
   const predicted = Math.round(consistencyAdjusted);
   const variance = Math.max(4, Math.min(7, Math.round(5 + (62 - weightedSuccessRate) / 20)));
+
+  console.log('estimatePredictedScore:', {
+    skillLevel,
+    skillBasedExpectedScore,
+    expectedToPar,
+    skillBasedPredicted,
+    courseAdjustedPredicted,
+    weightedSuccessRate,
+    performanceBonus,
+    consistencyAdjusted,
+    predicted,
+    totalPar,
+    holesPlayed,
+  });
 
   return { predicted, variance };
 }
 
 export function getPerformanceSummary(
   finalScore: number,
+  finalPar: number,
   predictedScore: number,
+  predictedPar: number,
   playerSkillLevel?: number,
 ): PerformanceSummary {
   const skillLevel = playerSkillLevel ?? 0.5;
   // スキルレベルに応じて閾値を調整
   // 初心者(0.1): ±3, 中級者(0.5): ±2, 上級者(0.9): ±1
-  const threshold = Math.round(3 - skillLevel * 2); // 0.1→2.8→3, 0.5→2, 0.9→1.2→1
+  // 予測よりかなり良いスコアの場合のみ「素晴らしい」と判定（閾値を厳しく設定）
+  // 0.1→5, 0.5→4, 0.9→3
+  const amazingThreshold = Math.round(5 - skillLevel * 2);
+  // 通常の閾値（平均的判定用）
+  const normalThreshold = Math.round(2 - skillLevel); // 0.1→2, 0.5→1, 0.9→0
 
-  if (finalScore <= predictedScore - threshold) {
+  // Parを考慮してtoParで比較（9ホールと18ホールを正しく比較するため）
+  const finalToPar = finalScore - finalPar;
+  const predictedToPar = predictedScore - predictedPar;
+
+  if (finalToPar <= predictedToPar - amazingThreshold) {
     return { label: "素晴らしいラウンド", toneClass: "text-emerald-300" };
   }
 
-  if (finalScore <= predictedScore + threshold) {
+  if (finalToPar <= predictedToPar + normalThreshold) {
     return { label: "平均的", toneClass: "text-amber-300" };
   }
 

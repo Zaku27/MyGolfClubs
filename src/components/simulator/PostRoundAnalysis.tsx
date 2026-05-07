@@ -153,7 +153,7 @@ export function PostRoundAnalysis({
     const final = finalScore ?? perHoleResults.reduce((sum, hole) => sum + hole.strokes, 0);
     const keyStats = calculateKeyRoundStats(perHoleResults, course, roundShots);
     const predicted = estimatePredictedScore(totalPar, perHoleResults.length, clubUsageStats, playerSkillLevel, playMode === 'measured', courseAverage);
-    const performance = getPerformanceSummary(final, predicted.predicted, playerSkillLevel);
+    const performance = getPerformanceSummary(final, totalPar, predicted.predicted, totalPar, playerSkillLevel);
 
     const ranked = [...clubUsageStats].filter((club) => club.timesUsed > 0);
     const bestClubs = ranked

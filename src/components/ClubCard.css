@@ -319,6 +319,39 @@
   color: white;
 }
 
+.btn-lock {
+  background-color: #fff8e1;
+  border-color: #ffe082;
+}
+
+.btn-lock.locked {
+  background-color: #ffecb3;
+  border-color: #ffc107;
+}
+
+.btn-lock.locked svg {
+  color: #f57c00;
+}
+
+.btn-lock.unlocked {
+  background-color: #f5f5f5;
+  border-color: #bdbdbd;
+}
+
+.btn-lock.unlocked svg {
+  color: #757575;
+}
+
+.btn-lock:hover {
+  background-color: #ffecb3;
+  border-color: #ffa000;
+  transform: translateY(-1px);
+}
+
+.btn-lock:hover svg {
+  color: #e65100;
+}
+
 .club-card-body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));

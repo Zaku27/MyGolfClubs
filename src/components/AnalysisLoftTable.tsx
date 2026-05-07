@@ -66,12 +66,12 @@ export const AnalysisLoftTable = ({
                 <ClubDisplayName clubType={club.clubType} number={club.number} name={club.name} />
               </td>
               <td>{club.loftAngle.toFixed(1)}°</td>
-              <td>{club.estimatedDistance.toFixed(1)} y</td>
+              <td>{Math.round(club.estimatedDistance)} y</td>
               <td>
                 <input
                   type="number"
                   min="0"
-                  step="0.1"
+                  step="1"
                   value={club.actualDistance || ''}
                   onChange={(event) => onActualDistanceChange(club.id, event)}
                   className="analysis-input"

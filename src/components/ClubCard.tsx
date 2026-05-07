@@ -8,6 +8,7 @@ interface ClubCardProps {
   club: GolfClub;
   onEdit: (club: GolfClub) => void;
   onDelete: (id: number) => void;
+  onToggleLock?: (club: GolfClub) => void;
   activeBagName?: string;
   isInActiveBag?: boolean;
   isActiveBagFull?: boolean;
@@ -18,11 +19,14 @@ export const ClubCard: React.FC<ClubCardProps> = ({
   club,
   onEdit,
   onDelete,
+  onToggleLock,
   activeBagName,
   isInActiveBag = false,
   isActiveBagFull = false,
   onToggleActiveBagMembership,
 }) => {
+  const isLocked = club.locked ?? false;
+  const canToggleLock = typeof onToggleLock === 'function';
   const compactLoft = club.loftAngle != null ? `${club.loftAngle}°` : '-';
   const canToggleBag = typeof onToggleActiveBagMembership === 'function' && !!activeBagName;
   const bagButtonDisabled = !isInActiveBag && isActiveBagFull;
@@ -60,17 +64,19 @@ export const ClubCard: React.FC<ClubCardProps> = ({
           <span className={`club-bag-badge ${isInActiveBag ? 'in-bag' : 'out-of-bag'}`}>
             {isInActiveBag ? `${activeBagName}に登録済み` : `${activeBagName}には未登録`}
           </span>
-          <button
-            type="button"
-            className={`club-bag-toggle ${isInActiveBag ? 'remove' : 'add'}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleActiveBagMembership?.(club);
-            }}
-            disabled={bagButtonDisabled}
-          >
-            {isInActiveBag ? 'バッグから外す' : isActiveBagFull ? 'バッグは14本です' : 'バッグに入れる'}
-          </button>
+          {!isLocked && (
+            <button
+              type="button"
+              className={`club-bag-toggle ${isInActiveBag ? 'remove' : 'add'}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleActiveBagMembership?.(club);
+              }}
+              disabled={bagButtonDisabled}
+            >
+              {isInActiveBag ? 'バッグから外す' : isActiveBagFull ? 'バッグは14本です' : 'バッグに入れる'}
+            </button>
+          )}
         </div>
       )}
       <div className="club-card-body">
@@ -82,36 +88,63 @@ export const ClubCard: React.FC<ClubCardProps> = ({
             <span className="compact-item"><strong>Lie</strong>{club.lieAngle != null ? `${club.lieAngle}°` : '-'}</span>
           </div>
           <div className="club-card-actions">
-            <button
-              className="btn-icon btn-edit"
-              onClick={(event) => {
-                event.stopPropagation();
-                onEdit(club);
-              }}
-              title="編集"
-              aria-label="編集"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-            </button>
-            <button
-              className="btn-icon btn-delete"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete(club.id!);
-              }}
-              title="削除"
-              aria-label="削除"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-              </svg>
-            </button>
+            {canToggleLock && (
+              <button
+                className={`btn-icon btn-lock ${isLocked ? 'locked' : 'unlocked'}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleLock?.(club);
+                }}
+                title={isLocked ? 'ロック解除' : 'ロック'}
+                aria-label={isLocked ? 'ロック解除' : 'ロック'}
+              >
+                {isLocked ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="5" y="11" width="14" height="10" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="5" y="11" width="14" height="10" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                  </svg>
+                )}
+              </button>
+            )}
+            {!isLocked && (
+              <button
+                className="btn-icon btn-edit"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onEdit(club);
+                }}
+                title="編集"
+                aria-label="編集"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+            )}
+            {!isLocked && (
+              <button
+                className="btn-icon btn-delete"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete(club.id!);
+                }}
+                title="削除"
+                aria-label="削除"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </div>

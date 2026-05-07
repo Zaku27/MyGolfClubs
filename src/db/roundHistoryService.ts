@@ -124,20 +124,20 @@ export const RoundHistoryService = {
       };
     }
 
+    // Parを考慮したスコア比較（toPar = totalScore - totalPar）
+    const toPars = targetRounds.map((r) => r.totalScore - r.totalPar);
+    const bestToPar = Math.min(...toPars);
+    const worstToPar = Math.max(...toPars);
+    const bestRound = targetRounds.find((r) => r.totalScore - r.totalPar === bestToPar);
+    const worstRound = targetRounds.find((r) => r.totalScore - r.totalPar === worstToPar);
+    const bestScore = bestRound?.totalScore ?? null;
+    const worstScore = worstRound?.totalScore ?? null;
+
     const scores = targetRounds.map((r) => r.totalScore);
-    const bestScore = Math.min(...scores);
-    const worstScore = Math.max(...scores);
-    const bestRound = targetRounds.find((r) => r.totalScore === bestScore);
-    const worstRound = targetRounds.find((r) => r.totalScore === worstScore);
-    
-    // デバッグログ
-    console.log('getAggregateStats:', { bestScore, worstScore, bestRound, worstRound, targetRounds });
-    
     const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 
     const avgTotalPar = Math.round(targetRounds.reduce((a, b) => a + b.totalPar, 0) / targetRounds.length);
 
-    const toPars = targetRounds.map((r) => r.totalScore - r.totalPar);
     const avgToPar = Number((toPars.reduce((a, b) => a + b, 0) / toPars.length).toFixed(1));
 
     const avgGirPercent = Math.round(

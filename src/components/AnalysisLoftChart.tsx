@@ -110,7 +110,7 @@ export const AnalysisLoftChart: React.FC<AnalysisLoftChartProps> = ({
                 </div>
                 <div className="chart-tooltip-row">
                   <span className="chart-tooltip-label">推定</span>
-                  <span className="chart-tooltip-value">{loftTooltip.club.estimatedDistance.toFixed(1)} y</span>
+                  <span className="chart-tooltip-value">{Math.round(loftTooltip.club.estimatedDistance)} y</span>
                 </div>
                 <div className="chart-tooltip-row">
                   <span className="chart-tooltip-label">実測</span>
@@ -208,7 +208,7 @@ export const AnalysisLoftChart: React.FC<AnalysisLoftChartProps> = ({
                 })
               }
             >
-              <title>{`${club.name} | ロフト ${club.loftAngle}° | 推定 ${club.estimatedDistance.toFixed(1)}y`}</title>
+              <title>{`${club.name} | ロフト ${club.loftAngle}° | 推定 ${Math.round(club.estimatedDistance)}y`}</title>
             </circle>
             {club.actualDistance > 0 && (
               <circle

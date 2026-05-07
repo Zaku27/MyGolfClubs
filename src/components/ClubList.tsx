@@ -49,6 +49,7 @@ interface ClubListProps {
   onChangeListScope?: (scope: 'bag' | 'all') => void;
   onSwitchToAllClubs?: () => void;
   onToggleActiveBagMembership?: (club: GolfClub) => void;
+  onToggleClubLock?: (club: GolfClub) => void;
   loading?: boolean;
 }
 
@@ -80,6 +81,7 @@ export const ClubList: React.FC<ClubListProps> = ({
   onChangeListScope,
   onSwitchToAllClubs,
   onToggleActiveBagMembership,
+  onToggleClubLock,
   loading = false,
 }) => {
   const normalizedSearchText = searchText.trim().toLowerCase();
@@ -272,6 +274,7 @@ export const ClubList: React.FC<ClubListProps> = ({
                 club={club}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onToggleLock={onToggleClubLock}
                 activeBagName={activeBagName}
                 isInActiveBag={club.id != null && activeBagClubIdSet.has(club.id)}
                 isActiveBagFull={activeBagClubCount >= activeBagLimit}

@@ -80,6 +80,7 @@ export function AppMainContent({
     handleImportJSON,
     setActiveBag,
     handleToggleActiveBagMembership,
+    handleToggleClubLock,
   } = clubActions;
 
   const {
@@ -212,6 +213,7 @@ export function AppMainContent({
             onChangeListScope={handleChangeClubListScope}
             onSwitchToAllClubs={() => handleChangeClubListScope('all')}
             onToggleActiveBagMembership={handleToggleActiveBagMembership}
+            onToggleClubLock={handleToggleClubLock}
             loading={loading}
           />
         </>

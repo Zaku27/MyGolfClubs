@@ -24,6 +24,7 @@ export interface GolfClub {
   distance: number; // 飛距離（小数1桁）
   notes: string;
   imageData?: string[];
+  locked?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
