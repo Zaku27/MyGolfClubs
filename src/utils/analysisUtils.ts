@@ -761,8 +761,8 @@ export const getWeightPointStyle = (
 
   if (deviationClass === 'lightOutlier') {
     return {
-      fill: '#ec407a',
-      stroke: '#ad1457',
+      fill: '#1565c0',
+      stroke: '#0d47a1',
       strokeWidth: 3,
       radius: 7,
     };

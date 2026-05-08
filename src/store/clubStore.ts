@@ -21,6 +21,7 @@ type ClubStoreActions = {
   updateClub: (id: number, club: Partial<GolfClub>) => Promise<void>;
   deleteClub: (id: number) => Promise<void>;
   toggleClubLock: (id: number) => Promise<void>;
+  toggleBagLock: (id: number) => Promise<void>;
   initializeDefaults: () => Promise<void>;
   resetToDefaults: () => Promise<void>;
   clearAllClubs: () => Promise<void>;
@@ -187,6 +188,23 @@ export const useClubStore = create<ClubStore>((set, get) => ({
       set((state) => ({
         clubs: state.clubs.map((c) =>
           c.id === id ? { ...c, locked: newLocked } : c
+        ),
+      }));
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  toggleBagLock: async (id) => {
+    set({ error: null });
+    try {
+      const bag = get().bags.find((b) => b.id === id);
+      if (!bag) return;
+      const newLocked = !(bag.locked ?? false);
+      await ClubService.updateBag(id, { locked: newLocked });
+      set((state) => ({
+        bags: state.bags.map((b) =>
+          b.id === id ? { ...b, locked: newLocked } : b
         ),
       }));
     } catch (error) {

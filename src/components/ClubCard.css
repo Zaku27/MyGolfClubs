@@ -325,8 +325,8 @@
 }
 
 .btn-lock.locked {
-  background-color: #ffecb3;
-  border-color: #ffc107;
+  background-color: #fff8e1;
+  border-color: #ffe082;
 }
 
 .btn-lock.locked svg {

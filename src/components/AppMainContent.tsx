@@ -81,6 +81,7 @@ export function AppMainContent({
     setActiveBag,
     handleToggleActiveBagMembership,
     handleToggleClubLock,
+    handleToggleBagLock,
   } = clubActions;
 
   const {
@@ -171,6 +172,7 @@ export function AppMainContent({
               onRenameActiveBag={onRenameActiveBag}
               onDeleteActiveBag={onDeleteActiveBag}
               onShiftSelectedBagLeft={onShiftSelectedBagLeft}
+              onToggleBagLock={handleToggleBagLock}
               listScope={clubListScope}
               onChangeListScope={handleChangeClubListScope}
               compact

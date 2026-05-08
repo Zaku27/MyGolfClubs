@@ -123,7 +123,7 @@ const createBagRecord = (
 };
 
 const createUpdatedBagRecord = (
-  patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData' | 'swingWeightTarget' | 'swingGoodTolerance' | 'swingAdjustThreshold'>>,
+  patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData' | 'swingWeightTarget' | 'swingGoodTolerance' | 'swingAdjustThreshold' | 'locked'>>,
 ): Partial<GolfBag> => ({
   ...(patch.name != null ? { name: normalizeBagName(patch.name) } : {}),
   ...(patch.clubIds != null ? { clubIds: validateBagClubIds(patch.clubIds) } : {}),
@@ -131,6 +131,7 @@ const createUpdatedBagRecord = (
   ...(patch.swingWeightTarget != null ? { swingWeightTarget: patch.swingWeightTarget } : {}),
   ...(patch.swingGoodTolerance != null ? { swingGoodTolerance: patch.swingGoodTolerance } : {}),
   ...(patch.swingAdjustThreshold != null ? { swingAdjustThreshold: patch.swingAdjustThreshold } : {}),
+  ...(patch.locked != null ? { locked: patch.locked } : {}),
   updatedAt: createTimestamp(),
 });
 
@@ -280,7 +281,7 @@ export class ClubService {
 
   static async updateBag(
     id: number,
-    patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData' | 'swingWeightTarget' | 'swingGoodTolerance' | 'swingAdjustThreshold'>>,
+    patch: Partial<Pick<GolfBag, 'name' | 'clubIds' | 'imageData' | 'swingWeightTarget' | 'swingGoodTolerance' | 'swingAdjustThreshold' | 'locked'>>,
   ): Promise<number> {
     return db.golfBags.update(id, createUpdatedBagRecord(patch));
   }

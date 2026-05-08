@@ -16,6 +16,7 @@ type GolfBagPanelProps = {
   onRenameActiveBag?: () => void;
   onDeleteActiveBag?: () => void;
   onShiftSelectedBagLeft?: () => void;
+  onToggleBagLock?: (bagId: number) => void;
   listScope?: ListScope;
   onChangeListScope?: (scope: ListScope) => void;
   showManagement?: boolean;
@@ -33,6 +34,7 @@ export const GolfBagPanel = ({
   onRenameActiveBag,
   onDeleteActiveBag,
   onShiftSelectedBagLeft,
+  onToggleBagLock,
   showManagement = true,
   showImage = true,
   compact = true,
@@ -40,6 +42,7 @@ export const GolfBagPanel = ({
 }: GolfBagPanelProps) => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const activeBag = bags.find((bag) => bag.id === activeBagId) ?? bags[0] ?? null;
+  const isLocked = activeBag?.locked ?? false;
   const activeImage = activeBag ? (activeBag.imageData?.[0] ?? '/images/GolfBag.png') : undefined;
   const tooltipText = description ?? 'ゴルフクラブを14本選んで、ゴルフバッグに入れて管理します。';
 
@@ -108,7 +111,27 @@ export const GolfBagPanel = ({
             })}
             {showManagement && (
               <>
-                {onCreateBag && (
+                <button
+                  type="button"
+                  className={`btn-icon btn-lock ${isLocked ? 'locked' : 'unlocked'}`}
+                  onClick={() => activeBag?.id != null && onToggleBagLock?.(activeBag.id)}
+                  title={isLocked ? 'ロック解除' : 'ロック'}
+                  aria-label={isLocked ? 'ロック解除' : 'ロック'}
+                  disabled={activeBag?.id == null || !onToggleBagLock}
+                >
+                  {isLocked ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="5" y="11" width="14" height="10" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="5" y="11" width="14" height="10" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                    </svg>
+                  )}
+                </button>
+                {!isLocked && onCreateBag && (
                   <button type="button" className="btn-icon btn-add" onClick={onCreateBag} title="バッグを追加">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -116,7 +139,7 @@ export const GolfBagPanel = ({
                     </svg>
                   </button>
                 )}
-                {activeBag && onRenameActiveBag && (
+                {!isLocked && activeBag && onRenameActiveBag && (
                   <button type="button" className="btn-icon btn-edit" onClick={onRenameActiveBag} title="バッグ名を変更">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -124,7 +147,7 @@ export const GolfBagPanel = ({
                     </svg>
                   </button>
                 )}
-                {activeBag && onShiftSelectedBagLeft && (
+                {!isLocked && activeBag && onShiftSelectedBagLeft && (
                   <button
                     type="button"
                     className="btn-icon btn-shift"
@@ -137,7 +160,7 @@ export const GolfBagPanel = ({
                     </svg>
                   </button>
                 )}
-                {activeBag && bags.length > 1 && onDeleteActiveBag && (
+                {!isLocked && activeBag && bags.length > 1 && onDeleteActiveBag && (
                   <button type="button" className="btn-icon btn-delete" onClick={handleDeleteClick} title="バッグを削除">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="3 6 5 6 21 6"></polyline>
@@ -157,7 +180,27 @@ export const GolfBagPanel = ({
             ) : null}
             {showManagement && (
               <div className="golf-bag-single-management">
-                {onCreateBag && (
+                <button
+                  type="button"
+                  className={`btn-icon btn-lock ${isLocked ? 'locked' : 'unlocked'}`}
+                  onClick={() => activeBag?.id != null && onToggleBagLock?.(activeBag.id)}
+                  title={isLocked ? 'ロック解除' : 'ロック'}
+                  aria-label={isLocked ? 'ロック解除' : 'ロック'}
+                  disabled={activeBag?.id == null || !onToggleBagLock}
+                >
+                  {isLocked ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="5" y="11" width="14" height="10" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="5" y="11" width="14" height="10" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                    </svg>
+                  )}
+                </button>
+                {!isLocked && onCreateBag && (
                   <button type="button" className="btn-icon btn-add" onClick={onCreateBag} title="バッグを追加">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -165,7 +208,7 @@ export const GolfBagPanel = ({
                     </svg>
                   </button>
                 )}
-                {activeBag && onRenameActiveBag && (
+                {!isLocked && activeBag && onRenameActiveBag && (
                   <button type="button" className="btn-icon btn-edit" onClick={onRenameActiveBag} title="バッグ名を変更">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -173,7 +216,7 @@ export const GolfBagPanel = ({
                     </svg>
                   </button>
                 )}
-                {activeBag && onShiftSelectedBagLeft && (
+                {!isLocked && activeBag && onShiftSelectedBagLeft && (
                   <button
                     type="button"
                     className="btn-icon btn-shift"
@@ -186,7 +229,7 @@ export const GolfBagPanel = ({
                     </svg>
                   </button>
                 )}
-                {activeBag && bags.length > 1 && onDeleteActiveBag && (
+                {!isLocked && activeBag && bags.length > 1 && onDeleteActiveBag && (
                   <button type="button" className="btn-icon btn-delete" onClick={handleDeleteClick} title="バッグを削除">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="3 6 5 6 21 6"></polyline>

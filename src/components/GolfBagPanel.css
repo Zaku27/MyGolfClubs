@@ -472,6 +472,39 @@
   color: #c2292a;
 }
 
+.btn-lock {
+  background-color: #fff8e1;
+  border-color: #ffe082;
+}
+
+.btn-lock.locked {
+  background-color: #fff8e1;
+  border-color: #ffe082;
+}
+
+.btn-lock.locked svg {
+  color: #f57c00;
+}
+
+.btn-lock.unlocked {
+  background-color: #f5f5f5;
+  border-color: #bdbdbd;
+}
+
+.btn-lock.unlocked svg {
+  color: #757575;
+}
+
+.btn-lock:hover {
+  background-color: #ffecb3;
+  border-color: #ffa000;
+  transform: translateY(-1px);
+}
+
+.btn-lock:hover svg {
+  color: #e65100;
+}
+
 .golf-bag-panel-actions {
   display: flex;
   flex-wrap: wrap;

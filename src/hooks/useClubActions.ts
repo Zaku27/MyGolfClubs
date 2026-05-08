@@ -18,6 +18,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     updateClub,
     deleteClub,
     toggleClubLock,
+    toggleBagLock,
     initializeDefaults,
     resetToDefaults,
     clearAllClubs,
@@ -275,6 +276,10 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     await toggleClubLock(clubItem.id);
   }, [toggleClubLock]);
 
+  const handleToggleBagLock = useCallback(async (bagId: number) => {
+    await toggleBagLock(bagId);
+  }, [toggleBagLock]);
+
   const handleAddBagImage = useCallback(async (bagId: number, imageData: string[]) => {
     await updateBagImage(bagId, imageData);
   }, [updateBagImage]);
@@ -329,6 +334,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     handleDeleteBag,
     handleToggleActiveBagMembership,
     handleToggleClubLock,
+    handleToggleBagLock,
     handleAddBagImage,
     setActiveBag,
     updateBagSwingSettings,

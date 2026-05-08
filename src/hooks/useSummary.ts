@@ -827,7 +827,7 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
       adjustments.push({
         priority: 'medium',
         title: 'SW-長さの傾斜最適化',
-        description: `現在のSW-長さの傾斜は「${slopeMessage}」です。理想的な傾斜（-0.8〜-1.2）に近づけることで、長いクラブと短いクラブの間で一貫したスイングフィールが得られます。`,
+        description: `現在のSW-長さの傾斜は「${slopeMessage}」です。理想的な傾斜（-0.8〜0）に近づけることで、長いクラブと短いクラブの間で一貫したスイングフィールが得られます。`,
         estimatedEffect: '長短クラブのフィール適正化',
       });
     }

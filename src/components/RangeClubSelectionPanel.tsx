@@ -64,7 +64,7 @@ export function RangeClubSelectionPanel({
                       simClub ? (
                         seatType === 'robot'
                           ? '100% (ロボット固定)'
-                          : (clubPersonal && effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
+                          : (effectiveSuccess !== null && effectiveSuccess !== undefined ? effectiveSuccess.toFixed(1) : '--') + '%'
                       ) : '--'
                     }
                   </span>

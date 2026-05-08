@@ -42,6 +42,7 @@ export interface GolfBag {
   swingGoodTolerance?: number;
   swingAdjustThreshold?: number;
   playerSkillLevel?: number; // バッグごとのプレイヤースキルレベル (0-1)
+  locked?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

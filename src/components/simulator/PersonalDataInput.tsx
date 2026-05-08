@@ -121,7 +121,7 @@ export function PersonalDataInput() {
   const [draftByClubId, setDraftByClubId] = useState<Record<string, DraftRow>>({});
   // 分析減点の寄与割合（重み）: 全クラブ共通
   const [analysisPenaltyWeight, setAnalysisPenaltyWeight] = useState(1.0);
-  const [activeMode, setActiveMode] = useState<'skill' | 'actual'>('actual');
+  const [activeMode, setActiveMode] = useState<'skill' | 'actual'>('skill');
   const [shotRows, setShotRows] = useState<ShotRecord[]>([]);
   const [shotSearchText, setShotSearchText] = useState('');
   const [shotLoadError, setShotLoadError] = useState<string | null>(null);
@@ -646,18 +646,6 @@ export function PersonalDataInput() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setActiveMode('actual')}
-            className={[
-              "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
-              activeMode === 'actual'
-                ? 'border-emerald-700 bg-emerald-700 text-white'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-            ].join(' ')}
-          >
-            実測データ読み込み
-          </button>
-          <button
-            type="button"
             onClick={() => setActiveMode('skill')}
             className={[
               "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
@@ -667,6 +655,18 @@ export function PersonalDataInput() {
             ].join(' ')}
           >
             分析ベースのパーソナルデータ
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMode('actual')}
+            className={[
+              "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+              activeMode === 'actual'
+                ? 'border-emerald-700 bg-emerald-700 text-white'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+            ].join(' ')}
+          >
+            実測データ読み込み
           </button>
         </div>
 
