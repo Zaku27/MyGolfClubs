@@ -47,11 +47,18 @@ export const useBagHandlers = (
     }
   }, [activeBag, clubActions]);
 
+  const handleCopyActiveBag = useCallback(async () => {
+    if (activeBag?.id != null) {
+      await clubActions.handleCopyBag(activeBag.id);
+    }
+  }, [activeBag, clubActions]);
+
   return {
     handleCreateBagConfirm,
     handleRenameActiveBag,
     handleRenameBagConfirm,
     handleDeleteActiveBag,
     handleShiftSelectedBagLeft,
+    handleCopyActiveBag,
   };
 };

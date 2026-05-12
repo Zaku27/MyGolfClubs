@@ -11,8 +11,8 @@ export const LoftLegend = () => (
   <div className="analysis-legend">
     <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
     <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
-    <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
-    <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
+    <span><i style={{ backgroundColor: '#00acc1' }} />ハイブリッド</span>
+    <span><i style={{ backgroundColor: '#0b8f5b' }} />アイアン</span>
     <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
     <span><i className="legend-estimated" />推定</span>
     <span><i className="legend-actual" />実測</span>
@@ -24,8 +24,8 @@ export const LieLegend = ({ lieGoodTolerance }: LieLegendProps) => (
   <div className="analysis-legend">
     <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
     <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
-    <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
-    <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
+    <span><i style={{ backgroundColor: '#00acc1' }} />ハイブリッド</span>
+    <span><i style={{ backgroundColor: '#0b8f5b' }} />アイアン</span>
     <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
     <span><i style={{ backgroundColor: '#424242' }} />パター</span>
     <span><i className="legend-good-range" />良好範囲 ±{lieGoodTolerance.toFixed(1)}°</span>
@@ -39,8 +39,8 @@ export const SwingLegend = ({ swingGoodTolerance, swingAdjustThreshold }: SwingL
   <div className="analysis-legend">
     <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
     <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
-    <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
-    <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
+    <span><i style={{ backgroundColor: '#00acc1' }} />ハイブリッド</span>
+    <span><i style={{ backgroundColor: '#0b8f5b' }} />アイアン</span>
     <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
     <span><i style={{ backgroundColor: '#fb8c00' }} />ややズレ</span>
     <span><i style={{ backgroundColor: '#c62828' }} />調整推奨</span>
@@ -83,8 +83,8 @@ export const LoftLengthLegend = () => (
   <div className="analysis-legend">
     <span><i style={{ backgroundColor: '#1976d2' }} />ドライバー</span>
     <span><i style={{ backgroundColor: '#0d47a1' }} />ウッド</span>
-    <span><i style={{ backgroundColor: '#26c6da' }} />ハイブリッド</span>
-    <span><i style={{ backgroundColor: '#2e8b57' }} />アイアン</span>
+    <span><i style={{ backgroundColor: '#00acc1' }} />ハイブリッド</span>
+    <span><i style={{ backgroundColor: '#0b8f5b' }} />アイアン</span>
     <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
     <span><i className="legend-standard-line" />クラブ種別ごとの標準スペックライン</span>
   </div>

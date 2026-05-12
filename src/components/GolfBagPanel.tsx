@@ -15,6 +15,7 @@ type GolfBagPanelProps = {
   onCreateBag?: () => void;
   onRenameActiveBag?: () => void;
   onDeleteActiveBag?: () => void;
+  onCopyActiveBag?: () => void;
   onShiftSelectedBagLeft?: () => void;
   onToggleBagLock?: (bagId: number) => void;
   listScope?: ListScope;
@@ -33,6 +34,7 @@ export const GolfBagPanel = ({
   onCreateBag,
   onRenameActiveBag,
   onDeleteActiveBag,
+  onCopyActiveBag,
   onShiftSelectedBagLeft,
   onToggleBagLock,
   showManagement = true,
@@ -160,6 +162,14 @@ export const GolfBagPanel = ({
                     </svg>
                   </button>
                 )}
+                {!isLocked && activeBag && onCopyActiveBag && (
+                  <button type="button" className="btn-icon btn-copy" onClick={onCopyActiveBag} title="バッグをコピー">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </button>
+                )}
                 {!isLocked && activeBag && bags.length > 1 && onDeleteActiveBag && (
                   <button type="button" className="btn-icon btn-delete" onClick={handleDeleteClick} title="バッグを削除">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -226,6 +236,14 @@ export const GolfBagPanel = ({
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                  </button>
+                )}
+                {!isLocked && activeBag && onCopyActiveBag && (
+                  <button type="button" className="btn-icon btn-copy" onClick={onCopyActiveBag} title="バッグをコピー">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                     </svg>
                   </button>
                 )}

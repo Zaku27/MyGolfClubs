@@ -369,8 +369,8 @@
 }
 
 .analysis-legend i.legend-light-outlier {
-  background: #ec407a;
-  border: 2px solid #ad1457;
+  background: #fb8c00;
+  border: 2px solid #e65100;
   box-sizing: border-box;
 }
 
@@ -396,8 +396,8 @@
 }
 
 .analysis-legend i.legend-flat-outlier {
-  background: #1565c0;
-  border: 2px solid #0d47a1;
+  background: #fb8c00;
+  border: 2px solid #e65100;
   box-sizing: border-box;
 }
 

@@ -10,6 +10,7 @@ export type AppMainContentProps = {
   // Bag management handlers that are defined in App.tsx
   onRenameActiveBag: () => void;
   onDeleteActiveBag: () => void;
+  onCopyActiveBag: () => void;
   onShiftSelectedBagLeft: () => void;
   onShiftSelectedAccessoryLeft: () => void;
   selectedAccessoryId: string | null;
@@ -19,6 +20,7 @@ export type AppMainContentProps = {
 export function AppMainContent({
   onRenameActiveBag,
   onDeleteActiveBag,
+  onCopyActiveBag,
   onShiftSelectedBagLeft,
   onShiftSelectedAccessoryLeft,
   selectedAccessoryId,
@@ -171,6 +173,7 @@ export function AppMainContent({
               onCreateBag={handleShowCreateBagDialog}
               onRenameActiveBag={onRenameActiveBag}
               onDeleteActiveBag={onDeleteActiveBag}
+              onCopyActiveBag={onCopyActiveBag}
               onShiftSelectedBagLeft={onShiftSelectedBagLeft}
               onToggleBagLock={handleToggleBagLock}
               listScope={clubListScope}

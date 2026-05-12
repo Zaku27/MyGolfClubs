@@ -17,7 +17,6 @@
   margin-bottom: 20px;
   padding: 18px;
   border-radius: 20px;
-  gap: 12px;
 }
 
 .golf-bag-panel.compact h2 {
@@ -89,7 +88,7 @@
   align-items: flex-start;
   justify-content: flex-start;
   padding: 0;
-  gap: 12px;
+  gap: 6px;
 }
 
 .golf-bag-panel-image-container {

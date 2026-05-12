@@ -70,20 +70,20 @@ export function SummaryTab({ data }: SummaryTabProps) {
             <p className="text-3xl font-bold">{currentSet.clubCount}<span className="text-lg font-normal text-muted-foreground">本</span></p>
           </div>
 
-          {/* ドライバー平均飛距離 */}
+          {/* ドライバー飛距離 */}
           <div className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <IconTarget className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">ドライバー平均</span>
+              <span className="text-sm text-muted-foreground">ドライバー飛距離</span>
             </div>
             <p className="text-3xl font-bold">{currentSet.avgDriverDistance}<span className="text-lg font-normal text-muted-foreground">yd</span></p>
           </div>
 
-          {/* 7I平均飛距離 */}
+          {/* 7I飛距離 */}
           <div className="bg-card/80 border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <IconTarget className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">7I平均飛距離</span>
+              <span className="text-sm text-muted-foreground">7I飛距離</span>
             </div>
             <p className="text-3xl font-bold">{currentSet.avg7IronDistance}<span className="text-lg font-normal text-muted-foreground">yd</span></p>
           </div>

@@ -637,8 +637,8 @@ export const getLieLengthPointStyle = (
 
   if (deviation <= -1.2) {
     return {
-      fill: '#1565c0',
-      stroke: '#0d47a1',
+      fill: '#fb8c00',
+      stroke: '#e65100',
       strokeWidth: 2.5,
       radius: 7,
     };
@@ -761,8 +761,8 @@ export const getWeightPointStyle = (
 
   if (deviationClass === 'lightOutlier') {
     return {
-      fill: '#1565c0',
-      stroke: '#0d47a1',
+      fill: '#fb8c00',
+      stroke: '#e65100',
       strokeWidth: 3,
       radius: 7,
     };

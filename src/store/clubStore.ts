@@ -32,6 +32,7 @@ type ClubStoreActions = {
   updateBagSwingSettings: (id: number, settings: { swingWeightTarget?: number; swingGoodTolerance?: number; swingAdjustThreshold?: number }) => Promise<void>;
   updateBagClubIds: (id: number, clubIds: number[]) => Promise<void>;
   deleteBag: (id: number) => Promise<void>;
+  copyBag: (id: number) => Promise<void>;
   setActiveBag: (id: number) => Promise<void>;
   moveBagLeft: (id: number) => Promise<void>;
   moveBagRight: (id: number) => Promise<void>;
@@ -356,6 +357,28 @@ export const useClubStore = create<ClubStore>((set, get) => ({
         ClubService.getActiveBagId(),
       ]);
       set({ bags, activeBagId: activeBagId ?? bags[0]?.id ?? null, error: null });
+    } catch (error) {
+      setStoreError(set, error);
+    }
+  },
+
+  copyBag: async (id) => {
+    set({ error: null });
+    try {
+      await ClubService.copyBag(id);
+      const [bags, newBagId] = await Promise.all([
+        ClubService.getAllBags(),
+        ClubService.getActiveBagId(),
+      ]);
+      // Set the newly created bag as active
+      const sortedBags = bags.slice().sort((left, right) => (left.createdAt ?? '').localeCompare(right.createdAt ?? ''));
+      const sourceIndex = sortedBags.findIndex((bag) => bag.id === id);
+      const newActiveBag = sortedBags[sourceIndex + 1]; // The copy is to the right of source
+      set({
+        bags,
+        activeBagId: newActiveBag?.id ?? newBagId ?? bags[0]?.id ?? null,
+        error: null,
+      });
     } catch (error) {
       setStoreError(set, error);
     }

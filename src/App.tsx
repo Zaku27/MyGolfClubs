@@ -91,6 +91,7 @@ function App() {
       <AppMainContent
         onRenameActiveBag={bagHandlers.handleRenameActiveBag}
         onDeleteActiveBag={bagHandlers.handleDeleteActiveBag}
+        onCopyActiveBag={bagHandlers.handleCopyActiveBag}
         onShiftSelectedBagLeft={bagHandlers.handleShiftSelectedBagLeft}
         onShiftSelectedAccessoryLeft={handleShiftSelectedAccessoryLeft}
         selectedAccessoryId={selectedAccessoryId}

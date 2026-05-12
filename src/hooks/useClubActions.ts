@@ -26,6 +26,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     createBag,
     renameBag,
     deleteBag,
+    copyBag,
     setActiveBag,
     toggleClubInActiveBag,
     updateBagImage,
@@ -260,6 +261,10 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     });
   }, [openConfirmDialog, deleteBag]);
 
+  const handleCopyBag = useCallback(async (bagId: number) => {
+    await copyBag(bagId);
+  }, [copyBag]);
+
   const handleToggleActiveBagMembership = useCallback(async (clubItem: GolfClub) => {
     if (typeof clubItem.id !== 'number') {
       return;
@@ -332,6 +337,7 @@ export const useClubActions = (uiState: UseUIStateReturn) => {
     handleCreateBag,
     handleRenameBag,
     handleDeleteBag,
+    handleCopyBag,
     handleToggleActiveBagMembership,
     handleToggleClubLock,
     handleToggleBagLock,

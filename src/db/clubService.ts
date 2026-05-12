@@ -311,6 +311,53 @@ export class ClubService {
     ]);
   }
 
+  static async copyBag(id: number): Promise<number> {
+    const sourceBag = await db.golfBags.get(id);
+    if (!sourceBag) {
+      throw new Error('対象のゴルフバッグが見つかりません');
+    }
+
+    const bags = await db.golfBags.toArray();
+    const sorted = bags.slice().sort((left, right) => (left.createdAt ?? '').localeCompare(right.createdAt ?? ''));
+    const sourceIndex = sorted.findIndex((bag) => bag.id === id);
+
+    // Calculate new createdAt to place copy right after source bag
+    const sourceCreatedAt = sourceBag.createdAt ?? createTimestamp();
+    const nextBag = sorted[sourceIndex + 1];
+    const nextCreatedAt = nextBag?.createdAt;
+
+    let newCreatedAt: string;
+    if (nextCreatedAt) {
+      // Place between source and next bag
+      const sourceTime = new Date(sourceCreatedAt).getTime();
+      const nextTime = new Date(nextCreatedAt).getTime();
+      const midTime = sourceTime + (nextTime - sourceTime) / 2;
+      newCreatedAt = new Date(midTime).toISOString();
+    } else {
+      // Source is last bag, add 1 second
+      const sourceTime = new Date(sourceCreatedAt).getTime();
+      newCreatedAt = new Date(sourceTime + 1000).toISOString();
+    }
+
+    const timestamp = createTimestamp();
+    const copyName = `${sourceBag.name}（コピー）`;
+
+    const newBag: GolfBag = {
+      name: copyName,
+      clubIds: sourceBag.clubIds ? [...sourceBag.clubIds] : [],
+      imageData: sourceBag.imageData ? [...sourceBag.imageData] : undefined,
+      swingWeightTarget: sourceBag.swingWeightTarget,
+      swingGoodTolerance: sourceBag.swingGoodTolerance,
+      swingAdjustThreshold: sourceBag.swingAdjustThreshold,
+      playerSkillLevel: sourceBag.playerSkillLevel,
+      locked: false, // Copy is not locked by default
+      createdAt: newCreatedAt,
+      updatedAt: timestamp,
+    };
+
+    return db.golfBags.add(newBag);
+  }
+
   static async deleteBag(id: number): Promise<void> {
     const bagCount = await db.golfBags.count();
     if (bagCount <= 1) {
