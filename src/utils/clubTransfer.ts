@@ -25,6 +25,10 @@ type ExportableBag = Omit<GolfBag, 'id' | 'createdAt' | 'updatedAt' | 'clubIds'>
   clubIds: string[]; // Use exportIds (strings) instead of database IDs (numbers)
 };
 
+type ImportableBag = Omit<GolfBag, 'id' | 'createdAt' | 'updatedAt'> & {
+  clubIds: Array<string | number>;
+};
+
 type ExportableAccessory = Omit<AccessoryItem, 'id' | 'createdAt'>;
 
 type CompleteDataExportPayload = {
@@ -70,6 +74,10 @@ const isExportableClubArray = (value: unknown): value is ExportableClub[] => {
   return Array.isArray(value);
 };
 
+const isImportableBagArray = (value: unknown): value is ImportableBag[] => {
+  return Array.isArray(value);
+};
+
 const parseTransferPayload = (value: unknown): ExportableClub[] => {
   if (Array.isArray(value)) {
     return value as ExportableClub[];
@@ -102,7 +110,7 @@ export const readClubsFromJsonFile = async (
 
 export const readCompleteDataFromJsonFile = async (
   file: File,
-): Promise<{ clubs: Omit<GolfClub, 'id'>[]; bags: Omit<GolfBag, 'id'>[]; accessories: Omit<AccessoryItem, 'id' | 'createdAt'>[] }> => {
+): Promise<{ clubs: Omit<GolfClub, 'id'>[]; bags: ImportableBag[]; accessories: Omit<AccessoryItem, 'id' | 'createdAt'>[] }> => {
   const text = await file.text();
   const parsed = JSON.parse(text);
 
@@ -116,7 +124,7 @@ export const readCompleteDataFromJsonFile = async (
     if (!isExportableClubArray(data.clubs)) {
       throw new Error('クラブ配列が見つかりません');
     }
-    if (!Array.isArray(data.bags)) {
+    if (!isImportableBagArray(data.bags)) {
       throw new Error('バッグ配列が見つかりません');
     }
     if (!Array.isArray(data.accessories)) {
