@@ -25,7 +25,7 @@ export function RangeClubSelectionPanel({
   simClub,
   estimatedClubDistance,
   seatType,
-  clubPersonal,
+
   effectiveSuccess,
 }: RangeClubSelectionPanelProps) {
   return (
