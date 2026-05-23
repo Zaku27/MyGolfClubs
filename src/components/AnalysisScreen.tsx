@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import type { GolfClub } from '../types/golf';
 import { AnalysisHeader, type AnalysisTab } from './AnalysisHeader';
 import { AnalysisLieChart } from './AnalysisLieChart';
@@ -61,6 +61,7 @@ import {
   formatSignedSwingWeight,
   getCategoryColor,
   getCategoryLabel,
+  getClubCategory,
   getLieLengthDeviationLabel,
   getLieLengthPointStyle,
   getSwingLengthDeviationLabel,
@@ -68,6 +69,9 @@ import {
   getTooltipPosition,
   getWeightDeviationLabel,
   getWeightPointStyle,
+  getWeightRegressionForGroup,
+  getWeightTrendMessage,
+  getExpectedWeight,
   isAnalysisClubVisible,
 } from '../utils/analysisUtils';
 import {
@@ -123,6 +127,22 @@ export const AnalysisScreen = ({
   onResetLieStandards,
 }: AnalysisScreenProps) => {
   const [activeTab, setActiveTab] = useState<AnalysisTab>('loftDistance');
+  const [weightTrendMode, setWeightTrendMode] = useState<'single' | 'split'>(() => {
+    try {
+      const stored = localStorage.getItem('weightTrendMode');
+      return stored === 'split' ? 'split' : 'single';
+    } catch (e) {
+      return 'single';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('weightTrendMode', weightTrendMode);
+    } catch (e) {
+      // ignore
+    }
+  }, [weightTrendMode]);
 
   // Get summary data from useSummary hook
   const summaryData = useSummary();
@@ -276,6 +296,97 @@ export const AnalysisScreen = ({
       mapWeightLengthX,
       mapWeightLengthY,
     );
+
+  const ironWedgeWeightTrend = buildWeightTrendPoints(
+    weightLengthClubs.some((club) => {
+      const category = getClubCategory(club);
+      return category === 'iron' || category === 'wedge';
+    }),
+    weightBounds,
+    getWeightRegressionForGroup(
+      weightLengthClubs.filter((club) => {
+        const category = getClubCategory(club);
+        return category === 'iron' || category === 'wedge';
+      }),
+    ),
+    WEIGHT_NORMAL_BAND_TOLERANCE,
+    mapWeightLengthX,
+    mapWeightLengthY,
+  );
+
+  const hybridWoodDriverWeightTrend = buildWeightTrendPoints(
+    weightLengthClubs.some((club) => {
+      const category = getClubCategory(club);
+      return category === 'hybrid' || category === 'wood' || category === 'driver';
+    }),
+    weightBounds,
+    getWeightRegressionForGroup(
+      weightLengthClubs.filter((club) => {
+        const category = getClubCategory(club);
+        return category === 'hybrid' || category === 'wood' || category === 'driver';
+      }),
+    ),
+    WEIGHT_NORMAL_BAND_TOLERANCE,
+    mapWeightLengthX,
+    mapWeightLengthY,
+  );
+
+  const ironWedgeWeightRegression = getWeightRegressionForGroup(
+    weightLengthClubs.filter((club) => {
+      const category = getClubCategory(club);
+      return category === 'iron' || category === 'wedge';
+    }),
+  );
+
+  const hybridWoodDriverWeightRegression = getWeightRegressionForGroup(
+    weightLengthClubs.filter((club) => {
+      const category = getClubCategory(club);
+      return category === 'hybrid' || category === 'wood' || category === 'driver';
+    }),
+  );
+
+  const chartWeightLengthClubs = weightLengthClubs.map((club) => {
+    const category = getClubCategory(club);
+    const groupRegression =
+      category === 'iron' || category === 'wedge'
+        ? ironWedgeWeightRegression
+        : category === 'hybrid' || category === 'wood' || category === 'driver'
+        ? hybridWoodDriverWeightRegression
+        : weightRegression;
+
+    const splitExpectedWeight = getExpectedWeight(club.length, groupRegression);
+    const splitDeviation = club.weight - splitExpectedWeight;
+    const splitWeightTrendMessage = getWeightTrendMessage(splitDeviation);
+
+    return {
+      ...club,
+      category,
+      splitExpectedWeight,
+      splitDeviation,
+      splitWeightTrendMessage,
+    };
+  });
+
+  const tableWeightLengthClubs = weightLengthTableClubs.map((club) => {
+    const weightClub = club as any;
+    const groupRegression =
+      weightClub.category === 'iron' || weightClub.category === 'wedge'
+        ? ironWedgeWeightRegression
+        : weightClub.category === 'hybrid' || weightClub.category === 'wood' || weightClub.category === 'driver'
+        ? hybridWoodDriverWeightRegression
+        : weightRegression;
+
+    const splitExpectedWeight = getExpectedWeight(weightClub.length, groupRegression);
+    const splitDeviation = weightClub.weight - splitExpectedWeight;
+    const splitWeightTrendMessage = getWeightTrendMessage(splitDeviation);
+
+    return {
+      ...weightClub,
+      splitExpectedWeight,
+      splitDeviation,
+      splitWeightTrendMessage,
+    };
+  });
 
   const { mapX: mapLieLengthX, mapY: mapLieLengthY } = createWeightChartMappers(
     lieLengthChartSize,
@@ -434,7 +545,12 @@ export const AnalysisScreen = ({
       lengthTicks={lengthTicks}
       mapWeightLengthX={mapWeightLengthX}
       weightTrendLinePoints={weightTrendLinePoints}
-      weightLengthClubs={weightLengthClubs}
+      weightTrendLinePointsPrimary={ironWedgeWeightTrend.linePoints}
+      weightTrendLinePointsSecondary={hybridWoodDriverWeightTrend.linePoints}
+      weightTrendBandPointsPrimary={ironWedgeWeightTrend.bandPoints}
+      weightTrendBandPointsSecondary={hybridWoodDriverWeightTrend.bandPoints}
+      weightTrendMode={weightTrendMode}
+      weightLengthClubs={chartWeightLengthClubs}
       getWeightPointStyle={getWeightPointStyle}
       setWeightTooltip={setWeightTooltip}
       weightTooltip={weightTooltip}
@@ -482,6 +598,8 @@ export const AnalysisScreen = ({
         showLieSettings={showLieSettings}
         onToggleLieSettings={() => setShowLieSettings((prev) => !prev)}
         onBack={onBack}
+        weightTrendMode={weightTrendMode}
+        onSetWeightTrendMode={setWeightTrendMode}
       />
 
       {activeTab === 'loftDistance' ? (
@@ -565,7 +683,8 @@ export const AnalysisScreen = ({
           </div>
           <AnalysisWeightTable
             hasAnyWeightLengthData={hasAnyWeightLengthData}
-            weightLengthTableClubs={weightLengthTableClubs}
+            weightLengthTableClubs={tableWeightLengthClubs}
+            weightTrendMode={weightTrendMode}
             hiddenClubKeySet={hiddenClubKeySet}
             onSetAnalysisClubVisible={onSetAnalysisClubVisible}
           />

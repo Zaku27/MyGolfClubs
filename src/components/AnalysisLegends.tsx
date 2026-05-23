@@ -60,8 +60,31 @@ export const WeightLegend = () => (
     <span><i style={{ backgroundColor: '#9acd32' }} />ウェッジ</span>
     <span><i className="legend-heavy-outlier" />重い</span>
     <span><i className="legend-light-outlier" />軽い</span>
-    <span><i className="legend-trend-line" />トレンド線</span>
-    <span><i className="legend-expected-band" />期待帯 ±12g</span>
+    <span><i className="legend-trend-line" />全体トレンド線</span>
+    <span>
+      <i
+        style={{
+          width: 18,
+          height: 2,
+          backgroundColor: '#1565c0',
+          borderRadius: 2,
+        }}
+      />
+      アイアン・ウェッジ線
+    </span>
+    <span>
+      <i
+        style={{
+          width: 18,
+          height: 2,
+          backgroundColor: '#2e7d32',
+          borderRadius: 2,
+        }}
+      />
+      ハイブリッド・ウッド・ドライバー線
+    </span>
+    <span><i className="legend-expected-band" />アイアン・ウェッジ 期待帯 ±12g</span>
+    <span><i className="legend-expected-band-secondary" />ハイブリッド・ウッド・ドライバー 期待帯 ±12g</span>
   </div>
 );
 

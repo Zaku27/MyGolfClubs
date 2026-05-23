@@ -4,7 +4,11 @@ import { WeightLegend } from './AnalysisLegends';
 import type { WeightTooltipState } from './analysisTypes';
 import type { ClubCategory } from '../utils/analysisUtils';
 
-type WeightChartClub = WeightTooltipState['club'];
+type WeightChartClub = WeightTooltipState['club'] & {
+  splitExpectedWeight?: number;
+  splitDeviation?: number;
+  splitWeightTrendMessage?: string;
+};
 
 type AnalysisWeightChartProps = {
   hasAnyWeightLengthData: boolean;
@@ -17,6 +21,11 @@ type AnalysisWeightChartProps = {
   lengthTicks: number[];
   mapWeightLengthX: (value: number) => number;
   weightTrendLinePoints: string | null;
+  weightTrendLinePointsPrimary?: string;
+  weightTrendLinePointsSecondary?: string;
+  weightTrendBandPointsPrimary?: string;
+  weightTrendBandPointsSecondary?: string;
+  weightTrendMode: 'single' | 'split';
   weightLengthClubs: WeightChartClub[];
   getWeightPointStyle: (club: WeightChartClub, deviation: number) => {
     radius: number;
@@ -50,6 +59,11 @@ export const AnalysisWeightChart: React.FC<AnalysisWeightChartProps> = ({
   lengthTicks,
   mapWeightLengthX,
   weightTrendLinePoints,
+  weightTrendLinePointsPrimary,
+  weightTrendLinePointsSecondary,
+  weightTrendBandPointsPrimary,
+  weightTrendBandPointsSecondary,
+  weightTrendMode,
   weightLengthClubs,
   getWeightPointStyle,
   setWeightTooltip,
@@ -136,7 +150,7 @@ export const AnalysisWeightChart: React.FC<AnalysisWeightChartProps> = ({
                   </g>
                 ))}
 
-                {weightTrendLinePoints && (
+                {weightTrendMode === 'single' && weightTrendLinePoints && (
                   <polyline
                     points={weightTrendLinePoints}
                     fill="none"
@@ -145,9 +159,44 @@ export const AnalysisWeightChart: React.FC<AnalysisWeightChartProps> = ({
                     className="chart-standard-line"
                   />
                 )}
+                {weightTrendMode === 'split' && (
+                  <>
+                    {weightTrendBandPointsPrimary && (
+                      <polygon points={weightTrendBandPointsPrimary} className="weight-trend-band" />
+                    )}
+                    {weightTrendBandPointsSecondary && (
+                      <polygon points={weightTrendBandPointsSecondary} className="weight-trend-band weight-trend-band-secondary" />
+                    )}
+                    {weightTrendLinePointsPrimary && (
+                      <polyline
+                        points={weightTrendLinePointsPrimary}
+                        fill="none"
+                        stroke="#1565c0"
+                        strokeWidth="2"
+                        className="chart-standard-line"
+                      />
+                    )}
+                    {weightTrendLinePointsSecondary && (
+                      <polyline
+                        points={weightTrendLinePointsSecondary}
+                        fill="none"
+                        stroke="#2e7d32"
+                        strokeWidth="2"
+                        className="chart-standard-line"
+                      />
+                    )}
+                  </>
+                )}
 
                 {weightLengthClubs.map((club, index) => {
-                  const style = getWeightPointStyle(club, club.deviation);
+                  const displayDeviation =
+                    weightTrendMode === 'split' ? club.splitDeviation ?? club.deviation : club.deviation;
+                  const style = getWeightPointStyle(club, displayDeviation);
+                  const displayExpectedWeight =
+                    weightTrendMode === 'split'
+                      ? club.splitExpectedWeight ?? club.expectedWeight
+                      : club.expectedWeight;
+
                   return (
                     <g
                       key={`wl-${getAnalysisClubKey(club)}`}
@@ -181,8 +230,8 @@ export const AnalysisWeightChart: React.FC<AnalysisWeightChartProps> = ({
                           club.category
                         )} | 長さ ${club.length.toFixed(2)} in | 重量 ${club.weight.toFixed(
                           1
-                        )} g | 期待 ${club.expectedWeight.toFixed(1)} g | 偏差 ${formatSignedGrams(
-                          club.deviation
+                        )} g | 期待 ${displayExpectedWeight.toFixed(1)} g | 偏差 ${formatSignedGrams(
+                          displayDeviation
                         )}`}</title>
                       </circle>
                     </g>
@@ -208,52 +257,70 @@ export const AnalysisWeightChart: React.FC<AnalysisWeightChartProps> = ({
                 </text>
               </svg>
               {weightTooltip && (
-                <div
-                  ref={weightTooltipRef}
-                  className="chart-tooltip"
-                  style={{
-                    left: weightTooltipPos?.left,
-                    top: weightTooltipPos?.top,
-                  }}
-                >
-                  <div className="chart-tooltip-title">{weightTooltip.club.name}</div>
-                  <div className="chart-tooltip-list">
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">クラブ種別</span>
-                      <span className="chart-tooltip-value">
-                        {getClubTypeDisplay(weightTooltip.club.clubType, weightTooltip.club.number)}
-                      </span>
+                (() => {
+                  const tooltipClub = weightTooltip.club as WeightChartClub;
+                  const displayExpectedWeight =
+                    weightTrendMode === 'split'
+                      ? tooltipClub.splitExpectedWeight ?? tooltipClub.expectedWeight
+                      : tooltipClub.expectedWeight;
+                  const displayDeviation =
+                    weightTrendMode === 'split'
+                      ? tooltipClub.splitDeviation ?? tooltipClub.deviation
+                      : tooltipClub.deviation;
+                  const displayWeightTrendMessage =
+                    weightTrendMode === 'split'
+                      ? tooltipClub.splitWeightTrendMessage ?? tooltipClub.weightTrendMessage
+                      : tooltipClub.weightTrendMessage;
+
+                  return (
+                    <div
+                      ref={weightTooltipRef}
+                      className="chart-tooltip"
+                      style={{
+                        left: weightTooltipPos?.left,
+                        top: weightTooltipPos?.top,
+                      }}
+                    >
+                      <div className="chart-tooltip-title">{weightTooltip.club.name}</div>
+                      <div className="chart-tooltip-list">
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">クラブ種別</span>
+                          <span className="chart-tooltip-value">
+                            {getClubTypeDisplay(weightTooltip.club.clubType, weightTooltip.club.number)}
+                          </span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">長さ</span>
+                          <span className="chart-tooltip-value">
+                            {weightTooltip.club.length.toFixed(2)} in
+                          </span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">重量</span>
+                          <span className="chart-tooltip-value">{weightTooltip.club.weight.toFixed(1)} g</span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">期待値</span>
+                          <span className="chart-tooltip-value">
+                            {displayExpectedWeight.toFixed(1)} g
+                          </span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">偏差</span>
+                          <span className="chart-tooltip-value">
+                            {getWeightDeviationLabel(displayDeviation)}
+                          </span>
+                        </div>
+                        <div className="chart-tooltip-row">
+                          <span className="chart-tooltip-label">示唆</span>
+                          <span className="chart-tooltip-value">
+                            {displayWeightTrendMessage}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">長さ</span>
-                      <span className="chart-tooltip-value">
-                        {weightTooltip.club.length.toFixed(2)} in
-                      </span>
-                    </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">重量</span>
-                      <span className="chart-tooltip-value">{weightTooltip.club.weight.toFixed(1)} g</span>
-                    </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">期待値</span>
-                      <span className="chart-tooltip-value">
-                        {weightTooltip.club.expectedWeight.toFixed(1)} g
-                      </span>
-                    </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">偏差</span>
-                      <span className="chart-tooltip-value">
-                        {getWeightDeviationLabel(weightTooltip.club.deviation)}
-                      </span>
-                    </div>
-                    <div className="chart-tooltip-row">
-                      <span className="chart-tooltip-label">示唆</span>
-                      <span className="chart-tooltip-value">
-                        {weightTooltip.club.weightTrendMessage}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()
               )}
             </div>
           ) : (

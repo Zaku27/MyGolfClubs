@@ -67,6 +67,21 @@
   flex-wrap: wrap;
 }
 
+.analysis-toggle-group {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.analysis-toggle-btn {
+  padding: 8px 12px;
+}
+
+.analysis-toggle-btn.active {
+  background-color: #18794e;
+  color: #ffffff;
+  border-color: #18794e;
+}
+
 .headspeed-control {
   display: grid;
   gap: 6px;
@@ -389,6 +404,14 @@
   border-radius: 2px;
 }
 
+.analysis-legend i.legend-expected-band-secondary {
+  width: 18px;
+  height: 8px;
+  background: rgba(220, 100, 60, 0.16);
+  border: 1px solid rgba(180, 80, 40, 0.22);
+  border-radius: 2px;
+}
+
 .analysis-legend i.legend-upright-outlier {
   background: #c62828;
   border: 2px solid #7f0000;
@@ -536,6 +559,11 @@
 
 .weight-trend-band {
   fill: rgba(70, 99, 130, 0.12);
+  stroke: none;
+}
+
+.weight-trend-band-secondary {
+  fill: rgba(220, 100, 60, 0.16);
   stroke: none;
 }
 

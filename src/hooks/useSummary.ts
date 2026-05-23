@@ -4,7 +4,7 @@ import type { SummaryData, Recommendation, Adjustment, ProposedSpec, WeightLengt
 import type { GolfClub } from '../types/golf';
 import { buildSwingLengthAnalysis, buildWeightLengthAnalysis } from '../utils/analysisBuilders';
 import { readStoredNumber } from '../utils/storage';
-import { computeGapsAndRecommendations, evaluateSwingLengthSlope, getSwingLengthSlopeMessage, swingWeightToNumeric, estimateHeadSpeedFromClubs, checkFlexCompatibility, getEstimatedDistance, getClubCategory } from '../utils/analysisUtils';
+import { computeGapsAndRecommendations, evaluateSwingLengthSlope, getSwingLengthSlopeMessage, swingWeightToNumeric, estimateHeadSpeedFromClubs, checkFlexCompatibility, getEstimatedDistance, getClubCategory, getWeightRegressionForGroup, getExpectedWeight } from '../utils/analysisUtils';
 import { getClubTypeDisplay } from '../utils/clubUtils';
 
 // Map internal club types to summary category types
@@ -1043,17 +1043,64 @@ export function useSummary(options: UseSummaryOptions = {}): SummaryData {
 
     // Generate weight/length analysis suggestions
     const { tableClubs: weightLengthTable } = buildWeightLengthAnalysis(bagClubs, () => true);
+
+    // Determine if user has enabled split-mode trend (persisted in localStorage)
+    const storedWeightTrendMode = (() => {
+      try {
+        const v = window.localStorage.getItem('weightTrendMode');
+        return v === 'split' ? 'split' : 'single';
+      } catch {
+        return 'single';
+      }
+    })();
+
+    let adjustedWeightLengthTable = weightLengthTable;
+
+    if (storedWeightTrendMode === 'split') {
+      // Build group regressions and recalc expected/deviation per group
+      const ironWedgeClubs = bagClubs
+        .filter((c) => {
+          const cat = getClubCategory(c);
+          return cat === 'iron' || cat === 'wedge';
+        })
+        .map((c) => ({ length: c.length, weight: c.weight }));
+
+      const hybridWoodDriverClubs = bagClubs
+        .filter((c) => {
+          const cat = getClubCategory(c);
+          return cat === 'hybrid' || cat === 'wood' || cat === 'driver';
+        })
+        .map((c) => ({ length: c.length, weight: c.weight }));
+
+      const ironWedgeRegression = getWeightRegressionForGroup(ironWedgeClubs);
+      const hybridWoodDriverRegression = getWeightRegressionForGroup(hybridWoodDriverClubs);
+
+      adjustedWeightLengthTable = weightLengthTable.map((club) => {
+        const category = getClubCategory(club as GolfClub);
+        if (category === 'iron' || category === 'wedge') {
+          const se = getExpectedWeight(club.length, ironWedgeRegression);
+          const sd = club.weight - se;
+          return { ...club, expectedWeight: se, deviation: sd };
+        }
+        if (category === 'hybrid' || category === 'wood' || category === 'driver') {
+          const se = getExpectedWeight(club.length, hybridWoodDriverRegression);
+          const sd = club.weight - se;
+          return { ...club, expectedWeight: se, deviation: sd };
+        }
+        return club;
+      });
+    }
     const weightLengthSuggestions: WeightLengthSuggestion[] = [];
 
     // Calculate overall set weight trend (average deviation)
-    const avgDeviation = weightLengthTable.length > 0
-      ? weightLengthTable.reduce((sum, club) => sum + club.deviation, 0) / weightLengthTable.length
+    const avgDeviation = adjustedWeightLengthTable.length > 0
+      ? adjustedWeightLengthTable.reduce((sum, club) => sum + club.deviation, 0) / adjustedWeightLengthTable.length
       : 0;
     const isSetGenerallyLight = avgDeviation < -5;  // Average deviation less than -5g
     const isSetGenerallyHeavy = avgDeviation > 5; // Average deviation more than 5g
 
     // Find clubs with significant weight deviations from trend
-    const weightOutliers = weightLengthTable.filter((club) => {
+    const weightOutliers = adjustedWeightLengthTable.filter((club) => {
       const absDeviation = Math.abs(club.deviation);
       return absDeviation > 12; // More than 12g deviation from trend
     });

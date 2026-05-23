@@ -8,11 +8,15 @@ type WeightTableClub = GolfClub & {
   category: ClubCategory;
   expectedWeight: number;
   deviation: number;
+  splitExpectedWeight?: number;
+  splitDeviation?: number;
+  splitWeightTrendMessage?: string;
 };
 
 type AnalysisWeightTableProps = {
   hasAnyWeightLengthData: boolean;
   weightLengthTableClubs: WeightTableClub[];
+  weightTrendMode: 'single' | 'split';
   hiddenClubKeySet: Set<string>;
   onSetAnalysisClubVisible: (clubKey: string, visible: boolean) => void;
 };
@@ -20,6 +24,7 @@ type AnalysisWeightTableProps = {
 export const AnalysisWeightTable = ({
   hasAnyWeightLengthData,
   weightLengthTableClubs,
+  weightTrendMode,
   hiddenClubKeySet,
   onSetAnalysisClubVisible,
 }: AnalysisWeightTableProps) => (
@@ -43,25 +48,36 @@ export const AnalysisWeightTable = ({
         </thead>
         <tbody>
           {hasAnyWeightLengthData ? (
-            weightLengthTableClubs.map((club) => (
-              <tr key={`wl-row-${getAnalysisClubKey(club)}`}>
-                <AnalysisSelectionCell
-                  club={club}
-                  hiddenClubKeySet={hiddenClubKeySet}
-                  onSetAnalysisClubVisible={onSetAnalysisClubVisible}
-                />
-                <td>
-                  <ClubDisplayName clubType={club.clubType} number={club.number} name={club.name} />
-                </td>
-                <td>{getCategoryLabel(club.category)}</td>
-                <td>{club.length.toFixed(2)}</td>
-                <td>{club.weight.toFixed(1)}</td>
-                <td>{club.expectedWeight.toFixed(1)}</td>
-                <td style={{ color: getWeightPointStyle(club, club.deviation).fill, fontWeight: 700 }}>
-                  {formatSignedGrams(club.deviation)}
-                </td>
-              </tr>
-            ))
+            weightLengthTableClubs.map((club) => {
+              const displayExpectedWeight =
+                weightTrendMode === 'split' && club.splitExpectedWeight != null
+                  ? club.splitExpectedWeight
+                  : club.expectedWeight;
+              const displayDeviation =
+                weightTrendMode === 'split' && club.splitDeviation != null
+                  ? club.splitDeviation
+                  : club.deviation;
+
+              return (
+                <tr key={`wl-row-${getAnalysisClubKey(club)}`}>
+                  <AnalysisSelectionCell
+                    club={club}
+                    hiddenClubKeySet={hiddenClubKeySet}
+                    onSetAnalysisClubVisible={onSetAnalysisClubVisible}
+                  />
+                  <td>
+                    <ClubDisplayName clubType={club.clubType} number={club.number} name={club.name} />
+                  </td>
+                  <td>{getCategoryLabel(club.category)}</td>
+                  <td>{club.length.toFixed(2)}</td>
+                  <td>{club.weight.toFixed(1)}</td>
+                  <td>{displayExpectedWeight.toFixed(1)}</td>
+                  <td style={{ color: getWeightPointStyle(club, displayDeviation).fill, fontWeight: 700 }}>
+                    {formatSignedGrams(displayDeviation)}
+                  </td>
+                </tr>
+              );
+            })
           ) : (
             <tr>
               <td colSpan={7} className="analysis-empty-cell">クラブがまだ追加されていません</td>

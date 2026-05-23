@@ -474,6 +474,18 @@ export const getWeightRegression = (
   };
 };
 
+export const getWeightRegressionForGroup = (
+  clubs: Pick<GolfClub, 'length' | 'weight'>[],
+): WeightRegression => {
+  if (clubs.length === 0) {
+    return { slope: 0, intercept: 0 };
+  }
+  if (clubs.length === 1) {
+    return { slope: 0, intercept: clubs[0].weight };
+  }
+  return getWeightRegression(clubs);
+};
+
 export const getExpectedWeight = (length: number, regression: WeightRegression) =>
   regression.slope * length + regression.intercept;
 

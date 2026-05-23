@@ -54,6 +54,8 @@ type AnalysisHeaderProps = {
   showLieSettings: boolean;
   onToggleLieSettings: () => void;
   onBack: () => void;
+  weightTrendMode?: 'single' | 'split';
+  onSetWeightTrendMode?: (mode: 'single' | 'split') => void;
 };
 
 export const AnalysisHeader = ({
@@ -62,6 +64,8 @@ export const AnalysisHeader = ({
   showLieSettings,
   onToggleLieSettings,
   onBack,
+  weightTrendMode = 'single',
+  onSetWeightTrendMode,
 }: AnalysisHeaderProps) => (
   <div className="analysis-header">
     <div>
@@ -84,6 +88,24 @@ export const AnalysisHeader = ({
       </div>
     </div>
     <div className="analysis-controls">
+      {activeTab === 'weightLength' && onSetWeightTrendMode ? (
+        <div className="analysis-toggle-group">
+          <button
+            className={`btn-secondary analysis-toggle-btn ${weightTrendMode === 'single' ? 'active' : ''}`}
+            type="button"
+            onClick={() => onSetWeightTrendMode('single')}
+          >
+            全体トレンド
+          </button>
+          <button
+            className={`btn-secondary analysis-toggle-btn ${weightTrendMode === 'split' ? 'active' : ''}`}
+            type="button"
+            onClick={() => onSetWeightTrendMode('split')}
+          >
+            種別別 2本
+          </button>
+        </div>
+      ) : null}
       {activeTab === 'lieAngle' && (
         <button className="btn-secondary" onClick={onToggleLieSettings}>
           {showLieSettings ? '基準値設定を閉じる' : '基準値設定を開く'}
